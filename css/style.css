@@ -79,7 +79,12 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
   border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgba(60,48,20,.16);padding:6px 14px 14px;
   max-height:52%;overflow:auto;transform:translateY(110%);transition:transform .18s ease;z-index:5}
 .sheet.open{transform:none}
-.sheet-grip{width:40px;height:4px;background:var(--rule);border-radius:2px;margin:4px auto 10px}
+.sheet-grip{width:44px;height:5px;background:var(--rule);border-radius:3px;margin:4px auto 10px;cursor:pointer}
+.sheet-grip::before{content:"";position:absolute;left:0;right:0;top:0;height:26px}
+.sheet-close{position:absolute;top:6px;right:8px;width:32px;height:32px;border:0;background:none;
+  font-size:18px;line-height:1;color:var(--ink-soft);cursor:pointer;border-radius:8px;z-index:2}
+.sheet-close:active{background:var(--paper-2)}
+.sheet.locked .sheet-close,.sheet.locked .sheet-grip{display:none}
 .sheet h3{font-family:var(--serif);margin:0 0 2px;font-size:17px}
 .sheet .sub{font-size:12px;color:var(--ink-soft);margin:0 0 10px}
 .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
@@ -95,6 +100,7 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
 .overlay.show{display:flex}
 .modal{background:var(--paper);width:min(680px,100%);max-height:88%;display:flex;flex-direction:column;
   border-radius:14px 14px 0 0;overflow:hidden}
+.overlay.wide .modal{width:min(920px,100%)}
 .modal header{display:flex;align-items:center;padding:8px 8px 8px 16px;border-bottom:1px solid var(--rule)}
 .modal h3{flex:1;margin:0;font-family:var(--serif);font-size:19px}
 #ov-body{overflow:auto;padding:14px 16px calc(20px + var(--safe-b))}
@@ -119,8 +125,45 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
 .tech.owned{background:#dfe7cf;border-color:#9fb37a}
 .tech.avail{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red-soft)}
 .tech.locked{opacity:.4;cursor:default}
+.owner-marks{display:flex;gap:3px;margin-top:5px;flex-wrap:wrap;align-items:center}
+.owner-mark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+  font-size:11px;line-height:1;border-radius:50%;background:rgba(255,255,255,.55)}
+.owner-mark.self{outline:2px solid var(--ink);outline-offset:1px;font-weight:700;background:#fff}
 .age-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--ink-soft);margin:10px 0 4px;grid-column:1/-1;border-top:1px solid var(--rule);padding-top:6px}
+
+/* Technologiebogen mit Ertragsübersicht: nebeneinander ab breitem Schirm, sonst gestapelt */
+.tech-layout{display:flex;gap:14px;align-items:flex-start}
+.tech-main{flex:1;min-width:0}
+.tech-aside{flex:0 0 190px;position:sticky;top:0}
+@media (max-width:719px){
+  .tech-layout{flex-direction:column;gap:10px}
+  .tech-aside{flex:none;width:100%;position:static}
+}
+.yield-panel{background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:8px 10px}
+.yhead{margin:0 0 6px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.yrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;font-size:12px}
+.yrow+.yrow{border-top:1px solid rgba(201,187,152,.4)}
+.yl{display:flex;align-items:center;gap:6px;min-width:0}
+.ydot{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.yname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ycount{color:var(--ink-soft);font-family:var(--mono);font-size:11px}
+.yvals{display:flex;gap:7px;flex:0 0 auto;font-family:var(--mono)}
+.yv{display:inline-flex;align-items:center;gap:1px;min-width:20px;justify-content:flex-end}
+.yv .yi{font-size:9px;opacity:.7}
+.yv.zero{color:var(--rule);min-width:20px;justify-content:center}
+.yrow.pop{margin-top:2px}
+.yrow.sum{border-top:1.5px solid var(--rule);margin-top:3px;font-weight:700}
+.yrow.sum .yname{font-weight:700}
+/* auf schmalem Schirm die Übersicht als horizontale Leiste */
+@media (max-width:719px){
+  .yield-panel{display:flex;gap:8px;overflow-x:auto;padding:8px;-webkit-overflow-scrolling:touch}
+  .yhead{display:none}
+  .yrow{flex-direction:column;align-items:flex-start;gap:2px;padding:0 4px;border:0;min-width:74px}
+  .yrow+.yrow{border-top:0;border-left:1px solid rgba(201,187,152,.5);padding-left:8px}
+  .yvals{gap:5px}
+}
 
 /* Editor */
 #ed-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:none}
