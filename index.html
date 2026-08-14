@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hochzeivilization</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#e4dbbe">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Hochzeiv.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------------ Menü -->
+<section id="screen-menu" class="screen show">
+  <div class="menu-wrap">
+    <p class="eyebrow">für 1–4 Spieler*innen</p>
+    <h1 class="title">Hochzeivilization</h1>
+    <p class="lede">Ne Runde Civilization? Auf dem Tablet, ohne Bleistift und Radiergummi.</p>
+    <div class="menu-actions">
+      <button class="btn primary" id="m-new">Neues Spiel</button>
+      <button class="btn" id="m-continue" hidden>Spiel fortsetzen</button>
+      <button class="btn" id="m-editor">Karte bearbeiten</button>
+      <button class="btn ghost" id="m-rules">Regeln &amp; Technologien</button>
+      <button class="btn ghost" id="m-load">Spielstand laden</button>
+    </div>
+    <p class="foot">Offline spielbar · zum Home-Bildschirm hinzufügen</p>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ Aufbau -->
+<section id="screen-setup" class="screen">
+  <header class="bar">
+    <button class="icon-btn" data-back>‹</button>
+    <h2>Aufbau</h2>
+  </header>
+  <div class="pad">
+    <p class="hint">Wer zuletzt ein Weltwunder gebaut hat, beginnt. Ansonsten: die erste
+      menschliche Zivilisation in der Liste.</p>
+    <div id="setup-list"></div>
+    <label class="row"><span>Karte</span>
+      <select id="setup-map"></select></label>
+    <label class="row"><span>Regeln</span>
+      <select id="setup-rules"></select></label>
+    <label class="row"><span>Startspieler*in</span>
+      <select id="setup-start"></select></label>
+    <button class="btn primary wide" id="setup-go">Spiel beginnen</button>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ Spiel -->
+<section id="screen-game" class="screen">
+  <header class="hud">
+    <button class="icon-btn" id="g-menu">☰</button>
+    <div class="hud-civ"><span id="hud-sym" class="civ-chip"></span>
+      <div><strong id="hud-name">—</strong><small id="hud-round">Runde 1</small></div></div>
+    <div class="hud-res">
+      <span class="res sci" title="Wissenschaft">🔬<b id="hud-sci">0</b></span>
+      <span class="res food" title="Nahrung">🌾<b id="hud-food">0</b></span>
+      <span class="res coin" title="Münzen">🪙<b id="hud-coins">0</b></span>
+      <span class="res pow" title="Macht">⚔︎<b id="hud-power">0</b></span>
+    </div>
+  </header>
+
+  <div id="map-host"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+  <div id="sheet" class="sheet">
+    <div class="sheet-grip"></div>
+    <div id="sheet-body"></div>
+  </div>
+
+  <nav class="actionbar">
+    <button class="btn small" id="a-tech">Forschen</button>
+    <button class="btn small" id="a-power">Macht</button>
+    <button class="btn small" id="a-army">Armeen</button>
+    <button class="btn small" id="a-log">Protokoll</button>
+    <button class="btn small primary" id="a-end">Zug beenden</button>
+  </nav>
+</section>
+
+<!-- ------------------------------------------------------------------ Karteneditor -->
+<section id="screen-editor" class="screen">
+  <header class="bar">
+    <button class="icon-btn" data-back>‹</button>
+    <h2>Karte bearbeiten</h2>
+    <button class="icon-btn" id="ed-save">✓</button>
+  </header>
+  <div id="ed-host"><svg id="ed-map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="palette" id="ed-palette"></div>
+  <div class="ed-tools">
+    <button class="btn small" id="ed-size">Größe</button>
+    <button class="btn small" id="ed-export">Exportieren</button>
+    <button class="btn small" id="ed-import">Importieren</button>
+    <button class="btn small" id="ed-reset">Zurücksetzen</button>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ Overlay -->
+<div id="overlay" class="overlay"><div class="modal"><header><h3 id="ov-title"></h3>
+  <button class="icon-btn" id="ov-close">✕</button></header><div id="ov-body"></div></div></div>
+<div id="toast" class="toast"></div>
+
+<script src="js/data.js"></script>
+<script src="js/hex.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/bots.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
