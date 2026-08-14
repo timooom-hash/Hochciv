@@ -14,15 +14,8 @@ function settleable(S, r, c) {
   if (armyAt(S, r, c)) return false;
   return !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3);
 }
-function botCanEnter(S, pi, r, c) {
-  const p = S.players[pi];
-  const t = terrainAt(S, r, c);
-  if (!t) return false;
-  if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
-  if (cityAt(S, r, c)) return false;
-  if (armyAt(S, r, c)) return false;
-  return true;
-}
+// Bots bewegen sich nach genau denselben Regeln wie Menschen.
+function botCanEnter(S, pi, r, c) { return canEnter(S, pi, r, c); }
 
 function botTurn(S, pi) {
   const p = S.players[pi];
@@ -171,18 +164,44 @@ function botMoveArmy(S, pi, army) {
     if (goal) why = 'flankiert eine gegnerische Armee';
   }
 
-  // Priorität 4: an den Reichsrand, möglichst nah an einer gegnerischen Stadt
+  // Priorität 4: innerhalb des eigenen Reiches an den Rand ziehen, dem eine gegnerische
+  // Stadt am nächsten liegt. Der Bot verlässt sein Territorium hier NICHT.
+  // Tiebreaker: gleiche Distanz → geringster Verteidigungswert der Stadt → auswürfeln.
   if (!goal) {
     const own = controlledTiles(S, pi);
-    const rim = tiles.filter(t => neighbors(t[0], t[1]).some(([r, c]) => terrainAt(S, r, c) && !own.has(key(r, c))));
-    const list = rim.length ? rim : tiles;
+    for (const c of citiesOf(S, pi)) own.add(key(c.r, c.c));   // eigene Städte gehören dazu
+    // nur erreichbare Felder im eigenen Reich
+    const inRealm = tiles.filter(t => own.has(key(t[0], t[1])));
+    const insideNow = own.has(key(army.r, army.c));
+    if (!inRealm.length && !insideNow) {
+      // Armee steht außerhalb und erreicht ihr Reich diese Runde nicht → dorthin zurück
+      const realmCells = [...own].map(unkey);
+      goal = chooseBy(tiles, t =>
+        Math.min(...realmCells.map(rc => hexDistance(rc[0], rc[1], t[0], t[1]))) * 10 + cost(t));
+      if (goal && (goal[0] !== army.r || goal[1] !== army.c)) why = 'kehrt ins eigene Reich zurück';
+      else goal = null;
+    } else {
+    const rim = inRealm.filter(t =>
+      neighbors(t[0], t[1]).some(([r, c]) => !own.has(key(r, c))));
+    const list = rim.length ? rim : (inRealm.length ? inRealm : [[army.r, army.c]]);
     const enemyCities = S.cities.filter(x => x.owner !== pi);
-    goal = chooseBy(list, t => {
-      const dc = enemyCities.length
-        ? Math.min(...enemyCities.map(c => hexDistance(c.r, c.c, t[0], t[1]))) : 0;
-      return dc * 10 - cost(t) * 0.01;      // näher an einer gegnerischen Stadt zuerst
-    });
-    if (goal) why = 'zieht an den Reichsrand';
+    if (enemyCities.length) {
+      // nächste Gegnerstadt je Zielfeld bestimmen, dann nach (Distanz, Verteidigung) werten
+      goal = chooseBy(list, t => {
+        let bestDist = Infinity, bestDef = Infinity;
+        for (const c of enemyCities) {
+          const d = hexDistance(c.r, c.c, t[0], t[1]);
+          const def = defenseValue(S, c);
+          if (d < bestDist || (d === bestDist && def < bestDef)) { bestDist = d; bestDef = def; }
+        }
+        return bestDist * 1000 + bestDef;     // Distanz dominiert, Verteidigung als Tiebreaker
+      });
+    } else {
+      goal = chooseBy(list, () => 0);         // keine Gegnerstädte: irgendein Randfeld
+    }
+    if (goal && (goal[0] !== army.r || goal[1] !== army.c)) why = 'zieht an den Reichsrand';
+    else goal = null;                         // schon am besten Randfeld: stehen bleiben
+    }
   }
 
   if (goal) {

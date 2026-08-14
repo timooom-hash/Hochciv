@@ -16,11 +16,12 @@ function toast(msg) {
 }
 function modal(title, html) {
   $('ov-title').textContent = title; $('ov-body').innerHTML = html;
+  $('overlay').classList.remove('wide');
   $('overlay').classList.add('show');
 }
-function closeModal() { $('overlay').classList.remove('show'); }
+function closeModal() { $('overlay').classList.remove('show'); $('overlay').classList.remove('wide'); }
 function sheet(html) { $('sheet-body').innerHTML = html; $('sheet').classList.add('open'); }
-function closeSheet() { $('sheet').classList.remove('open'); }
+function closeSheet() { if (ui.botLock) return; $('sheet').classList.remove('open'); }
 
 function store(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
 function load(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
@@ -289,9 +290,13 @@ function openTile(r, c) {
     head = `<h3>${owner.n}${city.cap ? ' · Hauptstadt' : ''}</h3>
       <p class="sub">Bevölkerung ${city.pop} · Verteidigung ${defenseValue(S, city)}</p>`;
     if (city.owner === pi) {
-      const gc = growCost(S, pi, city), gerr = canGrow(S, pi, city);
-      btn('Bevölkerung wachsen', gerr || `auf ${city.pop + 1}`, `${gc.food}🌾 ${gc.coins}🪙`,
-        () => { const e = growCity(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); }, !!gerr);
+      if (freeGrowthAvailable(S, pi, city))
+        btn('Kostenlos wachsen', `auf ${city.pop + 1} · Verbundwerkstoffe`, 'gratis',
+          () => { const e = growCity(S, pi, city, 'free'); e ? toast(e) : redraw(); openTile(r, c); });
+      const pc = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+      const perr = canGrowPaid(S, pi, city);
+      btn('Bevölkerung wachsen', perr || `auf ${city.pop + 1}`, `${pc.food}🌾 ${pc.coins}🪙`,
+        () => { const e = growCity(S, pi, city, 'paid'); e ? toast(e) : redraw(); openTile(r, c); }, !!perr);
       const ac = armyCost(S, pi);
       btn('Armee bauen', 'muss die Stadt noch verlassen', `${ac}🪙`,
         () => { const e = buildArmy(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
@@ -372,42 +377,88 @@ function armySheet() {
   });
 }
 
+/* Kleine Symbolmarker: welche Reiche diese Technologie schon haben.
+   Eigenes Reich mit Ring hervorgehoben, damit man sich sofort verortet. */
+function ownerMarks(S, techKey, pi) {
+  const marks = S.players.map((pl, i) => {
+    if (!pl.techs[techKey] || pl.dead) return '';
+    const civ = civOf(pl);
+    const self = i === pi;
+    return `<span class="owner-mark${self ? ' self' : ''}" style="color:${civ.color}"
+      title="${civ.n}${self ? ' (du)' : ''}">${SYM[civ.sym]}</span>`;
+  }).join('');
+  return marks ? `<span class="owner-marks">${marks}</span>` : '';
+}
+/* Kompakte Ertragsübersicht (Inspiration: Ozymandias). Je Geländetyp ein farbiger
+   Punkt, Feldanzahl und der Beitrag zu Wissenschaft/Nahrung/Münzen; darunter die
+   Bevölkerung und die Gesamtsumme. Zeigt das Einkommen des laufenden Zugs. */
+const YIELD_ICON = ['🔬', '🌾', '🪙'];
+const TERRAIN_GLYPH = { G: '🌿', W: '🌲', B: '⛰️', F: '💧', M: '🌊', I: '🏝️' };
+function yieldRow(label, glyph, color, count, y, opts = {}) {
+  const cells = y.map((n, i) => n
+    ? `<span class="yv"><span class="yi">${YIELD_ICON[i]}</span>${n}</span>`
+    : `<span class="yv zero">·</span>`).join('');
+  return `<div class="yrow ${opts.cls || ''}">
+    <span class="yl"><span class="ydot" style="background:${color}">${glyph}</span>
+      <span class="yname">${label}</span>${count != null ? `<span class="ycount">×${count}</span>` : ''}</span>
+    <span class="yvals">${cells}</span></div>`;
+}
+function yieldOverview(S, pi) {
+  const b = incomeBreakdown(S, pi);
+  let h = '<div class="yield-panel"><h4 class="yhead">Ertrag nächster Zug</h4>';
+  for (const r of b.rows)
+    h += yieldRow(r.name, TERRAIN_GLYPH[r.key] || '▪', TERRAIN[r.key].color, r.count, r.y);
+  h += yieldRow('Bevölkerung', '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
+  h += yieldRow('Summe', '∑', '#6b5d47', null, b.total, { cls: 'sum' });
+  h += '</div>';
+  return h;
+}
 /* ------------------------------------------------------------------ Technologien */
 function techModal() {
   const pi = S.cur, p = P(S);
-  let h = '<div class="techgrid">';
+  const others = S.players.filter((pl, i) => i !== pi && !pl.dead)
+    .map(pl => `<span style="color:${civOf(pl).color}">${SYM[civOf(pl).sym]}</span> ${civOf(pl).n}`).join(' · ');
+  let grid = others
+    ? `<p class="sub" style="margin:-2px 0 10px">Symbole an einer Technologie zeigen, wer sie schon hat: ${others} · dein Reich ist umrandet.</p>`
+    : '';
+  grid += '<div class="techgrid">';
   for (let a = 0; a < 4; a++) {
-    h += `<div class="age-label">${AGES[a]}</div>`;
+    grid += `<div class="age-label">${AGES[a]}</div>`;
     for (let f = 0; f < 4; f++) {
-      h += `<div class="techcol">${a === 0 ? `<h4>${FIELDS[f]}</h4>` : ''}`;
+      grid += `<div class="techcol">${a === 0 ? `<h4>${FIELDS[f]}</h4>` : ''}`;
       for (const t of techsIn(f, a)) {
         const owned = has(p, t.k), avail = p.avail[t.k] && !owned;
         const cost = techCost(S, pi, t);
         const can = avail && available(S, pi, 'sci') >= cost;
-        h += `<button class="tech ${owned ? 'owned' : avail ? 'avail' : 'locked'}"
+        grid += `<button class="tech ${owned ? 'owned' : avail ? 'avail' : 'locked'}"
           ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : cost}</span>
-          <b>${t.n}</b><span class="eff">${t.e}</span></button>`;
+          <b>${t.n}</b><span class="eff">${t.e}</span>${ownerMarks(S, t.k, pi)}</button>`;
       }
-      h += '</div>';
+      grid += '</div>';
     }
   }
-  h += '</div>';
+  grid += '</div>';
   const sing = singularityReady(p), sc = techCost(S, pi, SINGULARITY);
-  h += `<button class="tech ${p.techs.singularitaet ? 'owned' : sing ? 'avail' : 'locked'}" style="margin-top:10px"
+  grid += `<button class="tech ${p.techs.singularitaet ? 'owned' : sing ? 'avail' : 'locked'}" style="margin-top:10px"
       ${sing && available(S, pi, 'sci') >= sc && !p.techs.singularitaet ? 'data-tech="singularitaet"' : 'disabled'}>
       <span class="c">${sc}</span><b>Singularität</b><span class="eff">${SINGULARITY.e}</span></button>`;
   const cop = copyableTechs(S, pi);
   if (cop.length) {
     const free = internetAvailable(S, pi) && cop.some(o => o.free);
-    h += `<p class="sub" style="margin-top:14px">Technologien kopieren${
+    grid += `<p class="sub" style="margin-top:14px">Technologien kopieren${
       free ? ' · 1× gratis per Internet' : ''}</p>`;
     cop.slice(0, 40).forEach(o => {
-      h += `<button class="tech avail" data-copy="${o.tech.k}"><span class="c">${
+      grid += `<button class="tech avail" data-copy="${o.tech.k}"><span class="c">${
         o.free ? 'gratis' : o.coins + '🪙'}</span>
-        <b>${o.tech.n}</b><span class="eff">${o.tech.e}</span></button>`;
+        <b>${o.tech.n}</b><span class="eff">${o.tech.e}</span>${ownerMarks(S, o.tech.k, pi)}</button>`;
     });
   }
-  modal(`Technologien · ${available(S, pi, 'sci')} Wissenschaft verfügbar`, h);
+  const layout = `<div class="tech-layout">
+    <aside class="tech-aside">${yieldOverview(S, pi)}</aside>
+    <div class="tech-main">${grid}</div>
+  </div>`;
+  modal(`Technologien · ${available(S, pi, 'sci')} Wissenschaft verfügbar`, layout);
+  $('overlay').classList.add('wide');
   $('ov-body').querySelectorAll('[data-tech]').forEach(b => b.onclick = () => {
     const e = doResearch(S, S.cur, b.dataset.tech);
     if (e) return toast(e);
@@ -471,12 +522,18 @@ function runBots() {
   finishTurn(S);                       // Kampf des Bots, einmal pro Zug
   redraw();
   const lines = S.log.slice(before).map(l => `<div class="logline ${l.c}">${l.m}</div>`).join('');
+  ui.botLock = true;                   // Sheet ist jetzt gesperrt: nur „Weiter" führt weiter
   sheet(`<h3>${civOf(p).n} (Bot)</h3><p class="sub">Runde ${S.round}</p>${lines}
     <button class="btn wide" id="bot-next">Weiter</button>`);
+  $('sheet').classList.add('locked');
   $('bot-next').onclick = () => {
+    ui.botLock = false;
+    $('sheet').classList.remove('locked');
     closeSheet();
     if (S.over) return gameOver();
-    advanceTurn(S); redraw(); runBots();
+    advanceTurn(S); redraw();
+    if (P(S).kind === 'bot') runBots();
+    else toast(civOf(P(S)).n + ' ist am Zug');
   };
 }
 function gameOver() {
@@ -493,6 +550,8 @@ function setupScreen() {
     (customMap ? '<option value="eigene">Eigene Karte</option>' : '');
   $('setup-rules').innerHTML = Object.entries(RULESETS)
     .map(([k, r]) => `<option value="${k}">${r.name}</option>`).join('');
+  $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
+    `<option value="${x.k}"${x.k === 'prinz' ? ' selected' : ''}>${x.n}</option>`).join('');
   const list = $('setup-list'); list.innerHTML = '';
   CIVS.forEach((civ, i) => {
     const d = document.createElement('div'); d.className = 'slot';
@@ -500,27 +559,20 @@ function setupScreen() {
       <div class="seg" data-civ="${civ.k}">
         <button data-kind="human" class="${i === 0 ? 'on' : ''}">Mensch</button>
         <button data-kind="bot" class="${i === 0 ? '' : 'on'}">Bot</button>
-      </div>
-      <div class="seg diffs" style="margin-top:6px" ${i === 0 ? 'hidden' : ''}>
-        ${DIFFICULTIES.map(x => `<button data-diff="${x.k}" class="${x.k === 'prinz' ? 'on' : ''}">${x.n}</button>`).join('')}
       </div>`;
     list.appendChild(d);
     d.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
       d.querySelectorAll('[data-kind]').forEach(x => x.classList.toggle('on', x === b));
-      d.querySelector('.diffs').hidden = b.dataset.kind === 'human';
       refreshStart();
-    });
-    d.querySelectorAll('[data-diff]').forEach(b => b.onclick = () => {
-      d.querySelectorAll('[data-diff]').forEach(x => x.classList.toggle('on', x === b));
     });
   });
   refreshStart();
 }
 function setupConfig() {
+  const diff = $('setup-diff').value;    // ein Schwierigkeitsgrad für alle Bots
   return CIVS.map((civ, i) => {
     const slot = $('setup-list').children[i];
     const kind = slot.querySelector('[data-kind].on').dataset.kind;
-    const diff = slot.querySelector('[data-diff].on')?.dataset.diff || 'prinz';
     return { civ: civ.k, kind, diff };
   });
 }
@@ -582,7 +634,8 @@ function boot() {
   document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => show('screen-menu'));
   $('ov-close').onclick = closeModal;
   $('overlay').onclick = e => { if (e.target === $('overlay')) closeModal(); };
-  $('sheet').querySelector('.sheet-grip').onclick = closeSheet;
+  $('sheet-grip').onclick = closeSheet;
+  $('sheet-close').onclick = closeSheet;
 
   $('setup-go').onclick = () => {
     const players = setupConfig();

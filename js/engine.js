@@ -48,13 +48,19 @@ function powerOf(S, pi) {
 function newGame(cfg) {
   const rules = cfg.rules || 'standard';
   setRules(rules);
+  // Feste Spielerreihenfolge: Russland → Griechenland → England → Wikinger.
+  // Der Startspieler verschiebt nur den Einstiegspunkt in dieser Rotation.
+  const ORDER = ['russland', 'griechenland', 'england', 'wikinger'];
+  const startCiv = cfg.players[cfg.startPlayer ?? 0] && cfg.players[cfg.startPlayer ?? 0].civ;
+  const ordered = cfg.players.slice().sort((a, b) => ORDER.indexOf(a.civ) - ORDER.indexOf(b.civ));
+  const startIdx = Math.max(0, ordered.findIndex(p => p.civ === startCiv));
   const S = {
     v: 1, seed: (cfg.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
     rules, round: 1, cur: 0, over: null, log: [],
     map: JSON.parse(JSON.stringify(cfg.map || DEFAULT_MAP)),
     roads: {}, sieges: {}, bought: {},
     cities: [], armies: [], nextId: 1,
-    players: cfg.players.map(pc => ({
+    players: ordered.map(pc => ({
       civ: pc.civ, kind: pc.kind, diff: pc.diff || 'prinz', name: pc.name || null,
       power: 0, techs: {}, avail: {}, res: { sci: 0, food: 0, coins: 0 },
       copies: 0, nuked: false, dead: false,
@@ -76,7 +82,7 @@ function newGame(cfg) {
       if (spot) S.armies.push({ id: S.nextId++, owner: i, r: spot[0], c: spot[1], mp: 0, born: 0 });
     }
   });
-  if (cfg.startPlayer != null) S.cur = cfg.startPlayer;
+  S.cur = startIdx;
   beginTurn(S);
   return S;
 }
@@ -127,10 +133,15 @@ function doResearch(S, pi, tk) {
   const p = S.players[pi];
   const tech = tk === 'singularitaet' ? SINGULARITY : TECH_BY_KEY[tk];
   const cost = techCost(S, pi, tech);
+  const rangeBefore = moveAllowance(S, pi);
   if (!pay(S, pi, 'sci', cost)) return 'Nicht genug Wissenschaft.';
   p.techs[tk] = true;
   log(S, 'act', `${civOf(p).n} erforscht ${tech.n} (${cost} Wissenschaft).`);
   if (tk === 'singularitaet') { S.over = { winner: pi, how: 'Forschungssieg (Singularität)' }; return null; }
+  // Reichweitensprung (Luftwaffe/Panzerschiff) sofort wirksam machen: die Erhöhung der
+  // Maximalweite wird der Restbewegung der eigenen Armeen dieser Runde gutgeschrieben.
+  const gained = moveAllowance(S, pi) - rangeBefore;
+  if (gained > 0) for (const a of armiesOf(S, pi)) a.mp += gained;
   // Erste Technologie in Zeitalter+Feld → nächstes Zeitalter auswürfeln
   const sameAgeField = TECHS_ACTIVE.filter(t => t.f === tech.f && t.age === tech.age && p.techs[t.k]);
   if (sameAgeField.length === 1) rollAvailability(S, pi, tech.f, tech.age + 1);
@@ -192,6 +203,39 @@ function controlledTiles(S, pi) {
     }
   for (const k of (S.bought[pi] || [])) if (!cityAt(S, ...unkey(k))) set.add(k);
   return set;
+}
+/* Aufschlüsselung des Einkommens für die Übersicht: je Geländetyp die Anzahl
+   kontrollierter Felder und ihr Gesamtertrag, plus eine Zeile für die Stadtbevölkerung.
+   Die Summe entspricht income(). Erträge nach dem laufenden Zug (mit allen Boni). */
+function incomeBreakdown(S, pi) {
+  const p = S.players[pi];
+  const rows = [];
+  const byTerrain = {};
+  for (const k of controlledTiles(S, pi)) {
+    const [r, c] = unkey(k);
+    const t = terrainAt(S, r, c);
+    const y = tileYieldAt(S, pi, r, c);
+    const e = byTerrain[t] || (byTerrain[t] = { count: 0, y: [0, 0, 0] });
+    e.count++; e.y[0] += y[0]; e.y[1] += y[1]; e.y[2] += y[2];
+  }
+  for (const t of Object.keys(TERRAIN)) {
+    const e = byTerrain[t];
+    if (e) rows.push({ key: t, name: TERRAIN[t].name, count: e.count, y: e.y });
+  }
+  // Bevölkerung als eigene Zeile
+  const py = cityPopYield(S, pi);
+  let pop = 0, py0 = 0, py1 = 0, py2 = 0;
+  for (const city of citiesOf(S, pi)) {
+    const mult = (city.cap && has(p, 'buerokratie')) ? 2 : 1;
+    let f = py[1] * city.pop;
+    if (has(p, 'oekologie')) f += Math.floor(city.pop / 2);
+    pop += city.pop;
+    py0 += py[0] * city.pop * mult;
+    py1 += f * mult;
+    py2 += py[2] * city.pop * mult;
+  }
+  const inc = income(S, pi);
+  return { rows, pop: { count: pop, y: [py0, py1, py2] }, total: [inc.sci, inc.food, inc.coins] };
 }
 function income(S, pi) {
   const p = S.players[pi];
@@ -290,11 +334,10 @@ function canEnter(S, pi, r, c) {
   const p = S.players[pi];
   const t = terrainAt(S, r, c);
   if (!t) return false;
-  if (has(p, 'luftwaffe')) { const ct = cityAt(S, r, c); return !(ct && ct.owner !== pi) && !armyAt(S, r, c); }
+  if (cityAt(S, r, c)) return false;            // Armeen dürfen auf keine Stadt ziehen
+  if (armyAt(S, r, c)) return false;            // nicht auf andere Armeen (nicht stapelbar)
+  if (has(p, 'luftwaffe')) return true;         // Luftwaffe ignoriert Gelände (Städte/Armeen s.o.)
   if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
-  const ct = cityAt(S, r, c);
-  if (ct && ct.owner !== pi) return false;      // nicht auf gegnerische Städte
-  if (armyAt(S, r, c)) return false;            // nicht auf andere Armeen
   return true;
 }
 /* Kontrollzone (Schießpulver): wer ein Feld neben einer feindlichen Armee betritt, hält an */
@@ -354,6 +397,12 @@ function growCost(S, pi, city) {
   if ((city.grown || 0) < lim.free) return { food: 0, coins: 0, free: true };
   return { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
 }
+// Steht der Stadt diese Runde noch ein kostenloses Wachstum zu? (v2 mit Verbundwerkstoffe)
+function freeGrowthAvailable(S, pi, city) {
+  if (city.owner !== pi || city.born === S.round) return false;
+  const lim = growLimits(S, pi);
+  return lim.free > 0 && (city.grown || 0) < lim.free;
+}
 function canGrow(S, pi, city) {
   if (city.owner !== pi) return 'Fremde Stadt.';
   if (city.born === S.round) return 'Neue Städte wachsen erst nächste Runde.';
@@ -364,7 +413,36 @@ function canGrow(S, pi, city) {
   if (c.coins && available(S, pi, 'coins') < c.coins) return 'Zu wenig Münzen.';
   return null;
 }
-function growCity(S, pi, city) {
+// Kann die Stadt kostenpflichtig wachsen? (unabhängig vom Gratis-Kontingent)
+function canGrowPaid(S, pi, city) {
+  if (city.owner !== pi) return 'Fremde Stadt.';
+  if (city.born === S.round) return 'Neue Städte wachsen erst nächste Runde.';
+  const lim = growLimits(S, pi);
+  if ((city.grown || 0) >= lim.max) return 'Diese Runde schon gewachsen.';
+  const p = S.players[pi];
+  const cost = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+  if (cost.food && available(S, pi, 'food') < cost.food) return 'Zu wenig Nahrung.';
+  if (cost.coins && available(S, pi, 'coins') < cost.coins) return 'Zu wenig Münzen.';
+  return null;
+}
+/* mode: 'free' erzwingt kostenloses Wachstum (nur wenn Kontingent offen),
+   'paid' erzwingt bezahltes Wachstum, sonst automatisch (gratis zuerst). */
+function growCity(S, pi, city, mode) {
+  if (mode === 'free') {
+    if (!freeGrowthAvailable(S, pi, city)) return 'Kein kostenloses Wachstum verfügbar.';
+    city.pop++; city.grown = (city.grown || 0) + 1;
+    log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst kostenlos auf ${city.pop}.`);
+    return null;
+  }
+  if (mode === 'paid') {
+    const err = canGrowPaid(S, pi, city); if (err) return err;
+    const p = S.players[pi];
+    const cost = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+    if (cost.food) pay(S, pi, 'food', cost.food); if (cost.coins) pay(S, pi, 'coins', cost.coins);
+    city.pop++; city.grown = (city.grown || 0) + 1;
+    log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst auf ${city.pop} (${cost.food} Nahrung, ${cost.coins} Münzen).`);
+    return null;
+  }
   const err = canGrow(S, pi, city); if (err) return err;
   const c = growCost(S, pi, city);
   if (c.food) pay(S, pi, 'food', c.food); if (c.coins) pay(S, pi, 'coins', c.coins);
