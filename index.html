@@ -45,6 +45,8 @@
       <select id="setup-map"></select></label>
     <label class="row"><span>Regeln</span>
       <select id="setup-rules"></select></label>
+    <label class="row"><span>Schwierigkeit (alle Bots)</span>
+      <select id="setup-diff"></select></label>
     <label class="row"><span>Startspieler*in</span>
       <select id="setup-start"></select></label>
     <button class="btn primary wide" id="setup-go">Spiel beginnen</button>
@@ -68,7 +70,8 @@
   <div id="map-host"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
 
   <div id="sheet" class="sheet">
-    <div class="sheet-grip"></div>
+    <button class="sheet-close" id="sheet-close" aria-label="Schließen">✕</button>
+    <div class="sheet-grip" id="sheet-grip"></div>
     <div id="sheet-body"></div>
   </div>
 

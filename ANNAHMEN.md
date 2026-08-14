@@ -6,7 +6,7 @@ Umsetzung entschieden hat. Alles davon lässt sich ändern – die Stellen sind 
 
 *Vom Autor durchgesehen und gegen das aktuelle Regelheft abgeglichen. Der frühere
 Rechenfehler in Zug 1 ist in der vorliegenden Fassung behoben (jetzt „3 Münzen"). Diese
-Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abschnitt 8.*
+Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abschnitt 9.*
 
 ## 1. Kampf (aktualisiertes Regelheft)
 
@@ -30,7 +30,18 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
   Stadt zerstoert. Die Stadt faellt, wenn der Angriff **zwei aufeinanderfolgende eigene
   Zuege** hoeher war; sinkt er dazwischen, beginnt die Zaehlung neu.
 
-## 2. Rundungen und Zahlen
+## 2. Bewegung und Armeen
+
+- Armeen sind **nicht stapelbar**: kein Feld trägt zwei Armeen. Sie dürfen auf **keine Stadt**
+  ziehen, auch nicht auf eine eigene. Eine frisch gebaute Armee steht im Zug ihrer Entstehung
+  auf dem Stadtfeld und muss es im selben Zug verlassen.
+- Reichweite: 3 Felder, mit Panzerschiff 6, mit Luftwaffe faktisch unbegrenzt (Wert 9, ignoriert
+  Gelände). Ein durch Forschung gewonnener Reichweitensprung wirkt **sofort im selben Zug** –
+  die Erhöhung wird der Restbewegung der eigenen Armeen gutgeschrieben.
+- Spielerreihenfolge ist fest: **Russland → Griechenland → England → Wikinger**. Der Startspieler
+  (wer zuletzt ein Weltwunder baute) bestimmt nur den Einstiegspunkt in dieser Rotation.
+
+## 3. Rundungen und Zahlen
 
 | Punkt | Entscheidung | Alternative |
 |---|---|---|
@@ -43,7 +54,7 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
 | Sklaverei | höchstens **einmal pro Runde pro Stadt**; die Stadt darf davor wachsen | |
 | Kolonialismus | kauft nur **herrenlose** Felder (keine Stadt, keine Kontrolle) | |
 
-## 3. Was ein Feld einbringt
+## 4. Was ein Feld einbringt
 
 * Ressourcen sind **Fluss, kein Vorrat**: Wissenschaft, Nahrung und Münzen verfallen am
   Zugende, nur Macht bleibt liegen. (Das Regelheft sagt es nicht ausdrücklich, das
@@ -62,7 +73,7 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
   an eine zweite eigene Stadt grenzt, zählt als Hauptstadtumland und verdoppelt sich
   ebenfalls. Das Aktionsblatt zeigt bei diesen Feldern direkt den verdoppelten Ertrag.
 
-## 4. Straßen und Eisenbahn
+## 5. Straßen und Eisenbahn
 
 Straßen liegen auf Feldern, nicht auf Kanten: 1 Münze für nichts → Straße oder
 Straße → Eisenbahn, 2 Münzen für nichts → Eisenbahn. Ein Schritt zwischen zwei
@@ -75,7 +86,7 @@ sondern läuft durch die Stadt hindurch weiter; man muss (und kann) auf Stadtfel
 nichts bauen. Zwei benachbarte Städte, die je an einer Straße liegen, sind dadurch
 ebenfalls verbunden.
 
-## 5. Technologien
+## 6. Technologien
 
 * Verfügbarkeit: je Technologie ein Würfel, 4+ ist verfügbar. Griechenland +1 (im
   Standard) und Philosophie +1 **stapeln**. Ist danach nichts verfügbar, wird eine
@@ -90,7 +101,7 @@ ebenfalls verbunden.
   bezahlte **und** die kostenlose Kopie machen. Beim Kopieren gelten keine Vergünstigungen
   (Wiss. Methode etc.), es zählen die Basiskosten der Technologie.
 
-## 6. Bots
+## 7. Bots
 
 * Der Machtwert eines Bots ist immer seine Gesamtbevölkerung (so das Regelheft) – das macht
   Bots früh militärisch stark. In 40 Testpartien gewannen sie überwiegend militärisch.
@@ -114,7 +125,7 @@ ebenfalls verbunden.
 * **v2**: Bots forschen zweimal pro Runde (zwei Würfe auf Erfolg) und dann in zwei
   **unterschiedlichen** Technologiefeldern.
 
-## 7. Karten
+## 8. Karten
 
 Zur Wahl stehen zwei Karten, umschaltbar im Aufbaubildschirm:
 
@@ -144,7 +155,7 @@ beweist sie aber nicht.
 
 „Kernphysik" und „Raumfahrt" kommen im Technologiebogen ohnehin nicht vor.
 
-## 8. Experimentelle Variante v2
+## 9. Experimentelle Variante v2
 
 Im Aufbaubildschirm unter „Regeln" wählbar. Der Modus wird im Spielstand gespeichert und
 beim Laden reaktiviert; im Rundentitel steht dann „Experimentell v2". Unterschiede zu den
@@ -159,7 +170,9 @@ Standardregeln:
   Mittelalter, Kosten 10) senkt die Siegschwelle auf >3/5 der Weltbevölkerung.
 - **Verbundwerkstoffe** bekommt einen neuen Effekt: 1× zusätzliches, **kostenloses**
   Wachstum pro Stadt und Runde. Allein also normales Wachstum + 1 gratis = 2×. Mit Keramik
-  zusammen bis **3×** pro Stadt, davon eins gratis (das erste der Runde).
+  zusammen bis **3×** pro Stadt, davon eins gratis (das erste der Runde). In der Oberfläche
+  ist das kostenlose Wachstum ein **eigener Knopf** („Kostenlos wachsen"), getrennt vom
+  bezahlten „Bevölkerung wachsen".
 - **Sklaverei** wird obsolet, sobald ein Reich die erste Technologie der **Moderne**
   erforscht hat.
 - **Siegschwellen** stapeln nicht, es gilt immer die niedrigste verfügbare: Standard ≥2/3,

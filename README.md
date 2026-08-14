@@ -22,6 +22,8 @@ sonst behalten installierte Geräte die alte Fassung.
 | | |
 |---|---|
 | Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
+| Bevölkerung wachsen | zwei Knöpfe, wenn v2 ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
+| **Forschen** | links die Ertragsübersicht (Felder, Bevölkerung, Summe fürs nächste Einkommen), rechts der Technologiebogen |
 | **Armeen** | Übersicht aller eigenen Armeen; antippen wählt aus, dann Zielfeld antippen |
 | Armee auf der Karte | antippen → *Bewegen*; steht sie in der eigenen Stadt, steht die Aktion im Stadtblatt |
 | Zwei Finger | Zoomen, ein Finger schiebt die Karte |
@@ -45,7 +47,7 @@ Im Aufbaubildschirm unter **Regeln** wählbar:
 * **Experimentell v2** – Singularität kostet 100, Griechenland ohne Würfelbonus, zwei neue
   Technologien (Keramik, Theologie), Verbundwerkstoffe gibt ein kostenloses Wachstum,
   Sklaverei wird in der Moderne obsolet, Theologie senkt die Siegschwelle, Bots forschen
-  doppelt. Details in `ANNAHMEN.md`, Abschnitt 8.
+  doppelt. Details in `ANNAHMEN.md`, Abschnitt 9.
 
 Der gewählte Modus steht während des Spiels im Rundentitel und wird im Spielstand
 gespeichert.

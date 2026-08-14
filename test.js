@@ -10,13 +10,33 @@ const eq = (got, want, label) => {
   else console.log(`  ok  ${label}`);
 };
 
+// Bringt die Zielzivilisation auf Index 0, indem Spieler samt Städte/Armeen umnummeriert
+// werden. Nötig, weil newGame die feste Reihenfolge erzwingt; die meisten Tests wollen
+// aber „ihren" Spieler an Index 0. Am Spielverhalten ändert das nichts.
+function normalize(S, civ) {
+  const from = S.players.findIndex(p => p.civ === civ);
+  if (from === 0) return S;
+  const remap = {}; S.players.forEach((_, i) => remap[i] = i);
+  const order = [from, ...S.players.map((_, i) => i).filter(i => i !== from)];
+  const newPlayers = order.map(i => S.players[i]);
+  const inv = {}; order.forEach((oldI, newI) => inv[oldI] = newI);
+  S.players = newPlayers;
+  S.cities.forEach(c => c.owner = inv[c.owner]);
+  S.armies.forEach(a => a.owner = inv[a.owner]);
+  Object.keys(S.sieges || {}).forEach(k => {
+    const [pi, cid] = k.split('|'); const nk = inv[+pi] + '|' + cid;
+    if (nk !== k) { S.sieges[nk] = S.sieges[k]; delete S.sieges[k]; }
+  });
+  S.cur = inv[S.cur];
+  return S;
+}
 const mk = (civ, techs = []) => {
-  const S = newGame({ players: [{ civ, kind: 'human' }, { civ: 'england', kind: 'bot' }], seed: 7 });
+  const S = normalize(newGame({ players: [{ civ, kind: 'human' }, { civ: 'england', kind: 'bot' }], seed: 7 }), civ);
   techs.forEach(t => S.players[0].techs[t] = true);
   return S;
 };
 const mkV2 = (civ, techs = []) => {
-  const S = newGame({ players: [{ civ, kind: 'human' }, { civ: 'england', kind: 'bot' }], seed: 7, rules: 'v2' });
+  const S = normalize(newGame({ players: [{ civ, kind: 'human' }, { civ: 'england', kind: 'bot' }], seed: 7, rules: 'v2' }), civ);
   techs.forEach(t => S.players[0].techs[t] = true);
   return S;
 };
@@ -200,17 +220,19 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 /* --- Bots kämpfen genau einmal pro Zug (nicht in botTurn UND im Zugende) */
 {
   const B = newGame({ players: [{ civ: 'england', kind: 'bot', diff: 'siedler' }, { civ: 'griechenland', kind: 'human' }], seed: 11 });
-  capitalOf(B, 0).pop = 20;                       // Bot-Macht = Gesamtbevölkerung
-  const gr = capitalOf(B, 1); gr.pop = 4;
+  const bi = B.players.findIndex(p => p.civ === 'england');   // Bot
+  const hi = B.players.findIndex(p => p.civ === 'griechenland');
+  capitalOf(B, bi).pop = 20;                       // Bot-Macht = Gesamtbevölkerung
+  const gr = capitalOf(B, hi); gr.pop = 4;
   const spot = neighbors(gr.r, gr.c).find(([r, c]) => isLand(B, r, c) && !cityAt(B, r, c) && !armyAt(B, r, c));
-  B.armies.push({ id: 900, owner: 0, r: spot[0], c: spot[1], mp: 0, born: 0 });
-  B.cur = 0;
-  botTurn(B, 0);
-  eq(B.sieges['0|' + gr.id] || 0, 0, 'botTurn allein löst noch keinen Kampf aus');
+  B.armies.push({ id: 900, owner: bi, r: spot[0], c: spot[1], mp: 0, born: 0 });
+  B.cur = bi;
+  botTurn(B, bi);
+  eq(B.sieges[bi + '|' + gr.id] || 0, 0, 'botTurn allein löst noch keinen Kampf aus');
   const army = B.armies.find(a => a.id === 900);
   army.r = spot[0]; army.c = spot[1];              // Bot könnte sie versetzt haben
   finishTurn(B);
-  eq(B.sieges['0|' + gr.id], 1, 'Kampf findet genau einmal statt – Stadt fällt nicht im selben Zug');
+  eq(B.sieges[bi + '|' + gr.id], 1, 'Kampf findet genau einmal statt – Stadt fällt nicht im selben Zug');
   eq(!!B.cities.find(x => x.id === gr.id), true, 'Hauptstadt steht nach einem Bot-Zug noch');
 }
 
@@ -415,6 +437,98 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(zocStop(S, 0, d2[0], d2[1]), true, 'mit Raketentechnik Kontrollzone auf Distanz 2');
   S.players[0].techs.luftwaffe = true;
   eq(zocStop(S, 0, d1[0], d1[1]), false, 'Luftwaffe ignoriert Kontrollzonen');
+}
+
+/* Bot-Bewegung Priorität 4: bleibt im eigenen Reich, geht ans stadtnächste Randfeld */
+{
+  const S = newGame({ players: [{ civ: 'russland', kind: 'bot', diff: 'prinz' }, { civ: 'england', kind: 'human' }], seed: 20 });
+  const cap = capitalOf(S, 0);
+  const spot = spotBy(S, cap);
+  S.armies.length = 0;
+  S.armies.push({ id: 1, owner: 0, r: spot[0], c: spot[1], mp: moveAllowance(S, 0), born: 0 });
+  const realm = () => { const o = controlledTiles(S, 0); for (const c of citiesOf(S, 0)) o.add(key(c.r, c.c)); return o; };
+  eq(realm().has(key(spot[0], spot[1])), true, 'Armee startet im eigenen Reich');
+  botMoveArmy(S, 0, S.armies[0]);
+  const a = S.armies[0];
+  eq(realm().has(key(a.r, a.c)), true, 'Bot verlässt sein Reich ohne höhere Priorität NICHT');
+}
+
+/* Luftwaffe: Reichweitensprung wirkt sofort im selben Zug */
+{
+  const S = mk('griechenland');
+  const cap = capitalOf(S, 0);
+  const spot = spotBy(S, cap);
+  S.armies.push({ id: 1, owner: 0, r: spot[0], c: spot[1], mp: 3, born: 0 });
+  S.players[0].avail.luftwaffe = true; S.players[0].res.sci = 99;
+  // vorher Reichweite 3
+  eq(moveAllowance(S, 0), 3, 'vor Luftwaffe Reichweite 3');
+  doResearch(S, 0, 'luftwaffe');
+  eq(moveAllowance(S, 0), 9, 'Luftwaffe erhöht die Reichweite auf 9');
+  eq(S.armies[0].mp, 9, 'die bereits stehende Armee bekommt die höhere Reichweite sofort (3 + 6)');
+}
+
+/* Panzerschiff: Teilbewegung behält Rest, Sprung wird addiert */
+{
+  const S = mk('griechenland');
+  const spot = spotBy(S, capitalOf(S, 0));
+  S.armies.push({ id: 2, owner: 0, r: spot[0], c: spot[1], mp: 1, born: 0 });  // schon 2 verbraucht
+  S.players[0].avail.panzerschiff = true; S.players[0].res.sci = 99;
+  doResearch(S, 0, 'panzerschiff');
+  eq(S.armies[0].mp, 4, 'Panzerschiff (+3) wird der Restbewegung gutgeschrieben: 1 + 3');
+}
+
+/* Feste Spielerreihenfolge: Russland → Griechenland → England → Wikinger */
+{
+  const S = newGame({ players: [
+    { civ: 'wikinger', kind: 'bot' }, { civ: 'england', kind: 'bot' },
+    { civ: 'griechenland', kind: 'human' }, { civ: 'russland', kind: 'bot' },
+  ], startPlayer: 2, seed: 7 });   // startPlayer zeigt auf Griechenland
+  eq(S.players.map(p => p.civ), ['russland', 'griechenland', 'england', 'wikinger'], 'feste Rotation R→G→E→W');
+  eq(S.players[S.cur].civ, 'griechenland', 'Startspieler ist der gewählte (Griechenland)');
+}
+
+/* Armeen: nicht stapelbar, dürfen auf keine Stadt (auch nicht die eigene) */
+{
+  const S = mk('griechenland');
+  const cap = capitalOf(S, 0);
+  const ns = neighbors(cap.r, cap.c).filter(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
+  S.armies.push({ id: 1, owner: 0, r: ns[0][0], c: ns[0][1], mp: 3, born: 0 });
+  S.armies.push({ id: 2, owner: 0, r: ns[1][0], c: ns[1][1], mp: 3, born: 0 });
+  eq(canEnter(S, 0, ns[1][0], ns[1][1]), false, 'Armee darf nicht auf ein Feld mit anderer Armee');
+  eq(canEnter(S, 0, cap.r, cap.c), false, 'Armee darf nicht auf die eigene Stadt');
+  // frisch gebaute Armee darf ihre Heimatstadt verlassen
+  S.players[0].res.coins = 50;
+  eq(buildArmy(S, 0, cap), null, 'Armee bauen klappt');
+  const fresh = S.armies[S.armies.length - 1];
+  const out = neighbors(cap.r, cap.c).find(([r, c]) => canEnter(S, 0, r, c));
+  eq(moveArmy(S, fresh, out[0], out[1]), null, 'frische Armee kann aus der Stadt herausziehen');
+}
+
+/* Gratis-Wachstum (v2) getrennt vom bezahlten Wachstum */
+{
+  const S = mkV2('griechenland', ['verbundwerkstoffe']);
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.born = 0;
+  eq(freeGrowthAvailable(S, 0, c), true, 'Gratis-Wachstum steht bereit');
+  eq(growCity(S, 0, c, 'free'), null, 'kostenloses Wachstum klappt');
+  eq(c.pop, 4, 'Bevölkerung +1 ohne Kosten');
+  eq(freeGrowthAvailable(S, 0, c), false, 'Gratis-Wachstum diese Runde verbraucht');
+  // danach noch bezahltes Wachstum möglich (max 2)
+  S.players[0].res = { sci: 0, food: 99, coins: 99 };
+  eq(canGrowPaid(S, 0, c), null, 'bezahltes Wachstum danach möglich');
+  eq(growCity(S, 0, c, 'paid'), null, 'bezahltes Wachstum klappt');
+  eq(c.pop, 5, 'zweites Wachstum bezahlt');
+}
+
+/* Einkommensaufschlüsselung summiert sich zum Gesamteinkommen */
+{
+  const S = mk('griechenland', ['landwirtschaft', 'papier']);
+  capitalOf(S, 0).pop = 3;
+  const b = incomeBreakdown(S, 0);
+  const sum = b.rows.reduce((a, r) => [a[0] + r.y[0], a[1] + r.y[1], a[2] + r.y[2]], [0, 0, 0]);
+  sum[0] += b.pop.y[0]; sum[1] += b.pop.y[1]; sum[2] += b.pop.y[2];
+  eq(sum, b.total, 'Aufschlüsselung (Gelände + Bevölkerung) summiert sich zum Einkommen');
+  const inc = income(S, 0);
+  eq(b.total, [inc.sci, inc.food, inc.coins], 'Übersichtssumme entspricht income()');
 }
 
 /* --- Vollständige Partien: 4 Bots, keine Ausnahmen, Spiel endet */

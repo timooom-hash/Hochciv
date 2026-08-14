@@ -43,6 +43,12 @@ step('Kartenauswahl vorhanden', () => {
   if (n < 2) throw new Error('nur ' + n + ' Karte(n) wählbar');
   console.log('       ' + [...$('setup-map').options].map(o => o.text).join(' · '));
 });
+step('Schwierigkeit ist global (ein Dropdown)', () => {
+  const sel = $('setup-diff');
+  if (!sel || sel.options.length < 3) throw new Error('kein globales Schwierigkeit-Dropdown');
+  if ($('setup-list').querySelector('[data-diff]')) throw new Error('noch Pro-Bot-Schwierigkeit vorhanden');
+  console.log('       ' + [...sel.options].map(o => o.text).join(' · '));
+});
 step('Regelmodus wählbar', () => {
   const opts = [...$('setup-rules').options].map(o => o.text);
   if (opts.length < 2) throw new Error('kein v2-Modus wählbar');
@@ -140,6 +146,53 @@ step('Atomwaffen: Knopf vorhanden und wirksam', () => {
   const again = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Atomschlag/.test(x.textContent));
   console.log('       Armee zerstört; zweiter Einsatz in derselben Runde ' +
     (again && again.disabled ? 'gesperrt' : 'NICHT gesperrt'));
+});
+step('Info-Sheet lässt sich schließen (Punkt 4)', () => {
+  const cap = G('capitalOf')(G('S'), G('S').cur);
+  G('tapHex')(cap.r, cap.c);
+  if (!$('sheet').classList.contains('open')) throw new Error('Sheet öffnet nicht');
+  if (!$('sheet-close')) throw new Error('kein Schließen-Knopf im Sheet');
+  $('sheet-close').onclick();
+  if ($('sheet').classList.contains('open')) throw new Error('Sheet lässt sich nicht schließen');
+});
+step('Technologiebogen zeigt, wer welche Tech hat (Punkt 2)', () => {
+  const S = G('S'), pi = S.cur;
+  S.players[pi].techs.schrift = true;
+  S.players[(pi + 1) % S.players.length].techs.schrift = true;
+  $('a-tech').onclick();
+  const tile = [...$('ov-body').querySelectorAll('.tech')].find(t => /Schrift/.test(t.textContent));
+  const marks = tile.querySelectorAll('.owner-mark');
+  if (marks.length < 2) throw new Error('Besitzer-Marker fehlen');
+  if (!tile.querySelector('.owner-mark.self')) throw new Error('eigenes Reich nicht hervorgehoben');
+  console.log('       ' + marks.length + ' Reiche auf der Schrift-Kachel markiert');
+  G('closeModal')();
+});
+step('Ertragsübersicht im Forschungsbogen (Punkt 2)', () => {
+  const S = G('S'), pi = S.cur;
+  G('capitalOf')(S, pi).pop = 3;
+  $('a-tech').onclick();
+  const panel = $('ov-body').querySelector('.yield-panel');
+  if (!panel) throw new Error('keine Ertragsübersicht');
+  const rows = panel.querySelectorAll('.yrow');
+  if (rows.length < 2) throw new Error('Übersicht hat zu wenige Zeilen');
+  if (!$('overlay').classList.contains('wide')) throw new Error('Modal nicht verbreitert');
+  // die Summe muss dem Einkommen entsprechen
+  const inc = G('income')(S, pi);
+  console.log('       ' + rows.length + ' Zeilen · Summe ' + [inc.sci, inc.food, inc.coins].join('/'));
+  G('closeModal')();
+});
+step('Bot-Zug: nur „Weiter" führt weiter (Punkt 5)', () => {
+  const S = G('S');
+  $('a-end').onclick();                       // menschlichen Zug beenden → Bots laufen
+  let guard = 0;
+  while (S.players[S.cur].kind === 'bot' && !S.over && guard++ < 6) {
+    if (!$('bot-next')) throw new Error('kein Weiter-Knopf im Bot-Sheet');
+    if (!G('ui').botLock) throw new Error('Sheet ist während Bot-Zug nicht gesperrt');
+    G('closeSheet')();                         // darf nichts bewirken
+    if (!$('sheet').classList.contains('open')) throw new Error('Sheet ließ sich trotz Sperre schließen');
+    $('bot-next').onclick();
+  }
+  if (G('ui').botLock) throw new Error('Sperre nach Bot-Runde nicht aufgehoben');
 });
 step('Zug beenden + Bot-Züge', () => {
   for (let i = 0; i < 8 && !G('S').over; i++) {
