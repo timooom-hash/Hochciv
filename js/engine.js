@@ -270,7 +270,12 @@ function rates(p) {
 function available(S, pi, kind) {   // wie viel man höchstens ausgeben kann
   const p = S.players[pi], r = rates(p), R = p.res;
   if (kind === 'food') return R.food + Math.floor(R.coins / r.coinsToFood) + Math.floor(R.sci / r.sciToFood);
-  if (kind === 'sci') return R.sci + Math.floor(R.coins / r.coinsToSci);
+  if (kind === 'sci') {
+    // Münzen sind die Drehscheibe: eigene Münzen plus die aus Nahrung umwandelbaren
+    // (bei England 1:1) können in Wissenschaft getauscht werden.
+    const coinsFromFood = r.foodToCoins === Infinity ? 0 : Math.floor(R.food / r.foodToCoins);
+    return R.sci + Math.floor((R.coins + coinsFromFood) / r.coinsToSci);
+  }
   return R.coins + Math.floor(R.sci / r.sciToCoins) + Math.floor(R.food / r.foodToCoins);
 }
 function pay(S, pi, kind, amount) {
@@ -285,7 +290,15 @@ function pay(S, pi, kind, amount) {
   };
   take(kind, 1);
   if (kind === 'food') { take('coins', r.coinsToFood); take('sci', r.sciToFood); }
-  else if (kind === 'sci') { take('coins', r.coinsToSci); }
+  else if (kind === 'sci') {
+    take('coins', r.coinsToSci);
+    // Rest über Nahrung → Münzen → Wissenschaft (nur wenn beide Kurse existieren)
+    if (need > 0 && r.foodToCoins !== Infinity && r.coinsToSci !== Infinity) {
+      const perSci = r.coinsToSci * r.foodToCoins;   // Nahrung je Wissenschaft
+      const n = Math.min(need, Math.floor(R.food / perSci));
+      R.food -= n * perSci; need -= n;
+    }
+  }
   else { take('sci', r.sciToCoins); take('food', r.foodToCoins); }
   return need <= 0;
 }
