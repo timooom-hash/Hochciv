@@ -507,7 +507,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 /* Gratis-Wachstum (v2) getrennt vom bezahlten Wachstum */
 {
   const S = mkV2('griechenland', ['verbundwerkstoffe']);
-  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.born = 0;
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
   eq(freeGrowthAvailable(S, 0, c), true, 'Gratis-Wachstum steht bereit');
   eq(growCity(S, 0, c, 'free'), null, 'kostenloses Wachstum klappt');
   eq(c.pop, 4, 'Bevölkerung +1 ohne Kosten');
@@ -517,6 +517,31 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(canGrowPaid(S, 0, c), null, 'bezahltes Wachstum danach möglich');
   eq(growCity(S, 0, c, 'paid'), null, 'bezahltes Wachstum klappt');
   eq(c.pop, 5, 'zweites Wachstum bezahlt');
+}
+
+/* Regression: bezahltes Wachstum ZUERST darf das Gratis-Kontingent nicht verbrauchen */
+{
+  const S = mkV2('griechenland', ['verbundwerkstoffe']);
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
+  S.players[0].res = { sci: 0, food: 99, coins: 99 };
+  eq(growCity(S, 0, c, 'paid'), null, 'erst bezahlt wachsen');
+  eq(freeGrowthAvailable(S, 0, c), true, 'Gratis-Wachstum bleibt danach verfügbar (Bugfix)');
+  eq(growCity(S, 0, c, 'free'), null, 'kostenloses Wachstum danach klappt');
+  eq(c.pop, 5, 'beide Wachstumsschritte gezählt');
+  eq(freeGrowthAvailable(S, 0, c), false, 'jetzt beide Kontingente aufgebraucht');
+}
+
+/* Regression: Keramik+Verbund, 2× bezahlt zuerst, Gratis muss noch gehen (max 3) */
+{
+  const S = mkV2('griechenland', ['keramik', 'verbundwerkstoffe']);
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
+  S.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq(growCity(S, 0, c, 'paid'), null, 'erstes bezahltes Wachstum');
+  eq(growCity(S, 0, c, 'paid'), null, 'zweites bezahltes Wachstum');
+  eq(freeGrowthAvailable(S, 0, c), true, 'Gratis nach 2× bezahlt noch verfügbar');
+  eq(growCity(S, 0, c, 'free'), null, 'kostenloses Wachstum als dritter Schritt');
+  eq(c.pop, 6, 'drei Wachstumsschritte insgesamt');
+  eq(typeof canGrow(S, 0, c), 'string', 'ein viertes Wachstum wird abgelehnt (max 3)');
 }
 
 /* Einkommensaufschlüsselung summiert sich zum Gesamteinkommen */
