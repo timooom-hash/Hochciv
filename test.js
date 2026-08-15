@@ -135,6 +135,23 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(available(E, 0, 'food'), 4, 'England: 4 Münzen ergeben 4 Nahrung');
 }
 
+/* --- England kann Nahrung für Forschung ausgeben (Nahrung = Münzen = Wissenschaft) */
+{
+  const E = mk('england');
+  E.players[0].res = { sci: 0, food: 10, coins: 0 };   // nur Nahrung
+  eq(available(E, 0, 'sci'), 5, 'England: 10 Nahrung → 10 Münzen → 5 Wissenschaft (Kurs 2)');
+  eq(pay(E, 0, 'sci', 3), true, 'England kann 3 Wissenschaft aus Nahrung bezahlen');
+  eq(E.players[0].res.food, 4, '3 Wissenschaft kosten 6 Nahrung, 4 übrig');
+  // mit Computertechnik ist der Kurs 1:1
+  const E2 = mk('england', ['computertechnik']);
+  E2.players[0].res = { sci: 0, food: 10, coins: 0 };
+  eq(available(E2, 0, 'sci'), 10, 'England mit Computertechnik: 10 Nahrung → 10 Wissenschaft');
+  // Nicht-England darf das nicht
+  const G = mk('griechenland');
+  G.players[0].res = { sci: 0, food: 10, coins: 0 };
+  eq(available(G, 0, 'sci'), 0, 'Griechenland kann Nahrung NICHT in Wissenschaft tauschen');
+}
+
 /* --- Verteidigungswert aus dem Kampfbeispiel: Stadt mit 2 Bevölkerung + Bot-Armee
        daneben (Bot-Macht = Gesamtbevölkerung 3) → 5                              */
 {
