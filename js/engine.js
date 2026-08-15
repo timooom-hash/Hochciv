@@ -320,7 +320,7 @@ function beginTurn(S) {
     log(S, 'info', `Macht −${loss} (1/${div}, aufgerundet) → ${p.power}.`);
   }
   // Zustände zurücksetzen
-  S.cities.forEach(c => { if (c.owner === S.cur) c.grown = 0; });
+  S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
   S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
   p.copies = 0; p.nuked = false;
 }
@@ -390,18 +390,21 @@ function growLimits(S, pi) {
   const free = has(p, 'verbundwerkstoffe') ? 1 : 0;
   return { max: paidMax + free, free };
 }
+// Das kostenlose Kontingent ist NICHT an die Reihenfolge gebunden: es zählt, wie viele
+// Gratis-Schritte diese Runde schon genutzt wurden (city.freeUsed), unabhängig davon,
+// ob vorher bezahlt gewachsen wurde.
 function growCost(S, pi, city) {
   const p = S.players[pi];
-  const lim = growLimits(S, pi);
-  // die ersten `free` Wachstumsschritte dieser Runde sind kostenlos
-  if ((city.grown || 0) < lim.free) return { food: 0, coins: 0, free: true };
+  if (freeGrowthAvailable(S, pi, city)) return { food: 0, coins: 0, free: true };
   return { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
 }
 // Steht der Stadt diese Runde noch ein kostenloses Wachstum zu? (v2 mit Verbundwerkstoffe)
 function freeGrowthAvailable(S, pi, city) {
   if (city.owner !== pi || city.born === S.round) return false;
   const lim = growLimits(S, pi);
-  return lim.free > 0 && (city.grown || 0) < lim.free;
+  if (lim.free <= 0) return false;
+  if ((city.grown || 0) >= lim.max) return false;          // Gesamtmaximum erreicht
+  return (city.freeUsed || 0) < lim.free;                  // Gratis-Kontingent noch offen
 }
 function canGrow(S, pi, city) {
   if (city.owner !== pi) return 'Fremde Stadt.';
@@ -430,7 +433,7 @@ function canGrowPaid(S, pi, city) {
 function growCity(S, pi, city, mode) {
   if (mode === 'free') {
     if (!freeGrowthAvailable(S, pi, city)) return 'Kein kostenloses Wachstum verfügbar.';
-    city.pop++; city.grown = (city.grown || 0) + 1;
+    city.pop++; city.grown = (city.grown || 0) + 1; city.freeUsed = (city.freeUsed || 0) + 1;
     log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst kostenlos auf ${city.pop}.`);
     return null;
   }
@@ -439,7 +442,7 @@ function growCity(S, pi, city, mode) {
     const p = S.players[pi];
     const cost = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
     if (cost.food) pay(S, pi, 'food', cost.food); if (cost.coins) pay(S, pi, 'coins', cost.coins);
-    city.pop++; city.grown = (city.grown || 0) + 1;
+    city.pop++; city.grown = (city.grown || 0) + 1;   // freeUsed bleibt: bezahltes Wachstum verbraucht das Gratis-Kontingent nicht
     log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst auf ${city.pop} (${cost.food} Nahrung, ${cost.coins} Münzen).`);
     return null;
   }
@@ -447,6 +450,7 @@ function growCity(S, pi, city, mode) {
   const c = growCost(S, pi, city);
   if (c.food) pay(S, pi, 'food', c.food); if (c.coins) pay(S, pi, 'coins', c.coins);
   city.pop++; city.grown = (city.grown || 0) + 1;
+  if (c.free) city.freeUsed = (city.freeUsed || 0) + 1;
   log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst auf ${city.pop}` +
     (c.free ? ' (kostenlos).' : ` (${c.food} Nahrung, ${c.coins} Münzen).`));
   return null;
