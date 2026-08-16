@@ -444,13 +444,22 @@ function techModal() {
       <span class="c">${sc}</span><b>Singularität</b><span class="eff">${SINGULARITY.e}</span></button>`;
   const cop = copyableTechs(S, pi);
   if (cop.length) {
-    const free = internetAvailable(S, pi) && cop.some(o => o.free);
+    const anyFree = internetAvailable(S, pi) && cop.some(o => o.freeOk);
     grid += `<p class="sub" style="margin-top:14px">Technologien kopieren${
-      free ? ' · 1× gratis per Internet' : ''}</p>`;
+      anyFree ? ' · 1× gratis per Internet' : ''}</p>`;
     cop.slice(0, 40).forEach(o => {
-      grid += `<button class="tech avail" data-copy="${o.tech.k}"><span class="c">${
-        o.free ? 'gratis' : o.coins + '🪙'}</span>
-        <b>${o.tech.n}</b><span class="eff">${o.tech.e}</span>${ownerMarks(S, o.tech.k, pi)}</button>`;
+      // je Technologie ggf. zwei Knöpfe: bezahlt und/oder gratis
+      const buttons = [];
+      if (o.paidCoins != null)
+        buttons.push(`<button class="tech avail" data-copy="${o.tech.k}" data-mode="paid">
+          <span class="c">${o.paidCoins}🪙</span><b>${o.tech.n}</b>
+          <span class="eff">${o.tech.e}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
+      if (o.freeOk)
+        buttons.push(`<button class="tech avail" data-copy="${o.tech.k}" data-mode="free">
+          <span class="c">gratis</span><b>${o.tech.n}</b>
+          <span class="eff">Internet · Gratiskopie${o.paidCoins != null ? '' : ''}</span>
+          ${ownerMarks(S, o.tech.k, pi)}</button>`);
+      grid += buttons.join('');
     });
   }
   const layout = `<div class="tech-layout">
@@ -465,7 +474,7 @@ function techModal() {
     redraw(); if (S.over) { closeModal(); gameOver(); } else techModal();
   });
   $('ov-body').querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
-    const e = copyTech(S, S.cur, b.dataset.copy);
+    const e = copyTech(S, S.cur, b.dataset.copy, b.dataset.mode);
     if (e) return toast(e); redraw(); techModal();
   });
 }
@@ -500,9 +509,9 @@ function endHumanTurn() {
   }
   ui.confirmedEnd = false; ui.army = null; ui.sel = null; ui.mode = null;
   closeSheet();
-  const before = S.log.length;
+  const sinceSeq = S.logSeq || 0;
   finishTurn(S);                       // Kampf und Siegprüfung
-  const fights = S.log.slice(before).filter(l => l.c === 'fight');
+  const fights = logSince(S, sinceSeq).filter(l => l.c === 'fight');
   redraw();
   if (S.over) return gameOver();
   advanceTurn(S);
@@ -517,11 +526,14 @@ function runBots() {
     toast(civOf(p).n + ' ist am Zug');
     return redraw();
   }
-  const before = S.log.length;
+  const sinceSeq = S.logSeq || 0;
   botTurn(S, S.cur);
   finishTurn(S);                       // Kampf des Bots, einmal pro Zug
   redraw();
-  const lines = S.log.slice(before).map(l => `<div class="logline ${l.c}">${l.m}</div>`).join('');
+  const entries = logSince(S, sinceSeq);
+  const lines = entries.length
+    ? entries.map(l => `<div class="logline ${l.c}">${l.m}</div>`).join('')
+    : '<div class="logline info">Keine Aktionen in dieser Runde.</div>';
   ui.botLock = true;                   // Sheet ist jetzt gesperrt: nur „Weiter" führt weiter
   sheet(`<h3>${civOf(p).n} (Bot)</h3><p class="sub">Runde ${S.round}</p>${lines}
     <button class="btn wide" id="bot-next">Weiter</button>`);

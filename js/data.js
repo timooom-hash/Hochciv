@@ -95,7 +95,7 @@ TECHS.forEach(t => { t.age = ageOfCost(t.c); });
    Regel-Flags. Die zwei neuen Technologien liegen an den im Heft genannten
    Stellen (Keramik: Produktion/Antike, Theologie: Spezial/Mittelalter). */
 const TECHS_V2_EXTRA = [
-  { k: 'keramik', n: 'Keramik', f: 1, c: 4, e: 'Wie Verbundwerkstoffe: Städte 2x/Runde erweitern' },
+  { k: 'keramik', n: 'Keramik', f: 1, c: 4, e: 'Städte 2× pro Runde erweitern' },
   { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>3/5 der Bevölkerung zum Sieg' },
 ];
 
@@ -127,10 +127,18 @@ const RULESETS = {
   },
 };
 
+// Basistexte, die je Regelmodus abweichen können. Werden bei jedem setRules gesetzt,
+// damit ein Moduswechsel nicht die Beschreibung des anderen Modus behält.
+const TECH_TEXT_BASE = { verbundwerkstoffe: 'Städte 2× pro Runde erweitern' };
 function setRules(key) {
   RULES = RULESETS[key] || RULESETS.standard;
   RULES.extraTechs.forEach(t => { if (t.age === undefined) t.age = ageOfCost(t.c); });
   TECHS_ACTIVE = TECHS.concat(RULES.extraTechs);
+  // Effekttexte je Modus setzen
+  const vb = TECHS.find(t => t.k === 'verbundwerkstoffe');
+  if (vb) vb.e = RULES.verbundGratisGrowth
+    ? '1× zusätzliches, kostenloses Wachstum pro Stadt'   // v2
+    : TECH_TEXT_BASE.verbundwerkstoffe;                    // Standard
   TECH_BY_KEY = {};
   TECHS_ACTIVE.forEach(t => { TECH_BY_KEY[t.k] = t; });
   SINGULARITY = {
@@ -138,8 +146,10 @@ function setRules(key) {
     e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
   };
 }
-// Techs je Feld und Zeitalter, in Bogen-Reihenfolge (wichtig fürs Auswürfeln)
-function techsIn(field, age) { return TECHS_ACTIVE.filter(t => t.f === field && t.age === age); }
+// Techs je Feld und Zeitalter, nach Kosten sortiert (billigere zuerst)
+function techsIn(field, age) {
+  return TECHS_ACTIVE.filter(t => t.f === field && t.age === age).sort((a, b) => a.c - b.c);
+}
 setRules('standard');
 
 /* ---------------------------------------------------------------- Zivilisationen */

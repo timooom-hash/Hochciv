@@ -17,7 +17,13 @@ function d6(S, why) {
   return v;
 }
 function pick(S, arr) { return arr[Math.floor(nextRand(S) * arr.length)]; }
-function log(S, cls, msg) { S.log.push({ c: cls, m: msg, r: S.round }); if (S.log.length > 600) S.log.shift(); }
+function log(S, cls, msg) {
+  S.logSeq = (S.logSeq || 0) + 1;
+  S.log.push({ c: cls, m: msg, r: S.round, seq: S.logSeq });
+  if (S.log.length > 600) S.log.shift();
+}
+// Alle Log-Einträge ab einer Sequenznummer (stabil, auch wenn ältere weggekappt wurden).
+function logSince(S, seq) { return S.log.filter(e => e.seq > seq); }
 
 /* ------------------------------------------------------------ Kürzel */
 const P = S => S.players[S.cur];
@@ -343,16 +349,28 @@ function moveAllowance(S, pi) {
   const p = S.players[pi];
   return has(p, 'luftwaffe') ? 9 : has(p, 'panzerschiff') ? 6 : 3;
 }
-function canEnter(S, pi, r, c) {
+// Darf das Feld auf dem Weg durchquert werden? Navigation/Panzerschiff/Luftwaffe erlauben Wasser.
+function canPass(S, pi, r, c) {
   const p = S.players[pi];
   const t = terrainAt(S, r, c);
   if (!t) return false;
-  if (cityAt(S, r, c)) return false;            // Armeen dürfen auf keine Stadt ziehen
+  if (cityAt(S, r, c)) return false;            // Städte blockieren
   if (armyAt(S, r, c)) return false;            // nicht auf andere Armeen (nicht stapelbar)
-  if (has(p, 'luftwaffe')) return true;         // Luftwaffe ignoriert Gelände (Städte/Armeen s.o.)
+  if (has(p, 'luftwaffe')) return true;         // Luftwaffe ignoriert Gelände
   if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
   return true;
 }
+// Darf die Armee auf diesem Feld anhalten? Auf Wasser nur mit Panzerschiff oder Luftwaffe,
+// NICHT mit bloßer Navigation (die erlaubt nur das Durchqueren).
+function canStop(S, pi, r, c) {
+  if (!canPass(S, pi, r, c)) return false;
+  const t = terrainAt(S, r, c);
+  if (!TERRAIN[t].land && !(has(S.players[pi], 'panzerschiff') || has(S.players[pi], 'luftwaffe')))
+    return false;
+  return true;
+}
+// Rückwärtskompatibel: canEnter = durchqueren erlaubt.
+function canEnter(S, pi, r, c) { return canPass(S, pi, r, c); }
 /* Kontrollzone (Schießpulver): wer ein Feld neben einer feindlichen Armee betritt, hält an */
 function zocStop(S, pi, r, c) {
   if (has(S.players[pi], 'luftwaffe')) return false;        // Luftwaffe ignoriert Kontrollzonen
@@ -375,9 +393,17 @@ function moveCost(S, r1, c1, r2, c2) {
 }
 function armyReach(S, army) {
   const pi = army.owner;
-  return reachable(army.r, army.c, army.mp,
-    (r, c) => canEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
+  const raw = reachable(army.r, army.c, army.mp,
+    (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
+  // Felder, auf denen die Armee nicht anhalten darf (Wasser ohne Panzerschiff/Luftwaffe),
+  // sind zwar durchquerbar, aber keine gültigen Zielfelder.
+  const out = new Map();
+  for (const [k, v] of raw) {
+    const [r, c] = unkey(k);
+    if (canStop(S, pi, r, c)) out.set(k, v);
+  }
+  return out;
 }
 function moveArmy(S, army, r, c) {
   const reach = armyReach(S, army);
@@ -607,25 +633,35 @@ function copyableTechs(S, pi) {
       seen.add(k);
       const t = TECH_BY_KEY[k];
       if (!t) return;
-      // Wenn bezahlt möglich ist, Preis nennen; sonst (nur Internet) gratis.
-      const coins = paidPossible ? rate * t.c : 0;
-      out.push({ tech: t, coins, free: !paidPossible });
+      // Beide Wege sind unabhängig: bezahlt (Spionage/Kundschafterei) UND/ODER
+      // die eine Gratiskopie pro Runde (Internet).
+      out.push({
+        tech: t,
+        paidCoins: paidPossible ? rate * t.c : null,   // null = kein bezahlter Weg
+        freeOk: freePossible,                          // true = Gratiskopie möglich
+      });
     });
   });
   return out;
 }
-function copyTech(S, pi, tk) {
+function copyTech(S, pi, tk, mode) {
   const p = S.players[pi];
   const opt = copyableTechs(S, pi).find(o => o.tech.k === tk);
   if (!opt) return 'Nicht kopierbar.';
-  if (opt.free) {
-    if (!internetAvailable(S, pi)) return 'Diese Runde schon per Internet kopiert.';
+  // Modus wählen: 'free' oder 'paid'. Ohne Angabe: bezahlt bevorzugen, damit die
+  // Gratiskopie für später frei bleibt.
+  const useMode = mode || (opt.paidCoins != null ? 'paid' : 'free');
+  if (useMode === 'free') {
+    if (!opt.freeOk || !internetAvailable(S, pi)) return 'Diese Runde schon per Internet kopiert.';
     p.internetUsed = S.round;
+    p.techs[tk] = true;
+    log(S, 'act', `${civOf(p).n}: ${opt.tech.n} kopiert (Internet, gratis).`);
   } else {
-    if (opt.coins && !pay(S, pi, 'coins', opt.coins)) return `Zu wenig Münzen (${opt.coins} nötig).`;
+    if (opt.paidCoins == null) return 'Kein bezahlter Kopierweg erforscht.';
+    if (opt.paidCoins && !pay(S, pi, 'coins', opt.paidCoins)) return `Zu wenig Münzen (${opt.paidCoins} nötig).`;
+    p.techs[tk] = true;
+    log(S, 'act', `${civOf(p).n}: ${opt.tech.n} kopiert (${opt.paidCoins} Münzen).`);
   }
-  p.techs[tk] = true;
-  log(S, 'act', `${civOf(p).n}: ${opt.tech.n} kopiert${opt.coins ? ' (' + opt.coins + ' Münzen)' : ' (Internet, gratis)'}.`);
   const same = TECHS_ACTIVE.filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
   if (same.length === 1) rollAvailability(S, pi, opt.tech.f, opt.tech.age + 1);
   return null;

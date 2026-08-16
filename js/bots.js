@@ -94,7 +94,9 @@ function botMoveArmy(S, pi, army) {
   const reach = reachable(army.r, army.c, army.mp,
     (r, c) => botCanEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
-  const tiles = [...reach.keys()].map(unkey);
+  // Zielfelder: nur solche, auf denen die Armee auch anhalten darf (kein Wasser ohne
+  // Panzerschiff/Luftwaffe). Wasser bleibt als Durchgangsfeld erlaubt.
+  const tiles = [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c));
   if (!tiles.length) return;
   const cost = t => reach.get(key(t[0], t[1]));
   const rng = attackRange(S, pi);
@@ -186,11 +188,22 @@ function botMoveArmy(S, pi, army) {
     const list = rim.length ? rim : (inRealm.length ? inRealm : [[army.r, army.c]]);
     const enemyCities = S.cities.filter(x => x.owner !== pi);
     if (enemyCities.length) {
-      // nächste Gegnerstadt je Zielfeld bestimmen, dann nach (Distanz, Verteidigung) werten
+      // Distanz über tatsächlich passierbares Gelände (nicht Luftlinie): der Bot kann
+      // ohne die passende Technologie nicht über Wasser, muss also außenherum.
+      const passable = (r, c) => {
+        const t = terrainAt(S, r, c);
+        if (!t) return false;
+        if (cityAt(S, r, c)) return false;      // Städte blockieren den Weg
+        return TERRAIN[t].land || has(p, 'navigation') || has(p, 'panzerschiff') || has(p, 'luftwaffe');
+      };
+      const distTo = (c, t) => {
+        const d = pathSteps(t[0], t[1], c.r, c.c, passable);
+        return d == null ? 9999 : d;            // unerreichbar (z. B. andere Insel) ganz hinten
+      };
       goal = chooseBy(list, t => {
         let bestDist = Infinity, bestDef = Infinity;
         for (const c of enemyCities) {
-          const d = hexDistance(c.r, c.c, t[0], t[1]);
+          const d = distTo(c, t);
           const def = defenseValue(S, c);
           if (d < bestDist || (d === bestDist && def < bestDef)) { bestDist = d; bestDef = def; }
         }
