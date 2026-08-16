@@ -253,6 +253,20 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(!!B.cities.find(x => x.id === gr.id), true, 'Hauptstadt steht nach einem Bot-Zug noch');
 }
 
+/* --- Log-Fenster bei vollem Protokoll: logSince liefert neue Einträge, slice-by-length nicht */
+{
+  const S = mk('griechenland');
+  // Log über die 600er-Grenze füllen
+  for (let i = 0; i < 650; i++) log(S, 'roll', 'Füller ' + i);
+  eq(S.log.length, 600, 'Protokoll ist auf 600 Einträge gekappt');
+  const beforeLen = S.log.length;      // fehleranfälliger Längen-Marker
+  const sinceSeq = S.logSeq;           // stabiler Sequenz-Marker
+  log(S, 'act', 'Neuer Eintrag A'); log(S, 'act', 'Neuer Eintrag B');
+  eq(S.log.slice(beforeLen).length, 0, 'slice(length) findet die neuen Einträge NICHT (der alte Bug)');
+  eq(logSince(S, sinceSeq).length, 2, 'logSince findet beide neuen Einträge trotz Kappung');
+  eq(logSince(S, sinceSeq).map(e => e.m), ['Neuer Eintrag A', 'Neuer Eintrag B'], 'korrekte neue Einträge');
+}
+
 /* --- Stadtfelder zählen als Straße bzw. Eisenbahn */
 {
   const S = mk('griechenland');
@@ -338,21 +352,39 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   S.players[0].techs.internet = true;
   eq(internetAvailable(S, 0), true, 'Internet-Kopie steht zu Rundenbeginn bereit');
   const opt = copyableTechs(S, 0);
-  eq(opt.length >= 2 && opt.every(o => o.free), true, 'reines Internet: alle Kopien gratis');
+  eq(opt.length >= 2 && opt.every(o => o.freeOk && o.paidCoins == null), true, 'reines Internet: nur Gratiskopie, kein bezahlter Weg');
   eq(copyTech(S, 0, 'stadtmauern'), null, 'erste Gratiskopie klappt');
   eq(typeof copyTech(S, 0, 'taktik'), 'string', 'zweite Kopie in derselben Runde wird abgelehnt');
 }
 
-/* Spionage + Internet kombiniert: bezahlte Kopie plus eine Gratiskopie */
+/* Kundschafterei/Spionage + Internet: jede Tech bietet bezahlt UND gratis an */
 {
   const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 15 });
   S.players[1].techs.stadtmauern = true;   // Kosten 5
   S.players[1].techs.taktik = true;        // Kosten 1
-  S.players[0].techs.spionage = true; S.players[0].techs.internet = true;
+  S.players[0].techs.kundschafterei = true; S.players[0].techs.internet = true;
   S.players[0].res.coins = 50;
-  const opt = copyableTechs(S, 0);
-  eq(opt.every(o => !o.free), true, 'mit Spionage sind Kopien bezahlt (Internet separat)');
-  eq(opt.find(o => o.tech.k === 'stadtmauern').coins, 5, 'Spionage: 1× Basiskosten in Münzen');
+  const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
+  eq(sm.paidCoins, 15, 'Kundschafterei: 3× Basiskosten (3×5) in Münzen');
+  eq(sm.freeOk, true, 'Internet-Gratiskopie steht trotz Kundschafterei zur Verfügung (Bugfix)');
+  // Gratiskopie kostet keine Münzen und verbraucht das Rundenkontingent
+  eq(copyTech(S, 0, 'stadtmauern', 'free'), null, 'gratis kopieren klappt');
+  eq(S.players[0].res.coins, 50, 'Gratiskopie kostet keine Münzen');
+  eq(internetAvailable(S, 0), false, 'Internet-Kontingent danach verbraucht');
+  // eine zweite Kopie in derselben Runde geht nur noch bezahlt
+  const tk = copyableTechs(S, 0).find(o => o.tech.k === 'taktik');
+  eq(tk.freeOk, false, 'keine zweite Gratiskopie in derselben Runde');
+  eq(tk.paidCoins, 3, 'bezahlter Weg (3×1) bleibt');
+}
+
+/* Nur Spionage (ohne Internet): bezahlt, keine Gratiskopie */
+{
+  const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 15 });
+  S.players[1].techs.stadtmauern = true;
+  S.players[0].techs.spionage = true;
+  const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
+  eq(sm.paidCoins, 5, 'Spionage: 1× Basiskosten in Münzen');
+  eq(sm.freeOk, false, 'ohne Internet keine Gratiskopie');
 }
 
 /* === Experimentelle Variante v2 === */
@@ -470,6 +502,28 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(realm().has(key(a.r, a.c)), true, 'Bot verlässt sein Reich ohne höhere Priorität NICHT');
 }
 
+/* Bot-Zielwahl nutzt Geländedistanz, nicht Luftlinie (kein Weg über Wasser) */
+{
+  const S = newGame({ players: [{ civ: 'russland', kind: 'bot', diff: 'prinz' }, { civ: 'england', kind: 'human' }], seed: 20 });
+  const passableLand = (r, c) => {
+    const t = terrainAt(S, r, c);
+    return t && !cityAt(S, r, c) && TERRAIN[t].land;   // ohne Navigation: kein Wasser
+  };
+  // Ein Feld finden, dessen Landweg zu einem Ziel länger ist als die Luftlinie
+  // (weil Wasser dazwischen liegt) – das belegt, dass beide Maße sich unterscheiden.
+  const cap = capitalOf(S, 0);
+  let diffSeen = false, blockedSeen = false;
+  for (let dr = -5; dr <= 5; dr++) for (let dc = -5; dc <= 5; dc++) {
+    const r = cap.r + dr, c = cap.c + dc, t = terrainAt(S, r, c);
+    if (!t || TERRAIN[t].land || cityAt(S, r, c)) continue;   // nur Wasserziele
+    const air = hexDistance(cap.r, cap.c, r, c);
+    const land = pathSteps(cap.r, cap.c, r, c, passableLand);
+    if (land == null) blockedSeen = true;
+    else if (land > air) diffSeen = true;
+  }
+  eq(diffSeen || blockedSeen, true, 'Geländedistanz weicht von der Luftlinie ab, wo Wasser im Weg liegt');
+}
+
 /* Luftwaffe: Reichweitensprung wirkt sofort im selben Zug */
 {
   const S = mk('griechenland');
@@ -519,6 +573,35 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const fresh = S.armies[S.armies.length - 1];
   const out = neighbors(cap.r, cap.c).find(([r, c]) => canEnter(S, 0, r, c));
   eq(moveArmy(S, fresh, out[0], out[1]), null, 'frische Armee kann aus der Stadt herausziehen');
+}
+
+/* Navigation: Wasser durchqueren erlaubt, aber nicht darauf anhalten */
+{
+  const S = mk('england', ['navigation']);
+  const cap = capitalOf(S, 0);
+  const spot = spotBy(S, cap);
+  S.armies.push({ id: 1, owner: 0, r: spot[0], c: spot[1], mp: 6, born: 0 });
+  const army = S.armies[0];
+  // ein Wasserfeld in der Nähe finden
+  let water = null;
+  for (let dr = -3; dr <= 3 && !water; dr++) for (let dc = -3; dc <= 3; dc++) {
+    const r = cap.r + dr, c = cap.c + dc, t = terrainAt(S, r, c);
+    if (t && !TERRAIN[t].land && !cityAt(S, r, c)) { water = [r, c]; break; }
+  }
+  if (water) {
+    eq(canPass(S, 0, water[0], water[1]), true, 'Navigation: Wasser darf durchquert werden');
+    eq(canStop(S, 0, water[0], water[1]), false, 'Navigation: auf Wasser darf NICHT angehalten werden');
+    eq(typeof moveArmy(S, army, water[0], water[1]), 'string', 'Zug auf ein Wasserfeld wird abgelehnt');
+    S.players[0].techs.panzerschiff = true;
+    eq(canStop(S, 0, water[0], water[1]), true, 'mit Panzerschiff darf man auf Wasser anhalten');
+  }
+  // die Reach-Map enthält nie ein Wasserfeld als Ziel (nur Navigation)
+  const S2 = mk('england', ['navigation']);
+  const cap2 = capitalOf(S2, 0); const spot2 = spotBy(S2, cap2);
+  S2.armies.push({ id: 2, owner: 0, r: spot2[0], c: spot2[1], mp: 6, born: 0 });
+  eq([...armyReach(S2, S2.armies[0]).keys()].every(k => {
+    const [r, c] = unkey(k); return TERRAIN[terrainAt(S2, r, c)].land;
+  }), true, 'kein Wasserfeld ist ein gültiges Zielfeld (nur Navigation)');
 }
 
 /* Gratis-Wachstum (v2) getrennt vom bezahlten Wachstum */
@@ -571,6 +654,19 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(sum, b.total, 'Aufschlüsselung (Gelände + Bevölkerung) summiert sich zum Einkommen');
   const inc = income(S, 0);
   eq(b.total, [inc.sci, inc.food, inc.coins], 'Übersichtssumme entspricht income()');
+}
+
+/* v2: Tech-Labels korrekt und Sortierung nach Kosten */
+{
+  setRules('v2');
+  eq(TECH_BY_KEY.keramik.e, 'Städte 2× pro Runde erweitern', 'v2: Keramik hat eigenständiges Label');
+  eq(TECH_BY_KEY.verbundwerkstoffe.e, '1× zusätzliches, kostenloses Wachstum pro Stadt', 'v2: Verbundwerkstoffe zeigt Gratis-Wachstum');
+  const prod = techsIn(1, 0).map(t => t.c);
+  eq(prod, prod.slice().sort((a, b) => a - b), 'Techs sind nach Kosten sortiert');
+  eq(techsIn(1, 0).map(t => t.n), ['Landwirtschaft', 'Fischerei', 'Rad', 'Keramik', 'Bewässerung'], 'Keramik (4) steht vor Bewässerung (5)');
+  setRules('standard');
+  eq(TECH_BY_KEY.verbundwerkstoffe.e, 'Städte 2× pro Runde erweitern', 'Standard: Verbundwerkstoffe-Label zurückgesetzt');
+  eq(TECH_BY_KEY.keramik, undefined, 'Keramik gibt es nur in v2');
 }
 
 /* --- Vollständige Partien: 4 Bots, keine Ausnahmen, Spiel endet */

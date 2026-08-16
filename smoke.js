@@ -181,6 +181,20 @@ step('Ertragsübersicht im Forschungsbogen (Punkt 2)', () => {
   console.log('       ' + rows.length + ' Zeilen · Summe ' + [inc.sci, inc.food, inc.coins].join('/'));
   G('closeModal')();
 });
+step('Bot-Fenster zeigt Einträge auch bei vollem Log (Bugfix)', () => {
+  const S = G('S');
+  for (let i = 0; i < 650; i++) G('log')(S, 'roll', 'Füller ' + i);
+  if (S.log.length !== 600) throw new Error('Log nicht gekappt');
+  $('a-end').onclick();                       // Bots laufen
+  if (S.players[S.cur].kind === 'bot') {
+    const lines = $('sheet-body').querySelectorAll('.logline').length;
+    if (lines === 0) throw new Error('Bot-Fenster leer trotz Aktionen (der alte Bug)');
+    console.log('       Bot-Fenster: ' + lines + ' Zeilen bei vollem Log');
+    // die Runde zu Ende klicken
+    let g = 0;
+    while (S.players[S.cur].kind === 'bot' && !S.over && g++ < 6 && $('bot-next')) $('bot-next').onclick();
+  }
+});
 step('Bot-Zug: nur „Weiter" führt weiter (Punkt 5)', () => {
   const S = G('S');
   $('a-end').onclick();                       // menschlichen Zug beenden → Bots laufen
