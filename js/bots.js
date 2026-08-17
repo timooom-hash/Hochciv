@@ -287,7 +287,7 @@ function botMoveArmy(S, pi, army) {
 }
 
 /* ---------------------------------------------------- Forschung */
-function botResearch(S, pi, avoidFields = [], noSingularity = false) {
+function botResearch(S, pi, avoidFields = []) {
   const p = S.players[pi];
   let f, field, guard = 0;
   do {
@@ -295,7 +295,7 @@ function botResearch(S, pi, avoidFields = [], noSingularity = false) {
     field = f - 1;
   } while (avoidFields.includes(field) && ++guard < 20);  // v2: anderes Feld als beim ersten Mal
   // Singularität, sobald ein Feld der Moderne schon beforscht ist
-  if (!noSingularity && techPool(S).some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
+  if (techPool(S).some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
     p.techs.singularitaet = true;
     S.over = { winner: pi, how: 'Forschungssieg (Singularität)' };
     log(S, 'act', `${civOf(p).n} erforscht die Singularität!`);

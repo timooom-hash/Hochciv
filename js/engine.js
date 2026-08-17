@@ -379,7 +379,7 @@ function incomeBreakdown(S, pi) {
   }
   if (sea) extra.push({ name: 'Städte am Meer', glyph: '⚓', count: sea, y: [2 * sea, 2 * sea, 2 * sea] });
   // Wallfahrt (Erweiterung): je eigenem Weltwunder +3 auf alle drei Erträge
-  if (has(p, 'wallfahrt')) {
+  if (has(p, 'wallfahrt') && p.kind !== 'bot') {
     const w = wondersOf(S, pi).length;
     if (w) extra.push({ name: 'Wallfahrt', glyph: '⛪', count: w, y: [3 * w, 3 * w, 3 * w] });
   }

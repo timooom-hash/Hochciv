@@ -201,11 +201,25 @@ function barbFight(S, force) {
 /* ================================================================ Weltwunder */
 function wondersOf(S, pi) { return (S.wonders || []).filter(w => w.owner === pi); }
 function wondersInCity(S, city) { return (S.wonders || []).filter(w => w.cityId === city.id); }
-function hasWonder(S, pi, k) {
+/* Besitzt das Reich dieses Wunder? (reine Eigentumsfrage, gilt auch für Bots) */
+function ownsWonder(S, pi, k) {
   if (!S || !S.wonders || !S.wonders.length) return false;
   return S.wonders.some(w => w.owner === pi && w.k === k);
 }
-function kremlBuilt(S) { return !!(S && S.wonders && S.wonders.some(w => w.k === 'kreml')); }
+/* Wirkt dieses Wunder für das Reich? Bots und Barbaren wenden keine Wundereffekte an –
+   sie besitzen Wunder (für Kosten, Stufenregel und Kultursieg), nutzen sie aber nicht.
+   Einzige Ausnahme ist die Technologie Militärlogistik, die nur die Anzahl der eigenen
+   Wunder zählt (siehe moveAllowance) und deshalb nicht über hasWonder läuft. */
+function hasWonder(S, pi, k) {
+  const p = S && S.players && S.players[pi];
+  if (!p || p.kind === 'bot' || p.kind === 'barbar') return false;
+  return ownsWonder(S, pi, k);
+}
+// Der Kreml verteuert die Singularität für alle – aber nur, wenn ihn kein Bot hält.
+function kremlBuilt(S) {
+  if (!S || !S.wonders) return false;
+  return S.wonders.some(w => w.k === 'kreml' && hasWonder(S, w.owner, 'kreml'));
+}
 function wonderCounts(S, pi) {
   const c = { 1: 0, 2: 0, 3: 0 };
   for (const w of wondersOf(S, pi)) c[w.lvl]++;
@@ -217,7 +231,8 @@ function wonderCounts(S, pi) {
    10/20/30/…; das Muster setzt sich über das sechste Wunder hinaus fort. */
 function wonderCost(S, pi) {
   const idx = wondersOf(S, pi).length + 1;
-  const step = has(S.players[pi], 'baukraene') ? WONDER_STEP - 2 : WONDER_STEP;
+  const p = S.players[pi];
+  const step = (has(p, 'baukraene') && p.kind !== 'bot') ? WONDER_STEP - 2 : WONDER_STEP;
   return step * idx;
 }
 /* Pyramidenregel: Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. */
@@ -279,12 +294,9 @@ function buildWonder(S, pi, city, wk, opts) {
   if (gained > 0) for (const a of armiesOf(S, pi)) a.mp += gained;
   // Raumfahrt: bei jedem Wunderbau eine Technologie gratis (kein neues Zeitalter,
   // keine Singularität). Bots würfeln sie nach den normalen Bot-Forschungsregeln aus.
-  if (has(p, 'raumfahrt')) {
-    if (p.kind === 'bot') botResearch(S, pi, [], true);
-    else {
-      addFreePick(S, pi, { n: 1, unlockedOnly: true, why: 'Raumfahrt' });
-      log(S, 'info', `${civOf(p).n}: Raumfahrt – eine Technologie gratis erforschbar.`);
-    }
+  if (has(p, 'raumfahrt') && p.kind !== 'bot') {
+    addFreePick(S, pi, { n: 1, unlockedOnly: true, why: 'Raumfahrt' });
+    log(S, 'info', `${civOf(p).n}: Raumfahrt – eine Technologie gratis erforschbar.`);
   }
   if (!(opts && opts.noEffect)) applyWonderEffect(S, pi, city, w);
   if (w.lvl === 3) {
@@ -409,7 +421,9 @@ function loseCityWonders(S, city) {
   if (!S.wonders || !S.wonders.length) return;
   const list = wondersInCity(S, city);
   if (!list.length) return;
-  const protectedBy = list.some(w => w.k === 'stonehenge') || hasWonder(S, city.owner, 'stonehenge');
+  // Stonehenge schützt nur, wenn es für das Reich auch wirkt (nicht bei Bots)
+  const protectedBy = hasWonder(S, city.owner, 'stonehenge') ||
+    (list.some(w => w.k === 'stonehenge') && hasWonder(S, city.owner, 'stonehenge'));
   for (const w of list) {
     if (protectedBy) { w.cityId = null; continue; }
     removeWonder(S, w);
