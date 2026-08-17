@@ -190,3 +190,19 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
   .modal{border-radius:14px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Aufbau: Fähigkeitswahl je Zivilisation */
+.slot .row{padding:6px 0;border-top:1px solid var(--rule);font-size:12px}
+.slot select{padding:6px;font-size:12px;max-width:62%}
+.slot .abil{margin:6px 0 0;font-size:11px;color:var(--ink-soft);line-height:1.35}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
+/* Ereignis- und Wunderhinweise */
+.evbox{background:#f2e5cf;border:1px solid var(--rule);border-radius:10px;padding:9px 11px;margin:0 0 10px}
+.evbox b{font-family:var(--serif);font-size:15px}
+.evbox p{margin:3px 0 0;font-size:12px;color:var(--ink-soft);line-height:1.4}
+.wlist{margin-top:8px}
+.wtag{display:inline-block;font-size:11px;padding:2px 6px;border:1px solid var(--rule);
+  border-radius:20px;margin:0 4px 4px 0;background:var(--paper)}
+.tech.obsolete{opacity:.55;text-decoration:line-through}
+.tech.obsolete .eff{text-decoration:none;font-style:italic}
+.res.food{border:0;background:none;cursor:pointer}
