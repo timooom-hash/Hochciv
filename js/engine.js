@@ -42,18 +42,35 @@ const popOf = (S, pi) => citiesOf(S, pi).reduce((a, x) => a + x.pop, 0);
 const worldPop = S => S.cities.reduce((a, x) => a + x.pop, 0);
 const capitalOf = (S, pi) => citiesOf(S, pi).find(x => x.cap);
 const roadLevel = (S, r, c) => S.roads[key(r, c)] || 0;
-const civOf = p => CIVS.find(c => c.k === p.civ);
+const civOf = p => CIV_BY_KEY[p.civ] || BARB_CIV;
 
-/* Machtwert: Bots haben immer ihre Gesamtbevölkerung als Macht */
+/* Zivilisationsfähigkeit des Reiches ('basis' oder eine der Alternativen).
+   Bots und die neutrale Barbarenfraktion haben KEINE Fähigkeit. */
+function abilityOf(p) {
+  if (!p || p.kind === 'bot' || p.kind === 'barbar') return null;
+  return p.ability || 'basis';
+}
+function isAbil(p, k) { return abilityOf(p) === k; }
+
+/* Machtwert: Bots haben immer ihre Gesamtbevölkerung als Macht.
+   Zuschläge (Wikinger "Kriegerkultur", Zeusstatue) erhöhen den Machtwert,
+   gehen aber beim Machtverlust zu Zugbeginn nicht verloren. */
+function powerBonus(S, pi) {
+  const p = S.players[pi];
+  let b = 0;
+  if (isAbil(p, 'armeemacht')) b += armiesOf(S, pi).length;
+  if (hasWonder(S, pi, 'zeus')) b += 3;
+  return b;
+}
 function powerOf(S, pi) {
   const p = S.players[pi];
-  return p.kind === 'bot' ? popOf(S, pi) : p.power;
+  if (p.kind === 'barbar') return 0;
+  if (p.kind === 'bot') return popOf(S, pi);
+  return p.power + powerBonus(S, pi);
 }
 
 /* ------------------------------------------------------------ Neues Spiel */
 function newGame(cfg) {
-  const rules = cfg.rules || 'standard';
-  setRules(rules);
   // Feste Spielerreihenfolge: Russland → Griechenland → England → Wikinger.
   // Der Startspieler verschiebt nur den Einstiegspunkt in dieser Rotation.
   const ORDER = ['russland', 'griechenland', 'england', 'wikinger'];
@@ -61,18 +78,25 @@ function newGame(cfg) {
   const ordered = cfg.players.slice().sort((a, b) => ORDER.indexOf(a.civ) - ORDER.indexOf(b.civ));
   const startIdx = Math.max(0, ordered.findIndex(p => p.civ === startCiv));
   const S = {
-    v: 1, seed: (cfg.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
-    rules, round: 1, cur: 0, over: null, log: [],
+    v: 2, seed: (cfg.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
+    round: 1, cur: 0, over: null, log: [],
     map: JSON.parse(JSON.stringify(cfg.map || DEFAULT_MAP)),
     roads: {}, sieges: {}, bought: {},
     cities: [], armies: [], nextId: 1,
+    // Erweiterungen: Ereignisse und Weltwunder werden im Aufbau zugeschaltet
+    ev: cfg.events ? { mode: cfg.eventMode === 'easy' ? 'easy' : 'hard' } : null,
+    wo: !!cfg.wonders,
+    event: null, evNext: null, nukeBan: false,
+    wonders: [], wpool: { 1: [], 2: [], 3: [] }, wgone: [],
     players: ordered.map(pc => ({
       civ: pc.civ, kind: pc.kind, diff: pc.diff || 'prinz', name: pc.name || null,
+      ability: pc.kind === 'bot' ? 'basis' : (pc.ability || 'basis'),
       power: 0, techs: {}, avail: {}, res: { sci: 0, food: 0, coins: 0 },
       copies: 0, nuked: false, dead: false,
     })),
   };
-  log(S, 'head', 'Neues Spiel — ' + S.players.map(p => civOf(p).n + (p.kind === 'bot' ? ' (Bot)' : '')).join(', '));
+  log(S, 'head', 'Neues Spiel — ' + S.players.map(p => civOf(p).n + (p.kind === 'bot' ? ' (Bot)' : '')).join(', ') +
+    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? ' · Weltwunder' : ''));
 
   // Aufbau 3: Starttechnologien der Antike auswürfeln
   S.players.forEach((p, i) => {
@@ -83,12 +107,14 @@ function newGame(cfg) {
     const pos = S.map.capitals[p.civ];
     if (!pos) return;
     S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: 1, cap: true, grown: 0, born: 0 });
-    if (p.civ === 'wikinger') {   // Wikinger: kostenlose Armee am Start
+    if (p.civ === 'wikinger' && isAbil(p, 'basis')) {   // Wikinger: kostenlose Armee am Start
       const spot = neighbors(pos[0], pos[1]).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
       if (spot) S.armies.push({ id: S.nextId++, owner: i, r: spot[0], c: spot[1], mp: 0, born: 0 });
     }
   });
+  if (S.wo) initWonderPools(S);
   S.cur = startIdx;
+  startRound(S);          // Ereignis der ersten Runde
   beginTurn(S);
   return S;
 }
@@ -98,14 +124,13 @@ function techCost(S, pi, tech) {
   const p = S.players[pi];
   let c = tech.c;
   const age = tech.k === 'singularitaet' ? 4 : tech.age;
-  if (p.civ === 'griechenland') c -= (age + 1);          // 1/2/3/4/5 je Zeitalter
+  if (tech.k === 'singularitaet' && kremlBuilt(S)) c += KREML_SURCHARGE;
+  if (p.civ === 'griechenland' && isAbil(p, 'basis')) c -= (age + 1);   // 1/2/3/4/5 je Zeitalter
   if (has(p, 'wiss_methode')) c -= 2 * (age + 1);        // -2/-4/-6/-8/-10
   return Math.max(0, c);
 }
-function availBonus(p) {
-  const greek = (p.civ === 'griechenland' && RULES.greekAvailBonus) ? 1 : 0;   // v2: kein Bonus
-  return greek + (has(p, 'philosophie') ? 1 : 0);
-}
+// Griechenland hat keinen Würfelbonus mehr – nur Philosophie gibt +1.
+function availBonus(p) { return has(p, 'philosophie') ? 1 : 0; }
 function rollAvailability(S, pi, field, age) {
   const p = S.players[pi];
   if (age > 3) return;
@@ -137,13 +162,26 @@ function researchable(S, pi) {
 }
 function doResearch(S, pi, tk) {
   const p = S.players[pi];
+  if (evActive(S, pi, 'dunkles_zeitalter')) return 'Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.';
   const tech = tk === 'singularitaet' ? SINGULARITY : TECH_BY_KEY[tk];
+  if (!tech) return 'Unbekannte Technologie.';
   const cost = techCost(S, pi, tech);
-  const rangeBefore = moveAllowance(S, pi);
-  if (!pay(S, pi, 'sci', cost)) return 'Nicht genug Wissenschaft.';
-  p.techs[tk] = true;
-  log(S, 'act', `${civOf(p).n} erforscht ${tech.n} (${cost} Wissenschaft).`);
+  if (available(S, pi, 'sci') < cost) return 'Nicht genug Wissenschaft.';
+  pay(S, pi, 'sci', cost);
+  applyTech(S, pi, tech, `${cost} Wissenschaft`);
   if (tk === 'singularitaet') { S.over = { winner: pi, how: 'Forschungssieg (Singularität)' }; return null; }
+  // Griechenland "Rückschau": zusätzlich eine beliebige Technologie eines früheren
+  // Zeitalters gratis. Keine Kette – die Gratis-Tech löst das nicht erneut aus.
+  if (isAbil(p, 'rueckschau') && tech.age > 0) p.backPick = tech.age - 1;
+  return null;
+}
+/* Technologie eintragen (bezahlt oder gratis) samt Folgewirkungen. */
+function applyTech(S, pi, tech, note) {
+  const p = S.players[pi];
+  const rangeBefore = moveAllowance(S, pi);
+  p.techs[tech.k] = true;
+  log(S, 'act', `${civOf(p).n} erforscht ${tech.n} (${note}).`);
+  if (tech.k === 'singularitaet') return;
   // Reichweitensprung (Luftwaffe/Panzerschiff) sofort wirksam machen: die Erhöhung der
   // Maximalweite wird der Restbewegung der eigenen Armeen dieser Runde gutgeschrieben.
   const gained = moveAllowance(S, pi) - rangeBefore;
@@ -151,12 +189,53 @@ function doResearch(S, pi, tk) {
   // Erste Technologie in Zeitalter+Feld → nächstes Zeitalter auswürfeln
   const sameAgeField = TECHS_ACTIVE.filter(t => t.f === tech.f && t.age === tech.age && p.techs[t.k]);
   if (sameAgeField.length === 1) rollAvailability(S, pi, tech.f, tech.age + 1);
+}
+/* Kostenlose Forschung: Griechenland-Fähigkeiten und die Wunder Bibliothek/Oxford.
+   quelle beschreibt, woher der Anspruch kommt (nur für das Protokoll). */
+function grantTech(S, pi, tk, quelle) {
+  const p = S.players[pi];
+  const tech = TECH_BY_KEY[tk];
+  if (!tech) return 'Unbekannte Technologie.';
+  if (p.techs[tk]) return 'Schon erforscht.';
+  applyTech(S, pi, tech, quelle);
+  return null;
+}
+/* Griechenland "Freie Forschung": 1× pro Runde eine verfügbare Technologie
+   der Industrialisierung oder früher (Zeitalter 0–2) umsonst. */
+function freeTechOptions(S, pi) {
+  const p = S.players[pi];
+  if (!isAbil(p, 'gratistech') || p.freeTechUsed === S.round) return [];
+  if (evActive(S, pi, 'dunkles_zeitalter')) return [];
+  return TECHS_ACTIVE.filter(t => t.age <= 2 && p.avail[t.k] && !p.techs[t.k]);
+}
+function useFreeTech(S, pi, tk) {
+  const p = S.players[pi];
+  if (!freeTechOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
+  const err = grantTech(S, pi, tk, 'Freie Forschung');
+  if (err) return err;
+  p.freeTechUsed = S.round;
+  return null;
+}
+/* Griechenland "Rückschau": beliebige Tech eines früheren Zeitalters, auch nicht freigeschaltet. */
+function backPickOptions(S, pi) {
+  const p = S.players[pi];
+  if (p.backPick == null) return [];
+  return TECHS_ACTIVE.filter(t => t.age <= p.backPick && !p.techs[t.k]);
+}
+function useBackPick(S, pi, tk) {
+  const p = S.players[pi];
+  if (!backPickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
+  const err = grantTech(S, pi, tk, 'Rückschau');
+  if (err) return err;
+  p.backPick = null;
   return null;
 }
 
 /* ------------------------------------------------------------ Einkommen */
 function tileYield(S, pi, t) {
   const p = S.players[pi];
+  if (TERRAIN[t].block) return [0, 0, 0];              // Vulkan
+  if (evTerrainDead(S, pi, t)) return [0, 0, 0];       // Ereignis legt das Gelände lahm
   const y = TERRAIN[t].yield.slice();
   const add = (i, n) => y[i] += n;
   switch (t) {
@@ -165,7 +244,8 @@ function tileYield(S, pi, t) {
       if (has(p, 'landwirtschaft')) add(1, 1); if (has(p, 'gruene_revolution')) add(2, 1); break;
     case 'W':
       if (has(p, 'mathematik')) add(0, 1); if (has(p, 'elektrizitaet')) add(0, 1); if (has(p, 'ki')) add(0, 1);
-      if (has(p, 'kunstduenger')) add(1, 1); if (p.civ === 'russland') add(1, 1); break;
+      if (has(p, 'kunstduenger')) add(1, 1);
+      if (p.civ === 'russland' && isAbil(p, 'basis')) add(1, 1); break;
     case 'B':
       if (has(p, 'chemie')) add(0, 1); if (has(p, 'bewaesserung')) add(1, 1); break;
     case 'F':
@@ -173,7 +253,9 @@ function tileYield(S, pi, t) {
     case 'M':
       if (has(p, 'astronomie')) add(0, 1);
       if (has(p, 'fischerei')) add(1, 1); if (has(p, 'segeln')) add(1, 1);
-      if (has(p, 'containerlogistik')) add(2, 1); break;
+      if (has(p, 'containerlogistik')) add(2, 1);
+      if (hasWonder(S, pi, 'leuchtturm')) { add(0, 1); add(1, 1); add(2, 1); }   // Großer Leuchtturm
+      break;
   }
   return y;
 }
@@ -210,15 +292,47 @@ function controlledTiles(S, pi) {
   for (const k of (S.bought[pi] || [])) if (!cityAt(S, ...unkey(k))) set.add(k);
   return set;
 }
+/* Grenzt die Stadt an Meer? (Für Englands Alternative "Seemacht".) */
+function cityAtSea(S, city) {
+  return neighbors(city.r, city.c).some(([r, c]) => terrainAt(S, r, c) === 'M');
+}
+/* Wikinger "Beutezüge": je Armee, die neben einer gegnerischen Armee oder Stadt steht,
+   1 Wissenschaft/Nahrung/Münze pro Punkt Überlegenheit. Gegen Städte zählt der
+   Verteidigungswert, gegen Armeen der Machtwert. Mehrere Nachbarn: der größte Vorsprung.
+   Bewertet wird beim Einkommen (Zugbeginn) – Ressourcen verfallen am Zugende, ein
+   Ertrag in der Kampfphase wäre nicht mehr ausgebbar. */
+function raidBonus(S, pi) {
+  const p = S.players[pi];
+  if (!isAbil(p, 'kampfertrag')) return 0;
+  const mine = powerOf(S, pi);
+  let sum = 0;
+  for (const a of armiesOf(S, pi)) {
+    let best = 0;
+    for (const [r, c] of neighbors(a.r, a.c)) {
+      const ec = cityAt(S, r, c), ea = armyAt(S, r, c);
+      if (ec && ec.owner !== pi) best = Math.max(best, mine - defenseValue(S, ec));
+      if (ea && ea.owner !== pi) best = Math.max(best, mine - powerOf(S, ea.owner));
+    }
+    if (best > 0) sum += best;
+  }
+  return sum;
+}
 /* Aufschlüsselung des Einkommens für die Übersicht: je Geländetyp die Anzahl
-   kontrollierter Felder und ihr Gesamtertrag, plus eine Zeile für die Stadtbevölkerung.
-   Die Summe entspricht income(). Erträge nach dem laufenden Zug (mit allen Boni). */
+   kontrollierter Felder und ihr Gesamtertrag, dazu Sonderzeilen, die Stadtbevölkerung
+   und die Summe. Die Summe ist per Definition das Einkommen – income() liest sie hier ab,
+   damit Übersicht und Rechnung nicht auseinanderlaufen können. */
 function incomeBreakdown(S, pi) {
   const p = S.players[pi];
-  const rows = [];
-  const byTerrain = {};
+  const rows = [], extra = [], byTerrain = {};
+  const revolution = evActive(S, pi, 'revolution');
+  const cap = capitalOf(S, pi);
+  // Revolution: die Hauptstadt produziert nichts – auch ihr Umland nicht, sofern das
+  // Feld nicht zusätzlich an eine andere eigene Stadt grenzt.
+  const deadTile = (r, c) => revolution && cap && hexDistance(cap.r, cap.c, r, c) === 1 &&
+    !citiesOf(S, pi).some(ct => !ct.cap && hexDistance(ct.r, ct.c, r, c) === 1);
   for (const k of controlledTiles(S, pi)) {
     const [r, c] = unkey(k);
+    if (deadTile(r, c)) continue;
     const t = terrainAt(S, r, c);
     const y = tileYieldAt(S, pi, r, c);
     const e = byTerrain[t] || (byTerrain[t] = { count: 0, y: [0, 0, 0] });
@@ -230,51 +344,58 @@ function incomeBreakdown(S, pi) {
   }
   // Bevölkerung als eigene Zeile
   const py = cityPopYield(S, pi);
-  let pop = 0, py0 = 0, py1 = 0, py2 = 0;
+  let pop = 0, pyy = [0, 0, 0], sea = 0;
   for (const city of citiesOf(S, pi)) {
+    pop += city.pop;
+    if (isAbil(p, 'kuestenstaedte') && cityAtSea(S, city)) sea++;
+    if (revolution && city.cap) { pyy[1] += py[1] * city.pop; continue; }   // verbraucht nur Nahrung
     const mult = (city.cap && has(p, 'buerokratie')) ? 2 : 1;
     let f = py[1] * city.pop;
     if (has(p, 'oekologie')) f += Math.floor(city.pop / 2);
-    pop += city.pop;
-    py0 += py[0] * city.pop * mult;
-    py1 += f * mult;
-    py2 += py[2] * city.pop * mult;
+    pyy[0] += py[0] * city.pop * mult;
+    pyy[1] += f * mult;
+    pyy[2] += py[2] * city.pop * mult;
   }
-  const inc = income(S, pi);
-  return { rows, pop: { count: pop, y: [py0, py1, py2] }, total: [inc.sci, inc.food, inc.coins] };
+  if (sea) extra.push({ name: 'Städte am Meer', glyph: '⚓', count: sea, y: [2 * sea, 2 * sea, 2 * sea] });
+  const raid = raidBonus(S, pi);
+  if (raid) extra.push({ name: 'Beutezüge', glyph: '⚔︎', count: null, y: [raid, raid, raid] });
+  // Summe, danach die Ereignis- und Wundereffekte auf das Gesamteinkommen
+  const total = [0, 0, 0];
+  for (const r of rows) for (let i = 0; i < 3; i++) total[i] += r.y[i];
+  for (const e of extra) for (let i = 0; i < 3; i++) total[i] += e.y[i];
+  for (let i = 0; i < 3; i++) total[i] += pyy[i];
+  if (evActive(S, pi, 'hungersnot')) total[1] = 0;        // keine Nahrung produziert
+  if (evActive(S, pi, 'wirtschaftskrise')) total[2] = 0;  // keine Münzen produziert
+  if (p.doubleIncome === S.round) for (let i = 0; i < 3; i++) total[i] *= 2;   // Taj Mahal
+  return { rows, extra, pop: { count: pop, y: pyy }, total };
 }
 function income(S, pi) {
-  const p = S.players[pi];
-  const tot = [0, 0, 0];
-  for (const k of controlledTiles(S, pi)) {
-    const [r, c] = unkey(k);
-    const y = tileYieldAt(S, pi, r, c);
-    tot[0] += y[0]; tot[1] += y[1]; tot[2] += y[2];
-  }
-  const py = cityPopYield(S, pi);
-  for (const city of citiesOf(S, pi)) {
-    const mult = (city.cap && has(p, 'buerokratie')) ? 2 : 1;
-    let f = py[1] * city.pop;
-    if (has(p, 'oekologie')) f += Math.floor(city.pop / 2);
-    tot[0] += py[0] * city.pop * mult;
-    tot[1] += f * mult;
-    tot[2] += py[2] * city.pop * mult;
-  }
-  return { sci: tot[0], food: tot[1], coins: tot[2] };
+  const t = incomeBreakdown(S, pi).total;
+  return { sci: t[0], food: t[1], coins: t[2] };
 }
 
 /* ------------------------------------------------------------ Umrechnungskurse */
-function rates(p) {
+/* Umrechnungskurse. Gentechnik und Massenmedien sind ausdrücklich KEIN allgemeiner
+   Umtausch – sie füttern nur Städte (siehe feed()) und stehen deshalb hier nicht.
+   opts.foodOk: Bürgerkrieg erlaubt in dieser Runde, Armeen/Macht mit Nahrung zu zahlen. */
+function rates(S, pi, opts) {
+  const p = S.players[pi];
+  const eng = p.civ === 'england' && isAbil(p, 'basis');
+  const hungry = evActive(S, pi, 'hungersnot');
+  let coinsToFood = eng || has(p, 'gilden') ? 1 : 2;
+  if (hungry) coinsToFood = eng ? 1 : (has(p, 'gilden') ? 2 : 4);
+  let foodToCoins = (eng || hasWonder(S, pi, 'pyramiden')) ? 1 : Infinity;
+  if (opts && opts.foodOk && foodToCoins === Infinity) foodToCoins = 1;
   return {
-    coinsToFood: (p.civ === 'england' || has(p, 'gilden') || has(p, 'massenmedien')) ? 1 : 2,
+    coinsToFood,
     coinsToSci: has(p, 'computertechnik') ? 1 : 2,
     sciToCoins: has(p, 'alchemie') ? 1 : Infinity,
-    sciToFood: has(p, 'gentechnik') ? 1 : Infinity,
-    foodToCoins: p.civ === 'england' ? 1 : Infinity,
+    sciToFood: Infinity,
+    foodToCoins,
   };
 }
-function available(S, pi, kind) {   // wie viel man höchstens ausgeben kann
-  const p = S.players[pi], r = rates(p), R = p.res;
+function available(S, pi, kind, opts) {   // wie viel man höchstens ausgeben kann
+  const p = S.players[pi], r = rates(S, pi, opts), R = p.res;
   if (kind === 'food') return R.food + Math.floor(R.coins / r.coinsToFood) + Math.floor(R.sci / r.sciToFood);
   if (kind === 'sci') {
     // Münzen sind die Drehscheibe: eigene Münzen plus die aus Nahrung umwandelbaren
@@ -284,10 +405,10 @@ function available(S, pi, kind) {   // wie viel man höchstens ausgeben kann
   }
   return R.coins + Math.floor(R.sci / r.sciToCoins) + Math.floor(R.food / r.foodToCoins);
 }
-function pay(S, pi, kind, amount) {
+function pay(S, pi, kind, amount, opts) {
   if (amount <= 0) return true;
-  const p = S.players[pi], r = rates(p), R = p.res;
-  if (available(S, pi, kind) < amount) return false;
+  const p = S.players[pi], r = rates(S, pi, opts), R = p.res;
+  if (available(S, pi, kind, opts) < amount) return false;
   let need = amount;
   const take = (from, rate) => {
     if (need <= 0 || rate === Infinity) return;
@@ -309,39 +430,74 @@ function pay(S, pi, kind, amount) {
   return need <= 0;
 }
 
+/* --------------------------------------------- Nahrungsgrenze und Städte füttern
+   Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald
+   das Einkommen dadurch unter 0 fiele. Gentechnik (aus Wissenschaft) und Massenmedien
+   (aus Münzen) heben diese Grenze auf; gefüttert wird zu Zugbeginn, 1:1, nach Wahl
+   des Spielers. Ein nicht gedecktes Defizit lässt die Nahrung bei 0 stehen –
+   Bevölkerung verhungert nicht. */
+function canFeed(p) { return has(p, 'gentechnik') || has(p, 'massenmedien'); }
+function feedSources(S, pi) {
+  const p = S.players[pi], out = [];
+  if (has(p, 'massenmedien')) out.push({ kind: 'coins', n: 'Münzen', have: p.res.coins });
+  if (has(p, 'gentechnik')) out.push({ kind: 'sci', n: 'Wissenschaft', have: p.res.sci });
+  return out;
+}
+function feed(S, pi, kind, amount) {
+  const p = S.players[pi];
+  if (kind === 'sci' && !has(p, 'gentechnik')) return 'Gentechnik nicht erforscht.';
+  if (kind === 'coins' && !has(p, 'massenmedien')) return 'Massenmedien nicht erforscht.';
+  amount = Math.min(Math.floor(amount), p.res[kind]);
+  if (amount <= 0) return 'Nichts abzugeben.';
+  p.res[kind] -= amount;
+  const cover = Math.min(amount, p.foodDeficit || 0);
+  p.foodDeficit = (p.foodDeficit || 0) - cover;
+  p.res.food += amount - cover;
+  log(S, 'act', `${civOf(p).n}: Städte gefüttert – ${amount} ${kind === 'sci' ? 'Wissenschaft' : 'Münzen'}` +
+    (cover ? ` (${cover} deckt das Nahrungsdefizit)` : '') + '.');
+  return null;
+}
+/* Nahrungseinkommen, wenn die Stadt um delta wachsen würde. */
+function foodAfterGrowth(S, pi, city, delta) {
+  const before = city.pop;
+  city.pop += delta;
+  const f = income(S, pi).food;
+  city.pop = before;
+  return f;
+}
+function growthBlocked(S, pi, city, delta = 1) {
+  if (canFeed(S.players[pi])) return false;      // Gentechnik/Massenmedien heben die Grenze auf
+  return foodAfterGrowth(S, pi, city, delta) < 0;
+}
+
 /* ------------------------------------------------------------ Zugbeginn */
 function beginTurn(S) {
-  setRules(S.rules || 'standard');     // nach Laden eines Spielstands den Modus reaktivieren
   const p = P(S);
   if (p.dead || !citiesOf(S, S.cur).length && !armiesOf(S, S.cur).length) { p.dead = true; return; }
   log(S, 'head', `Runde ${S.round} — ${civOf(p).n}${p.kind === 'bot' ? ' (Bot)' : ''}`);
+  // 0 Kultursieg: ein Stufe-3-Wunder gewinnt zu Beginn des nächsten eigenen Zuges
+  if (checkCultureVictory(S, S.cur)) return;
   // 1 Einkommen
   const inc = income(S, S.cur);
   p.res = { sci: inc.sci, food: Math.max(0, inc.food), coins: inc.coins };
-  if (inc.food < 0) {   // Defizit ggf. mit Münzen/Wissenschaft decken
-    const r = rates(p);
-    let need = -inc.food;
-    const cover = (from, rate) => {
-      if (need <= 0 || rate === Infinity) return;
-      const n = Math.min(need, Math.floor(p.res[from] / rate));
-      p.res[from] -= n * rate; need -= n;
-    };
-    cover('coins', r.coinsToFood); cover('sci', r.sciToFood);
-    if (need > 0) log(S, 'warn', `Nahrungsdefizit von ${need} – nicht gedeckt.`);
-  }
+  p.foodDeficit = Math.max(0, -inc.food);
+  if (p.foodDeficit)
+    log(S, 'warn', `Nahrungsdefizit von ${p.foodDeficit}` +
+      (canFeed(p) ? ' – kann mit Wissenschaft/Münzen gefüttert werden.' : ' – Nahrung bleibt bei 0.'));
   if (p.kind !== 'bot')
     log(S, 'info', `Einkommen: ${p.res.sci} Wissenschaft, ${p.res.food} Nahrung, ${p.res.coins} Münzen.`);
-  // 2 Macht reduzieren
-  if (p.kind !== 'bot' && p.power > 0) {
+  // 2 Macht reduzieren. Zuschläge aus Armeen/Zeusstatue erhöhen den Verlust,
+  // können aber selbst nicht verloren gehen.
+  if (p.kind !== 'bot' && powerOf(S, S.cur) > 0) {
     const div = has(p, 'panzer') ? 4 : has(p, 'stahl') ? 3 : 2;
-    const loss = Math.ceil(p.power / div);
+    const loss = Math.min(p.power, Math.ceil(powerOf(S, S.cur) / div));
     p.power -= loss;
-    log(S, 'info', `Macht −${loss} (1/${div}, aufgerundet) → ${p.power}.`);
+    if (loss) log(S, 'info', `Macht −${loss} (1/${div}, aufgerundet) → ${powerOf(S, S.cur)}.`);
   }
   // Zustände zurücksetzen
   S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
   S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
-  p.copies = 0; p.nuked = false;
+  p.copies = 0; p.nuked = false; p.backPick = null;
 }
 
 /* ------------------------------------------------------------ Bewegung */
@@ -356,6 +512,7 @@ function canPass(S, pi, r, c) {
   if (!t) return false;
   if (cityAt(S, r, c)) return false;            // Städte blockieren
   if (armyAt(S, r, c)) return false;            // nicht auf andere Armeen (nicht stapelbar)
+  if (TERRAIN[t].block) return false;           // Vulkan: unpassierbar, auch für die Luftwaffe
   if (has(p, 'luftwaffe')) return true;         // Luftwaffe ignoriert Gelände
   if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
   return true;
@@ -416,28 +573,30 @@ function moveArmy(S, army, r, c) {
 }
 
 /* ------------------------------------------------------------ Aktionen */
-/* Wie oft eine Stadt pro Runde wachsen darf und wie oft davon kostenlos.
-   Standard: Verbundwerkstoffe erlaubt 2x (beide bezahlt).
-   v2: Keramik = 2x (wie altes Verbundwerkstoffe); Verbundwerkstoffe = +1x gratis.
-       Beide zusammen: bis 3x, davon 1x gratis. */
+/* Wie oft eine Stadt pro Runde wachsen darf und wie oft davon kostenlos:
+   Keramik = 2× bezahlt, Verbundwerkstoffe = +1× gratis, beide zusammen bis 3×. */
 function growLimits(S, pi) {
   const p = S.players[pi];
-  if (!RULES.verbundGratisGrowth) {
-    return { max: has(p, 'verbundwerkstoffe') ? 2 : 1, free: 0 };
-  }
   const paidMax = has(p, 'keramik') ? 2 : 1;
   const free = has(p, 'verbundwerkstoffe') ? 1 : 0;
   return { max: paidMax + free, free };
+}
+/* Preis für bezahltes Wachstum. Russland "Fruchtbarkeit": keine Nahrungskosten. */
+function growPrice(S, pi, city) {
+  const p = S.players[pi];
+  return {
+    food: isAbil(p, 'wachstum') ? 0 : city.pop,
+    coins: has(p, 'dampfmaschine') ? 0 : city.pop,
+  };
 }
 // Das kostenlose Kontingent ist NICHT an die Reihenfolge gebunden: es zählt, wie viele
 // Gratis-Schritte diese Runde schon genutzt wurden (city.freeUsed), unabhängig davon,
 // ob vorher bezahlt gewachsen wurde.
 function growCost(S, pi, city) {
-  const p = S.players[pi];
   if (freeGrowthAvailable(S, pi, city)) return { food: 0, coins: 0, free: true };
-  return { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+  return growPrice(S, pi, city);
 }
-// Steht der Stadt diese Runde noch ein kostenloses Wachstum zu? (v2 mit Verbundwerkstoffe)
+// Steht der Stadt diese Runde noch ein kostenloses Wachstum zu? (Verbundwerkstoffe)
 function freeGrowthAvailable(S, pi, city) {
   if (city.owner !== pi || city.born === S.round) return false;
   const lim = growLimits(S, pi);
@@ -445,11 +604,19 @@ function freeGrowthAvailable(S, pi, city) {
   if ((city.grown || 0) >= lim.max) return false;          // Gesamtmaximum erreicht
   return (city.freeUsed || 0) < lim.free;                  // Gratis-Kontingent noch offen
 }
+/* Gründe, die jedes Wachstum dieser Stadt verhindern (Ereignis, Nahrungsgrenze). */
+function growBlockReason(S, pi, city) {
+  if (city.noGrow === S.round) return 'Sturmflut: Diese Stadt kann diese Runde nicht wachsen.';
+  if (growthBlocked(S, pi, city))
+    return 'Nahrungsproduktion würde negativ – Gentechnik oder Massenmedien nötig.';
+  return null;
+}
 function canGrow(S, pi, city) {
   if (city.owner !== pi) return 'Fremde Stadt.';
   if (city.born === S.round) return 'Neue Städte wachsen erst nächste Runde.';
   const lim = growLimits(S, pi);
   if ((city.grown || 0) >= lim.max) return 'Diese Runde schon gewachsen.';
+  const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
   const c = growCost(S, pi, city);
   if (c.food && available(S, pi, 'food') < c.food) return 'Zu wenig Nahrung.';
   if (c.coins && available(S, pi, 'coins') < c.coins) return 'Zu wenig Münzen.';
@@ -461,8 +628,8 @@ function canGrowPaid(S, pi, city) {
   if (city.born === S.round) return 'Neue Städte wachsen erst nächste Runde.';
   const lim = growLimits(S, pi);
   if ((city.grown || 0) >= lim.max) return 'Diese Runde schon gewachsen.';
-  const p = S.players[pi];
-  const cost = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+  const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
+  const cost = growPrice(S, pi, city);
   if (cost.food && available(S, pi, 'food') < cost.food) return 'Zu wenig Nahrung.';
   if (cost.coins && available(S, pi, 'coins') < cost.coins) return 'Zu wenig Münzen.';
   return null;
@@ -472,14 +639,14 @@ function canGrowPaid(S, pi, city) {
 function growCity(S, pi, city, mode) {
   if (mode === 'free') {
     if (!freeGrowthAvailable(S, pi, city)) return 'Kein kostenloses Wachstum verfügbar.';
+    const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
     city.pop++; city.grown = (city.grown || 0) + 1; city.freeUsed = (city.freeUsed || 0) + 1;
     log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst kostenlos auf ${city.pop}.`);
     return null;
   }
   if (mode === 'paid') {
     const err = canGrowPaid(S, pi, city); if (err) return err;
-    const p = S.players[pi];
-    const cost = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+    const cost = growPrice(S, pi, city);
     if (cost.food) pay(S, pi, 'food', cost.food); if (cost.coins) pay(S, pi, 'coins', cost.coins);
     city.pop++; city.grown = (city.grown || 0) + 1;   // freeUsed bleibt: bezahltes Wachstum verbraucht das Gratis-Kontingent nicht
     log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst auf ${city.pop} (${cost.food} Nahrung, ${cost.coins} Münzen).`);
@@ -494,10 +661,24 @@ function growCity(S, pi, city, mode) {
     (c.free ? ' (kostenlos).' : ` (${c.food} Nahrung, ${c.coins} Münzen).`));
   return null;
 }
+/* Kostenloses Sofortwachstum aus Wundereffekten. Zählt nicht gegen das Rundenkontingent,
+   respektiert aber die Nahrungsgrenze hart: es wird nur so weit gewachsen, wie möglich. */
+function growFree(S, pi, city, n, why) {
+  let done = 0;
+  for (let i = 0; i < n; i++) {
+    if (city.noGrow === S.round) break;
+    if (growthBlocked(S, pi, city)) break;
+    city.pop++; done++;
+  }
+  if (done) log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst kostenlos um ${done} auf ${city.pop} (${why}).`);
+  else log(S, 'info', `${civOf(S.players[pi]).n}: kostenloses Wachstum (${why}) nicht möglich – Nahrungsgrenze.`);
+  return done;
+}
 function foundCost(S, pi, r, c) {
   const p = S.players[pi];
   const n = citiesOf(S, pi).length;
-  const base = n * (n + 1) / 2;                      // 1/3/6/10/15 …
+  let base = n * (n + 1) / 2;                        // 1/3/6/10/15 …
+  if (isAbil(p, 'gruenden')) base = 0;               // England: keine Basiskosten
   if (has(p, 'kartografie')) return base;
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
   if (!cap) return base;
@@ -509,6 +690,7 @@ function canFound(S, pi, r, c) {
   const t = terrainAt(S, r, c);
   if (!t) return 'Kein Feld.';
   if (!TERRAIN[t].land) return 'Nicht auf Meer.';
+  if (TERRAIN[t].block) return 'Nicht auf einem Vulkan.';
   if (armyAt(S, r, c)) return 'Feld besetzt.';
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return 'Mindestens 3 Felder Abstand zu allen Städten.';
   const cost = foundCost(S, pi, r, c);
@@ -519,14 +701,17 @@ function foundCity(S, pi, r, c) {
   const err = canFound(S, pi, r, c); if (err) return err;
   const cost = foundCost(S, pi, r, c);
   pay(S, pi, 'food', cost);
-  S.cities.push({ id: S.nextId++, owner: pi, r, c, pop: 1, cap: false, grown: 0, born: S.round });
-  log(S, 'act', `${civOf(S.players[pi]).n}: Stadt gegründet auf ${r}/${c} (${cost} Nahrung).`);
+  const pop = isAbil(S.players[pi], 'siedler') ? 2 : 1;   // Russland: Städte mit 2 Bevölkerung
+  const city = { id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round };
+  S.cities.push(city);
+  log(S, 'act', `${civOf(S.players[pi]).n}: Stadt gegründet auf ${r}/${c} (${cost} Nahrung, Bevölkerung ${pop}).`);
+  claimOrphanWonders(S, pi, city);      // Wunder, die ohne Stadt auf dem Feld stehen
   return null;
 }
 function armyCost(S, pi) {
   const p = S.players[pi];
   let n = armiesOf(S, pi).length + 1;
-  if (p.civ === 'wikinger') n = Math.max(0, n - 1);   // eine Armee zählt nicht mit
+  if (p.civ === 'wikinger' && isAbil(p, 'basis')) n = Math.max(0, n - 1);   // eine Armee zählt nicht mit
   const mult = has(p, 'nationalismus') ? 2 : has(p, 'demokratie') ? 4 : 5;
   return mult * n;
 }
@@ -534,18 +719,21 @@ function buildArmy(S, pi, city) {
   if (!city || city.owner !== pi) return 'Nur in eigener Stadt.';
   if (armyAt(S, city.r, city.c)) return 'Dort steht schon eine Armee.';
   const cost = armyCost(S, pi);
-  if (!pay(S, pi, 'coins', cost)) return `Zu wenig Münzen (${cost} nötig).`;
+  const opts = { foodOk: evActive(S, pi, 'buergerkrieg') };   // Bürgerkrieg: auch mit Nahrung
+  if (!pay(S, pi, 'coins', cost, opts)) return `Zu wenig Münzen (${cost} nötig).`;
   S.armies.push({ id: S.nextId++, owner: pi, r: city.r, c: city.c, mp: moveAllowance(S, pi), born: S.round });
   log(S, 'act', `${civOf(S.players[pi]).n}: Armee gebaut (${cost} Münzen) – muss die Stadt noch verlassen.`);
   return null;
 }
 function powerPrice(S, pi) {
   const p = S.players[pi];
-  return has(p, 'gewehre') ? 3 : has(p, 'eisenverarbeitung') ? 4 : 5;
+  const base = has(p, 'gewehre') ? 3 : has(p, 'eisenverarbeitung') ? 4 : 5;
+  return Math.max(1, base - (hasWonder(S, pi, 'himeji') ? 1 : 0));   // Burg Himeji
 }
 function buyPower(S, pi, n = 1) {
   const price = powerPrice(S, pi) * n;
-  if (!pay(S, pi, 'coins', price)) return 'Zu wenig Münzen.';
+  const opts = { foodOk: evActive(S, pi, 'buergerkrieg') };   // Bürgerkrieg: auch mit Nahrung
+  if (!pay(S, pi, 'coins', price, opts)) return 'Zu wenig Münzen.';
   S.players[pi].power += n;
   log(S, 'act', `${civOf(S.players[pi]).n}: +${n} Macht für ${price} Münzen → ${S.players[pi].power}.`);
   return null;
@@ -578,13 +766,13 @@ function hasModernTech(p) {
 }
 function slaveryUsable(p) {
   if (!has(p, 'sklaverei')) return false;
-  if (RULES.slaveryObsoleteInModern && hasModernTech(p)) return false;   // v2
+  if (SLAVERY_OBSOLETE_IN_MODERN && hasModernTech(p)) return false;
   return true;
 }
 function sacrifice(S, pi, city) {           // Sklaverei
   const p = S.players[pi];
   if (!has(p, 'sklaverei')) return 'Sklaverei nicht erforscht.';
-  if (RULES.slaveryObsoleteInModern && hasModernTech(p))
+  if (SLAVERY_OBSOLETE_IN_MODERN && hasModernTech(p))
     return 'Sklaverei ist mit dem Eintritt in die Moderne obsolet.';
   if (!city || city.owner !== pi) return 'Fremde Stadt.';
   if (city.pop < 2) return 'Die letzte Bevölkerung darf nicht geopfert werden.';
@@ -669,6 +857,7 @@ function copyTech(S, pi, tk, mode) {
 function nuke(S, pi, r, c) {                // Atomwaffen
   const p = S.players[pi];
   if (!has(p, 'atomwaffen')) return 'Atomwaffen nicht erforscht.';
+  if (evNukeBan(S, pi)) return 'Atomwaffenproteste: Atomwaffen können nicht mehr eingesetzt werden.';
   if (p.nuked) return 'Diese Runde schon eingesetzt.';
   const area = [[r, c], ...neighbors(r, c)];
   let n = 0;
@@ -701,7 +890,10 @@ function attackValue(S, pi, count) {
 }
 function defenseValue(S, city) {
   const o = S.players[city.owner], oi = city.owner;
-  let d = city.pop * (has(o, 'maschinengewehr') ? 3 : 1);
+  if (o.kind === 'barbar') return city.pop;      // Barbarenstädte verteidigen nur mit Bevölkerung
+  // Die Große Mauer rechnet die Verteidigung mit der Gesamtbevölkerung des Reiches.
+  const base = hasWonder(S, oi, 'mauer') ? popOf(S, oi) : city.pop;
+  let d = base * (has(o, 'maschinengewehr') ? 3 : 1);
   if (has(o, 'stadtmauern')) d += 5;
   if (has(o, 'burgenbau')) d += powerOf(S, oi);          // virtuelle Armee in der Stadt
   const rng = projectRange(S, oi);
@@ -765,12 +957,16 @@ function captureCity(S, pi, city) {
   delete S.sieges[pi + '|' + city.id];
   if (city.pop <= 0) {
     S.cities = S.cities.filter(x => x !== city);
+    loseCityWonders(S, city);          // zerstört – oder bleibt stehen (Stonehenge)
     log(S, 'fight', `${civOf(p).n} zerstört eine Stadt von ${civOf(loser).n}.`);
   } else {
+    const old = city.owner;
     city.owner = pi; city.cap = false; city.grown = 99;
+    takeCityWonders(S, city, old, pi);  // Wunder samt dauerhafter Effekte wechseln den Besitzer
     log(S, 'fight', `${civOf(p).n} erobert eine Stadt von ${civOf(loser).n} (Bevölkerung ${city.pop}).`);
   }
-  if (wasCapital) S.over = { winner: pi, how: `Militärsieg (Hauptstadt von ${civOf(loser).n} erobert)` };
+  if (wasCapital && p.kind !== 'barbar')
+    S.over = { winner: pi, how: `Militärsieg (Hauptstadt von ${civOf(loser).n} erobert)` };
   if (!citiesOf(S, S.players.indexOf(loser)).length) loser.dead = true;
 }
 
@@ -778,10 +974,9 @@ function captureCity(S, pi, city) {
 /* Alle verfügbaren Siegschwellen. UN und Theologie senken die Standardschwelle von ⅔;
    es gilt immer die niedrigste. UN/Theologie sind „mehr als", der Standard „mindestens". */
 function victoryOption(p) {
-  const opts = [{ frac: RULES.victoryThirds, strict: false, label: '2/3' }];
-  if (has(p, 'un')) opts.push({ frac: 0.5, strict: true, label: '1/2' });
-  if (RULES.theologyThreshold && has(p, 'theologie'))
-    opts.push({ frac: RULES.theologyThreshold, strict: true, label: '3/5' });
+  const opts = [{ frac: VICTORY_FRAC, strict: false, label: '2/3' }];
+  if (has(p, 'un')) opts.push({ frac: UN_FRAC, strict: true, label: '1/2' });
+  if (has(p, 'theologie')) opts.push({ frac: THEOLOGY_FRAC, strict: true, label: '3/5' });
   return opts.sort((a, b) => a.frac - b.frac)[0];
 }
 function checkVictory(S, pi) {
@@ -812,7 +1007,7 @@ function advanceTurn(S) {
   let guard = 0;
   do {
     S.cur = (S.cur + 1) % S.players.length;
-    if (S.cur === 0) S.round++;
+    if (S.cur === 0) { S.round++; startRound(S); }
     guard++;
   } while (S.players[S.cur].dead && guard < 20);
   beginTurn(S);

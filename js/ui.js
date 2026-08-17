@@ -1,6 +1,6 @@
 /* Hochzeivilization – Oberfläche */
 const $ = id => document.getElementById(id);
-const SYM = { star: '★', cross: '✕', square: '■', triangle: '▲' };
+const SYM = { star: '★', cross: '✕', square: '■', triangle: '▲', skull: '☠' };
 const HEX = 30;
 let S = null, ui = { sel: null, army: null, mode: null, botTimer: null };
 let view = { k: 1, x: 0, y: 0 }, edView = { k: 1, x: 0, y: 0 };
@@ -49,6 +49,40 @@ function terrainGlyph(g, t, x, y) {
   else if (t === 'W') for (let i = -1; i <= 1; i++)
     add('path', { d: `M${x + i * 8 - 5},${y + 6} L${x + i * 8},${y - 4} L${x + i * 8 + 5},${y + 6} Z`, fill: '#3f5f38' });
   else if (t === 'I') add('circle', { cx: x, cy: y, r: 5, fill: '#9fb37a', stroke: '#7c8a5a' });
+  else if (t === 'V') {            // Vulkan: Kegel mit glühendem Krater
+    add('path', { d: `M${x - 9},${y + 7} L${x - 3.5},${y - 6} L${x + 3.5},${y - 6} L${x + 9},${y + 7} Z`,
+      fill: '#3b322b', stroke: '#241f1a', 'stroke-width': 1 });
+    add('path', { d: `M${x - 3.5},${y - 6} L${x + 3.5},${y - 6} L${x + 1},${y - 1} L${x - 1},${y - 1} Z`,
+      fill: '#c4552f' });
+  }
+}
+/* Weltwunder einer Stadt: kleine Rauten unter dem Stadtsymbol, Zahl = Stufe. */
+function wonderMarks(g, S2, ct, x, y) {
+  const list = (S2.wonders || []).filter(w => w.cityId === ct.id);
+  if (!list.length) return;
+  list.forEach((w, i) => {
+    const dx = (i - (list.length - 1) / 2) * 15;
+    g.appendChild(svgEl('rect', {
+      x: x + dx - 6, y: y + 15, width: 12, height: 12, rx: 2,
+      transform: `rotate(45 ${x + dx} ${y + 21})`,
+      fill: '#f7f1e0', stroke: '#8a6f2f', 'stroke-width': 1.6, 'pointer-events': 'none'
+    }));
+    const t = svgEl('text', {
+      x: x + dx, y: y + 25, 'text-anchor': 'middle', 'font-size': 10,
+      fill: '#8a6f2f', 'font-weight': 700, 'pointer-events': 'none'
+    });
+    t.textContent = w.lvl; g.appendChild(t);
+  });
+}
+/* Freistehende Wunder (Stonehenge-Ruinen ohne Stadt) */
+function orphanMarks(g, S2) {
+  (S2.wonders || []).filter(w => w.cityId == null).forEach(w => {
+    const [x, y] = hexCenter(w.r, w.c, HEX);
+    const t = svgEl('text', {
+      x, y: y + 7, 'text-anchor': 'middle', 'font-size': 20, fill: '#8a6f2f', 'pointer-events': 'none'
+    });
+    t.textContent = '◈'; g.appendChild(t);
+  });
 }
 function tallyMarks(g, n, x, y, col) {
   for (let i = 0; i < Math.min(n, 20); i++) {
@@ -102,7 +136,7 @@ function drawMap(svg, map, opts) {
       if (p.dead) return;
       const own = controlledTiles(S2, i);
       citiesOf(S2, i).forEach(ct => own.add(key(ct.r, ct.c)));
-      const col = CIVS.find(c => c.k === p.civ).color;
+      const col = civOf(p).color;
       for (const k of own) {
         const [r, c] = unkey(k), [x, y] = hexCenter(r, c, HEX), v = hexPoints(HEX);
         for (let d = 0; d < 6; d++) {
@@ -127,7 +161,7 @@ function drawMap(svg, map, opts) {
     // 5 Armeen
     S2.armies.forEach(a => {
       const [x, y] = hexCenter(a.r, a.c, HEX);
-      const civ = CIVS.find(c => c.k === S2.players[a.owner].civ);
+      const civ = civOf(S2.players[a.owner]);
       // Symbol zweimal: erst als heller Umriss, dann gefüllt – so bleibt es auf
       // jedem Gelände lesbar, ohne wie eine Stadt (Kreis) auszusehen.
       for (const halo of [true, false]) {
@@ -146,7 +180,7 @@ function drawMap(svg, map, opts) {
     // 6 Städte
     S2.cities.forEach(ct => {
       const [x, y] = hexCenter(ct.r, ct.c, HEX);
-      const civ = CIVS.find(c => c.k === S2.players[ct.owner].civ);
+      const civ = civOf(S2.players[ct.owner]);
       world.appendChild(svgEl('circle', {
         cx: x, cy: y, r: 15, fill: '#f7f1e0', stroke: ct.cap ? '#2a2721' : civ.color,
         'stroke-width': ct.cap ? 3.5 : 2.4, 'pointer-events': 'none'
@@ -156,6 +190,7 @@ function drawMap(svg, map, opts) {
       });
       t.textContent = SYM[civ.sym]; world.appendChild(t);
       tallyMarks(world, ct.pop, x, y, civ.color);
+      wonderMarks(world, S2, ct, x, y);
     });
   } else if (map.capitals) {
     for (const k in map.capitals) {
@@ -167,6 +202,7 @@ function drawMap(svg, map, opts) {
       t.textContent = SYM[civ.sym]; world.appendChild(t);
     }
   }
+  if (opts.state) orphanMarks(world, opts.state);
   // 7 Auswahl
   if (opts.sel) {
     const [x, y] = hexCenter(opts.sel[0], opts.sel[1], HEX);
@@ -247,10 +283,11 @@ function redraw() {
   $('hud-sym').textContent = SYM[civ.sym];
   $('hud-sym').style.borderColor = civ.color;
   $('hud-name').textContent = civ.n + (p.kind === 'bot' ? ' · Bot' : '');
-  const modeTag = (S.rules && S.rules !== 'standard' && RULESETS[S.rules])
-    ? ' · ' + RULESETS[S.rules].name : '';
-  $('hud-round').textContent = `Runde ${S.round} · Bevölkerung ${popOf(S, S.cur)}/${worldPop(S)}${modeTag}`;
-  $('hud-sci').textContent = p.res.sci; $('hud-food').textContent = p.res.food;
+  const ev = curEvent();
+  $('hud-round').textContent = `Runde ${S.round} · Bevölkerung ${popOf(S, S.cur)}/${worldPop(S)}` +
+    (ev ? ` · ${ev.n}` : '');
+  $('hud-sci').textContent = p.res.sci;
+  $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
   $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
   const human = p.kind !== 'bot' && !S.over;
   ['a-tech', 'a-power', 'a-army', 'a-end'].forEach(id => $(id).disabled = !human);
@@ -287,16 +324,28 @@ function openTile(r, c) {
 
   if (city) {
     const owner = civOf(S.players[city.owner]);
+    const wl = (S.wonders || []).filter(w => w.cityId === city.id);
     head = `<h3>${owner.n}${city.cap ? ' · Hauptstadt' : ''}</h3>
-      <p class="sub">Bevölkerung ${city.pop} · Verteidigung ${defenseValue(S, city)}</p>`;
+      <p class="sub">Bevölkerung ${city.pop} · Verteidigung ${defenseValue(S, city)}</p>` +
+      (wl.length ? `<div class="wlist">${wl.map(w =>
+        `<span class="wtag">◈ ${WONDER_BY_KEY[w.k].n} (Stufe ${w.lvl})</span>`).join('')}</div>` : '');
     if (city.owner === pi) {
       if (freeGrowthAvailable(S, pi, city))
         btn('Kostenlos wachsen', `auf ${city.pop + 1} · Verbundwerkstoffe`, 'gratis',
           () => { const e = growCity(S, pi, city, 'free'); e ? toast(e) : redraw(); openTile(r, c); });
-      const pc = { food: city.pop, coins: has(p, 'dampfmaschine') ? 0 : city.pop };
+      const pc = growPrice(S, pi, city);
       const perr = canGrowPaid(S, pi, city);
       btn('Bevölkerung wachsen', perr || `auf ${city.pop + 1}`, `${pc.food}🌾 ${pc.coins}🪙`,
         () => { const e = growCity(S, pi, city, 'paid'); e ? toast(e) : redraw(); openTile(r, c); }, !!perr);
+      if (S.wo) {
+        const wcost = wonderCost(S, pi);
+        const full = wondersInCity(S, city).length >= 2;
+        const any = availableWonders(S).some(w => !canBuildWonder(S, pi, city, w.k));
+        btn('Weltwunder bauen', full ? 'diese Stadt hat schon zwei Wunder'
+          : any ? `${wondersInCity(S, city).length}/2 in dieser Stadt`
+            : 'nichts baubar (Münzen oder Stufenregel)', `${wcost}🪙`,
+          () => wonderSheet(city), full || !any);
+      }
       const ac = armyCost(S, pi);
       btn('Armee bauen', 'muss die Stadt noch verlassen', `${ac}🪙`,
         () => { const e = buildArmy(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
@@ -408,6 +457,8 @@ function yieldOverview(S, pi) {
   let h = '<div class="yield-panel"><h4 class="yhead">Ertrag nächster Zug</h4>';
   for (const r of b.rows)
     h += yieldRow(r.name, TERRAIN_GLYPH[r.key] || '▪', TERRAIN[r.key].color, r.count, r.y);
+  for (const e of (b.extra || []))
+    h += yieldRow(e.name, e.glyph || '✦', '#c8a86a', e.count, e.y);
   h += yieldRow('Bevölkerung', '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
   h += yieldRow('Summe', '∑', '#6b5d47', null, b.total, { cls: 'sum' });
   h += '</div>';
@@ -430,9 +481,12 @@ function techModal() {
         const owned = has(p, t.k), avail = p.avail[t.k] && !owned;
         const cost = techCost(S, pi, t);
         const can = avail && available(S, pi, 'sci') >= cost;
-        grid += `<button class="tech ${owned ? 'owned' : avail ? 'avail' : 'locked'}"
+        // Sklaverei wird mit der ersten Technologie der Moderne obsolet – im Bogen sichtbar.
+        const dead = t.k === 'sklaverei' && owned && !slaveryUsable(p);
+        const eff = dead ? 'obsolet – seit der Moderne nicht mehr nutzbar' : t.e;
+        grid += `<button class="tech ${owned ? 'owned' : avail ? 'avail' : 'locked'}${dead ? ' obsolete' : ''}"
           ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : cost}</span>
-          <b>${t.n}</b><span class="eff">${t.e}</span>${ownerMarks(S, t.k, pi)}</button>`;
+          <b>${t.n}</b><span class="eff">${eff}</span>${ownerMarks(S, t.k, pi)}</button>`;
       }
       grid += '</div>';
     }
@@ -442,6 +496,19 @@ function techModal() {
   grid += `<button class="tech ${p.techs.singularitaet ? 'owned' : sing ? 'avail' : 'locked'}" style="margin-top:10px"
       ${sing && available(S, pi, 'sci') >= sc && !p.techs.singularitaet ? 'data-tech="singularitaet"' : 'disabled'}>
       <span class="c">${sc}</span><b>Singularität</b><span class="eff">${SINGULARITY.e}</span></button>`;
+  // Griechenland "Freie Forschung": eine verfügbare Tech bis Industrialisierung gratis
+  const ft = freeTechOptions(S, pi);
+  if (ft.length) {
+    grid += '<p class="sub" style="margin-top:14px">Freie Forschung (1× pro Runde, kostenlos)</p>';
+    grid += ft.map(t => `<button class="tech avail" data-freetech="${t.k}">
+      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
+  }
+  const bp = backPickOptions(S, pi);
+  if (bp.length) {
+    grid += '<p class="sub" style="margin-top:14px">Rückschau: eine Technologie eines früheren Zeitalters, kostenlos</p>';
+    grid += bp.map(t => `<button class="tech avail" data-backtech="${t.k}">
+      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
+  }
   const cop = copyableTechs(S, pi);
   if (cop.length) {
     const anyFree = internetAvailable(S, pi) && cop.some(o => o.freeOk);
@@ -472,6 +539,14 @@ function techModal() {
     const e = doResearch(S, S.cur, b.dataset.tech);
     if (e) return toast(e);
     redraw(); if (S.over) { closeModal(); gameOver(); } else techModal();
+  });
+  $('ov-body').querySelectorAll('[data-freetech]').forEach(b => b.onclick = () => {
+    const e = useFreeTech(S, S.cur, b.dataset.freetech);
+    if (e) return toast(e); redraw(); techModal();
+  });
+  $('ov-body').querySelectorAll('[data-backtech]').forEach(b => b.onclick = () => {
+    const e = useBackPick(S, S.cur, b.dataset.backtech);
+    if (e) return toast(e); redraw(); techModal();
   });
   $('ov-body').querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
     const e = copyTech(S, S.cur, b.dataset.copy, b.dataset.mode);
@@ -522,10 +597,7 @@ function endHumanTurn() {
 function runBots() {
   if (S.over) return gameOver();
   const p = P(S);
-  if (p.kind !== 'bot') {
-    toast(civOf(p).n + ' ist am Zug');
-    return redraw();
-  }
+  if (p.kind !== 'bot') return humanTurnStart();
   const sinceSeq = S.logSeq || 0;
   botTurn(S, S.cur);
   finishTurn(S);                       // Kampf des Bots, einmal pro Zug
@@ -545,7 +617,7 @@ function runBots() {
     if (S.over) return gameOver();
     advanceTurn(S); redraw();
     if (P(S).kind === 'bot') runBots();
-    else toast(civOf(P(S)).n + ' ist am Zug');
+    else humanTurnStart();
   };
 }
 function gameOver() {
@@ -555,28 +627,175 @@ function gameOver() {
     <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">Zurück zum Menü</button>`);
 }
 
+/* --------------------------------------------------------- Ereignis & Erweiterungen */
+function curEvent() {
+  if (!S || !S.ev || !S.event || !S.event.k || S.event.round !== S.round) return null;
+  return EVENT_BY_KEY[S.event.k];
+}
+/* „Welt": Ereignis dieser Runde, Weltwunder, Barbaren – alles auf einen Blick. */
+function worldModal() {
+  const pi = S.cur, p = P(S);
+  let h = '';
+  if (S.ev) {
+    const ev = curEvent();
+    h += ev
+      ? `<div class="evbox"><b>Ereignis: ${ev.n}</b><p>${ev.e}</p>
+         ${hasWonder(S, pi, 'palast') ? '<p>Der Apostolische Palast schützt dich davor.</p>' : ''}</div>`
+      : `<div class="evbox"><b>Kein Ereignis in dieser Runde</b><p>Der Spaltenwürfel ging ins Leere.</p></div>`;
+    if (hasWonder(S, pi, 'orakel')) {
+      const nx = peekNextEvent(S);
+      const nn = nx && nx.k ? EVENT_BY_KEY[nx.k].n : 'keines';
+      h += `<p class="sub">Das Orakel sieht für die nächste Runde: <b>${nn}</b></p>`;
+    }
+    if ((S.barbs || []).length)
+      h += `<p class="sub">Barbaren belagern ${S.barbs.length} Stadt/Städte.</p>`;
+    if (S.nukeBan) h += '<p class="sub">Atomwaffenproteste: Atomwaffen sind gesperrt.</p>';
+  }
+  if (S.wo) {
+    const c = wonderCounts(S, pi);
+    h += `<p class="sub" style="margin-top:12px">Deine Weltwunder — Stufe 1: ${c[1]} · Stufe 2: ${c[2]} · Stufe 3: ${c[3]}
+      · nächstes Wunder ${wonderCost(S, pi)} Münzen</p>`;
+    h += '<div class="wlist">' + (wondersOf(S, pi).map(w =>
+      `<span class="wtag">${WONDER_BY_KEY[w.k].n}${w.cityId == null ? ' (freistehend)' : ''}</span>`).join('')
+      || '<span class="sub">noch keins</span>') + '</div>';
+    for (const lvl of [1, 2, 3]) {
+      const pool = poolOf(S, lvl);
+      if (!pool.length) continue;
+      h += `<p class="sub" style="margin-top:10px">Verfügbar, Stufe ${lvl}</p>`;
+      h += pool.map(k => `<div class="tech ${wonderLevelOk(S, pi, lvl) ? 'avail' : 'locked'}">
+        <span class="c">${WONDER_BY_KEY[k].lvl}</span><b>${WONDER_BY_KEY[k].n}</b>
+        <span class="eff">${WONDER_BY_KEY[k].e}</span></div>`).join('');
+    }
+    const others = S.players.map((pl, i) => i).filter(i => i !== pi && wondersOf(S, i).length);
+    if (others.length) {
+      h += '<p class="sub" style="margin-top:10px">Andere Reiche</p>';
+      h += others.map(i => `<p style="font-size:12px;margin:2px 0">
+        <b style="color:${civOf(S.players[i]).color}">${civOf(S.players[i]).n}</b>: ` +
+        wondersOf(S, i).map(w => WONDER_BY_KEY[w.k].n).join(', ') + '</p>').join('');
+    }
+  }
+  if (!S.ev && !S.wo) h = '<p class="sub">Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.</p>';
+  modal('Welt', h);
+}
+/* Weltwunder in einer Stadt bauen */
+function wonderSheet(city) {
+  const pi = S.cur;
+  const cost = wonderCost(S, pi);
+  let h = `<h3>Weltwunder bauen</h3>
+    <p class="sub">Kosten ${cost} Münzen · diese Stadt hat ${wondersInCity(S, city).length}/2 Wunder ·
+    verfügbar: ${available(S, pi, 'coins')} Münzen</p>`;
+  const list = availableWonders(S);
+  const rows = list.map(w => {
+    const err = canBuildWonder(S, pi, city, w.k);
+    return `<button class="opt" data-w="${w.k}" ${err ? 'disabled' : ''}>
+      <span>${w.n}<small>Stufe ${w.lvl} · ${w.e}${err ? ' · ' + err : ''}</small></span>
+      <span class="cost">${cost}🪙</span></button>`;
+  }).join('');
+  sheet(h + (rows || '<p class="sub">Keine Wunder verfügbar.</p>'));
+  $('sheet-body').querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
+    const e = buildWonder(S, S.cur, city, b.dataset.w);
+    if (e) return toast(e);
+    redraw();
+    if (S.over) { closeSheet(); return gameOver(); }
+    if (P(S).freePick) return freePickModal();
+    openTile(city.r, city.c);
+  });
+}
+/* Städte füttern: Gentechnik (Wissenschaft) und Massenmedien (Münzen), 1:1 */
+function feedSheet() {
+  const pi = S.cur, p = P(S);
+  const src = feedSources(S, pi);
+  if (!src.length) return toast('Dafür braucht es Gentechnik oder Massenmedien.');
+  let h = `<h3>Städte füttern</h3><p class="sub">1:1 in Nahrung. ` +
+    (p.foodDeficit ? `Offenes Nahrungsdefizit: <b>${p.foodDeficit}</b>. ` : 'Kein Defizit – zusätzliche Nahrung ist möglich. ') +
+    `Nahrung jetzt: ${p.res.food}</p>`;
+  src.forEach(x => {
+    const steps = [...new Set([p.foodDeficit || 0, 1, 5, x.have].filter(n => n > 0 && n <= x.have))];
+    h += `<p class="sub" style="margin-top:8px">${x.n} (${x.have} vorhanden)</p>`;
+    steps.forEach(n => {
+      h += `<button class="opt" data-k="${x.kind}" data-n="${n}"><span>${n} ${x.n} geben</span>
+        <span class="cost">+${n}🌾</span></button>`;
+    });
+  });
+  sheet(h);
+  $('sheet-body').querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
+    const e = feed(S, S.cur, b.dataset.k, +b.dataset.n);
+    if (e) return toast(e);
+    redraw(); feedSheet();
+  });
+}
+/* Auswahl kostenloser Technologien (Bibliothek, Oxford, Griechenland) */
+function freePickModal() {
+  const pi = S.cur, p = P(S);
+  const pick = p.freePick;
+  const list = pick ? freePickOptions(S, pi) : backPickOptions(S, pi);
+  const title = pick ? pick.why : 'Rückschau';
+  if (!list.length) { closeModal(); return; }
+  const h = `<p class="sub">${pick ? `Noch ${pick.n} kostenlose Technologie(n).` :
+    'Eine beliebige Technologie eines früheren Zeitalters, kostenlos.'}</p>` +
+    list.map(t => `<button class="tech avail" data-free="${t.k}">
+      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
+  modal(title, h);
+  $('ov-body').querySelectorAll('[data-free]').forEach(b => b.onclick = () => {
+    const e = pick ? useFreePick(S, S.cur, b.dataset.free) : useBackPick(S, S.cur, b.dataset.free);
+    if (e) return toast(e);
+    redraw();
+    if (P(S).freePick || (P(S).backPick != null && backPickOptions(S, S.cur).length)) freePickModal();
+    else closeModal();
+  });
+}
+/* Nach jedem Zugwechsel auf einen Menschen: Ereignis melden, Defizit anbieten. */
+function humanTurnStart() {
+  redraw();
+  const p = P(S);
+  if (S.over) return gameOver();
+  const ev = curEvent();
+  toast(ev ? `${civOf(p).n} ist am Zug · Ereignis: ${ev.n}` : civOf(p).n + ' ist am Zug');
+  if (p.foodDeficit > 0 && canFeed(p)) feedSheet();
+  else if (p.freePick) freePickModal();
+}
+
 /* ------------------------------------------------------------------ Aufbau */
 function setupScreen() {
   const sel = $('setup-map');
+  // MAPS[0] ist die Originalkarte – damit ist sie im Menü vorausgewählt.
   sel.innerHTML = MAPS.map((m, i) => `<option value="${i}">${m.name}</option>`).join('') +
     (customMap ? '<option value="eigene">Eigene Karte</option>' : '');
-  $('setup-rules').innerHTML = Object.entries(RULESETS)
-    .map(([k, r]) => `<option value="${k}">${r.name}</option>`).join('');
+  sel.value = '0';
+  $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
     `<option value="${x.k}"${x.k === 'prinz' ? ' selected' : ''}>${x.n}</option>`).join('');
+  const evBox = $('setup-events');
+  evBox.onchange = () => { $('setup-evmode-row').hidden = !evBox.checked; };
+  $('setup-evmode-row').hidden = !evBox.checked;
   const list = $('setup-list'); list.innerHTML = '';
   CIVS.forEach((civ, i) => {
     const d = document.createElement('div'); d.className = 'slot';
-    d.innerHTML = `<h3>${SYM[civ.sym]} ${civ.n}</h3><p>${civ.ability}</p>
+    d.innerHTML = `<h3>${SYM[civ.sym]} ${civ.n}</h3>
       <div class="seg" data-civ="${civ.k}">
         <button data-kind="human" class="${i === 0 ? 'on' : ''}">Mensch</button>
         <button data-kind="bot" class="${i === 0 ? '' : 'on'}">Bot</button>
-      </div>`;
+      </div>
+      <label class="row"><span>Fähigkeit</span>
+        <select data-abil="${civ.k}">${civ.abilities.map((a, j) =>
+          `<option value="${a.k}">${j === 0 ? a.n : `Alternative ${j + 1}: ${a.n}`}</option>`).join('')}
+        </select></label>
+      <p class="abil"></p>`;
     list.appendChild(d);
+    const sela = d.querySelector('[data-abil]');
+    const note = d.querySelector('.abil');
+    const paint = () => {
+      const kind = d.querySelector('[data-kind].on').dataset.kind;
+      sela.disabled = kind === 'bot';
+      const a = civ.abilities.find(x => x.k === sela.value) || civ.abilities[0];
+      note.textContent = kind === 'bot' ? 'Bots erhalten keine Zivilisationsfähigkeit.' : a.e;
+    };
+    sela.onchange = paint;
     d.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
       d.querySelectorAll('[data-kind]').forEach(x => x.classList.toggle('on', x === b));
-      refreshStart();
+      paint(); refreshStart();
     });
+    paint();
   });
   refreshStart();
 }
@@ -585,7 +804,8 @@ function setupConfig() {
   return CIVS.map((civ, i) => {
     const slot = $('setup-list').children[i];
     const kind = slot.querySelector('[data-kind].on').dataset.kind;
-    return { civ: civ.k, kind, diff };
+    const ability = slot.querySelector('[data-abil]').value;
+    return { civ: civ.k, kind, diff, ability };
   });
 }
 function refreshStart() {
@@ -654,12 +874,18 @@ function boot() {
     if (!players.some(p => p.kind === 'human')) return toast('Mindestens eine menschliche Zivilisation.');
     const pick = $('setup-map').value;
     const map = pick === 'eigene' ? customMap : MAPS[+pick];
-    S = newGame({ players, map, rules: $('setup-rules').value, startPlayer: +$('setup-start').value });
+    S = newGame({
+      players, map, startPlayer: +$('setup-start').value,
+      events: $('setup-events').checked, eventMode: $('setup-evmode').value,
+      wonders: $('setup-wonders').checked,
+    });
     startGameScreen();
   };
   $('a-tech').onclick = techModal;
   $('a-power').onclick = powerSheet;
   $('a-army').onclick = armySheet;
+  $('a-info').onclick = worldModal;
+  $('hud-feed').onclick = () => { if (P(S).kind !== 'bot' && !S.over) feedSheet(); };
   $('a-log').onclick = logModal;
   $('a-end').onclick = endHumanTurn;
   $('g-menu').onclick = () => {
@@ -695,6 +921,7 @@ function startGameScreen() {
   redraw();
   setTimeout(() => { fitMap($('map'), view); }, 30);
   if (P(S).kind === 'bot') setTimeout(runBots, 400);
+  else setTimeout(humanTurnStart, 60);
 }
 function rulesModal() {
   modal('Kurzregeln', `
@@ -705,10 +932,15 @@ function rulesModal() {
       <li>Aktionen in beliebiger Reihenfolge, beliebig oft.</li>
       <li>Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen.
         Zwei Züge in Folge stärker → Stadt erobert.</li>
-      <li>Sieg: Singularität · 2/3 der Weltbevölkerung · gegnerische Hauptstadt.</li>
+      <li>Sieg: Singularität · 2/3 der Weltbevölkerung (UN 1/2, Theologie 3/5) ·
+        gegnerische Hauptstadt · Weltwunder der Stufe 3.</li>
     </ol>
     <p class="sub">Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
     2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.</p>
+    <p class="sub">Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert,
+    sobald das Einkommen dadurch unter 0 fiele. Gentechnik (Wissenschaft) und Massenmedien
+    (Münzen) heben die Grenze auf – sie füttern zu Zugbeginn 1:1 und sind kein
+    allgemeiner Umtausch.</p>
     <p class="sub">Geländeerträge je Feld</p>
     <table style="width:100%;font-size:13px;border-collapse:collapse">
       <tr style="color:var(--ink-soft);font-size:11px"><th align="left">Feld</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>
@@ -717,8 +949,17 @@ function rulesModal() {
       <tr style="border-top:1px solid var(--rule)"><td>Stadt (je Bevölkerung)</td>
         <td align="center">1</td><td align="center">−1</td><td align="center">1</td></tr>
     </table>
-    <p class="sub">Zivilisationen</p>
-    ${CIVS.map(c => `<p style="font-size:13px;margin:4px 0"><b>${SYM[c.sym]} ${c.n}</b> — ${c.ability}</p>`).join('')}`);
+    <p class="sub">Zivilisationen — je drei wählbare Fähigkeiten (Bots haben keine)</p>
+    ${CIVS.map(c => `<p style="font-size:13px;margin:6px 0"><b>${SYM[c.sym]} ${c.n}</b><br>` +
+      c.abilities.map((a, j) => `<span style="color:var(--ink-soft)">${j === 0 ? 'Grund' : 'Alt. ' + (j + 1)}:</span> ${a.e}`).join('<br>') +
+      '</p>').join('')}
+    <p class="sub">Weltwunder (Erweiterung)</p>
+    <p style="font-size:13px;margin:4px 0">Kosten 10/20/30/40 … für das 1./2./3./4. Wunder.
+      Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. Je Stadt zwei Wunder.
+      Ein Wunder der Stufe 3 gewinnt zu Beginn des nächsten Zuges.</p>
+    <p class="sub">Ereignisse (Erweiterung)</p>
+    <p style="font-size:13px;margin:4px 0">Zu Rundenbeginn wird gewürfelt: Zeile, dann Spalte.
+      Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.</p>`);
 }
 function download(name, text) {
   const a = document.createElement('a');

@@ -28,6 +28,9 @@ function botTurn(S, pi) {
   // 2 Siedeln
   if (capital && botTry(S, p, 'Siedeln')) botSettle(S, pi, capital);
 
+  // 2b Weltwunder (nur mit Erweiterung): Probe, dann ein zufälliges baubares Wunder.
+  botWonderStep(S, pi);
+
   // 3 Armee bauen
   if (capital && botTry(S, p, 'Armee bauen') && !armyAt(S, capital.r, capital.c)) {
     S.armies.push({ id: S.nextId++, owner: pi, r: capital.r, c: capital.c, mp: 0, born: S.round });
@@ -37,9 +40,9 @@ function botTurn(S, pi) {
   // 4 Armeen bewegen
   for (const army of armiesOf(S, pi)) { army.mp = moveAllowance(S, pi); botMoveArmy(S, pi, army); }
 
-  // 5 Forschen. v2: der Bot würfelt zweimal, ob er forscht; bei zwei Erfolgen
+  // 5 Forschen: der Bot würfelt zweimal, ob er forscht; bei zwei Erfolgen
   // erforscht er in zwei unterschiedlichen Technologiefeldern.
-  if (RULES.botResearchTwice) {
+  if (BOT_RESEARCH_TWICE) {
     const usedFields = [];
     for (let i = 0; i < 2; i++) {
       if (S.over) break;
