@@ -206,3 +206,5 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
 .tech.obsolete{opacity:.55;text-decoration:line-through}
 .tech.obsolete .eff{text-decoration:none;font-style:italic}
 .res.food{border:0;background:none;cursor:pointer}
+
+.yrow.prev{color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--rule)}
