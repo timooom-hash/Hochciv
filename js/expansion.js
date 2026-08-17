@@ -313,7 +313,13 @@ function applyWonderEffect(S, pi, city, w) {
       addFreePick(S, pi, { n: 1, maxAge: 1, why: 'Die große Bibliothek' });
       break;
     case 'oxford':
-      addFreePick(S, pi, { n: 2, availOnly: true, why: 'Universität von Oxford' });
+      // "zwei momentan verfügbare Technologien": die Auswahl wird beim Bau festgehalten.
+      // Sonst könnte die erste Gratis-Tech ein neues Zeitalter aufschließen und die
+      // zweite Wahl um Technologien erweitern, die vorher nicht verfügbar waren.
+      addFreePick(S, pi, {
+        n: 2, why: 'Universität von Oxford',
+        only: techPool(S).filter(t => p.avail[t.k] && !p.techs[t.k]).map(t => t.k),
+      });
       break;
     case 'gaerten':
       for (const c of citiesOf(S, pi)) growFree(S, pi, c, 1, 'Hängende Gärten');
@@ -381,6 +387,7 @@ function freePickOptions(S, pi) {
     if (p.techs[t.k]) return false;
     if (pick.maxAge != null && t.age > pick.maxAge) return false;
     if (pick.availOnly && !p.avail[t.k]) return false;
+    if (pick.only && !pick.only.includes(t.k)) return false;   // beim Bau festgehaltene Auswahl
     // Raumfahrt: kein Zeitalter, das in diesem Feld noch nicht freigeschaltet ist
     if (pick.unlockedOnly && t.age > unlockedAge(S, pi, t.f)) return false;
     return true;

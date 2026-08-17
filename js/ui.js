@@ -508,7 +508,7 @@ function techModal() {
   }
   const bp = backPickOptions(S, pi);
   if (bp.length) {
-    grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[p.backPick.f]}, früheres Zeitalter, kostenlos</p>`;
+    grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[backPick(p).f]}, früheres Zeitalter, kostenlos</p>`;
     grid += bp.map(t => `<button class="tech avail" data-backtech="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   }

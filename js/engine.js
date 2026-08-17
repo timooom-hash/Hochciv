@@ -115,6 +115,7 @@ function newGame(cfg) {
     }
   });
   if (S.wo) initWonderPools(S);
+  S.startIdx = startIdx;      // Rundenwechsel und Ereignis hängen am Startspieler
   S.cur = startIdx;
   startRound(S);          // Ereignis der ersten Runde
   beginTurn(S);
@@ -173,18 +174,21 @@ function doResearch(S, pi, tk) {
   pay(S, pi, 'sci', cost);
   applyTech(S, pi, tech, `${cost} Wissenschaft`);
   if (tk === 'singularitaet') { S.over = { winner: pi, how: 'Forschungssieg (Singularität)' }; return null; }
-  // Griechenland "Rückschau": zusätzlich eine beliebige Technologie eines früheren
-  // Zeitalters gratis. Keine Kette – die Gratis-Tech löst das nicht erneut aus.
-  // nur ein früheres Zeitalter im GLEICHEN Technologiefeld
-  if (isAbil(p, 'rueckschau') && tech.age > 0) p.backPick = { age: tech.age - 1, f: tech.f };
   return null;
 }
-/* Technologie eintragen (bezahlt oder gratis) samt Folgewirkungen. */
-function applyTech(S, pi, tech, note) {
+/* Technologie eintragen (bezahlt oder gratis) samt Folgewirkungen.
+   opts.noBack unterdrückt die Rückschau – nur für die Rückschau-Tech selbst,
+   damit keine Kette entsteht. */
+function applyTech(S, pi, tech, note, opts) {
   const p = S.players[pi];
   const rangeBefore = moveAllowance(S, pi);
   p.techs[tech.k] = true;
   log(S, 'act', `${civOf(p).n} erforscht ${tech.n} (${note}).`);
+  // Griechenland "Rückschau": jede erforschte Technologie – auch eine kostenlose aus
+  // Bibliothek, Oxford oder Raumfahrt – gibt zusätzlich eine beliebige Technologie eines
+  // früheren Zeitalters im selben Feld gratis.
+  if (isAbil(p, 'rueckschau') && tech.age > 0 && !(opts && opts.noBack))
+    (p.backPicks = p.backPicks || []).push({ age: tech.age - 1, f: tech.f });
   if (tech.k === 'singularitaet') return;
   // Reichweitensprung (Luftwaffe/Panzerschiff) sofort wirksam machen: die Erhöhung der
   // Maximalweite wird der Restbewegung der eigenen Armeen dieser Runde gutgeschrieben.
@@ -196,13 +200,13 @@ function applyTech(S, pi, tech, note) {
 }
 /* Kostenlose Forschung: Griechenland-Fähigkeiten und die Wunder Bibliothek/Oxford.
    quelle beschreibt, woher der Anspruch kommt (nur für das Protokoll). */
-function grantTech(S, pi, tk, quelle) {
+function grantTech(S, pi, tk, quelle, opts) {
   const p = S.players[pi];
   const tech = TECH_BY_KEY[tk];
   if (!tech) return 'Unbekannte Technologie.';
   if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   if (p.techs[tk]) return 'Schon erforscht.';
-  applyTech(S, pi, tech, quelle);
+  applyTech(S, pi, tech, quelle, opts);
   return null;
 }
 /* Griechenland "Freie Forschung": 1× pro Runde eine verfügbare Technologie
@@ -222,18 +226,21 @@ function useFreeTech(S, pi, tk) {
   return null;
 }
 /* Griechenland "Rückschau": beliebige Tech eines früheren Zeitalters, auch nicht freigeschaltet. */
+/* Offene Rückschau-Ansprüche. Es können mehrere gleichzeitig sein (Oxford gibt zwei
+   Technologien, also zwei Ansprüche); sie werden der Reihe nach abgearbeitet. */
+function backPick(p) { return (p.backPicks || [])[0] || null; }
 function backPickOptions(S, pi) {
   const p = S.players[pi];
-  if (!p.backPick) return [];
-  return techPool(S).filter(t =>
-    t.f === p.backPick.f && t.age <= p.backPick.age && !p.techs[t.k]);
+  const bp = backPick(p);
+  if (!bp) return [];
+  return techPool(S).filter(t => t.f === bp.f && t.age <= bp.age && !p.techs[t.k]);
 }
 function useBackPick(S, pi, tk) {
   const p = S.players[pi];
   if (!backPickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
-  const err = grantTech(S, pi, tk, 'Rückschau');
+  const err = grantTech(S, pi, tk, 'Rückschau', { noBack: true });   // keine Kette
   if (err) return err;
-  p.backPick = null;
+  p.backPicks.shift();
   return null;
 }
 
@@ -415,13 +422,12 @@ function rates(S, pi, opts) {
   if (hungry) coinsToFood = eng ? 1 : (has(p, 'gilden') ? 2 : 4);
   let foodToCoins = (eng || hasWonder(S, pi, 'pyramiden')) ? 1 : Infinity;
   if (opts && opts.foodOk && foodToCoins === Infinity) foodToCoins = 1;
-  return {
-    coinsToFood,
-    coinsToSci: has(p, 'computertechnik') ? 1 : 2,
-    sciToCoins: has(p, 'alchemie') ? 1 : Infinity,
-    sciToFood: Infinity,
-    foodToCoins,
-  };
+  const sciToCoins = has(p, 'alchemie') ? 1 : Infinity;
+  // Wissenschaft → Nahrung geht nur über die Münzen: mit Alchemie kostet 1 Nahrung also
+  // sciToCoins × coinsToFood Wissenschaft (ohne Gilden 2, mit Gilden oder England 1).
+  // Gentechnik steht bewusst nicht hier – sie füttert nur Städte (siehe feed()).
+  const sciToFood = sciToCoins === Infinity ? Infinity : sciToCoins * coinsToFood;
+  return { coinsToFood, coinsToSci: has(p, 'computertechnik') ? 1 : 2, sciToCoins, sciToFood, foodToCoins };
 }
 function available(S, pi, kind, opts) {   // wie viel man höchstens ausgeben kann
   const p = S.players[pi], r = rates(S, pi, opts), R = p.res;
@@ -533,7 +539,7 @@ function beginTurn(S) {
   // Zustände zurücksetzen
   S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
   S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
-  p.copies = 0; p.nuked = false; p.backPick = null;
+  p.copies = 0; p.nuked = false; p.backPicks = [];
 }
 
 /* ------------------------------------------------------------ Bewegung */
@@ -1058,10 +1064,13 @@ function finishTurn(S) {
   return S.over;
 }
 function advanceTurn(S) {
+  // Eine Runde ist eine volle Umdrehung ab dem Startspieler: dort wird hochgezählt und
+  // dort wird das Ereignis der neuen Runde ausgewürfelt – nicht bei Russland (Index 0).
+  const first = S.startIdx || 0;
   let guard = 0;
   do {
     S.cur = (S.cur + 1) % S.players.length;
-    if (S.cur === 0) { S.round++; startRound(S); }
+    if (S.cur === first) { S.round++; startRound(S); }
     guard++;
   } while (S.players[S.cur].dead && guard < 20);
   beginTurn(S);
