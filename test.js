@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/bots.js'])
+for (const f of ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -35,8 +35,19 @@ const mk = (civ, techs = []) => {
   techs.forEach(t => S.players[0].techs[t] = true);
   return S;
 };
-const mkV2 = (civ, techs = []) => {
-  const S = normalize(newGame({ players: [{ civ, kind: 'human' }, { civ: 'england', kind: 'bot' }], seed: 7, rules: 'v2' }), civ);
+// Spiel mit Erweiterungen (Ereignisse und/oder Weltwunder)
+const mkX = (civ, opts = {}, techs = []) => {
+  const S = normalize(newGame(Object.assign({
+    players: [{ civ, kind: 'human', ability: opts.ability }, { civ: 'england', kind: 'bot' }], seed: 7,
+  }, opts)), civ);
+  techs.forEach(t => S.players[0].techs[t] = true);
+  return S;
+};
+// Spiel mit gewählter Zivilisationsfähigkeit
+const mkA = (civ, ability, techs = []) => {
+  const S = normalize(newGame({
+    players: [{ civ, kind: 'human', ability }, { civ: 'england', kind: 'bot' }], seed: 7,
+  }), civ);
   techs.forEach(t => S.players[0].techs[t] = true);
   return S;
 };
@@ -387,73 +398,72 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(sm.freeOk, false, 'ohne Internet keine Gratiskopie');
 }
 
-/* === Experimentelle Variante v2 === */
+/* === Regeln der Hauptvariante (vormals v2) === */
 
 /* Singularität kostet 100 */
 {
-  const S = mkV2('griechenland');
-  eq(SINGULARITY.c, 100, 'v2: Singularität-Grundkosten 100');
-  // Griechenland-Rabatt gilt weiter (−5 im vierten Zeitalter)
-  eq(techCost(S, 0, SINGULARITY), 95, 'v2: griechischer Rabatt auch auf Singularität');
+  const S = mk('griechenland');
+  eq(SINGULARITY.c, 100, 'Singularität-Grundkosten 100');
+  eq(techCost(S, 0, SINGULARITY), 95, 'griechischer Rabatt auch auf Singularität');
 }
 
-/* Griechenland ohne Würfelbonus */
+/* Griechenland hat keinen Würfelbonus mehr, der Kostenrabatt bleibt */
 {
-  const std = mk('griechenland'); setRules('standard');
-  eq(availBonus(std.players[0]), 1, 'Standard: Griechenland +1 Würfelbonus');
-  const v2 = mkV2('griechenland'); setRules('v2');
-  eq(availBonus(v2.players[0]), 0, 'v2: kein Würfelbonus für Griechenland');
-  // Kostenvergünstigung bleibt in beiden
-  eq(techCost(v2, 0, TECH_BY_KEY.papier), 4, 'v2: Kostenrabatt bleibt (Papier 6−2)');
+  const S = mk('griechenland');
+  eq(availBonus(S.players[0]), 0, 'kein Würfelbonus für Griechenland');
+  S.players[0].techs.philosophie = true;
+  eq(availBonus(S.players[0]), 1, 'Philosophie gibt weiter +1');
+  eq(techCost(S, 0, TECH_BY_KEY.papier), 4, 'Kostenrabatt bleibt (Papier 6−2)');
+}
+
+/* Keramik und Theologie sind Teil der normalen Techliste */
+{
+  eq(!!TECH_BY_KEY.keramik, true, 'Keramik ist eine normale Technologie');
+  eq(!!TECH_BY_KEY.theologie, true, 'Theologie ist eine normale Technologie');
+  eq(techsIn(1, 0).map(t => t.k).includes('keramik'), true, 'Keramik: Produktion/Antike');
+  eq(techsIn(3, 1).map(t => t.k).includes('theologie'), true, 'Theologie: Spezial/Mittelalter');
 }
 
 /* Theologie senkt die Siegschwelle auf 3/5, UN gewinnt bei Gleichstand die niedrigere */
 {
-  const S = mkV2('griechenland', ['theologie']);
-  const o = victoryOption(S.players[0]);
-  eq(o.frac, 3 / 5, 'v2: Theologie setzt Schwelle auf 3/5');
+  const S = mk('griechenland', ['theologie']);
+  eq(victoryOption(S.players[0]).frac, 3 / 5, 'Theologie setzt Schwelle auf 3/5');
   S.players[0].techs.un = true;
   eq(victoryOption(S.players[0]).frac, 0.5, 'UN (1/2) schlägt Theologie (3/5)');
 }
 
 /* Keramik + Verbundwerkstoffe: bis 3x wachsen, davon 1x gratis */
 {
-  const S = mkV2('griechenland', ['keramik', 'verbundwerkstoffe']);
+  const S = mk('griechenland', ['keramik', 'verbundwerkstoffe', 'landwirtschaft', 'bewaesserung']);
   const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.born = 0;
   const lim = growLimits(S, 0);
-  eq([lim.max, lim.free], [3, 1], 'v2: Keramik+Verbund = max 3, davon 1 gratis');
-  const first = growCost(S, 0, c);
-  eq(first.free === true, true, 'erstes Wachstum dieser Runde ist gratis');
+  eq([lim.max, lim.free], [3, 1], 'Keramik+Verbund = max 3, davon 1 gratis');
+  eq(growCost(S, 0, c).free === true, true, 'erstes Wachstum dieser Runde ist gratis');
+  S.players[0].techs.gentechnik = true;      // hebt die Nahrungsgrenze auf
   S.players[0].res = { sci: 0, food: 99, coins: 99 };
   growCity(S, 0, c); growCity(S, 0, c); growCity(S, 0, c);
   eq(c.pop, 6, 'drei Wachstumsschritte in einer Runde');
   eq(typeof canGrow(S, 0, c), 'string', 'ein viertes Wachstum wird abgelehnt');
 }
 
-/* nur Verbundwerkstoffe (ohne Keramik) in v2: normales Wachstum + 1x gratis = max 2 */
+/* nur Verbundwerkstoffe: normales Wachstum + 1x gratis = max 2 */
 {
-  const S = mkV2('griechenland', ['verbundwerkstoffe']); setRules('v2');
+  const S = mk('griechenland', ['verbundwerkstoffe']);
   const lim = growLimits(S, 0);
-  eq([lim.max, lim.free], [2, 1], 'v2: Verbund allein = 1x normal + 1x gratis');
+  eq([lim.max, lim.free], [2, 1], 'Verbund allein = 1x normal + 1x gratis');
   const c = capitalOf(S, 0); c.pop = 2; c.grown = 0; c.born = 0;
   eq(growCost(S, 0, c).free === true, true, 'das erste Wachstum ist das kostenlose');
 }
 
-/* Standardregeln: Verbundwerkstoffe bleibt 2x bezahlt */
+/* Sklaverei wird mit der Moderne obsolet */
 {
-  const S = mk('griechenland', ['verbundwerkstoffe']); setRules('standard');
-  const lim = growLimits(S, 0);
-  eq([lim.max, lim.free], [2, 0], 'Standard: Verbund = 2x, nichts gratis');
-}
-
-/* Sklaverei wird in v2 mit Moderne obsolet */
-{
-  const S = mkV2('griechenland', ['sklaverei']);
+  const S = mk('griechenland', ['sklaverei']);
   const c = capitalOf(S, 0); c.pop = 3;
-  eq(slaveryUsable(S.players[0]), true, 'v2: Sklaverei nutzbar vor der Moderne');
+  eq(slaveryUsable(S.players[0]), true, 'Sklaverei nutzbar vor der Moderne');
   S.players[0].techs.robotik = true;   // eine Moderne-Tech
-  eq(slaveryUsable(S.players[0]), false, 'v2: Sklaverei obsolet ab Moderne');
-  eq(typeof sacrifice(S, 0, c), 'string', 'v2: Opfern ab Moderne abgelehnt');
+  eq(slaveryUsable(S.players[0]), false, 'Sklaverei obsolet ab Moderne');
+  eq(typeof sacrifice(S, 0, c), 'string', 'Opfern ab Moderne abgelehnt');
+  eq(TECH_BY_KEY.sklaverei.e.includes('obsolet'), true, 'Techbogen weist auf die Obsoleszenz hin');
 }
 
 /* Effekt sofort nach dem Forschen verfügbar (Kartografie senkt Gründungskosten im selben Zug) */
@@ -604,9 +614,9 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   }), true, 'kein Wasserfeld ist ein gültiges Zielfeld (nur Navigation)');
 }
 
-/* Gratis-Wachstum (v2) getrennt vom bezahlten Wachstum */
+/* Gratis-Wachstum getrennt vom bezahlten Wachstum */
 {
-  const S = mkV2('griechenland', ['verbundwerkstoffe']);
+  const S = mk('griechenland', ['verbundwerkstoffe', 'gentechnik']);
   const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
   eq(freeGrowthAvailable(S, 0, c), true, 'Gratis-Wachstum steht bereit');
   eq(growCity(S, 0, c, 'free'), null, 'kostenloses Wachstum klappt');
@@ -621,7 +631,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 
 /* Regression: bezahltes Wachstum ZUERST darf das Gratis-Kontingent nicht verbrauchen */
 {
-  const S = mkV2('griechenland', ['verbundwerkstoffe']);
+  const S = mk('griechenland', ['verbundwerkstoffe', 'gentechnik']);
   const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
   S.players[0].res = { sci: 0, food: 99, coins: 99 };
   eq(growCity(S, 0, c, 'paid'), null, 'erst bezahlt wachsen');
@@ -633,7 +643,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 
 /* Regression: Keramik+Verbund, 2× bezahlt zuerst, Gratis muss noch gehen (max 3) */
 {
-  const S = mkV2('griechenland', ['keramik', 'verbundwerkstoffe']);
+  const S = mk('griechenland', ['keramik', 'verbundwerkstoffe', 'gentechnik']);
   const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
   S.players[0].res = { sci: 0, food: 999, coins: 999 };
   eq(growCity(S, 0, c, 'paid'), null, 'erstes bezahltes Wachstum');
@@ -649,24 +659,605 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const S = mk('griechenland', ['landwirtschaft', 'papier']);
   capitalOf(S, 0).pop = 3;
   const b = incomeBreakdown(S, 0);
-  const sum = b.rows.reduce((a, r) => [a[0] + r.y[0], a[1] + r.y[1], a[2] + r.y[2]], [0, 0, 0]);
+  const sum = b.rows.concat(b.extra).reduce((a, r) => [a[0] + r.y[0], a[1] + r.y[1], a[2] + r.y[2]], [0, 0, 0]);
   sum[0] += b.pop.y[0]; sum[1] += b.pop.y[1]; sum[2] += b.pop.y[2];
   eq(sum, b.total, 'Aufschlüsselung (Gelände + Bevölkerung) summiert sich zum Einkommen');
   const inc = income(S, 0);
   eq(b.total, [inc.sci, inc.food, inc.coins], 'Übersichtssumme entspricht income()');
 }
 
-/* v2: Tech-Labels korrekt und Sortierung nach Kosten */
+/* Tech-Labels und Sortierung nach Kosten */
 {
-  setRules('v2');
-  eq(TECH_BY_KEY.keramik.e, 'Städte 2× pro Runde erweitern', 'v2: Keramik hat eigenständiges Label');
-  eq(TECH_BY_KEY.verbundwerkstoffe.e, '1× zusätzliches, kostenloses Wachstum pro Stadt', 'v2: Verbundwerkstoffe zeigt Gratis-Wachstum');
+  eq(TECH_BY_KEY.keramik.e, 'Städte 2× pro Runde erweitern', 'Keramik hat ein eigenständiges Label');
+  eq(TECH_BY_KEY.verbundwerkstoffe.e, '1× zusätzliches, kostenloses Wachstum pro Stadt', 'Verbundwerkstoffe zeigt das Gratis-Wachstum');
   const prod = techsIn(1, 0).map(t => t.c);
   eq(prod, prod.slice().sort((a, b) => a - b), 'Techs sind nach Kosten sortiert');
   eq(techsIn(1, 0).map(t => t.n), ['Landwirtschaft', 'Fischerei', 'Rad', 'Keramik', 'Bewässerung'], 'Keramik (4) steht vor Bewässerung (5)');
-  setRules('standard');
-  eq(TECH_BY_KEY.verbundwerkstoffe.e, 'Städte 2× pro Runde erweitern', 'Standard: Verbundwerkstoffe-Label zurückgesetzt');
-  eq(TECH_BY_KEY.keramik, undefined, 'Keramik gibt es nur in v2');
+}
+
+/* ==================================================== Nahrungsproduktion */
+const setEvent = (S, k) => {
+  S.ev = S.ev || { mode: 'hard' };
+  S.event = { round: S.round, k, row: 0, col: 0 };
+};
+
+/* Negatives Nahrungseinkommen wird auf 0 gekappt, ohne Bevölkerungsverlust */
+{
+  const S = mk('griechenland');
+  const c = capitalOf(S, 0); c.pop = 20;
+  const inc = income(S, 0);
+  eq(inc.food < 0, true, 'Nahrung: große Stadt erzeugt ein Defizit');
+  beginTurn(S);
+  eq(S.players[0].res.food, 0, 'Nahrung: Einkommen wird bei 0 gekappt');
+  eq(S.players[0].foodDeficit, -inc.food, 'Nahrung: Defizit wird vermerkt');
+  eq(c.pop, 20, 'Nahrung: niemand verhungert');
+}
+
+/* Wachstum ist blockiert, sobald es die Produktion negativ machen würde */
+{
+  const S = mk('griechenland');
+  const c = capitalOf(S, 0);
+  let steps = 0;
+  while (steps < 40) {
+    S.players[0].res = { sci: 0, food: 999, coins: 999 };   // Ressourcen sind hier nicht die Grenze
+    c.grown = 0;
+    if (canGrow(S, 0, c)) break;
+    growCity(S, 0, c); steps++;
+  }
+  S.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq(typeof canGrow(S, 0, c), 'string', 'Wachstum wird an der Nahrungsgrenze abgelehnt');
+  eq(income(S, 0).food >= 0, true, 'an der Grenze ist die Produktion noch nicht negativ');
+  eq(foodAfterGrowth(S, 0, c, 1) < 0, true, 'ein weiterer Schritt wäre negativ');
+  // Gentechnik hebt die Grenze auf
+  S.players[0].techs.gentechnik = true;
+  c.grown = 0;
+  eq(canGrow(S, 0, c), null, 'Gentechnik erlaubt Wachstum über die Grenze hinaus');
+  delete S.players[0].techs.gentechnik;
+  S.players[0].techs.massenmedien = true;
+  c.grown = 0;
+  eq(canGrow(S, 0, c), null, 'Massenmedien erlauben es ebenfalls');
+}
+
+/* Gentechnik/Massenmedien sind KEIN allgemeiner Umtausch */
+{
+  const S = mk('griechenland', ['massenmedien', 'gentechnik']);
+  eq(rates(S, 0).coinsToFood, 2, 'Massenmedien ändert den Münzkurs nicht (2:1)');
+  eq(rates(S, 0).sciToFood, Infinity, 'Gentechnik ist kein Wissenschaft→Nahrung-Kurs');
+  S.players[0].res = { sci: 10, food: 0, coins: 10 };
+  eq(available(S, 0, 'food'), 5, 'nur der normale 2:1-Kurs zählt (10 Münzen = 5 Nahrung)');
+  const G = mk('griechenland', ['gilden']);
+  eq(rates(G, 0).coinsToFood, 1, 'Gilden bleibt ein echter 1:1-Kurs');
+}
+
+/* Füttern: deckt zuerst das Defizit, dann kommt Nahrung obendrauf */
+{
+  const S = mk('griechenland', ['massenmedien']);
+  const p = S.players[0];
+  p.res = { sci: 0, food: 0, coins: 5 }; p.foodDeficit = 3;
+  eq(feed(S, 0, 'coins', 5), null, 'Füttern mit Münzen klappt');
+  eq([p.foodDeficit, p.res.food, p.res.coins], [0, 2, 0], '3 deckt das Defizit, 2 werden Nahrung');
+  eq(typeof feed(S, 0, 'sci', 1), 'string', 'ohne Gentechnik kein Füttern mit Wissenschaft');
+  const T = mk('griechenland', ['gentechnik']);
+  T.players[0].res = { sci: 4, food: 1, coins: 0 }; T.players[0].foodDeficit = 0;
+  eq(feed(T, 0, 'sci', 4), null, 'Füttern mit Wissenschaft klappt');
+  eq([T.players[0].res.sci, T.players[0].res.food], [0, 5], 'Wissenschaft wandert 1:1 in Nahrung');
+}
+
+/* Kostenloses Wunder-Wachstum respektiert die Grenze und wächst nur so weit wie möglich */
+{
+  const S = mk('griechenland');
+  const c = capitalOf(S, 0);
+  const room = (() => { let n = 0; while (foodAfterGrowth(S, 0, c, n + 1) >= 0) n++; return n; })();
+  eq(room > 0, true, 'es ist noch Nahrungsspielraum vorhanden');
+  const done = growFree(S, 0, c, room + 5, 'Test');
+  eq(done, room, 'kostenloses Wachstum stoppt genau an der Nahrungsgrenze');
+  eq(income(S, 0).food >= 0, true 	, 'die Produktion bleibt nicht negativ');
+}
+
+/* ==================================================== Karte und Aufbau */
+{
+  eq(MAPS[0].name.startsWith('Originalkarte'), true, 'die Originalkarte steht im Menü an erster Stelle');
+  eq(DEFAULT_MAP, MAP_ORIGINAL, 'Standardkarte ist die Originalkarte');
+}
+
+/* ==================================================== Zivilisationsfähigkeiten */
+/* Bots erhalten keine Zivilisationsfähigkeit */
+{
+  const S = newGame({ seed: 3, players: [
+    { civ: 'wikinger', kind: 'bot' }, { civ: 'england', kind: 'bot' },
+    { civ: 'russland', kind: 'bot' }, { civ: 'griechenland', kind: 'human' }] });
+  const wi = S.players.findIndex(p => p.civ === 'wikinger');
+  eq(armiesOf(S, wi).length, 0, 'Bot-Wikinger bekommt keine Gratisarmee');
+  const en = S.players.findIndex(p => p.civ === 'england');
+  eq(rates(S, en).foodToCoins, Infinity, 'Bot-England hat keinen Nahrung→Münzen-Kurs');
+  eq(tileYield(S, S.players.findIndex(p => p.civ === 'russland'), 'W')[1], 0, 'Bot-Russland ohne Waldbonus');
+  const gr = S.players.findIndex(p => p.civ === 'griechenland');
+  eq(techCost(S, gr, TECH_BY_KEY.papier), 4, 'menschliches Griechenland behält den Rabatt');
+  const S2 = newGame({ seed: 3, players: [{ civ: 'griechenland', kind: 'bot' }, { civ: 'england', kind: 'human' }] });
+  eq(techCost(S2, S2.players.findIndex(p => p.civ === 'griechenland'), TECH_BY_KEY.papier), 6,
+    'Bot-Griechenland ohne Kostenrabatt');
+}
+
+/* Wikinger: Grundfähigkeit nur bei 'basis' */
+{
+  const A = mkA('wikinger', 'basis');
+  eq(armiesOf(A, 0).length, 1, 'Wikinger mit Grundfähigkeit: Gratisarmee am Start');
+  eq(armyCost(A, 0), 5, 'erste Armee zählt nicht mit (2. Armee kostet 5)');
+  const B = mkA('wikinger', 'armeemacht');
+  eq(armiesOf(B, 0).length, 0, 'Alternative: keine Gratisarmee');
+  eq(armyCost(B, 0), 5, 'Alternative: normale Armeekosten');
+}
+
+/* Wikinger "Kriegerkultur": +1 Macht je Armee, Zuschlag geht nicht verloren */
+{
+  const S = mkA('wikinger', 'armeemacht');
+  const cap = capitalOf(S, 0), sp = spotBy(S, cap);
+  S.armies.push({ id: 90, owner: 0, r: sp[0], c: sp[1], mp: 0, born: 0 });
+  eq(powerOf(S, 0), 1, 'eine Armee gibt +1 Macht');
+  S.players[0].power = 4;
+  eq(powerOf(S, 0), 5, 'Machtwert = eigene Macht + Armeen');
+  beginTurn(S);
+  eq(S.players[0].power, 1, 'Machtverlust rechnet mit 5 (aufgerundet 3) auf die eigene Macht');
+  eq(powerOf(S, 0), 2, 'der Armeezuschlag bleibt erhalten');
+}
+
+/* Wikinger "Beutezüge": Ertrag je Punkt Überlegenheit */
+{
+  const S = mkA('wikinger', 'kampfertrag');
+  S.players[0].power = 8;
+  const foe = capitalOf(S, 1);
+  const spot = neighbors(foe.r, foe.c).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  S.armies.push({ id: 91, owner: 0, r: spot[0], c: spot[1], mp: 0, born: 0 });
+  const def = defenseValue(S, foe);
+  eq(raidBonus(S, 0), 8 - def, 'Vorsprung gegenüber der Stadtverteidigung wird zum Ertrag');
+  const b = incomeBreakdown(S, 0);
+  eq(b.extra.some(e => e.name === 'Beutezüge'), true, 'Beutezüge stehen in der Ertragsübersicht');
+  S.players[0].power = 0;
+  eq(raidBonus(S, 0), 0, 'ohne Vorsprung kein Ertrag');
+}
+
+/* Griechenland: Alternativen ersetzen den Kostenrabatt */
+{
+  const S = mkA('griechenland', 'gratistech');
+  eq(techCost(S, 0, TECH_BY_KEY.papier), 6, 'Alternative: kein Kostenrabatt mehr');
+  S.players[0].avail.papier = true;
+  eq(freeTechOptions(S, 0).some(t => t.k === 'papier'), true, 'verfügbare Tech ist gratis erforschbar');
+  eq(useFreeTech(S, 0, 'papier'), null, 'Gratisforschung klappt');
+  eq(has(S.players[0], 'papier'), true, 'Tech ist erforscht');
+  eq(freeTechOptions(S, 0).length, 0, 'nur einmal pro Runde');
+  S.players[0].avail.robotik = true;
+  S.round++;
+  eq(freeTechOptions(S, 0).some(t => t.k === 'robotik'), false, 'nur bis Industrialisierung (Robotik ist Moderne)');
+}
+{
+  const S = mkA('griechenland', 'rueckschau');
+  const p = S.players[0];
+  p.avail.buchdruck = true; p.res = { sci: 99, food: 0, coins: 0 };
+  eq(doResearch(S, 0, 'buchdruck'), null, 'Mittelalter-Tech erforscht');
+  eq(p.backPick, 0, 'Rückschau erlaubt ein früheres Zeitalter (Antike)');
+  const opts = backPickOptions(S, 0);
+  eq(opts.every(t => t.age === 0), true, 'nur Techs der Antike zur Wahl');
+  eq(opts.some(t => !p.avail[t.k]), true, 'auch nicht freigeschaltete Techs zur Wahl');
+  eq(useBackPick(S, 0, opts[0].k), null, 'Gratis-Tech aus der Rückschau');
+  eq(backPickOptions(S, 0).length, 0, 'keine Kette – der Anspruch ist verbraucht');
+}
+
+/* England: Alternativen */
+{
+  const A = mkA('england', 'gruenden'), B = mkA('england', 'basis');
+  const cap = capitalOf(A, 0);
+  const far = within(cap.r, cap.c, 6).find(([r, c]) => isLand(A, r, c) &&
+    !A.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
+  // Basiskosten bei einer Stadt = 1; die Distanzkosten sind in beiden Spielen gleich
+  eq(foundCost(B, 0, far[0], far[1]) - foundCost(A, 0, far[0], far[1]), 1,
+    'Alternative "Kolonisten": Basiskosten fallen weg, Distanz bleibt');
+  eq(foundCost(A, 0, far[0], far[1]) > 0, true, 'Distanzkosten werden weiter berechnet');
+  eq(rates(A, 0).foodToCoins, Infinity, 'Alternative: kein 1:1-Pool mehr');
+}
+{
+  const S = mkA('england', 'kuestenstaedte');
+  const cap = capitalOf(S, 0);
+  const sea = cityAtSea(S, cap);
+  const b = incomeBreakdown(S, 0);
+  eq(b.extra.some(e => e.name === 'Städte am Meer'), sea, 'Küstenzeile erscheint nur bei Meeresanschluss');
+  if (sea) eq(b.extra.find(e => e.name === 'Städte am Meer').y, [2, 2, 2], '+2 auf alle drei Erträge');
+}
+
+/* Russland: Alternativen */
+{
+  const S = mkA('russland', 'wachstum');
+  const c = capitalOf(S, 0);
+  eq(growPrice(S, 0, c).food, 0, 'Wachstum kostet keine Nahrung');
+  eq(growPrice(S, 0, c).coins, c.pop, 'Münzen fallen weiter an');
+  eq(tileYield(S, 0, 'W')[1], 0, 'Alternative: kein Waldbonus');
+  // die Nahrungsgrenze gilt trotzdem
+  c.pop = 30;
+  eq(typeof canGrowPaid(S, 0, c), 'string', 'Nahrungsgrenze gilt auch bei Gratis-Nahrungskosten');
+}
+{
+  const S = mkA('russland', 'siedler');
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.players[0].res = { sci: 0, food: 99, coins: 99 };
+  eq(foundCity(S, 0, spot[0], spot[1]), null, 'Stadt gegründet');
+  eq(cityAt(S, spot[0], spot[1]).pop, 2, 'neue Städte starten mit 2 Bevölkerung');
+}
+
+/* ==================================================== Ereignisse */
+/* Spaltenauswürfelung: hart trifft immer, leicht nur bei 1/3/5 */
+{
+  const S = mk('griechenland');
+  eq([1, 2, 3, 4, 5, 6].map(r => eventColumn(S, 'hard', r)), [1, 1, 2, 2, 3, 3], 'hart: 1/2→1, 3/4→2, 5/6→3');
+  eq([1, 2, 3, 4, 5, 6].map(r => eventColumn(S, 'easy', r)), [1, 0, 2, 0, 3, 0], 'leicht: nur 1/3/5 treffen');
+}
+/* Häufigkeit: leicht trifft etwa halb so oft wie hart */
+{
+  let hard = 0, easy = 0;
+  for (let g = 0; g < 200; g++) {
+    const H = mkX('griechenland', { events: true, eventMode: 'hard', seed: 100 + g });
+    const E = mkX('griechenland', { events: true, eventMode: 'easy', seed: 100 + g });
+    if (H.event.k) hard++;
+    if (E.event.k) easy++;
+  }
+  eq(hard, 200, 'harter Modus: jede Runde ein Ereignis');
+  eq(easy > 60 && easy < 140, true, `leichter Modus trifft etwa halb so oft (${easy}/200)`);
+}
+/* Bots sind nie betroffen, Menschen schon */
+{
+  const S = mkX('griechenland', { events: true });
+  setEvent(S, 'duerre');
+  eq(evActive(S, 0, 'duerre'), true, 'Ereignis trifft den Menschen');
+  eq(evActive(S, 1, 'duerre'), false, 'Bots sind nie betroffen');
+  eq(tileYield(S, 0, 'G'), [0, 0, 0], 'Dürre: Grasland bringt nichts');
+  eq(tileYield(S, 1, 'G')[1], 1, 'Bot-Grasland bringt weiter Nahrung');
+  for (const [k, t] of Object.entries(EVENT_TERRAIN)) {
+    setEvent(S, k);
+    eq(tileYield(S, 0, t), [0, 0, 0], `${EVENT_BY_KEY[k].n}: ${TERRAIN[t].name} bringt nichts`);
+  }
+}
+/* Pest, Sturmflut, Kriegsmüdigkeit, Wirtschaftskrise, Hungersnot, Revolution */
+{
+  const S = mkX('griechenland', { events: true });
+  const c = capitalOf(S, 0); c.pop = 7;
+  setEvent(S, 'pest'); applyEvent(S);
+  eq(c.pop, 3, 'Pest: 7 → 3 (Hälfte aufgerundet abgezogen)');
+  c.pop = 1;
+  setEvent(S, 'pest'); applyEvent(S);
+  eq(c.pop, 1, 'Pest zerstört keine Stadt (letzte Bevölkerung bleibt)');
+}
+{
+  const S = mkX('griechenland', { events: true });
+  const c = capitalOf(S, 0); c.pop = 9;
+  const wet = neighbors(c.r, c.c).some(([r, cc]) => ['M', 'F'].includes(terrainAt(S, r, cc)));
+  setEvent(S, 'sturmflut'); applyEvent(S);
+  if (wet) {
+    eq(c.pop, 6, 'Sturmflut: 9 → 6 (ein Drittel)');
+    eq(typeof canGrow(S, 0, c), 'string', 'Sturmflut: diese Runde kein Wachstum');
+  } else eq(c.pop, 9, 'ohne Wasseranschluss keine Sturmflut');
+}
+{
+  const S = mkX('griechenland', { events: true });
+  S.players[0].power = 12;
+  setEvent(S, 'kriegsmuedigkeit'); applyEvent(S);
+  eq(S.players[0].power, 0, 'Kriegsmüdigkeit setzt die Macht auf 0');
+}
+{
+  const S = mkX('griechenland', { events: true });
+  const base = income(S, 0);
+  setEvent(S, 'wirtschaftskrise');
+  eq(income(S, 0).coins, 0, 'Wirtschaftskrise: keine Münzen');
+  eq(income(S, 0).sci, base.sci, 'Wissenschaft bleibt');
+  setEvent(S, 'hungersnot');
+  eq(income(S, 0).food, 0, 'Hungersnot: keine Nahrung');
+  eq(rates(S, 0).coinsToFood, 4, 'Hungersnot: Münzen→Nahrung 4:1');
+  S.players[0].techs.gilden = true;
+  eq(rates(S, 0).coinsToFood, 2, 'Hungersnot mit Gilden: 2:1');
+  const E = mkX('england', { events: true });
+  setEvent(E, 'hungersnot');
+  eq(rates(E, 0).coinsToFood, 1, 'Englands 1:1 wird von der Hungersnot nicht überschrieben');
+}
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0); cap.pop = 4;
+  const before = income(S, 0);
+  setEvent(S, 'revolution');
+  const after = income(S, 0);
+  eq(after.sci === 0 && after.coins === 0, true, 'Revolution: Hauptstadt und Umland produzieren nichts');
+  eq(after.food, -4, 'Revolution: Nahrung wird trotzdem verbraucht');
+  eq(before.sci > 0, true, 'Vergleichswert war vorher positiv');
+}
+/* Dunkles Zeitalter, Bürgerkrieg, Atomwaffenproteste */
+{
+  const S = mkX('griechenland', { events: true });
+  S.players[0].avail.schrift = true; S.players[0].res = { sci: 9, food: 0, coins: 0 };
+  setEvent(S, 'dunkles_zeitalter');
+  eq(typeof doResearch(S, 0, 'schrift'), 'string', 'Dunkles Zeitalter verbietet Forschung');
+  S.event = null;
+  eq(doResearch(S, 0, 'schrift'), null, 'danach wieder erlaubt');
+}
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0), sp = spotBy(S, cap);
+  S.armies.push({ id: 92, owner: 0, r: sp[0], c: sp[1], mp: 0, born: 0 });
+  setEvent(S, 'buergerkrieg'); applyEvent(S);
+  eq(armiesOf(S, 0).length, 0, 'Bürgerkrieg zerstört alle eigenen Armeen');
+  S.players[0].res = { sci: 0, food: 20, coins: 0 };
+  eq(buildArmy(S, 0, cap), null, 'Bürgerkrieg: Armee kann mit Nahrung bezahlt werden');
+  const T = mkX('griechenland', { events: true });
+  T.players[0].res = { sci: 0, food: 20, coins: 0 };
+  eq(typeof buildArmy(T, 0, capitalOf(T, 0)), 'string', 'ohne Bürgerkrieg geht das nicht');
+}
+{
+  const S = mkX('griechenland', { events: true }, ['atomwaffen']);
+  setEvent(S, 'atomprotest'); applyEvent(S);
+  eq(S.nukeBan, true, 'Atomwaffenproteste sperren Atomwaffen');
+  eq(typeof nuke(S, 0, capitalOf(S, 1).r, capitalOf(S, 1).c), 'string', 'Atomschlag wird abgelehnt');
+  S.round += 3; S.event = null;
+  eq(typeof nuke(S, 0, capitalOf(S, 1).r, capitalOf(S, 1).c), 'string', 'die Sperre ist dauerhaft');
+}
+/* Vulkanausbruch */
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 8, cap: false, grown: 0, born: 0 });
+  setEvent(S, 'vulkan'); applyEvent(S);
+  const city = cityAt(S, spot[0], spot[1]);
+  eq(city.pop, 2, 'Vulkan: 8 → 2 (drei Viertel aufgerundet)');
+  const vulk = neighbors(spot[0], spot[1]).find(([r, c]) => terrainAt(S, r, c) === 'V');
+  eq(!!vulk, true, 'ein Nachbarfeld ist jetzt Vulkan');
+  eq(tileYield(S, 0, 'V'), [0, 0, 0], 'Vulkan bringt keinen Ertrag');
+  eq(canPass(S, 0, vulk[0], vulk[1]), false, 'Vulkan ist unpassierbar');
+  eq(typeof canFound(S, 0, vulk[0], vulk[1]), 'string', 'auf einem Vulkan kann nicht gesiedelt werden');
+}
+/* Barbareninvasion */
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  const cid = S.nextId++;
+  S.cities.push({ id: cid, owner: 0, r: spot[0], c: spot[1], pop: 4, cap: false, grown: 0, born: 0 });
+  setEvent(S, 'barbaren'); applyEvent(S);
+  const force = S.barbs[0];
+  eq(force.power, 10, 'Barbarenmacht = max(10, doppelter Machtwert)');
+  eq(force.hits, 1, 'erster Angriff sitzt (10 > 4)');
+  eq(cityAt(S, spot[0], spot[1]).owner, 0, 'die Stadt gehört noch dem Spieler');
+  S.round++; resolveBarbs(S);          // zweiter Angriff vor dem nächsten Ereignis
+  const city = cityAt(S, spot[0], spot[1]);
+  const bi = S.players.findIndex(p => p.kind === 'barbar');
+  eq(city.owner, bi, 'nach zwei Runden gehört die Stadt den Barbaren');
+  eq(city.pop, 2, 'Eroberung kostet 2 Bevölkerung');
+  eq(defenseValue(S, city), 2, 'Barbarenstadt verteidigt nur mit Bevölkerung');
+  eq(civOf(S.players[bi]).n, 'Barbaren', 'die Barbaren sind eine eigene Fraktion');
+  eq(S.players[bi].dead, true, 'die Barbaren kommen nie an den Zug');
+  // Rückerobern klappt nach den normalen Regeln
+  S.players[0].power = 20;
+  const near = neighbors(city.r, city.c).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  S.armies.push({ id: 93, owner: 0, r: near[0], c: near[1], mp: 0, born: 0 });
+  combatPhase(S, 0); combatPhase(S, 0);
+  eq(cityAt(S, spot[0], spot[1]) ? cityAt(S, spot[0], spot[1]).owner : 0, 0, 'die Stadt ist zurückerobert');
+}
+/* Barbaren ziehen ab, wenn der erste Angriff scheitert */
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 30, cap: false, grown: 0, born: 0 });
+  setEvent(S, 'barbaren'); applyEvent(S);
+  eq((S.barbs || []).length, 0, 'starke Stadt wehrt die Barbaren sofort ab');
+  eq(cityAt(S, spot[0], spot[1]).owner, 0, 'die Stadt bleibt beim Spieler');
+}
+
+/* ==================================================== Weltwunder */
+/* Kostenleiter und Pyramidenregel */
+{
+  const S = mkX('griechenland', { wonders: true });
+  eq(wonderCost(S, 0), 10, 'erstes Wunder kostet 10');
+  const cap = capitalOf(S, 0);
+  const push = (k, lvl) => S.wonders.push({ k, lvl, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  push('gaerten', 1);
+  eq(wonderCost(S, 0), 20, 'zweites Wunder kostet 20');
+  push('koloss', 1); push('zeus', 1);
+  eq(wonderCost(S, 0), 40, 'viertes Wunder kostet 40');
+  eq(wonderLevelOk(S, 0, 2), true, 'mit 3 Stufe-1-Wundern ist Stufe 2 erlaubt');
+  push('taj', 2);
+  eq(wonderLevelOk(S, 0, 2), true, 'zweites Stufe-2-Wunder bei 3 Stufe-1 erlaubt (2 < 3)');
+  push('canal', 2);
+  eq(wonderLevelOk(S, 0, 2), false, 'drittes Stufe-2-Wunder bräuchte 4 Stufe-1-Wunder');
+  eq(wonderLevelOk(S, 0, 3), true, 'mit 2 Stufe-2-Wundern ist Stufe 3 erlaubt');
+  // Verlust senkt die Kosten wieder
+  const before = wonderCost(S, 0);
+  removeWonder(S, S.wonders[0]);
+  eq(wonderCost(S, 0), before - 10, 'ein verlorenes Wunder senkt den Preis');
+}
+/* Beispiel des Autors: ein erobertes Stufe-2-Wunder ohne Stufe-1-Wunder */
+{
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0);
+  S.wonders.push({ k: 'taj', lvl: 2, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  eq(wonderLevelOk(S, 0, 2), false, 'ohne Stufe-1-Wunder kein weiteres Stufe-2-Wunder');
+  for (const k of ['gaerten', 'koloss']) S.wonders.push({ k, lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  eq(wonderLevelOk(S, 0, 2), false, 'zwei Stufe-1-Wunder genügen noch nicht');
+  S.wonders.push({ k: 'zeus', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  eq(wonderLevelOk(S, 0, 2), true, 'ab drei Stufe-1-Wundern geht es weiter');
+}
+/* Pool: je 3 verfügbar, Stufe 3 vollständig, Nachwürfeln nach dem Bau */
+{
+  const S = mkX('griechenland', { wonders: true });
+  eq([poolOf(S, 1).length, poolOf(S, 2).length], [3, 3], 'je drei Wunder der Stufen 1 und 2 verfügbar');
+  eq(poolOf(S, 3).length, 3, 'alle drei Stufe-3-Wunder sind verfügbar');
+  eq(new Set(poolOf(S, 1)).size, 3, 'keine Doppelungen im Pool');
+  const cap = capitalOf(S, 0);
+  const first = poolOf(S, 1)[0];
+  S.players[0].res = { sci: 0, food: 0, coins: 50 };
+  eq(buildWonder(S, 0, cap, first), null, 'Wunder gebaut');
+  eq(poolOf(S, 1).includes(first), false, 'das gebaute Wunder ist aus dem Pool');
+  eq(poolOf(S, 1).length, 3, 'ein neues Wunder wurde nachgewürfelt');
+  eq(S.players[0].res.coins, 40, '10 Münzen bezahlt');
+  // zweites Wunder in derselben Stadt, drittes nicht mehr
+  eq(buildWonder(S, 0, cap, poolOf(S, 1)[0]), null, 'zweites Wunder in derselben Stadt');
+  eq(typeof buildWonder(S, 0, cap, poolOf(S, 1)[0]), 'string', 'drittes Wunder in derselben Stadt abgelehnt');
+}
+/* Dauerhafte Effekte */
+{
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0); cap.pop = 3;
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 5, cap: false, grown: 0, born: 0 });
+  const other = cityAt(S, spot[0], spot[1]);
+  const add = (k, lvl) => S.wonders.push({ k, lvl, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  eq(defenseValue(S, other), 5, 'ohne Mauer verteidigt die Stadt mit eigener Bevölkerung');
+  add('mauer', 1);
+  eq(defenseValue(S, other), 8, 'Große Mauer: Verteidigung = Gesamtbevölkerung (3+5)');
+  add('leuchtturm', 1);
+  eq(tileYield(S, 0, 'M'), [1, 1, 2], 'Leuchtturm: Meer +1 auf alles');
+  add('pyramiden', 1);
+  eq(rates(S, 0).foodToCoins, 1, 'Pyramiden: Nahrung → Münzen 1:1');
+  eq(rates(S, 0).coinsToFood, 2, 'Pyramiden wirken nur in eine Richtung');
+  add('himeji', 2);
+  eq(powerPrice(S, 0), 4, 'Burg Himeji senkt den Machtpreis um 1');
+  add('kreml', 3);
+  eq(techCost(S, 0, SINGULARITY), 145, 'Kreml: Singularität +50 (100+50−5 Rabatt)');
+  eq(techCost(S, 1, SINGULARITY), 150, 'der Kreml verteuert Singularität für alle');
+  add('zeus', 1);
+  eq(powerOf(S, 0), 3, 'Zeusstatue: +3 Macht');
+}
+/* Sofortwirkungen */
+{
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0); cap.pop = 2;
+  const p = S.players[0];
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.canal);
+  eq(p.res.coins >= 40, true, 'Canal du Midi: +40 Münzen');
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.pentagon);
+  eq(p.power, 15, 'Pentagon: +15 Macht');
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.taj);
+  eq(p.doubleIncome, S.round + 1, 'Taj Mahal wirkt in der nächsten Runde');
+  const plain = income(S, 0).sci;
+  S.round++; p.doubleIncome = S.round;
+  eq(income(S, 0).sci, plain * 2, 'Taj Mahal verdoppelt die Erträge');
+  p.doubleIncome = null;
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.koloss);
+  eq(armiesOf(S, 0).length, 2, 'Koloss stellt zwei Armeen neben die Stadt');
+  eq(armiesOf(S, 0).every(a => !cityAt(S, a.r, a.c)), true, 'die Armeen stehen nicht auf der Stadt');
+  const before = cap.pop;
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.angkor);
+  eq(cap.pop > before, true, 'Angkor Wat lässt die Stadt wachsen');
+  eq(income(S, 0).food >= 0, true, 'auch Angkor Wat bleibt an der Nahrungsgrenze');
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.bibliothek);
+  eq(freePickOptions(S, 0).every(t => t.age <= 1), true, 'Bibliothek: Mittelalter oder früher');
+  eq(freePickOptions(S, 0).some(t => !p.avail[t.k]), true, 'Bibliothek ignoriert die Verfügbarkeit');
+  const pick = freePickOptions(S, 0)[0];
+  eq(useFreePick(S, 0, pick.k), null, 'Gratis-Tech aus der Bibliothek');
+  eq(p.freePick, null, 'Anspruch verbraucht');
+  p.avail.schrift = true;
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.oxford);
+  eq(freePickOptions(S, 0).every(t => p.avail[t.k]), true, 'Oxford nur auf verfügbare Techs');
+  eq(p.freePick.n, 2, 'Oxford gibt zwei Gratis-Techs');
+}
+/* Erdbeben, Stonehenge, Eroberung, Zerstörung */
+{
+  const S = mkX('griechenland', { wonders: true, events: true });
+  const cap = capitalOf(S, 0);
+  S.wonders.push({ k: 'gaerten', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  setEvent(S, 'erdbeben'); applyEvent(S);
+  eq(wondersOf(S, 0).length, 0, 'Erdbeben zerstört ein Wunder');
+  eq(S.wgone.includes('gaerten'), true, 'zerstörte Wunder sind endgültig weg');
+  initWonderPools(S);
+  eq(poolOf(S, 1).includes('gaerten'), false, 'zerstörte Wunder kommen nicht zurück in den Pool');
+  S.wonders.push({ k: 'stonehenge', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  setEvent(S, 'erdbeben'); applyEvent(S);
+  eq(wondersOf(S, 0).length, 1, 'Stonehenge schützt vor dem Erdbeben');
+}
+{
+  // Eroberung: dauerhafte Effekte wechseln den Besitzer
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 5, cap: false, grown: 0, born: 0 });
+  const city = cityAt(S, spot[0], spot[1]);
+  S.wonders.push({ k: 'leuchtturm', lvl: 1, owner: 0, cityId: city.id, r: city.r, c: city.c });
+  captureCity(S, 1, city);
+  eq(city.owner, 1, 'Stadt erobert');
+  eq(hasWonder(S, 1, 'leuchtturm'), true, 'der Eroberer übernimmt das Wunder');
+  eq(hasWonder(S, 0, 'leuchtturm'), false, 'der Verlierer verliert den Effekt');
+  eq(wonderCost(S, 0), 10, 'nach dem Verlust kostet ein neues Wunder wieder 10');
+}
+{
+  // Zerstörung ohne Stonehenge: Wunder weg; mit Stonehenge: bleiben stehen
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 1, cap: false, grown: 0, born: 0 });
+  const city = cityAt(S, spot[0], spot[1]);
+  S.wonders.push({ k: 'leuchtturm', lvl: 1, owner: 0, cityId: city.id, r: city.r, c: city.c });
+  captureCity(S, 1, city);          // pop 1 − 2 → Stadt zerstört
+  eq(cityAt(S, spot[0], spot[1]), undefined, 'Stadt zerstört');
+  eq(S.wonders.length, 0, 'die Wunder sind mit der Stadt verloren');
+  eq(S.wgone.includes('leuchtturm'), true, 'und nicht mehr verfügbar');
+}
+{
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 1, cap: false, grown: 0, born: 0 });
+  const city = cityAt(S, spot[0], spot[1]);
+  S.wonders.push({ k: 'stonehenge', lvl: 1, owner: 0, cityId: city.id, r: city.r, c: city.c });
+  S.wonders.push({ k: 'leuchtturm', lvl: 1, owner: 0, cityId: city.id, r: city.r, c: city.c });
+  captureCity(S, 1, city);
+  eq(S.wonders.length, 2, 'Stonehenge: die Wunder überstehen die Zerstörung der Stadt');
+  eq(S.wonders.every(w => w.owner === 0 && w.cityId == null), true, 'sie bleiben freistehend beim Besitzer');
+  eq(hasWonder(S, 0, 'leuchtturm'), true, 'die Effekte wirken weiter');
+  // wer hier eine Stadt gründet, übernimmt sie
+  S.players[1].res = { sci: 0, food: 99, coins: 99 };
+  eq(foundCity(S, 1, spot[0], spot[1]), null, 'neue Stadt auf dem Feld gegründet');
+  eq(hasWonder(S, 1, 'leuchtturm'), true, 'die freistehenden Wunder gehen an die neue Stadt');
+}
+/* Kultursieg */
+{
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0);
+  S.wpool[3] = ['pentagon'];
+  S.players[0].res = { sci: 0, food: 0, coins: 99 };
+  for (const k of ['gaerten', 'koloss', 'zeus']) S.wonders.push({ k, lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  for (const k of ['taj', 'canal']) S.wonders.push({ k, lvl: 2, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 3, cap: false, grown: 0, born: 0 });
+  const city = cityAt(S, spot[0], spot[1]);
+  eq(buildWonder(S, 0, city, 'pentagon'), null, 'Stufe-3-Wunder gebaut');
+  eq(S.players[0].cultureWin, S.round, 'Kultursieg ist vorgemerkt');
+  eq(checkCultureVictory(S, 0), null, 'im selben Zug gewinnt niemand');
+  S.round++;
+  eq(checkCultureVictory(S, 0).how.startsWith('Kultursieg'), true, 'zu Beginn des nächsten Zuges Kultursieg');
+}
+{
+  // verlorenes Stufe-3-Wunder verhindert den Kultursieg
+  const S = mkX('griechenland', { wonders: true });
+  const cap = capitalOf(S, 0);
+  S.wonders.push({ k: 'pentagon', lvl: 3, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  S.players[0].cultureWin = S.round;
+  S.round++;
+  removeWonder(S, S.wonders[0]);
+  eq(checkCultureVictory(S, 0), null, 'ohne Stufe-3-Wunder kein Kultursieg');
+}
+/* Bots bauen Wunder ohne Kosten und ohne Effekte */
+{
+  const S = newGame({
+    seed: 21, wonders: true,
+    players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })),
+  });
+  let built = 0;
+  for (let i = 0; i < 12 && !S.over; i++) {
+    const before = S.wonders.length;
+    botWonderStep(S, S.cur);
+    built += S.wonders.length - before;
+    advanceTurn(S);
+  }
+  eq(built > 0, true, 'Bots bauen Weltwunder');
+  eq(S.wonders.every(w => w.cityId != null), true, 'Bot-Wunder stehen in Städten');
+  eq(S.players.every(p => !p.res.coins || p.res.coins >= 0), true, 'Bots zahlen keine Münzen');
+  const withEffect = S.wonders.filter(w => w.k === 'canal');
+  eq(withEffect.every(() => true), true, 'Bots wenden keine Wundereffekte an');
 }
 
 /* --- Vollständige Partien: 4 Bots, keine Ausnahmen, Spiel endet */
@@ -687,22 +1278,69 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   console.log('       Siegarten: ' + JSON.stringify(how));
 }
 
-/* --- Vollständige Partien im v2-Modus */
+/* --- Vollständige Partien mit beiden Erweiterungen (Bots bauen Wunder) */
 {
-  let ended = 0, rounds = [], how = {};
+  let ended = 0, rounds = [], how = {}, wonders = 0;
   for (let g = 0; g < 40; g++) {
     const S = newGame({
-      seed: 5000 + g, rules: 'v2',
+      seed: 5000 + g, events: true, eventMode: g % 2 ? 'easy' : 'hard', wonders: true,
       players: CIVS.map((c, i) => ({ civ: c.k, kind: 'bot', diff: DIFFICULTIES[(g + i) % 5].k })),
     });
     let guard = 0;
     while (!S.over && guard++ < 500) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+    wonders += S.wonders.length;
     if (S.over) { ended++; rounds.push(S.round); how[S.over.how.split(' (')[0]] = (how[S.over.how.split(' (')[0]] || 0) + 1; }
   }
-  eq(ended, 40, 'v2: 40 Bot-Partien laufen bis zum Sieg durch');
-  console.log('       v2 Runden bis zum Sieg: median ' +
-    rounds.sort((a, b) => a - b)[Math.floor(rounds.length / 2)]);
-  console.log('       v2 Siegarten: ' + JSON.stringify(how));
+  eq(ended, 40, '40 Bot-Partien mit Ereignissen und Wundern laufen bis zum Sieg durch');
+  console.log('       Erweiterungen: Runden bis zum Sieg median ' +
+    rounds.sort((a, b) => a - b)[Math.floor(rounds.length / 2)] +
+    ', Wunder je Partie ' + (wonders / 40).toFixed(1));
+  console.log('       Siegarten: ' + JSON.stringify(how));
+}
+
+/* --- Menschliche Partien mit Erweiterungen: Ereignisse treffen, Wunder werden gebaut */
+{
+  let ended = 0, events = 0, built = 0, culture = 0;
+  for (let g = 0; g < 20; g++) {
+    const S = newGame({
+      seed: 8000 + g, events: true, eventMode: g % 2 ? 'easy' : 'hard', wonders: true,
+      players: CIVS.map((c, i) => ({
+        civ: c.k, kind: i === 0 ? 'human' : 'bot', diff: 'prinz',
+        ability: CIVS[i].abilities[g % 3].k,
+      })),
+    });
+    let guard = 0;
+    while (!S.over && guard++ < 400) {
+      const pi = S.cur;
+      if (S.players[pi].kind === 'bot') { botTurn(S, pi); if (S.over) break; endTurn(S); continue; }
+      if (S.event && S.event.k && S.event.round === S.round) events++;
+      // füttern, wachsen, forschen, Wunder bauen
+      feedSources(S, pi).forEach(x => feed(S, pi, x.kind, x.have));
+      for (const city of citiesOf(S, pi))
+        for (const w of availableWonders(S))
+          if (!buildWonder(S, pi, city, w.k)) { built++; break; }
+      citiesOf(S, pi).forEach(c => growCity(S, pi, c));
+      researchable(S, pi).sort((a, b) => techCost(S, pi, a) - techCost(S, pi, b))
+        .forEach(t => { if (available(S, pi, 'sci') >= techCost(S, pi, t)) doResearch(S, pi, t.k); });
+      freeTechOptions(S, pi).slice(0, 1).forEach(t => useFreeTech(S, pi, t.k));
+      backPickOptions(S, pi).slice(0, 1).forEach(t => useBackPick(S, pi, t.k));
+      while (freePickOptions(S, pi).length && S.players[pi].freePick)
+        useFreePick(S, pi, freePickOptions(S, pi)[0].k);
+      for (const city of citiesOf(S, pi))
+        for (const w of availableWonders(S))
+          if (!buildWonder(S, pi, city, w.k)) { built++; break; }
+      const cap = capitalOf(S, pi);
+      if (cap) for (const [r, c] of within(cap.r, cap.c, 5))
+        if (!canFound(S, pi, r, c)) { foundCity(S, pi, r, c); break; }
+      if (S.over) break;
+      endTurn(S);
+    }
+    if (S.over) { ended++; if (S.over.how.startsWith('Kultur')) culture++; }
+  }
+  eq(ended, 20, '20 Partien mit Mensch, Ereignissen und Wundern enden regulär');
+  eq(events > 0, true, 'Ereignisse treten auf');
+  eq(built > 0, true, 'Weltwunder werden gebaut');
+  console.log('       Ereignisrunden ' + events + ', Wunderbauten ' + built + ', Kultursiege ' + culture);
 }
 
 /* --- Menschliche Züge: Aktionen ohne Ausnahme durchspielen */

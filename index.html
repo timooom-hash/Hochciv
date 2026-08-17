@@ -43,8 +43,12 @@
     <div id="setup-list"></div>
     <label class="row"><span>Karte</span>
       <select id="setup-map"></select></label>
-    <label class="row"><span>Regeln</span>
-      <select id="setup-rules"></select></label>
+    <label class="row"><span>Mit Ereignissen</span>
+      <input type="checkbox" id="setup-events"></label>
+    <label class="row" id="setup-evmode-row" hidden><span>Ereignisstärke</span>
+      <select id="setup-evmode"></select></label>
+    <label class="row"><span>Mit Weltwundern</span>
+      <input type="checkbox" id="setup-wonders"></label>
     <label class="row"><span>Schwierigkeit (alle Bots)</span>
       <select id="setup-diff"></select></label>
     <label class="row"><span>Startspieler*in</span>
@@ -61,7 +65,7 @@
       <div><strong id="hud-name">—</strong><small id="hud-round">Runde 1</small></div></div>
     <div class="hud-res">
       <span class="res sci" title="Wissenschaft">🔬<b id="hud-sci">0</b></span>
-      <span class="res food" title="Nahrung">🌾<b id="hud-food">0</b></span>
+      <button class="res food" id="hud-feed" title="Nahrung">🌾<b id="hud-food">0</b></button>
       <span class="res coin" title="Münzen">🪙<b id="hud-coins">0</b></span>
       <span class="res pow" title="Macht">⚔︎<b id="hud-power">0</b></span>
     </div>
@@ -79,6 +83,7 @@
     <button class="btn small" id="a-tech">Forschen</button>
     <button class="btn small" id="a-power">Macht</button>
     <button class="btn small" id="a-army">Armeen</button>
+    <button class="btn small" id="a-info">Welt</button>
     <button class="btn small" id="a-log">Protokoll</button>
     <button class="btn small primary" id="a-end">Zug beenden</button>
   </nav>
@@ -109,6 +114,7 @@
 <script src="js/data.js"></script>
 <script src="js/hex.js"></script>
 <script src="js/engine.js"></script>
+<script src="js/expansion.js"></script>
 <script src="js/bots.js"></script>
 <script src="js/ui.js"></script>
 </body>

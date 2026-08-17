@@ -22,7 +22,10 @@ sonst behalten installierte Geräte die alte Fassung.
 | | |
 |---|---|
 | Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
-| Bevölkerung wachsen | zwei Knöpfe, wenn v2 ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
+| Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
+| **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
+| 🌾 in der Kopfzeile | Städte füttern (nur mit Gentechnik oder Massenmedien) |
+| Weltwunder bauen | im Stadtblatt, wenn die Erweiterung an ist |
 | **Forschen** | links die Ertragsübersicht (Felder, Bevölkerung, Summe fürs nächste Einkommen), rechts der Technologiebogen |
 | **Armeen** | Übersicht aller eigenen Armeen; antippen wählt aus, dann Zielfeld antippen |
 | Armee auf der Karte | antippen → *Bewegen*; steht sie in der eigenen Stadt, steht die Aktion im Stadtblatt |

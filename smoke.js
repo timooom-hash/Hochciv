@@ -22,7 +22,7 @@ const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 // Im Browser teilen sich <script>-Tags den globalen Gültigkeitsbereich; eval nicht.
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
-const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/bots.js', 'js/ui.js']
+const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");');
 const G = n => window.__get(n);
@@ -49,12 +49,41 @@ step('Schwierigkeit ist global (ein Dropdown)', () => {
   if ($('setup-list').querySelector('[data-diff]')) throw new Error('noch Pro-Bot-Schwierigkeit vorhanden');
   console.log('       ' + [...sel.options].map(o => o.text).join(' · '));
 });
-step('Regelmodus wählbar', () => {
-  const opts = [...$('setup-rules').options].map(o => o.text);
-  if (opts.length < 2) throw new Error('kein v2-Modus wählbar');
-  console.log('       ' + opts.join(' · '));
+step('Originalkarte ist vorausgewählt', () => {
+  const sel = $('setup-map');
+  const chosen = sel.options[sel.selectedIndex >= 0 ? sel.selectedIndex : 0].text;
+  if (!/^Originalkarte/.test(chosen)) throw new Error('vorausgewählt ist: ' + chosen);
+  console.log('       ' + chosen);
 });
-step('Spiel starten', () => { $('setup-go').onclick(); });
+step('Kein Regelmodus-Dropdown mehr', () => {
+  if ($('setup-rules')) throw new Error('das v2-Dropdown existiert noch');
+});
+step('Erweiterungen ankreuzbar (Ereignisse, Weltwunder)', () => {
+  if (!$('setup-events') || !$('setup-wonders')) throw new Error('Checkboxen fehlen');
+  if (!$('setup-evmode-row').hidden) throw new Error('Ereignisstärke wird ohne Ereignisse gezeigt');
+  $('setup-events').checked = true; $('setup-events').onchange();
+  if ($('setup-evmode-row').hidden) throw new Error('Ereignisstärke bleibt versteckt');
+  const modes = [...$('setup-evmode').options].map(o => o.text);
+  if (modes.length !== 2) throw new Error('kein Easy/Hard-Modus');
+  $('setup-wonders').checked = true;
+  console.log('       ' + modes.join(' · '));
+});
+step('Fähigkeitswahl je Zivilisation', () => {
+  const sels = [...$('setup-list').querySelectorAll('[data-abil]')];
+  if (sels.length !== 4) throw new Error('nur ' + sels.length + ' Fähigkeits-Dropdowns');
+  if (sels[0].options.length !== 3) throw new Error('nicht drei Fähigkeiten je Reich');
+  const botSlot = $('setup-list').children[1];
+  if (!botSlot.querySelector('[data-abil]').disabled) throw new Error('Bot-Fähigkeit nicht gesperrt');
+  if (!/keine Zivilisationsfähigkeit/.test(botSlot.querySelector('.abil').textContent))
+    throw new Error('kein Hinweis, dass Bots keine Fähigkeit haben');
+  console.log('       ' + [...sels[0].options].map(o => o.text).join(' · '));
+});
+step('Spiel starten (mit Ereignissen und Weltwundern)', () => {
+  $('setup-go').onclick();
+  const S = G('S');
+  if (!S.ev || !S.wo) throw new Error('Erweiterungen nicht übernommen');
+  console.log('       Ereignis Runde 1: ' + (S.event && S.event.k ? S.event.k : 'keines'));
+});
 step('Karte gezeichnet', () => {
   const n = $('map').querySelectorAll('[data-r]').length;
   if (n < 100) throw new Error('nur ' + n + ' Felder');
@@ -109,6 +138,57 @@ step('Armeeübersicht in der Leiste', () => {
   if (!n) throw new Error('Übersicht listet keine Armeen');
   console.log('       ' + n + ' Armee(n) gelistet');
 });
+step('Welt-Ansicht zeigt Ereignis und Weltwunder', () => {
+  const S = G('S');
+  while (S.players[S.cur].kind === 'bot' && !S.over && $('bot-next')) $('bot-next').onclick();
+  if (S.over) return console.log('       Spiel schon entschieden – übersprungen');
+  $('a-info').onclick();
+  const txt = $('ov-body').textContent.replace(/\s+/g, ' ');
+  if (!/Weltwunder|Ereignis/.test(txt)) throw new Error('Welt-Ansicht ohne Inhalt');
+  console.log('       ' + txt.slice(0, 90));
+  G('closeModal')();
+});
+step('Weltwunder in der Stadt bauen', () => {
+  const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
+  if (!cap || S.players[pi].kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  S.players[pi].res.coins = 200;
+  G('tapHex')(cap.r, cap.c);
+  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Weltwunder bauen/.test(x.textContent));
+  if (!b) throw new Error('kein Weltwunder-Knopf im Stadtblatt');
+  if (b.disabled) throw new Error('Weltwunder-Knopf gesperrt trotz Münzen');
+  b.onclick();
+  const opts = [...$('sheet-body').querySelectorAll('[data-w]')].filter(x => !x.disabled);
+  if (!opts.length) throw new Error('keine baubaren Wunder angeboten');
+  const before = S.wonders.length;
+  opts[0].onclick();
+  if (S.wonders.length !== before + 1) throw new Error('Wunder nicht gebaut');
+  console.log('       gebaut: ' + G('WONDER_BY_KEY')[S.wonders[before].k].n +
+    ' · Marker auf der Karte: ' + $('map').querySelectorAll('rect').length);
+  G('closeModal')(); G('closeSheet')();
+});
+step('Städte füttern (Gentechnik/Massenmedien)', () => {
+  const S = G('S'), pi = S.cur;
+  if (S.players[pi].kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  S.players[pi].techs.massenmedien = true;
+  S.players[pi].res.coins = 12; S.players[pi].foodDeficit = 3;
+  $('hud-feed').onclick();
+  const b = [...$('sheet-body').querySelectorAll('[data-k]')];
+  if (!b.length) throw new Error('kein Futter-Knopf');
+  b[0].onclick();
+  if (S.players[pi].foodDeficit !== 0) throw new Error('Defizit nicht gedeckt');
+  console.log('       Defizit gedeckt, Nahrung ' + S.players[pi].res.food);
+  G('closeSheet')();
+});
+step('Sklaverei wird im Techbogen als obsolet markiert', () => {
+  const S = G('S'), pi = S.cur;
+  S.players[pi].techs.sklaverei = true; S.players[pi].techs.robotik = true;
+  $('a-tech').onclick();
+  const tile = [...$('ov-body').querySelectorAll('.tech')].find(t => /Sklaverei/.test(t.textContent));
+  if (!tile.classList.contains('obsolete')) throw new Error('keine Obsoleszenz-Markierung');
+  if (!/obsolet/.test(tile.textContent)) throw new Error('kein Hinweistext');
+  console.log('       ' + tile.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
+  G('closeModal')();
+});
 step('Internet: Gratiskopie im Technologiebogen', () => {
   const S = G('S'), pi = S.cur;
   S.players[pi].techs.internet = true;
@@ -125,12 +205,20 @@ step('Internet: Gratiskopie im Technologiebogen', () => {
 });
 step('Sklaverei- und Kolonialismus-Buttons erscheinen', () => {
   const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
+  // Sklaverei ist ab der Moderne obsolet – für diesen Test die Moderne-Techs entfernen
+  const modern = G('TECHS_ACTIVE').filter(t => t.age === 3 && S.players[pi].techs[t.k]).map(t => t.k);
+  modern.forEach(k => delete S.players[pi].techs[k]);
   S.players[pi].techs.sklaverei = true; S.players[pi].techs.kolonialismus = true;
   cap.pop = 3; S.players[pi].res.coins = 30;
   G('tapHex')(cap.r, cap.c);
   const acts = [...$('sheet-body').querySelectorAll('.opt')].map(b => b.textContent);
   if (!acts.some(t => /opfern/i.test(t))) throw new Error('kein Sklaverei-Button');
-  console.log('       Stadtaktionen sichtbar: ' + acts.length);
+  // mit einer Technologie der Moderne muss der Knopf verschwinden
+  S.players[pi].techs.robotik = true;
+  G('tapHex')(cap.r, cap.c);
+  const acts2 = [...$('sheet-body').querySelectorAll('.opt')].map(b => b.textContent);
+  if (acts2.some(t => /opfern/i.test(t))) throw new Error('Sklaverei ab Moderne noch anklickbar');
+  console.log('       Stadtaktionen sichtbar: ' + acts.length + ', ab Moderne ohne Opfern-Knopf');
 });
 step('Atomwaffen: Knopf vorhanden und wirksam', () => {
   const S = G('S');

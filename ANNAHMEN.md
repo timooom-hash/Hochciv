@@ -38,6 +38,8 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
 - Reichweite: 3 Felder, mit Panzerschiff 6, mit Luftwaffe faktisch unbegrenzt (Wert 9, ignoriert
   Gelände). Ein durch Forschung gewonnener Reichweitensprung wirkt **sofort im selben Zug** –
   die Erhöhung wird der Restbewegung der eigenen Armeen gutgeschrieben.
+- **Wasser**: Navigation erlaubt nur das **Durchqueren** von Wasser, nicht das Anhalten darauf.
+  Auf einem Wasserfeld enden darf eine Armee erst mit **Panzerschiff** oder **Luftwaffe**.
 - Spielerreihenfolge ist fest: **Russland → Griechenland → England → Wikinger**. Der Startspieler
   (wer zuletzt ein Weltwunder baute) bestimmt nur den Einstiegspunkt in dieser Rotation.
 
@@ -95,11 +97,11 @@ ebenfalls verbunden.
   Technologie erforscht ist – auch dann, wenn sie kopiert wurde.
 * Jeder Effekt wirkt **sofort nach dem Forschen** im selben Zug (z. B. senkt Kartografie
   die Gründungskosten unmittelbar). `test.js` prüft das.
-* Kopieren, drei getrennte Wege: **Spionage** bezahlt (1× Basiskosten in Münzen, kein
+* Kopieren, drei **unabhängige** Wege: **Spionage** bezahlt (1× Basiskosten in Münzen, kein
   Rundenlimit), **Kundschafterei** bezahlt (3× Basiskosten), **Internet** 1× pro Runde
-  kostenlos. Wer Spionage/Kundschafterei **und** Internet hat, kann in einer Runde eine
-  bezahlte **und** die kostenlose Kopie machen. Beim Kopieren gelten keine Vergünstigungen
-  (Wiss. Methode etc.), es zählen die Basiskosten der Technologie.
+  kostenlos. Wer einen bezahlten Weg **und** Internet hat, bekommt pro Technologie **beide**
+  Optionen angeboten (bezahlt kopieren oder die eine Gratiskopie darauf verwenden). Beim
+  Kopieren gelten keine Vergünstigungen (Wiss. Methode etc.), es zählen die Basiskosten.
 
 ## 7. Bots
 
@@ -122,6 +124,8 @@ ebenfalls verbunden.
   4. an den Reichsrand ziehen, möglichst nah an einer gegnerischen Stadt. Innerhalb einer
   Priorität wählt der Bot die Option mit dem **geringsten gegnerischen Machtwert**, bei
   Städten die **Hauptstadt** bevorzugt; echte Gleichstände werden ausgewürfelt.
+* Distanzen zu Gegnerstädten rechnet der Bot über **tatsächlich passierbares Gelände**
+  (nicht Luftlinie): ohne die passende Technologie muss er Wasser umgehen.
 * **v2**: Bots forschen zweimal pro Runde (zwei Würfe auf Erfolg) und dann in zwei
   **unterschiedlichen** Technologiefeldern.
 
@@ -155,29 +159,155 @@ beweist sie aber nicht.
 
 „Kernphysik" und „Raumfahrt" kommen im Technologiebogen ohnehin nicht vor.
 
-## 9. Experimentelle Variante v2
+## 9. Eine Regelvariante statt zwei
 
-Im Aufbaubildschirm unter „Regeln" wählbar. Der Modus wird im Spielstand gespeichert und
-beim Laden reaktiviert; im Rundentitel steht dann „Experimentell v2". Unterschiede zu den
-Standardregeln:
+Die früher „experimentell v2" genannten Regeln **sind** jetzt die Regeln. Das Dropdown
+„Regeln" im Aufbau ist weg, `RULESETS`/`setRules()` sind aus dem Code entfernt.
+Übernommen wurde:
 
-- **Singularität** kostet 100 statt 25 (Rabatte gelten weiter: Griechenland −5, Wiss.
-  Methode −10, also mindestens 85).
-- **Griechenland** bekommt **keinen** +1-Würfelbonus mehr beim Auswürfeln der Verfügbarkeit.
-  Die Kostenvergünstigung (1/2/3/4/5 je Zeitalter) bleibt.
-- Zwei neue Technologien: **Keramik** (Produktion, Antike, Kosten 4) gibt den alten Effekt
-  von Verbundwerkstoffe – Städte 2× pro Runde erweitern. **Theologie** (Spezial,
-  Mittelalter, Kosten 10) senkt die Siegschwelle auf >3/5 der Weltbevölkerung.
-- **Verbundwerkstoffe** bekommt einen neuen Effekt: 1× zusätzliches, **kostenloses**
-  Wachstum pro Stadt und Runde. Allein also normales Wachstum + 1 gratis = 2×. Mit Keramik
-  zusammen bis **3×** pro Stadt, davon eins gratis (das erste der Runde). In der Oberfläche
-  ist das kostenlose Wachstum ein **eigener Knopf** („Kostenlos wachsen"), getrennt vom
-  bezahlten „Bevölkerung wachsen".
-- **Sklaverei** wird obsolet, sobald ein Reich die erste Technologie der **Moderne**
-  erforscht hat.
-- **Siegschwellen** stapeln nicht, es gilt immer die niedrigste verfügbare: Standard ≥2/3,
-  Theologie >3/5, Vereinte Nationen >1/2.
-- **Bots** forschen zweimal pro Runde und dann in zwei unterschiedlichen Feldern.
+- **Singularität** kostet 100 (Rabatte gelten weiter: Griechenland −5, Wiss. Methode −10).
+- **Keramik** (Produktion, Antike, 4) und **Theologie** (Spezial, Mittelalter, 10) sind
+  normale Technologien.
+- **Verbundwerkstoffe**: 1× zusätzliches, kostenloses Wachstum pro Stadt und Runde. Allein
+  also 2×, mit Keramik bis 3×, davon eins gratis. Eigener Knopf „Kostenlos wachsen".
+- **Sklaverei** wird obsolet, sobald ein Reich die erste Technologie der Moderne hat. Im
+  Technologiebogen ist die Kachel dann durchgestrichen und trägt den Hinweis „obsolet".
+- **Siegschwellen** stapeln nicht: es gilt die niedrigste (Standard ≥2/3, Theologie >3/5,
+  UN >1/2).
+- **Bots** forschen zweimal pro Runde in unterschiedlichen Feldern.
+- **Griechenland hat keinen Würfelbonus** auf die Techverfügbarkeit. Der
+  Zivilisationsbogen nennt „3+ beim Würfeln", der Autor hat das ausdrücklich als Fehler im
+  PDF bezeichnet; es gilt nur die Kostenvergünstigung.
 
-In 40 Bot-Testpartien endet v2 im Median nach 5 Runden; durch das doppelte Forschen gibt es
-spürbar mehr Forschungssiege als im Standard.
+## 10. Nahrungsproduktion darf nicht negativ werden
+
+Grenze ist das **Einkommen** (Geländenahrung − Bevölkerung), nicht der Vorrat.
+
+- Jedes Wachstum wird abgelehnt, wenn das Nahrungseinkommen danach unter 0 fiele – bezahlt,
+  kostenlos und aus Wundereffekten gleichermaßen.
+- Ein Wundereffekt, der um mehrere Punkte wachsen lässt (Hängende Gärten, Angkor Wat,
+  Freiheitsstatue), wird **so weit ausgeführt, wie er passt**, und dann abgebrochen.
+- Ein bereits negatives Einkommen (nach Eroberung, Sturmflut, Revolution) wird auf 0
+  gekappt. **Es verhungert niemand**, die Bevölkerung bleibt stehen.
+- **Gentechnik** (aus Wissenschaft) und **Massenmedien** (aus Münzen) heben die Grenze auf.
+  Beide sind ausdrücklich **kein allgemeiner Umtauschkurs**: sie stehen nicht in `rates()`,
+  man kann mit ihnen also nichts kaufen. Sie füttern nur, 1:1, über den Knopf am
+  Nahrungszähler; der Spieler wählt zu Zugbeginn, aus welchem Vorrat – auch ohne Defizit,
+  wenn er einfach mehr Nahrung möchte.
+- Offene Frage, bewusst so umgesetzt: wer eine der beiden Techs hat, darf beliebig weit über
+  die Grenze wachsen, und ein **nicht gefüttertes** Defizit kostet nichts (Nahrung steht dann
+  bei 0). Die Techs heben die Mechanik damit eher auf, als sie in einen Handel zu verwandeln.
+  Sollte die Grenze wirklich beißen, wäre die Regel „Wachstum nur so weit, wie der Spieler
+  diese Runde auch füttern kann" oder „ungedecktes Defizit kostet Bevölkerung" – beides ist
+  eine Zeile in `growthBlocked()` bzw. `beginTurn()`.
+
+## 11. Zivilisationsfähigkeiten (Bogen „Civs")
+
+Der Bogen nennt andere Völkernamen als das Spiel; zugeordnet über die identischen
+Fähigkeiten, die Namen im Spiel bleiben unverändert:
+Keltenreich = **Wikinger**, Ägypten = **England**, Karthago = **Russland**,
+Griechenland = Griechenland. Karthagos „+1 Nahrung in Wüste" bleibt Russlands „+1 Nahrung
+in Wald" – Wüste gibt es auf den Karten nicht.
+
+Je Reich sind im Aufbau drei Fähigkeiten wählbar (Grund + zwei Alternativen). Eine
+Alternative **ersetzt** die Grundfähigkeit vollständig. **Bots erhalten keine
+Zivilisationsfähigkeit** – auch keine Grundfähigkeit, ein Bot-Wikinger bekommt also keine
+Gratisarmee.
+
+Auslegungen:
+
+- **Wikinger „Beutezüge"**: je eigene Armee, die neben (Distanz 1) einer gegnerischen Armee
+  oder Stadt steht, 1 Wissenschaft/Nahrung/Münze pro Punkt Überlegenheit. Gegen Städte zählt
+  der **Verteidigungswert**, gegen Armeen der Machtwert. Steht eine Armee neben mehreren
+  Gegnern, zählt der größte Vorsprung, je Armee einmal.
+  **Abweichung vom Abgesprochenen:** bewertet wird beim **Einkommen zu Zugbeginn**, nicht in
+  der Kampfphase. Ressourcen verfallen am Zugende – ein Ertrag in der Kampfphase (Schritt 4
+  von 5) wäre nie ausgebbar. Der Ertrag steht als eigene Zeile in der Ertragsübersicht.
+- **Wikinger „Kriegerkultur"**: +1 Machtwert je Armee. Der Zuschlag erhöht den
+  Machtverlust zu Zugbeginn (er rechnet auf den Gesamtwert), kann selbst aber nicht verloren
+  gehen – abgezogen wird nur von der gekauften Macht. Genauso die Zeusstatue (+3).
+- **Griechenland „Rückschau"**: die Gratis-Tech kommt aus einem Zeitalter unterhalb der
+  gerade erforschten, ignoriert die Verfügbarkeit und löst **keine Kette** aus.
+- **Griechenland „Freie Forschung"**: 1× pro Runde, nur **verfügbare** Techs bis
+  Industrialisierung (Zeitalter 0–2). Zusätzlich zur normalen Forschung.
+- **England „Seemacht"**: „an Wasser" heißt hier **Meer**. Der Ereignisbogen unterscheidet
+  „an Wasser oder Fluss", Fluss zählt also nicht. +2 je **Stadt**, nicht je Meeresfeld.
+- **England „Kolonisten"**: Basiskosten 0, Distanzkosten bleiben.
+- **Russland „Fruchtbarkeit"**: nur die **Nahrungskosten** des Wachstums fallen weg. Münzen
+  und die Nahrungsgrenze aus Abschnitt 10 gelten weiter.
+
+## 12. Ereignisse (Bogen „Ereignisse")
+
+Im Aufbau zuschaltbar, mit Stärke **hart** (jede Runde ein Ereignis) oder **leicht** (beim
+Spaltenwurf treffen nur 1/3/5, 2/4/6 gehen ins Leere – etwa halb so viele Ereignisse).
+Gewürfelt wird **einmal pro Runde** zu Rundenbeginn: erst die Zeile, dann die Spalte. Das
+Ergebnis gilt **gleichzeitig für alle menschlichen Reiche**; Effekte wie „würfle eine deiner
+Städte aus" werden für jedes Reich einzeln gewürfelt. **Bots sind nie betroffen.**
+
+Auslegungen:
+
+- **Bevölkerungsverluste zerstören keine Stadt.** Pest, Sturmflut und Vulkanausbruch lassen
+  immer mindestens 1 Bevölkerung stehen. Der Bogen sagt dazu nichts; die Alternative wäre,
+  dass die Pest Städte mit 1 Bevölkerung (auch Hauptstädte) auslöscht.
+- **Hungersnot** setzt das Nahrungseinkommen auf **genau 0** – der Verbrauch der Bevölkerung
+  wird in dieser Runde nicht gegengerechnet. Begründung: bei der Revolution steht
+  ausdrücklich „verbraucht aber trotzdem normal Nahrung", bei der Hungersnot nicht.
+  Der Notkurs 4:1 (mit Gilden 2:1) überschreibt Englands 1:1 **nicht**.
+- **Revolution**: die Hauptstadt produziert nichts, und ihr Umland ebenfalls nicht – außer
+  ein Feld grenzt zusätzlich an eine andere eigene Stadt. Das folgt der Bürokratie-Auslegung,
+  die das Umland als Produktion der Hauptstadt behandelt. Nahrung verbraucht sie weiter.
+- **Dunkles Zeitalter** verbietet Forschen (auch die griechischen Gratis-Techs), aber nicht
+  das **Kopieren** von Technologien (Spionage/Kundschafterei/Internet).
+- **Bürgerkrieg** trifft die Armeen aller Nicht-Bot-Reiche. Der Nahrungs-Notkauf gilt nur
+  für Armeen und Macht, nicht allgemein.
+- **Atomwaffenproteste** wirken dauerhaft und für alle Nicht-Bot-Reiche.
+- **Vulkanausbruch**: das Feld wird unpassierbar (auch für die Luftwaffe), bringt keinen
+  Ertrag, kann nicht besiedelt werden; eine dort stehende Armee wird zerstört. Gewählt wird
+  nur unter benachbarten **Landfeldern ohne Stadt**.
+- **Barbareninvasion**: Macht = max(10, doppelter eigener Machtwert), **beim Auftreten
+  festgeschrieben**. Zwei Angriffe: einer sofort, einer zu Beginn der nächsten Runde vor dem
+  neuen Ereignis. Nur zwei Erfolge in Folge erobern; scheitert der erste, ziehen die Barbaren
+  ab. Eine eroberte Stadt gehört der neutralen Fraktion **Barbaren** (Totenkopf auf der
+  Karte), verliert wie üblich 2 Bevölkerung, verteidigt sich **nur mit Bevölkerung** und ist
+  normal zurückerobern. Die Barbaren handeln nie, kommen nie an den Zug und können keine
+  Hauptstadt angreifen. Ihre Bevölkerung zählt weiter zur **Weltbevölkerung**, macht den
+  Wirtschaftssieg also etwas schwerer.
+
+## 13. Weltwunder (Bogen „Wunder")
+
+Im Aufbau zuschaltbar. Kosten 10/20/30/40 … Münzen für das 1./2./3./4. Wunder eines
+Reiches, gezählt werden die **aktuell besessenen** – ein zerstörtes oder verlorenes Wunder
+senkt den Preis wieder. Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2
+(strikt: das dritte Stufe-2-Wunder braucht vier Stufe-1-Wunder). Je Stadt zwei Wunder,
+markiert als Raute mit Stufenzahl unter dem Stadtsymbol. Verfügbar sind je drei ausgewürfelte
+Wunder der Stufen 1 und 2 – nach jedem Bau wird nachgewürfelt – sowie **alle drei**
+Stufe-3-Wunder (mehr gibt es nicht). Der Pool ist für alle Reiche gemeinsam.
+
+- **Kultursieg**: Wer ein Stufe-3-Wunder gebaut hat, gewinnt **zu Beginn seines nächsten
+  Zuges** – sofern er es dann noch besitzt. Wird die Stadt vorher erobert, erbt der Eroberer
+  den Anspruch.
+- **Eroberung**: dauerhafte Effekte wechseln mit dem Wunder den Besitzer, einmalige lösen
+  nicht erneut aus.
+- **Zerstörung** einer Stadt: die Wunder sind endgültig weg (nicht mehr im Pool) – **außer**
+  bei Stonehenge. Dann bleiben sie **freistehend auf dem Feld** (Raute ◈), wirken für den
+  Besitzer weiter und zählen für Kosten und Stufenregel. Wer später auf dem Feld eine Stadt
+  gründet, übernimmt sie; das ist die Auslegung von „nur erobern kann sie dem Besitzer
+  nehmen".
+- **Zeusstatue** +3 Macht und **Kreml** +50 Singularitätskosten wirken dauerhaft; der Kreml
+  verteuert für **alle** Reiche, auch für den Erbauer.
+- **Große Mauer** rechnet die Verteidigung **jeder** eigenen Stadt mit der Gesamtbevölkerung
+  des Reiches.
+- **Große Bibliothek** ignoriert die Verfügbarkeit (Mittelalter oder früher), **Oxford** nur
+  momentan verfügbare Techs.
+- **Canal du Midi** gibt 40 Münzen, die wie jede Ressource am Zugende verfallen.
+- **Taj Mahal** verdoppelt das Einkommen der nächsten eigenen Runde.
+- **Koloss** stellt zwei Armeen auf freie Landfelder neben der Baustadt (Armeen dürfen nicht
+  auf Städten stehen); sind weniger Felder frei, entsprechend weniger.
+- **Das Orakel** zeigt in der Ansicht „Welt" das Ereignis der nächsten Runde. Es wird dabei
+  einmal vorgewürfelt und zu Rundenbeginn genau so verwendet.
+- **Apostolischer Palast** macht sein Reich immun gegen alle Ereignisse.
+- **Bots** würfeln nach dem Siedeln einmal (gegen den Schwierigkeitsgrad) und bauen dann ein
+  zufälliges verfügbares und baubares Wunder – **kostenlos**, wie alle Bot-Aktionen, und
+  **ohne Effekte**. Gebaut wird in der Hauptstadt, sonst in der bevölkerungsreichsten Stadt
+  (Gleichstand wird ausgewürfelt). Ein Stufe-3-Wunder gewinnt auch für sie. Erobert ein
+  Mensch eine Bot-Stadt mit Wundern, werden die Effekte für ihn aktiv.
