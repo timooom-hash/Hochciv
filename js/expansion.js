@@ -212,8 +212,14 @@ function wonderCounts(S, pi) {
   return c;
 }
 /* Kosten: 10 für das erste eigene Wunder, dann 20/30/40 … Zerstörte und verlorene
-   Wunder zählen nicht mehr mit, der Preis sinkt also wieder. */
-function wonderCost(S, pi) { return WONDER_STEP * (wondersOf(S, pi).length + 1); }
+   Wunder zählen nicht mehr mit, der Preis sinkt also wieder.
+   Baukräne senkt den Preis des 1./2./3./… Wunders um 2/4/6/… – also 8/16/24/… statt
+   10/20/30/…; das Muster setzt sich über das sechste Wunder hinaus fort. */
+function wonderCost(S, pi) {
+  const idx = wondersOf(S, pi).length + 1;
+  const step = has(S.players[pi], 'baukraene') ? WONDER_STEP - 2 : WONDER_STEP;
+  return step * idx;
+}
 /* Pyramidenregel: Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. */
 function wonderLevelOk(S, pi, lvl) {
   if (lvl === 1) return true;
@@ -263,10 +269,23 @@ function buildWonder(S, pi, city, wk, opts) {
   const p = S.players[pi], w = WONDER_BY_KEY[wk];
   let cost = 0;
   if (!(opts && opts.free)) { cost = wonderCost(S, pi); pay(S, pi, 'coins', cost); }
+  const rangeBefore = moveAllowance(S, pi);
   S.wonders.push({ k: wk, lvl: w.lvl, owner: pi, cityId: city.id, r: city.r, c: city.c });
   S.wpool[w.lvl] = poolOf(S, w.lvl).filter(k => k !== wk);
   refillPool(S, w.lvl);
   log(S, 'act', `${civOf(p).n}: ${w.n} gebaut (Stufe ${w.lvl}${cost ? `, ${cost} Münzen` : ''}).`);
+  // Militärlogistik: die größere Reichweite wirkt sofort, wie bei einem Reichweitensprung
+  const gained = moveAllowance(S, pi) - rangeBefore;
+  if (gained > 0) for (const a of armiesOf(S, pi)) a.mp += gained;
+  // Raumfahrt: bei jedem Wunderbau eine Technologie gratis (kein neues Zeitalter,
+  // keine Singularität). Bots würfeln sie nach den normalen Bot-Forschungsregeln aus.
+  if (has(p, 'raumfahrt')) {
+    if (p.kind === 'bot') botResearch(S, pi, [], true);
+    else {
+      addFreePick(S, pi, { n: 1, unlockedOnly: true, why: 'Raumfahrt' });
+      log(S, 'info', `${civOf(p).n}: Raumfahrt – eine Technologie gratis erforschbar.`);
+    }
+  }
   if (!(opts && opts.noEffect)) applyWonderEffect(S, pi, city, w);
   if (w.lvl === 3) {
     p.cultureWin = S.round;
@@ -279,10 +298,10 @@ function applyWonderEffect(S, pi, city, w) {
   const p = S.players[pi];
   switch (w.k) {
     case 'bibliothek':
-      p.freePick = { n: 1, maxAge: 1, any: true, why: 'Die große Bibliothek' };
+      addFreePick(S, pi, { n: 1, maxAge: 1, why: 'Die große Bibliothek' });
       break;
     case 'oxford':
-      p.freePick = { n: 2, availOnly: true, why: 'Universität von Oxford' };
+      addFreePick(S, pi, { n: 2, availOnly: true, why: 'Universität von Oxford' });
       break;
     case 'gaerten':
       for (const c of citiesOf(S, pi)) growFree(S, pi, c, 1, 'Hängende Gärten');
@@ -322,23 +341,47 @@ function applyWonderEffect(S, pi, city, w) {
   }
 }
 /* Kostenlose Forschung aus Wundern (Bibliothek/Oxford). */
+/* Höchstes Zeitalter, das ein Reich in diesem Technologiefeld freigeschaltet hat:
+   ein Zeitalter gilt als freigeschaltet, sobald dort eine Technologie verfügbar oder
+   erforscht ist. Bots führen kein avail, bei ihnen zählen die erforschten Techs. */
+function unlockedAge(S, pi, field) {
+  const p = S.players[pi];
+  let best = 0;
+  for (const t of techPool(S))
+    if (t.f === field && (p.avail[t.k] || p.techs[t.k]) && t.age > best) best = t.age;
+  return best;
+}
+/* Offene Ansprüche auf kostenlose Forschung. Es können mehrere gleichzeitig sein –
+   ein Wunderbau kann über Raumfahrt und über das Wunder selbst (Bibliothek, Oxford)
+   zugleich einen Anspruch auslösen. Sie werden der Reihe nach abgearbeitet. */
+function addFreePick(S, pi, claim) {
+  const p = S.players[pi];
+  (p.freePicks = p.freePicks || []).push(claim);
+}
+function freePick(p) {
+  return (p.freePicks || []).find(c => c.n > 0) || null;
+}
 function freePickOptions(S, pi) {
   const p = S.players[pi];
-  if (!p.freePick || p.freePick.n <= 0) return [];
-  return TECHS_ACTIVE.filter(t => {
+  const pick = freePick(p);
+  if (!pick) return [];
+  return techPool(S).filter(t => {
     if (p.techs[t.k]) return false;
-    if (p.freePick.maxAge != null && t.age > p.freePick.maxAge) return false;
-    if (p.freePick.availOnly && !p.avail[t.k]) return false;
+    if (pick.maxAge != null && t.age > pick.maxAge) return false;
+    if (pick.availOnly && !p.avail[t.k]) return false;
+    // Raumfahrt: kein Zeitalter, das in diesem Feld noch nicht freigeschaltet ist
+    if (pick.unlockedOnly && t.age > unlockedAge(S, pi, t.f)) return false;
     return true;
   });
 }
 function useFreePick(S, pi, tk) {
   const p = S.players[pi];
-  if (!freePickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
-  const err = grantTech(S, pi, tk, p.freePick.why);
+  const pick = freePick(p);
+  if (!pick || !freePickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
+  const err = grantTech(S, pi, tk, pick.why);
   if (err) return err;
-  p.freePick.n--;
-  if (p.freePick.n <= 0) p.freePick = null;
+  pick.n--;
+  p.freePicks = p.freePicks.filter(c => c.n > 0);
   return null;
 }
 /* Erdbeben: ein zufälliges eigenes Wunder wird zerstört und ist für immer weg. */

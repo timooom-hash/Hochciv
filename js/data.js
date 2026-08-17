@@ -40,6 +40,7 @@ const TECHS = [
   { k: 'biologie', n: 'Biologie', f: 0, c: 15, e: 'Grasland: +1 Wissenschaft' },
   { k: 'computertechnik', n: 'Computertechnik', f: 0, c: 17, e: '1:1 Münzen → Wissenschaft' },
   { k: 'gentechnik', n: 'Gentechnik', f: 0, c: 18, e: 'Wissenschaft nutzen um Stadt zu füttern' },
+  { k: 'raumfahrt', n: 'Raumfahrt', f: 0, c: 19, wo: true, e: 'Bei jedem Wunderbau eine Technologie gratis' },
   { k: 'ki', n: 'Künstliche Intelligenz', f: 0, c: 20, e: 'Wald: +1 Wissenschaft' },
   // Produktion
   { k: 'landwirtschaft', n: 'Landwirtschaft', f: 1, c: 1, e: 'Grasland: +1 Nahrung' },
@@ -49,6 +50,7 @@ const TECHS = [
   { k: 'bewaesserung', n: 'Bewässerung', f: 1, c: 5, e: 'Gebirge: +1 Nahrung' },
   { k: 'segeln', n: 'Segeln', f: 1, c: 7, e: 'Meer: +1 Nahrung' },
   { k: 'muehlentechnik', n: 'Mühlentechnik', f: 1, c: 8, e: 'Fluss: +1 Münze' },
+  { k: 'baukraene', n: 'Baukräne', f: 1, c: 9, wo: true, e: 'Weltwunder kosten 2/4/6/8/… weniger' },
   { k: 'gilden', n: 'Gilden', f: 1, c: 10, e: '1:1 Münzen → Nahrung' },
   { k: 'dampfmaschine', n: 'Dampfmaschine', f: 1, c: 11, e: 'Keine Münzkosten für Stadterweiterung' },
   { k: 'eisenbahn', n: 'Eisenbahn', f: 1, c: 13, e: 'Eisenbahn' },
@@ -65,6 +67,7 @@ const TECHS = [
   { k: 'stadtmauern', n: 'Stadtmauern', f: 2, c: 5, e: 'Städte haben +5 Verteidigung' },
   { k: 'burgenbau', n: 'Burgenbau', f: 2, c: 7, e: 'Städte enthalten unbewegliche Armee' },
   { k: 'stahl', n: 'Stahl', f: 2, c: 8, e: 'Machtverlust = 1/3' },
+  { k: 'militaerlogistik', n: 'Militärlogistik', f: 2, c: 6, wo: true, e: '+1 Bewegungsweite je eigenem Weltwunder' },
   { k: 'schiesspulver', n: 'Schießpulver', f: 2, c: 10, e: 'Kontrollzone' },
   { k: 'gewehre', n: 'Gewehre', f: 2, c: 11, e: '3 Münzen = 1 Macht' },
   { k: 'panzerschiff', n: 'Panzerschiff', f: 2, c: 13, e: 'Bewegung = 6, Bewegung auf und über Wasser' },
@@ -77,6 +80,7 @@ const TECHS = [
   // Spezial
   { k: 'navigation', n: 'Navigation', f: 3, c: 1, e: 'Bewegung über Wasser' },
   { k: 'demokratie', n: 'Demokratie', f: 3, c: 3, e: 'Armeekosten = 4 × Anzahl' },
+  { k: 'wallfahrt', n: 'Wallfahrt', f: 3, c: 4, wo: true, e: 'Je eigenem Weltwunder +3 auf alle Erträge' },
   { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 10 Münzen · wird in der Moderne obsolet' },
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
   { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (3× Kosten in Münzen)' },
@@ -111,13 +115,17 @@ const SLAVERY_OBSOLETE_IN_MODERN = true;
 const TECHS_ACTIVE = TECHS;
 const TECH_BY_KEY = {};
 TECHS_ACTIVE.forEach(t => { TECH_BY_KEY[t.k] = t; });
+/* Technologien mit `wo: true` gehören zur Weltwunder-Erweiterung und existieren nur in
+   einer Partie mit Weltwundern. Ohne Spielstand (z. B. in Tabellen) zählt die Grundliste. */
+function techActive(S, t) { return !t.wo || !!(S && S.wo); }
+function techPool(S) { return TECHS_ACTIVE.filter(t => techActive(S, t)); }
 const SINGULARITY = {
   k: 'singularitaet', n: 'Singularität', c: SINGULARITY_BASE,
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
 };
 // Techs je Feld und Zeitalter, nach Kosten sortiert (billigere zuerst)
-function techsIn(field, age) {
-  return TECHS_ACTIVE.filter(t => t.f === field && t.age === age).sort((a, b) => a.c - b.c);
+function techsIn(field, age, S) {
+  return techPool(S).filter(t => t.f === field && t.age === age).sort((a, b) => a.c - b.c);
 }
 
 /* ---------------------------------------------------------------- Zivilisationen */

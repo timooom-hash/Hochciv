@@ -106,7 +106,9 @@ function newGame(cfg) {
   S.players.forEach((p, i) => {
     const pos = S.map.capitals[p.civ];
     if (!pos) return;
-    S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: 1, cap: true, grown: 0, born: 0 });
+    // Russland "Siedlertrecks": auch die Hauptstadt startet mit 2 Bevölkerung
+    const startPop = isAbil(p, 'siedler') ? 2 : 1;
+    S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: startPop, cap: true, grown: 0, born: 0 });
     if (p.civ === 'wikinger' && isAbil(p, 'basis')) {   // Wikinger: kostenlose Armee am Start
       const spot = neighbors(pos[0], pos[1]).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
       if (spot) S.armies.push({ id: S.nextId++, owner: i, r: spot[0], c: spot[1], mp: 0, born: 0 });
@@ -134,7 +136,7 @@ function availBonus(p) { return has(p, 'philosophie') ? 1 : 0; }
 function rollAvailability(S, pi, field, age) {
   const p = S.players[pi];
   if (age > 3) return;
-  const list = techsIn(field, age);
+  const list = techsIn(field, age, S);
   if (!list.length) return;
   const bonus = availBonus(p);
   let any = false;
@@ -152,11 +154,11 @@ function rollAvailability(S, pi, field, age) {
     (list.filter(t => p.avail[t.k]).map(t => t.n).join(', ') || '—'));
 }
 function singularityReady(p) {
-  return FIELDS.every((_, f) => TECHS_ACTIVE.some(t => t.f === f && t.age === 3 && p.techs[t.k]));
+  return FIELDS.every((_, f) => TECHS.some(t => t.f === f && t.age === 3 && p.techs[t.k]));
 }
 function researchable(S, pi) {
   const p = S.players[pi], out = [];
-  for (const t of TECHS_ACTIVE) if (p.avail[t.k] && !p.techs[t.k]) out.push(t);
+  for (const t of techPool(S)) if (p.avail[t.k] && !p.techs[t.k]) out.push(t);
   if (singularityReady(p) && !p.techs.singularitaet) out.push(SINGULARITY);
   return out;
 }
@@ -165,6 +167,7 @@ function doResearch(S, pi, tk) {
   if (evActive(S, pi, 'dunkles_zeitalter')) return 'Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.';
   const tech = tk === 'singularitaet' ? SINGULARITY : TECH_BY_KEY[tk];
   if (!tech) return 'Unbekannte Technologie.';
+  if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   const cost = techCost(S, pi, tech);
   if (available(S, pi, 'sci') < cost) return 'Nicht genug Wissenschaft.';
   pay(S, pi, 'sci', cost);
@@ -172,7 +175,8 @@ function doResearch(S, pi, tk) {
   if (tk === 'singularitaet') { S.over = { winner: pi, how: 'Forschungssieg (Singularität)' }; return null; }
   // Griechenland "Rückschau": zusätzlich eine beliebige Technologie eines früheren
   // Zeitalters gratis. Keine Kette – die Gratis-Tech löst das nicht erneut aus.
-  if (isAbil(p, 'rueckschau') && tech.age > 0) p.backPick = tech.age - 1;
+  // nur ein früheres Zeitalter im GLEICHEN Technologiefeld
+  if (isAbil(p, 'rueckschau') && tech.age > 0) p.backPick = { age: tech.age - 1, f: tech.f };
   return null;
 }
 /* Technologie eintragen (bezahlt oder gratis) samt Folgewirkungen. */
@@ -187,7 +191,7 @@ function applyTech(S, pi, tech, note) {
   const gained = moveAllowance(S, pi) - rangeBefore;
   if (gained > 0) for (const a of armiesOf(S, pi)) a.mp += gained;
   // Erste Technologie in Zeitalter+Feld → nächstes Zeitalter auswürfeln
-  const sameAgeField = TECHS_ACTIVE.filter(t => t.f === tech.f && t.age === tech.age && p.techs[t.k]);
+  const sameAgeField = techPool(S).filter(t => t.f === tech.f && t.age === tech.age && p.techs[t.k]);
   if (sameAgeField.length === 1) rollAvailability(S, pi, tech.f, tech.age + 1);
 }
 /* Kostenlose Forschung: Griechenland-Fähigkeiten und die Wunder Bibliothek/Oxford.
@@ -196,6 +200,7 @@ function grantTech(S, pi, tk, quelle) {
   const p = S.players[pi];
   const tech = TECH_BY_KEY[tk];
   if (!tech) return 'Unbekannte Technologie.';
+  if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   if (p.techs[tk]) return 'Schon erforscht.';
   applyTech(S, pi, tech, quelle);
   return null;
@@ -206,7 +211,7 @@ function freeTechOptions(S, pi) {
   const p = S.players[pi];
   if (!isAbil(p, 'gratistech') || p.freeTechUsed === S.round) return [];
   if (evActive(S, pi, 'dunkles_zeitalter')) return [];
-  return TECHS_ACTIVE.filter(t => t.age <= 2 && p.avail[t.k] && !p.techs[t.k]);
+  return techPool(S).filter(t => t.age <= 2 && p.avail[t.k] && !p.techs[t.k]);
 }
 function useFreeTech(S, pi, tk) {
   const p = S.players[pi];
@@ -219,8 +224,9 @@ function useFreeTech(S, pi, tk) {
 /* Griechenland "Rückschau": beliebige Tech eines früheren Zeitalters, auch nicht freigeschaltet. */
 function backPickOptions(S, pi) {
   const p = S.players[pi];
-  if (p.backPick == null) return [];
-  return TECHS_ACTIVE.filter(t => t.age <= p.backPick && !p.techs[t.k]);
+  if (!p.backPick) return [];
+  return techPool(S).filter(t =>
+    t.f === p.backPick.f && t.age <= p.backPick.age && !p.techs[t.k]);
 }
 function useBackPick(S, pi, tk) {
   const p = S.players[pi];
@@ -296,27 +302,42 @@ function controlledTiles(S, pi) {
 function cityAtSea(S, city) {
   return neighbors(city.r, city.c).some(([r, c]) => terrainAt(S, r, c) === 'M');
 }
-/* Wikinger "Beutezüge": je Armee, die neben einer gegnerischen Armee oder Stadt steht,
-   1 Wissenschaft/Nahrung/Münze pro Punkt Überlegenheit. Gegen Städte zählt der
-   Verteidigungswert, gegen Armeen der Machtwert. Mehrere Nachbarn: der größte Vorsprung.
-   Bewertet wird beim Einkommen (Zugbeginn) – Ressourcen verfallen am Zugende, ein
-   Ertrag in der Kampfphase wäre nicht mehr ausgebbar. */
-function raidBonus(S, pi) {
-  const p = S.players[pi];
-  if (!isAbil(p, 'kampfertrag')) return 0;
-  const mine = powerOf(S, pi);
-  let sum = 0;
-  for (const a of armiesOf(S, pi)) {
-    let best = 0;
-    for (const [r, c] of neighbors(a.r, a.c)) {
-      const ec = cityAt(S, r, c), ea = armyAt(S, r, c);
-      if (ec && ec.owner !== pi) best = Math.max(best, mine - defenseValue(S, ec));
-      if (ea && ea.owner !== pi) best = Math.max(best, mine - powerOf(S, ea.owner));
-    }
-    if (best > 0) sum += best;
-  }
-  return sum;
+/* Wikinger "Beutezüge": Am Ende des eigenen Zuges wird für jede gegnerische Stadt und
+   für jedes Feld mit gegnerischer Armee, an denen eigene Armeen stehen, gerechnet
+   Angriffswert − Verteidigungswert. Positive Differenzen ergeben zusammen den Ertrag, der
+   zu Beginn der nächsten Runde als Wissenschaft, Nahrung und Münzen ausgezahlt wird.
+   Es sind dieselben Werte wie im Kampf: mehrere angreifende Armeen addieren sich im
+   Angriffswert, mehrere verteidigende im Verteidigungswert. Gerechnet wird VOR den
+   Belagerungen, der Ertrag entsteht also auch für eine Stadt, die im selben Zug fällt. */
+function armyDefenseValue(S, army) {
+  const oi = army.owner;
+  const rng = projectRange(S, oi);
+  let helpers = 0;
+  for (const a of armiesOf(S, oi)) if (hexDistance(a.r, a.c, army.r, army.c) <= rng) helpers++;
+  return powerOf(S, oi) * (COMBAT.defenseStacks ? helpers : 1);
 }
+function raidYield(S, pi) {
+  const p = S.players[pi];
+  const out = { sum: 0, parts: [] };
+  if (!isAbil(p, 'kampfertrag')) return out;
+  const rng = attackRange(S, pi);
+  for (const city of S.cities) {
+    if (city.owner === pi) continue;
+    const atk = attackersOn(S, pi, city);
+    if (!atk.length) continue;
+    const diff = attackValue(S, pi, atk.length) - defenseValue(S, city);
+    if (diff > 0) { out.sum += diff; out.parts.push(`Stadt ${city.r}/${city.c}: +${diff}`); }
+  }
+  for (const enemy of S.armies) {
+    if (enemy.owner === pi) continue;
+    const atk = armiesOf(S, pi).filter(a => hexDistance(a.r, a.c, enemy.r, enemy.c) <= rng);
+    if (!atk.length) continue;
+    const diff = attackValue(S, pi, atk.length) - armyDefenseValue(S, enemy);
+    if (diff > 0) { out.sum += diff; out.parts.push(`Armee ${enemy.r}/${enemy.c}: +${diff}`); }
+  }
+  return out;
+}
+
 /* Aufschlüsselung des Einkommens für die Übersicht: je Geländetyp die Anzahl
    kontrollierter Felder und ihr Gesamtertrag, dazu Sonderzeilen, die Stadtbevölkerung
    und die Summe. Die Summe ist per Definition das Einkommen – income() liest sie hier ab,
@@ -357,8 +378,11 @@ function incomeBreakdown(S, pi) {
     pyy[2] += py[2] * city.pop * mult;
   }
   if (sea) extra.push({ name: 'Städte am Meer', glyph: '⚓', count: sea, y: [2 * sea, 2 * sea, 2 * sea] });
-  const raid = raidBonus(S, pi);
-  if (raid) extra.push({ name: 'Beutezüge', glyph: '⚔︎', count: null, y: [raid, raid, raid] });
+  // Wallfahrt (Erweiterung): je eigenem Weltwunder +3 auf alle drei Erträge
+  if (has(p, 'wallfahrt')) {
+    const w = wondersOf(S, pi).length;
+    if (w) extra.push({ name: 'Wallfahrt', glyph: '⛪', count: w, y: [3 * w, 3 * w, 3 * w] });
+  }
   // Summe, danach die Ereignis- und Wundereffekte auf das Gesamteinkommen
   const total = [0, 0, 0];
   for (const r of rows) for (let i = 0; i < 3; i++) total[i] += r.y[i];
@@ -367,7 +391,12 @@ function incomeBreakdown(S, pi) {
   if (evActive(S, pi, 'hungersnot')) total[1] = 0;        // keine Nahrung produziert
   if (evActive(S, pi, 'wirtschaftskrise')) total[2] = 0;  // keine Münzen produziert
   if (p.doubleIncome === S.round) for (let i = 0; i < 3; i++) total[i] *= 2;   // Taj Mahal
-  return { rows, extra, pop: { count: pop, y: pyy }, total };
+  // Vorschau, kein Einkommen: was die Armeen bei jetziger Stellung zu Zugende erbeuten
+  const preview = [];
+  const raid = raidYield(S, pi);
+  if (raid.sum) preview.push({ name: 'Beutezüge zu Zugende', glyph: '⚔︎', y: [raid.sum, raid.sum, raid.sum] });
+  if (p.raidPending) preview.push({ name: 'Beute (schon gutgeschrieben)', glyph: '⚔︎', y: [p.raidPending, p.raidPending, p.raidPending] });
+  return { rows, extra, preview, pop: { count: pop, y: pyy }, total };
 }
 function income(S, pi) {
   const t = incomeBreakdown(S, pi).total;
@@ -494,6 +523,13 @@ function beginTurn(S) {
     p.power -= loss;
     if (loss) log(S, 'info', `Macht −${loss} (1/${div}, aufgerundet) → ${powerOf(S, S.cur)}.`);
   }
+  // 3 Beute des letzten Zuges auszahlen (Wikinger-Alternative "Beutezüge")
+  if (p.raidPending > 0) {
+    const n = p.raidPending;
+    p.res.sci += n; p.res.food += n; p.res.coins += n;
+    log(S, 'act', `Beutezüge des letzten Zuges: je ${n} Wissenschaft, Nahrung und Münzen.`);
+  }
+  p.raidPending = 0;
   // Zustände zurücksetzen
   S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
   S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
@@ -503,7 +539,9 @@ function beginTurn(S) {
 /* ------------------------------------------------------------ Bewegung */
 function moveAllowance(S, pi) {
   const p = S.players[pi];
-  return has(p, 'luftwaffe') ? 9 : has(p, 'panzerschiff') ? 6 : 3;
+  const base = has(p, 'luftwaffe') ? 9 : has(p, 'panzerschiff') ? 6 : 3;
+  // Militärlogistik (Erweiterung): jedes eigene Weltwunder gibt +1 Bewegungsweite
+  return base + (has(p, 'militaerlogistik') ? wondersOf(S, pi).length : 0);
 }
 // Darf das Feld auf dem Weg durchquert werden? Navigation/Panzerschiff/Luftwaffe erlauben Wasser.
 function canPass(S, pi, r, c) {
@@ -679,12 +717,21 @@ function foundCost(S, pi, r, c) {
   const n = citiesOf(S, pi).length;
   let base = n * (n + 1) / 2;                        // 1/3/6/10/15 …
   if (isAbil(p, 'gruenden')) base = 0;               // England: keine Basiskosten
-  if (has(p, 'kartografie')) return base;
+  // Gründen kostet immer mindestens 1 Nahrung – sonst wäre es mit Englands Alternative
+  // plus Kartografie (keine Distanzkosten) vollständig gratis.
+  if (has(p, 'kartografie')) return Math.max(1, base);
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
-  if (!cap) return base;
+  if (!cap) return Math.max(1, base);
   const dist = pathSteps(cap.r, cap.c, r, c,
     (rr, cc) => { const t = terrainAt(S, rr, cc); return t && (TERRAIN[t].land || has(p, 'navigation') || has(p, 'panzerschiff')); });
-  return base + (dist == null ? hexDistance(cap.r, cap.c, r, c) : dist);
+  return Math.max(1, base + (dist == null ? hexDistance(cap.r, cap.c, r, c) : dist));
+}
+/* Steht auf einem Nachbarfeld eine fremde Armee? Dort wird nicht gesiedelt. */
+function enemyArmyAdjacent(S, pi, r, c) {
+  return neighbors(r, c).some(([nr, nc]) => {
+    const a = armyAt(S, nr, nc);
+    return a && a.owner !== pi;
+  });
 }
 function canFound(S, pi, r, c) {
   const t = terrainAt(S, r, c);
@@ -692,6 +739,7 @@ function canFound(S, pi, r, c) {
   if (!TERRAIN[t].land) return 'Nicht auf Meer.';
   if (TERRAIN[t].block) return 'Nicht auf einem Vulkan.';
   if (armyAt(S, r, c)) return 'Feld besetzt.';
+  if (enemyArmyAdjacent(S, pi, r, c)) return 'Nicht direkt neben einer gegnerischen Armee.';
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return 'Mindestens 3 Felder Abstand zu allen Städten.';
   const cost = foundCost(S, pi, r, c);
   if (available(S, pi, 'food') < cost) return `Zu wenig Nahrung (${cost} nötig).`;
@@ -762,7 +810,7 @@ function buildRoad(S, pi, r, c, target) {
   return null;
 }
 function hasModernTech(p) {
-  return TECHS_ACTIVE.some(t => t.age === 3 && p.techs[t.k]);
+  return TECHS.some(t => t.age === 3 && p.techs[t.k]);
 }
 function slaveryUsable(p) {
   if (!has(p, 'sklaverei')) return false;
@@ -850,7 +898,7 @@ function copyTech(S, pi, tk, mode) {
     p.techs[tk] = true;
     log(S, 'act', `${civOf(p).n}: ${opt.tech.n} kopiert (${opt.paidCoins} Münzen).`);
   }
-  const same = TECHS_ACTIVE.filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
+  const same = techPool(S).filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
   if (same.length === 1) rollAvailability(S, pi, opt.tech.f, opt.tech.age + 1);
   return null;
 }
@@ -905,6 +953,12 @@ function defenseValue(S, city) {
 }
 function combatPhase(S, pi) {
   const p = S.players[pi];
+  // Wikinger "Beutezüge": Stand vor den Belagerungen festhalten, Auszahlung nächste Runde
+  if (isAbil(p, 'kampfertrag')) {
+    const raid = raidYield(S, pi);
+    p.raidPending = raid.sum;
+    if (raid.sum) log(S, 'act', `${civOf(p).n}: Beutezüge ergeben ${raid.sum} (${raid.parts.join(', ')}) – gutgeschrieben zu Beginn der nächsten Runde.`);
+  }
   // Belagerungen
   for (const city of S.cities.slice()) {
     if (city.owner === pi) continue;

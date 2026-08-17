@@ -8,10 +8,13 @@ function botTry(S, p, why) {
   const v = d6(S, `${why} (${need}+)`);
   return v >= need;
 }
-function settleable(S, r, c) {
+/* Bots siedeln nach genau denselben Regeln wie Menschen (canFound), nur ohne
+   Kostenprüfung – Bots zahlen nichts. */
+function settleable(S, pi, r, c) {
   const t = terrainAt(S, r, c);
-  if (!t || !TERRAIN[t].land) return false;
+  if (!t || !TERRAIN[t].land || TERRAIN[t].block) return false;   // kein Meer, kein Vulkan
   if (armyAt(S, r, c)) return false;
+  if (enemyArmyAdjacent(S, pi, r, c)) return false;               // nicht neben fremden Armeen
   return !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3);
 }
 // Bots bewegen sich nach genau denselben Regeln wie Menschen.
@@ -58,28 +61,84 @@ function botTurn(S, pi) {
 }
 
 /* ---------------------------------------------------- Siedler (Zufallswanderung) */
+/* Siedlerbewegung nach den Bot-Regeln des Regelhefts (Schritte 1–7):
+   Der Siedler zieht auf das durch Bewegung erreichbare siedelbare Feld, das der
+   Hauptstadt am nächsten liegt; bei mehreren gleich nahen wird ausgewürfelt. Steht er
+   auf einem siedelbaren Feld, würfelt er: bei 3+ siedelt er, sonst zieht er ein Feld in
+   eine ausgewürfelte Richtung und prüft erneut. Er geht nie direkt zurück, betritt Meer
+   nur mit passender Technologie, und trifft er auf eine eigene Stadt, beginnt er wieder
+   beim Zug zum nächstgelegenen siedelbaren Feld. */
+function settleDistances(S, pi, fromR, fromC) {
+  // Geländedistanz vom Startfeld aus, mit den Bewegungsregeln des Bots
+  const dist = new Map([[key(fromR, fromC), 0]]);
+  let front = [[fromR, fromC]];
+  while (front.length) {
+    const next = [];
+    for (const [r, c] of front) {
+      const d = dist.get(key(r, c));
+      for (const [nr, nc] of neighbors(r, c)) {
+        const k = key(nr, nc);
+        if (dist.has(k)) continue;
+        if (!botCanEnter(S, pi, nr, nc)) continue;
+        dist.set(k, d + 1);
+        next.push([nr, nc]);
+      }
+    }
+    front = next;
+  }
+  return dist;
+}
+/* Die erreichbaren siedelbaren Felder mit der kleinsten Distanz zur Hauptstadt. */
+function nearestSettleSpots(S, pi, capital) {
+  const dist = settleDistances(S, pi, capital.r, capital.c);
+  let best = Infinity, out = [];
+  for (const [k, d] of dist) {
+    const [r, c] = unkey(k);
+    if (!settleable(S, pi, r, c)) continue;
+    if (d < best) { best = d; out = [[r, c]]; }
+    else if (d === best) out.push([r, c]);
+  }
+  return out;
+}
 function botSettle(S, pi, capital) {
   const p = S.players[pi];
-  let r = capital.r, c = capital.c, prev = null, first = true;
+  let r = capital.r, c = capital.c, prev = null;
+  // Schritte 2–3: zum nächstgelegenen siedelbaren Feld, Gleichstände auswürfeln
+  const goToNearest = () => {
+    const spots = nearestSettleSpots(S, pi, capital);
+    if (!spots.length) return false;
+    let pick = spots[0];
+    if (spots.length > 1) {
+      let idx = 0;
+      do { idx = d6(S, `Siedlerziel auswürfeln (1–${Math.min(spots.length, 6)})`); } while (idx > spots.length);
+      pick = spots[idx - 1];
+    }
+    r = pick[0]; c = pick[1]; prev = null;
+    log(S, 'info', `${civOf(p).n}: Siedler zieht auf ${r}/${c} (nächstes siedelbares Feld).`);
+    return true;
+  };
+  if (!goToNearest()) { log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`); return; }
   for (let step = 0; step < 40; step++) {
-    if (settleable(S, r, c) && !(r === capital.r && c === capital.c)) {
+    // Schritt 5: auf siedelbarem Feld würfeln, bei 3+ siedeln
+    if (settleable(S, pi, r, c)) {
       if (d6(S, 'Siedeln? (3+)') >= 3) {
-        S.cities.push({ id: S.nextId++, owner: pi, r, c, pop: 1, cap: false, grown: 0, born: S.round });
+        const pop = isAbil(p, 'siedler') ? 2 : 1;
+        S.cities.push({ id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round });
         log(S, 'act', `${civOf(p).n}: Siedler gründet Stadt auf ${r}/${c}.`);
         return;
       }
     }
+    // Schritt 6: ein Feld in ausgewürfelter Richtung
     const dir = d6(S, 'Richtung ' + DIR_NAMES.map((n, i) => (i + 1) + '=' + n[0] + n[1].toLowerCase()).join(' ')) - 1;
-    const steps = first ? 3 : 1; first = false;
-    let moved = false;
-    for (let s = 0; s < steps; s++) {
-      const [nr, nc] = neighbor(r, c, dir);
-      if (prev && prev[0] === nr && prev[1] === nc) break;          // nie direkt zurück
-      if (!botCanEnter(S, pi, nr, nc)) break;
-      prev = [r, c]; r = nr; c = nc; moved = true;
-      if (settleable(S, r, c)) break;
+    const [nr, nc] = neighbor(r, c, dir);
+    const own = cityAt(S, nr, nc);
+    if (own && own.owner === pi) {                       // Schritt 4: eigene Stadt → von vorn
+      if (!goToNearest()) break;
+      continue;
     }
-    if (!moved) continue;
+    if (prev && prev[0] === nr && prev[1] === nc) continue;   // Schritt 7: nie direkt zurück
+    if (!botCanEnter(S, pi, nr, nc)) continue;
+    prev = [r, c]; r = nr; c = nc;
   }
   log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`);
 }
@@ -228,7 +287,7 @@ function botMoveArmy(S, pi, army) {
 }
 
 /* ---------------------------------------------------- Forschung */
-function botResearch(S, pi, avoidFields = []) {
+function botResearch(S, pi, avoidFields = [], noSingularity = false) {
   const p = S.players[pi];
   let f, field, guard = 0;
   do {
@@ -236,7 +295,7 @@ function botResearch(S, pi, avoidFields = []) {
     field = f - 1;
   } while (avoidFields.includes(field) && ++guard < 20);  // v2: anderes Feld als beim ersten Mal
   // Singularität, sobald ein Feld der Moderne schon beforscht ist
-  if (TECHS_ACTIVE.some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
+  if (!noSingularity && techPool(S).some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
     p.techs.singularitaet = true;
     S.over = { winner: pi, how: 'Forschungssieg (Singularität)' };
     log(S, 'act', `${civOf(p).n} erforscht die Singularität!`);
@@ -244,10 +303,10 @@ function botResearch(S, pi, avoidFields = []) {
   }
   // höchstes erforschbares Zeitalter in diesem Feld
   let age = 0;
-  for (let a = 1; a <= 3; a++) if (TECHS_ACTIVE.some(t => t.f === field && t.age === a - 1 && p.techs[t.k])) age = a;
-  while (age >= 0 && !techsIn(field, age).some(t => !p.techs[t.k])) age--;
+  for (let a = 1; a <= 3; a++) if (techPool(S).some(t => t.f === field && t.age === a - 1 && p.techs[t.k])) age = a;
+  while (age >= 0 && !techsIn(field, age, S).some(t => !p.techs[t.k])) age--;
   if (age < 0) { log(S, 'info', `${civOf(p).n}: nichts mehr zu forschen in ${FIELDS[field]}.`); return field; }
-  const list = techsIn(field, age);
+  const list = techsIn(field, age, S);
   let idx;
   for (let guard = 0; guard < 30; guard++) {
     idx = d6(S, `Technologie in ${FIELDS[field]} / ${AGES[age]} (1–${list.length})`);

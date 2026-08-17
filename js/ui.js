@@ -461,6 +461,9 @@ function yieldOverview(S, pi) {
     h += yieldRow(e.name, e.glyph || '✦', '#c8a86a', e.count, e.y);
   h += yieldRow('Bevölkerung', '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
   h += yieldRow('Summe', '∑', '#6b5d47', null, b.total, { cls: 'sum' });
+  // Vorschau: kein Einkommen, sondern was die Armeen zu Zugende erbeuten (Wikinger)
+  for (const e of (b.preview || []))
+    h += yieldRow(e.name, e.glyph || '⚔︎', '#b08a4a', null, e.y, { cls: 'prev' });
   h += '</div>';
   return h;
 }
@@ -477,7 +480,7 @@ function techModal() {
     grid += `<div class="age-label">${AGES[a]}</div>`;
     for (let f = 0; f < 4; f++) {
       grid += `<div class="techcol">${a === 0 ? `<h4>${FIELDS[f]}</h4>` : ''}`;
-      for (const t of techsIn(f, a)) {
+      for (const t of techsIn(f, a, S)) {
         const owned = has(p, t.k), avail = p.avail[t.k] && !owned;
         const cost = techCost(S, pi, t);
         const can = avail && available(S, pi, 'sci') >= cost;
@@ -505,7 +508,7 @@ function techModal() {
   }
   const bp = backPickOptions(S, pi);
   if (bp.length) {
-    grid += '<p class="sub" style="margin-top:14px">Rückschau: eine Technologie eines früheren Zeitalters, kostenlos</p>';
+    grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[p.backPick.f]}, früheres Zeitalter, kostenlos</p>`;
     grid += bp.map(t => `<button class="tech avail" data-backtech="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   }
@@ -697,7 +700,7 @@ function wonderSheet(city) {
     if (e) return toast(e);
     redraw();
     if (S.over) { closeSheet(); return gameOver(); }
-    if (P(S).freePick) return freePickModal();
+    if (freePick(P(S))) return freePickModal();
     openTile(city.r, city.c);
   });
 }
@@ -727,12 +730,12 @@ function feedSheet() {
 /* Auswahl kostenloser Technologien (Bibliothek, Oxford, Griechenland) */
 function freePickModal() {
   const pi = S.cur, p = P(S);
-  const pick = p.freePick;
+  const pick = freePick(p);
   const list = pick ? freePickOptions(S, pi) : backPickOptions(S, pi);
   const title = pick ? pick.why : 'Rückschau';
   if (!list.length) { closeModal(); return; }
   const h = `<p class="sub">${pick ? `Noch ${pick.n} kostenlose Technologie(n).` :
-    'Eine beliebige Technologie eines früheren Zeitalters, kostenlos.'}</p>` +
+    'Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.'}</p>` +
     list.map(t => `<button class="tech avail" data-free="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   modal(title, h);
@@ -740,7 +743,7 @@ function freePickModal() {
     const e = pick ? useFreePick(S, S.cur, b.dataset.free) : useBackPick(S, S.cur, b.dataset.free);
     if (e) return toast(e);
     redraw();
-    if (P(S).freePick || (P(S).backPick != null && backPickOptions(S, S.cur).length)) freePickModal();
+    if (freePick(P(S)) || backPickOptions(S, S.cur).length) freePickModal();
     else closeModal();
   });
 }
@@ -752,7 +755,7 @@ function humanTurnStart() {
   const ev = curEvent();
   toast(ev ? `${civOf(p).n} ist am Zug · Ereignis: ${ev.n}` : civOf(p).n + ' ist am Zug');
   if (p.foodDeficit > 0 && canFeed(p)) feedSheet();
-  else if (p.freePick) freePickModal();
+  else if (freePick(p)) freePickModal();
 }
 
 /* ------------------------------------------------------------------ Aufbau */
