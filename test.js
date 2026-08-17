@@ -754,6 +754,217 @@ const setEvent = (S, k) => {
   eq(income(S, 0).food >= 0, true 	, 'die Produktion bleibt nicht negativ');
 }
 
+/* ============================================ Gründen neben gegnerischen Armeen */
+{
+  const S = mk('griechenland');
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  eq(canFound(S, 0, spot[0], spot[1]), null, 'freies Feld ist bebaubar');
+  // gegnerische Armee direkt daneben
+  const next = neighbors(spot[0], spot[1]).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  const foe = { id: 800, owner: 1, r: next[0], c: next[1], mp: 0, born: 0 };
+  S.armies.push(foe);
+  eq(typeof canFound(S, 0, spot[0], spot[1]), 'string', 'neben einer gegnerischen Armee nicht bebaubar');
+  eq(foundCity(S, 0, spot[0], spot[1]) !== null, true, 'Gründen wird abgelehnt');
+  eq(settleable(S, 0, spot[0], spot[1]), false, 'auch Bots dürfen dort nicht siedeln');
+  // die eigene Armee stört nicht
+  foe.owner = 0;
+  eq(canFound(S, 0, spot[0], spot[1]), null, 'eigene Armee daneben ist erlaubt');
+  eq(settleable(S, 0, spot[0], spot[1]), true, 'für Bots ebenso');
+  // zwei Felder entfernt stört sie auch nicht
+  foe.owner = 1;
+  const far = within(cap.r, cap.c, 6).find(([r, c]) => !canFound(S, 0, r, c) &&
+    hexDistance(foe.r, foe.c, r, c) > 1);
+  eq(canFound(S, 0, far[0], far[1]), null, 'zwei Felder entfernt ist wieder erlaubt');
+}
+/* Bots siedeln nicht auf Vulkanen */
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.map.rows[spot[0]] = S.map.rows[spot[0]].slice(0, spot[1]) + 'V' + S.map.rows[spot[0]].slice(spot[1] + 1);
+  eq(settleable(S, 0, spot[0], spot[1]), false, 'Bots siedeln nicht auf einem Vulkan');
+  eq(typeof canFound(S, 0, spot[0], spot[1]), 'string', 'Menschen auch nicht');
+}
+
+/* ============================================ Gründen kostet immer mindestens 1 */
+{
+  const A = mkA('england', 'gruenden', ['kartografie']);
+  const cap = capitalOf(A, 0);
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(A, 0, r, c));
+  eq(foundCost(A, 0, spot[0], spot[1]), 1,
+    'England-Alternative + Kartografie: Gründen kostet 1 statt 0');
+  const B = mkA('england', 'gruenden');
+  eq(foundCost(B, 0, spot[0], spot[1]) > 1, true, 'ohne Kartografie zahlt England die Distanz');
+  const C = mk('griechenland', ['kartografie']);
+  eq(foundCost(C, 0, spot[0], spot[1]), 1, 'Kartografie allein: Basiskosten der ersten Stadt = 1');
+}
+
+/* ==================================== Siedlerbewegung nach den Bot-Regeln */
+{
+  // Schritt 2–3: der Siedler zieht auf das erreichbare siedelbare Feld, das der
+  // Hauptstadt am nächsten liegt
+  const S = mk('england');
+  const cap = capitalOf(S, 0);
+  const spots = nearestSettleSpots(S, 0, cap);
+  eq(spots.length > 0, true, 'es gibt erreichbare siedelbare Felder');
+  const dist = settleDistances(S, 0, cap.r, cap.c);
+  const best = dist.get(key(spots[0][0], spots[0][1]));
+  eq(spots.every(([r, c]) => dist.get(key(r, c)) === best), true, 'alle Ziele sind gleich nah');
+  const closer = [...dist].filter(([k, d]) => d < best).map(([k]) => unkey(k));
+  eq(closer.every(([r, c]) => !settleable(S, 0, r, c)), true, 'kein näheres Feld ist siedelbar');
+  eq(spots.every(([r, c]) => settleable(S, 0, r, c)), true, 'die Ziele sind tatsächlich siedelbar');
+  // Erreichbarkeit zählt: ohne Navigation kein Ziel jenseits des Wassers
+  eq(spots.every(([r, c]) => dist.has(key(r, c))), true, 'nur durch Bewegung erreichbare Felder');
+}
+/* England (Hauptstadt in einer Bucht) siedelt jetzt zuverlässig in Runde 1 */
+{
+  let fail = 0;
+  for (let g = 0; g < 60; g++) {
+    const S = newGame({ seed: 4000 + g, players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })) });
+    const en = S.players.findIndex(p => p.civ === 'england');
+    S.cur = en; beginTurn(S);
+    const before = S.log.length;
+    botSettle(S, en, capitalOf(S, en));
+    if (S.log.slice(before).some(l => /findet keinen Platz/.test(l.m))) fail++;
+  }
+  eq(fail, 0, 'England scheitert in Runde 1 nie mehr am Siedeln (60 Partien)');
+}
+/* Der Siedler beachtet die Sperren: kein Meer ohne Technologie, kein Vulkan,
+   nicht neben gegnerischen Armeen */
+{
+  const S = mkX('griechenland', { events: true });
+  const cap = capitalOf(S, 0);
+  const spots = nearestSettleSpots(S, 0, cap);
+  eq(spots.every(([r, c]) => TERRAIN[terrainAt(S, r, c)].land), true, 'nie auf Meer');
+  // eine gegnerische Armee auf ein Zielfeld-Nachbarfeld setzen
+  const target = spots[0];
+  const next = neighbors(target[0], target[1]).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  S.armies.push({ id: 700, owner: 1, r: next[0], c: next[1], mp: 0, born: 0 });
+  eq(nearestSettleSpots(S, 0, cap).some(([r, c]) => r === target[0] && c === target[1]), false,
+    'Felder neben gegnerischen Armeen fallen als Ziel weg');
+}
+
+/* ============================== Technologien der Weltwunder-Erweiterung */
+/* Sie existieren nur mit Weltwundern */
+{
+  const keys = ['baukraene', 'wallfahrt', 'raumfahrt', 'militaerlogistik'];
+  const plain = mk('griechenland'), ext = mkX('griechenland', { wonders: true });
+  for (const k of keys) {
+    eq(techPool(plain).some(t => t.k === k), false, `${TECH_BY_KEY[k].n} fehlt ohne Erweiterung`);
+    eq(techPool(ext).some(t => t.k === k), true, `${TECH_BY_KEY[k].n} ist mit Erweiterung dabei`);
+  }
+  eq(techPool(ext).length - techPool(plain).length, 4, 'genau vier zusätzliche Technologien');
+  plain.players[0].avail.baukraene = true;
+  plain.players[0].res = { sci: 99, food: 0, coins: 0 };
+  eq(typeof doResearch(plain, 0, 'baukraene'), 'string', 'ohne Erweiterung nicht erforschbar');
+  // Zeitalter folgen den Kostenbereichen des Regelhefts
+  eq(techsIn(1, 1, ext).some(t => t.k === 'baukraene'), true, 'Baukräne: Produktion/Mittelalter (9)');
+  eq(techsIn(3, 0, ext).some(t => t.k === 'wallfahrt'), true, 'Wallfahrt: Spezial/Antike (4)');
+  eq(techsIn(0, 3, ext).some(t => t.k === 'raumfahrt'), true, 'Raumfahrt: Forschung/Moderne (19)');
+  eq(techsIn(2, 1, ext).some(t => t.k === 'militaerlogistik'), true, 'Militärlogistik: Militär/Mittelalter (6)');
+}
+/* Baukräne: 2/4/6/8/… weniger, also 8/16/24/32 statt 10/20/30/40 */
+{
+  const S = mkX('griechenland', { wonders: true }, ['baukraene']);
+  const cap = capitalOf(S, 0);
+  const costs = [];
+  for (let i = 0; i < 4; i++) {
+    costs.push(wonderCost(S, 0));
+    S.wonders.push({ k: 'w' + i, lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  }
+  eq(costs, [8, 16, 24, 32], 'Baukräne: 8/16/24/32 Münzen');
+  const B = mkX('griechenland', { wonders: true });
+  eq(wonderCost(B, 0), 10, 'ohne Baukräne unverändert 10');
+}
+/* Wallfahrt: je Weltwunder +3 auf alle Erträge */
+{
+  const S = mkX('griechenland', { wonders: true }, ['wallfahrt']);
+  const cap = capitalOf(S, 0);
+  const base = income(S, 0);
+  S.wonders.push({ k: 'gaerten', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  const one = income(S, 0);
+  eq([one.sci - base.sci, one.food - base.food, one.coins - base.coins], [3, 3, 3], 'ein Wunder: +3/+3/+3');
+  S.wonders.push({ k: 'koloss', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  eq(income(S, 0).sci - base.sci, 6, 'zwei Wunder: +6');
+  eq(incomeBreakdown(S, 0).extra.some(e => e.name === 'Wallfahrt'), true, 'eigene Zeile in der Ertragsübersicht');
+  const B = mkX('griechenland', { wonders: true });
+  B.wonders.push({ k: 'gaerten', lvl: 1, owner: 0, cityId: capitalOf(B, 0).id, r: 0, c: 0 });
+  eq(income(B, 0).sci, income(mkX('griechenland', { wonders: true }), 0).sci, 'ohne Wallfahrt kein Bonus');
+}
+/* Militärlogistik: +1 Bewegungsweite je Weltwunder, sofort wirksam */
+{
+  const S = mkX('griechenland', { wonders: true }, ['militaerlogistik']);
+  const cap = capitalOf(S, 0);
+  eq(moveAllowance(S, 0), 3, 'ohne Wunder normale Reichweite 3');
+  S.players[0].res = { sci: 0, food: 0, coins: 99 };
+  const sp = spotBy(S, cap);
+  const army = { id: 710, owner: 0, r: sp[0], c: sp[1], mp: 3, born: 0 };
+  S.armies.push(army);
+  eq(buildWonder(S, 0, cap, poolOf(S, 1)[0]), null, 'Wunder gebaut');
+  eq(moveAllowance(S, 0), 4, 'ein Wunder: Reichweite 4');
+  eq(army.mp, 4, 'die zusätzliche Bewegung wirkt sofort im selben Zug');
+  S.wonders.push({ k: 'zeus', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  eq(moveAllowance(S, 0), 5, 'zwei Wunder: Reichweite 5');
+  const B = mkX('griechenland', { wonders: true });
+  B.wonders.push({ k: 'zeus', lvl: 1, owner: 0, cityId: capitalOf(B, 0).id, r: 0, c: 0 });
+  eq(moveAllowance(B, 0), 3, 'ohne Militärlogistik unverändert');
+}
+/* Raumfahrt: Gratis-Tech bei jedem Wunderbau, nur in freigeschalteten Zeitaltern */
+{
+  const S = mkX('griechenland', { wonders: true }, ['raumfahrt']);
+  const p = S.players[0], cap = capitalOf(S, 0);
+  p.res = { sci: 0, food: 0, coins: 99 };
+  // Wunder ohne eigenen Forschungseffekt, damit nur der Raumfahrt-Anspruch offen ist
+  S.wpool[1] = ['zeus', 'mauer'];
+  eq(buildWonder(S, 0, cap, 'zeus'), null, 'Wunder gebaut');
+  const opts = freePickOptions(S, 0);
+  eq(opts.length > 0, true, 'es gibt eine Auswahl');
+  eq(opts.every(t => t.age <= unlockedAge(S, 0, t.f)), true,
+    'kein Zeitalter, das im Feld noch nicht freigeschaltet ist');
+  eq(opts.some(t => t.k === 'singularitaet'), false, 'Singularität ist ausgeschlossen');
+  eq(opts.some(t => !p.avail[t.k]), true, 'Verfügbarkeit ist nicht nötig, nur das Zeitalter');
+  const pick = opts[0];
+  eq(useFreePick(S, 0, pick.k), null, 'Gratis-Tech genommen');
+  eq(has(p, pick.k), true, 'Technologie ist erforscht');
+  eq(freePick(p), null, 'Anspruch verbraucht');
+  // beim nächsten Wunderbau wieder
+  eq(buildWonder(S, 0, cap, 'mauer'), null, 'zweites Wunder gebaut');
+  eq(freePickOptions(S, 0).length > 0, true, 'erneut eine Gratis-Tech');
+  // Zeitaltergrenze prüfen: ein Feld, in dem nur die Antike freigeschaltet ist
+  const f = 2;   // Militär
+  const maxAge = unlockedAge(S, 0, f);
+  eq(freePickOptions(S, 0).filter(t => t.f === f).every(t => t.age <= maxAge), true,
+    'im Militärfeld nur bis zum freigeschalteten Zeitalter');
+}
+/* Zwei Ansprüche gleichzeitig: Raumfahrt und das Wunder selbst (Bibliothek) */
+{
+  const S = mkX('griechenland', { wonders: true }, ['raumfahrt']);
+  const p = S.players[0], cap = capitalOf(S, 0);
+  p.res = { sci: 0, food: 0, coins: 99 };
+  S.wpool[1] = ['bibliothek'];
+  eq(buildWonder(S, 0, cap, 'bibliothek'), null, 'Bibliothek gebaut');
+  eq(p.freePicks.length, 2, 'beide Ansprüche stehen in der Warteschlange');
+  const first = freePick(p).why;
+  eq(useFreePick(S, 0, freePickOptions(S, 0)[0].k), null, 'erster Anspruch genutzt');
+  eq(freePick(p) !== null && freePick(p).why !== first, true, 'der zweite Anspruch bleibt offen');
+  eq(useFreePick(S, 0, freePickOptions(S, 0)[0].k), null, 'zweiter Anspruch genutzt');
+  eq(freePick(p), null, 'danach ist die Warteschlange leer');
+}
+
+/* Raumfahrt bei Bots: sie würfeln die Gratis-Tech aus, aber nie die Singularität */
+{
+  const S = newGame({ seed: 31, wonders: true, players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })) });
+  const pi = 0, p = S.players[pi];
+  p.techs.raumfahrt = true;
+  FIELDS.forEach((_, f) => { techsIn(f, 3, S).forEach(t => { p.techs[t.k] = true; }); });  // Moderne überall
+  const before = Object.keys(p.techs).length;
+  buildWonder(S, pi, capitalOf(S, pi), poolOf(S, 1)[0], { free: true, noEffect: true });
+  eq(Object.keys(p.techs).length > before, true, 'der Bot erforscht eine Gratis-Tech');
+  eq(!p.techs.singularitaet, true, 'aber nicht die Singularität');
+  eq(!S.over, true, 'und gewinnt damit nicht');
+}
+
 /* ==================================================== Karte und Aufbau */
 {
   eq(MAPS[0].name.startsWith('Originalkarte'), true, 'die Originalkarte steht im Menü an erster Stelle');
@@ -801,19 +1012,83 @@ const setEvent = (S, k) => {
   eq(powerOf(S, 0), 2, 'der Armeezuschlag bleibt erhalten');
 }
 
-/* Wikinger "Beutezüge": Ertrag je Punkt Überlegenheit */
+/* Wikinger "Beutezüge": Angriffswert − Verteidigungswert je Ziel, Auszahlung nächste Runde */
 {
   const S = mkA('wikinger', 'kampfertrag');
-  S.players[0].power = 8;
+  S.players[0].power = 12;
+  const foe = capitalOf(S, 1);
+  const spots = neighbors(foe.r, foe.c).filter(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  S.armies.push({ id: 91, owner: 0, r: spots[0][0], c: spots[0][1], mp: 0, born: 0 });
+  const atk1 = attackValue(S, 0, 1), def = defenseValue(S, foe);
+  eq(raidYield(S, 0).sum, atk1 - def, 'eine Armee: Angriffswert − Verteidigungswert');
+  // zweite Armee erhöht den Angriffswert und damit die Beute
+  S.armies.push({ id: 92, owner: 0, r: spots[1][0], c: spots[1][1], mp: 0, born: 0 });
+  eq(raidYield(S, 0).sum, attackValue(S, 0, 2) - def, 'mehrere Armeen addieren sich im Angriffswert');
+  eq(raidYield(S, 0).sum > atk1 - def, true, 'die Beute wächst mit der zweiten Armee');
+  // Auszahlung: Kampfphase merkt sich den Ertrag, ausgezahlt wird zu Zugbeginn
+  const expect = raidYield(S, 0).sum;
+  S.cur = 0; combatPhase(S, 0);
+  eq(S.players[0].raidPending, expect, 'Kampfphase hält den Ertrag fest');
+  eq(S.players[0].res.coins < expect, true, 'im selben Zug noch nicht ausgezahlt');
+  const before = income(S, 0);
+  S.round++; beginTurn(S);
+  eq(S.players[0].res.coins, before.coins + expect, 'zu Beginn der nächsten Runde gutgeschrieben');
+  eq(S.players[0].res.sci, before.sci + expect, 'auch Wissenschaft');
+  eq(S.players[0].res.food, Math.max(0, before.food) + expect, 'auch Nahrung');
+  eq(S.players[0].raidPending, 0, 'der Anspruch ist verbraucht');
+}
+/* Beute auch für Felder mit gegnerischer Armee, verteidigende Armeen zählen mit */
+{
+  const S = mkA('wikinger', 'kampfertrag');
+  S.players[0].power = 20;
+  const cap = capitalOf(S, 0);
+  // eine gegnerische Armee weit weg von Städten, daneben zwei eigene
+  const far = within(cap.r, cap.c, 6).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) &&
+    !S.cities.some(x => hexDistance(x.r, x.c, r, c) <= 2));
+  const foeArmy = { id: 95, owner: 1, r: far[0], c: far[1], mp: 0, born: 0 };
+  S.armies.push(foeArmy);
+  const near = neighbors(far[0], far[1]).filter(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  S.armies.push({ id: 96, owner: 0, r: near[0][0], c: near[0][1], mp: 0, born: 0 });
+  const oneAtk = raidYield(S, 0).sum;
+  eq(oneAtk, attackValue(S, 0, 1) - armyDefenseValue(S, foeArmy), 'Feld mit gegnerischer Armee zählt genauso');
+  eq(oneAtk > 0, true, 'bei Überlegenheit gibt es Ertrag');
+  // eine zweite gegnerische Armee daneben: sie erhöht den Verteidigungswert des ersten
+  // Feldes und ist gleichzeitig selbst ein Ziel
+  const def1 = armyDefenseValue(S, foeArmy);
+  S.armies.push({ id: 97, owner: 1, r: near[1][0], c: near[1][1], mp: 0, born: 0 });
+  eq(armyDefenseValue(S, foeArmy), def1 + powerOf(S, 1),
+    'verteidigende Armeen zählen in den Verteidigungswert');
+  const parts = raidYield(S, 0).parts;
+  eq(parts.length, 2, 'jedes Feld mit gegnerischer Armee ist ein eigenes Ziel');
+  eq(parts.every(t => +t.split('+')[1] === oneAtk - powerOf(S, 1)),
+    true, 'je Ziel sinkt die Beute um den zusätzlichen Verteidiger');
+}
+/* ohne Überlegenheit kein Ertrag, ohne Fähigkeit gar keiner */
+{
+  const S = mkA('wikinger', 'kampfertrag');
+  S.players[0].power = 0;
   const foe = capitalOf(S, 1);
   const spot = neighbors(foe.r, foe.c).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
-  S.armies.push({ id: 91, owner: 0, r: spot[0], c: spot[1], mp: 0, born: 0 });
-  const def = defenseValue(S, foe);
-  eq(raidBonus(S, 0), 8 - def, 'Vorsprung gegenüber der Stadtverteidigung wird zum Ertrag');
+  S.armies.push({ id: 98, owner: 0, r: spot[0], c: spot[1], mp: 0, born: 0 });
+  eq(raidYield(S, 0).sum, 0, 'kein Vorsprung, kein Ertrag');
+  const B = mkA('wikinger', 'basis');
+  B.players[0].power = 20;
+  B.armies.push({ id: 99, owner: 0, r: spot[0], c: spot[1], mp: 0, born: 0 });
+  eq(raidYield(B, 0).sum, 0, 'ohne die Alternative gibt es keine Beute');
+  combatPhase(B, 0);
+  eq(!B.players[0].raidPending, true, 'und auch keinen Anspruch');
+}
+/* Beute ist kein Einkommen: sie steht in der Vorschau, nicht in der Summe */
+{
+  const S = mkA('wikinger', 'kampfertrag');
+  S.players[0].power = 12;
+  const foe = capitalOf(S, 1);
+  const spot = neighbors(foe.r, foe.c).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+  const plain = income(S, 0).coins;
+  S.armies.push({ id: 100, owner: 0, r: spot[0], c: spot[1], mp: 0, born: 0 });
   const b = incomeBreakdown(S, 0);
-  eq(b.extra.some(e => e.name === 'Beutezüge'), true, 'Beutezüge stehen in der Ertragsübersicht');
-  S.players[0].power = 0;
-  eq(raidBonus(S, 0), 0, 'ohne Vorsprung kein Ertrag');
+  eq(b.total[2], plain, 'die Beute verändert das Einkommen nicht');
+  eq(b.preview.some(e => /Beutez/.test(e.name)), true, 'sie erscheint als Vorschauzeile');
 }
 
 /* Griechenland: Alternativen ersetzen den Kostenrabatt */
@@ -834,9 +1109,13 @@ const setEvent = (S, k) => {
   const p = S.players[0];
   p.avail.buchdruck = true; p.res = { sci: 99, food: 0, coins: 0 };
   eq(doResearch(S, 0, 'buchdruck'), null, 'Mittelalter-Tech erforscht');
-  eq(p.backPick, 0, 'Rückschau erlaubt ein früheres Zeitalter (Antike)');
+  eq([p.backPick.age, p.backPick.f], [0, TECH_BY_KEY.buchdruck.f],
+    'Rückschau erlaubt ein früheres Zeitalter im selben Feld');
   const opts = backPickOptions(S, 0);
   eq(opts.every(t => t.age === 0), true, 'nur Techs der Antike zur Wahl');
+  eq(opts.every(t => t.f === TECH_BY_KEY.buchdruck.f), true,
+    'nur Techs aus demselben Technologiefeld');
+  eq(opts.length > 0, true, 'es bleibt eine Auswahl übrig');
   eq(opts.some(t => !p.avail[t.k]), true, 'auch nicht freigeschaltete Techs zur Wahl');
   eq(useBackPick(S, 0, opts[0].k), null, 'Gratis-Tech aus der Rückschau');
   eq(backPickOptions(S, 0).length, 0, 'keine Kette – der Anspruch ist verbraucht');
@@ -877,6 +1156,8 @@ const setEvent = (S, k) => {
 {
   const S = mkA('russland', 'siedler');
   const cap = capitalOf(S, 0);
+  eq(cap.pop, 2, 'Siedlertrecks: auch die Hauptstadt startet mit 2 Bevölkerung');
+  eq(capitalOf(mkA('russland', 'basis'), 0).pop, 1, 'mit Grundfähigkeit startet sie mit 1');
   const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
   S.players[0].res = { sci: 0, food: 99, coins: 99 };
   eq(foundCity(S, 0, spot[0], spot[1]), null, 'Stadt gegründet');
@@ -1149,11 +1430,11 @@ const setEvent = (S, k) => {
   eq(freePickOptions(S, 0).some(t => !p.avail[t.k]), true, 'Bibliothek ignoriert die Verfügbarkeit');
   const pick = freePickOptions(S, 0)[0];
   eq(useFreePick(S, 0, pick.k), null, 'Gratis-Tech aus der Bibliothek');
-  eq(p.freePick, null, 'Anspruch verbraucht');
+  eq(freePick(p), null, 'Anspruch verbraucht');
   p.avail.schrift = true;
   applyWonderEffect(S, 0, cap, WONDER_BY_KEY.oxford);
   eq(freePickOptions(S, 0).every(t => p.avail[t.k]), true, 'Oxford nur auf verfügbare Techs');
-  eq(p.freePick.n, 2, 'Oxford gibt zwei Gratis-Techs');
+  eq(freePick(p).n, 2, 'Oxford gibt zwei Gratis-Techs');
 }
 /* Erdbeben, Stonehenge, Eroberung, Zerstörung */
 {
@@ -1324,8 +1605,7 @@ const setEvent = (S, k) => {
         .forEach(t => { if (available(S, pi, 'sci') >= techCost(S, pi, t)) doResearch(S, pi, t.k); });
       freeTechOptions(S, pi).slice(0, 1).forEach(t => useFreeTech(S, pi, t.k));
       backPickOptions(S, pi).slice(0, 1).forEach(t => useBackPick(S, pi, t.k));
-      while (freePickOptions(S, pi).length && S.players[pi].freePick)
-        useFreePick(S, pi, freePickOptions(S, pi)[0].k);
+      while (freePickOptions(S, pi).length) useFreePick(S, pi, freePickOptions(S, pi)[0].k);
       for (const city of citiesOf(S, pi))
         for (const w of availableWonders(S))
           if (!buildWonder(S, pi, city, w.k)) { built++; break; }

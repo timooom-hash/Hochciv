@@ -220,6 +220,8 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
 .tech.obsolete .eff{text-decoration:none;font-style:italic}
 .res.food{border:0;background:none;cursor:pointer}
 
+.yrow.prev{color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--rule)}
+
 </style>
 </head>
 <body>
@@ -364,6 +366,7 @@ const TECHS = [
   { k: 'biologie', n: 'Biologie', f: 0, c: 15, e: 'Grasland: +1 Wissenschaft' },
   { k: 'computertechnik', n: 'Computertechnik', f: 0, c: 17, e: '1:1 Münzen → Wissenschaft' },
   { k: 'gentechnik', n: 'Gentechnik', f: 0, c: 18, e: 'Wissenschaft nutzen um Stadt zu füttern' },
+  { k: 'raumfahrt', n: 'Raumfahrt', f: 0, c: 19, wo: true, e: 'Bei jedem Wunderbau eine Technologie gratis' },
   { k: 'ki', n: 'Künstliche Intelligenz', f: 0, c: 20, e: 'Wald: +1 Wissenschaft' },
   // Produktion
   { k: 'landwirtschaft', n: 'Landwirtschaft', f: 1, c: 1, e: 'Grasland: +1 Nahrung' },
@@ -373,6 +376,7 @@ const TECHS = [
   { k: 'bewaesserung', n: 'Bewässerung', f: 1, c: 5, e: 'Gebirge: +1 Nahrung' },
   { k: 'segeln', n: 'Segeln', f: 1, c: 7, e: 'Meer: +1 Nahrung' },
   { k: 'muehlentechnik', n: 'Mühlentechnik', f: 1, c: 8, e: 'Fluss: +1 Münze' },
+  { k: 'baukraene', n: 'Baukräne', f: 1, c: 9, wo: true, e: 'Weltwunder kosten 2/4/6/8/… weniger' },
   { k: 'gilden', n: 'Gilden', f: 1, c: 10, e: '1:1 Münzen → Nahrung' },
   { k: 'dampfmaschine', n: 'Dampfmaschine', f: 1, c: 11, e: 'Keine Münzkosten für Stadterweiterung' },
   { k: 'eisenbahn', n: 'Eisenbahn', f: 1, c: 13, e: 'Eisenbahn' },
@@ -389,6 +393,7 @@ const TECHS = [
   { k: 'stadtmauern', n: 'Stadtmauern', f: 2, c: 5, e: 'Städte haben +5 Verteidigung' },
   { k: 'burgenbau', n: 'Burgenbau', f: 2, c: 7, e: 'Städte enthalten unbewegliche Armee' },
   { k: 'stahl', n: 'Stahl', f: 2, c: 8, e: 'Machtverlust = 1/3' },
+  { k: 'militaerlogistik', n: 'Militärlogistik', f: 2, c: 6, wo: true, e: '+1 Bewegungsweite je eigenem Weltwunder' },
   { k: 'schiesspulver', n: 'Schießpulver', f: 2, c: 10, e: 'Kontrollzone' },
   { k: 'gewehre', n: 'Gewehre', f: 2, c: 11, e: '3 Münzen = 1 Macht' },
   { k: 'panzerschiff', n: 'Panzerschiff', f: 2, c: 13, e: 'Bewegung = 6, Bewegung auf und über Wasser' },
@@ -401,6 +406,7 @@ const TECHS = [
   // Spezial
   { k: 'navigation', n: 'Navigation', f: 3, c: 1, e: 'Bewegung über Wasser' },
   { k: 'demokratie', n: 'Demokratie', f: 3, c: 3, e: 'Armeekosten = 4 × Anzahl' },
+  { k: 'wallfahrt', n: 'Wallfahrt', f: 3, c: 4, wo: true, e: 'Je eigenem Weltwunder +3 auf alle Erträge' },
   { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 10 Münzen · wird in der Moderne obsolet' },
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
   { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (3× Kosten in Münzen)' },
@@ -435,13 +441,17 @@ const SLAVERY_OBSOLETE_IN_MODERN = true;
 const TECHS_ACTIVE = TECHS;
 const TECH_BY_KEY = {};
 TECHS_ACTIVE.forEach(t => { TECH_BY_KEY[t.k] = t; });
+/* Technologien mit `wo: true` gehören zur Weltwunder-Erweiterung und existieren nur in
+   einer Partie mit Weltwundern. Ohne Spielstand (z. B. in Tabellen) zählt die Grundliste. */
+function techActive(S, t) { return !t.wo || !!(S && S.wo); }
+function techPool(S) { return TECHS_ACTIVE.filter(t => techActive(S, t)); }
 const SINGULARITY = {
   k: 'singularitaet', n: 'Singularität', c: SINGULARITY_BASE,
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
 };
 // Techs je Feld und Zeitalter, nach Kosten sortiert (billigere zuerst)
-function techsIn(field, age) {
-  return TECHS_ACTIVE.filter(t => t.f === field && t.age === age).sort((a, b) => a.c - b.c);
+function techsIn(field, age, S) {
+  return techPool(S).filter(t => t.f === field && t.age === age).sort((a, b) => a.c - b.c);
 }
 
 /* ---------------------------------------------------------------- Zivilisationen */
@@ -854,7 +864,9 @@ function newGame(cfg) {
   S.players.forEach((p, i) => {
     const pos = S.map.capitals[p.civ];
     if (!pos) return;
-    S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: 1, cap: true, grown: 0, born: 0 });
+    // Russland "Siedlertrecks": auch die Hauptstadt startet mit 2 Bevölkerung
+    const startPop = isAbil(p, 'siedler') ? 2 : 1;
+    S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: startPop, cap: true, grown: 0, born: 0 });
     if (p.civ === 'wikinger' && isAbil(p, 'basis')) {   // Wikinger: kostenlose Armee am Start
       const spot = neighbors(pos[0], pos[1]).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
       if (spot) S.armies.push({ id: S.nextId++, owner: i, r: spot[0], c: spot[1], mp: 0, born: 0 });
@@ -882,7 +894,7 @@ function availBonus(p) { return has(p, 'philosophie') ? 1 : 0; }
 function rollAvailability(S, pi, field, age) {
   const p = S.players[pi];
   if (age > 3) return;
-  const list = techsIn(field, age);
+  const list = techsIn(field, age, S);
   if (!list.length) return;
   const bonus = availBonus(p);
   let any = false;
@@ -900,11 +912,11 @@ function rollAvailability(S, pi, field, age) {
     (list.filter(t => p.avail[t.k]).map(t => t.n).join(', ') || '—'));
 }
 function singularityReady(p) {
-  return FIELDS.every((_, f) => TECHS_ACTIVE.some(t => t.f === f && t.age === 3 && p.techs[t.k]));
+  return FIELDS.every((_, f) => TECHS.some(t => t.f === f && t.age === 3 && p.techs[t.k]));
 }
 function researchable(S, pi) {
   const p = S.players[pi], out = [];
-  for (const t of TECHS_ACTIVE) if (p.avail[t.k] && !p.techs[t.k]) out.push(t);
+  for (const t of techPool(S)) if (p.avail[t.k] && !p.techs[t.k]) out.push(t);
   if (singularityReady(p) && !p.techs.singularitaet) out.push(SINGULARITY);
   return out;
 }
@@ -913,6 +925,7 @@ function doResearch(S, pi, tk) {
   if (evActive(S, pi, 'dunkles_zeitalter')) return 'Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.';
   const tech = tk === 'singularitaet' ? SINGULARITY : TECH_BY_KEY[tk];
   if (!tech) return 'Unbekannte Technologie.';
+  if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   const cost = techCost(S, pi, tech);
   if (available(S, pi, 'sci') < cost) return 'Nicht genug Wissenschaft.';
   pay(S, pi, 'sci', cost);
@@ -920,7 +933,8 @@ function doResearch(S, pi, tk) {
   if (tk === 'singularitaet') { S.over = { winner: pi, how: 'Forschungssieg (Singularität)' }; return null; }
   // Griechenland "Rückschau": zusätzlich eine beliebige Technologie eines früheren
   // Zeitalters gratis. Keine Kette – die Gratis-Tech löst das nicht erneut aus.
-  if (isAbil(p, 'rueckschau') && tech.age > 0) p.backPick = tech.age - 1;
+  // nur ein früheres Zeitalter im GLEICHEN Technologiefeld
+  if (isAbil(p, 'rueckschau') && tech.age > 0) p.backPick = { age: tech.age - 1, f: tech.f };
   return null;
 }
 /* Technologie eintragen (bezahlt oder gratis) samt Folgewirkungen. */
@@ -935,7 +949,7 @@ function applyTech(S, pi, tech, note) {
   const gained = moveAllowance(S, pi) - rangeBefore;
   if (gained > 0) for (const a of armiesOf(S, pi)) a.mp += gained;
   // Erste Technologie in Zeitalter+Feld → nächstes Zeitalter auswürfeln
-  const sameAgeField = TECHS_ACTIVE.filter(t => t.f === tech.f && t.age === tech.age && p.techs[t.k]);
+  const sameAgeField = techPool(S).filter(t => t.f === tech.f && t.age === tech.age && p.techs[t.k]);
   if (sameAgeField.length === 1) rollAvailability(S, pi, tech.f, tech.age + 1);
 }
 /* Kostenlose Forschung: Griechenland-Fähigkeiten und die Wunder Bibliothek/Oxford.
@@ -944,6 +958,7 @@ function grantTech(S, pi, tk, quelle) {
   const p = S.players[pi];
   const tech = TECH_BY_KEY[tk];
   if (!tech) return 'Unbekannte Technologie.';
+  if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   if (p.techs[tk]) return 'Schon erforscht.';
   applyTech(S, pi, tech, quelle);
   return null;
@@ -954,7 +969,7 @@ function freeTechOptions(S, pi) {
   const p = S.players[pi];
   if (!isAbil(p, 'gratistech') || p.freeTechUsed === S.round) return [];
   if (evActive(S, pi, 'dunkles_zeitalter')) return [];
-  return TECHS_ACTIVE.filter(t => t.age <= 2 && p.avail[t.k] && !p.techs[t.k]);
+  return techPool(S).filter(t => t.age <= 2 && p.avail[t.k] && !p.techs[t.k]);
 }
 function useFreeTech(S, pi, tk) {
   const p = S.players[pi];
@@ -967,8 +982,9 @@ function useFreeTech(S, pi, tk) {
 /* Griechenland "Rückschau": beliebige Tech eines früheren Zeitalters, auch nicht freigeschaltet. */
 function backPickOptions(S, pi) {
   const p = S.players[pi];
-  if (p.backPick == null) return [];
-  return TECHS_ACTIVE.filter(t => t.age <= p.backPick && !p.techs[t.k]);
+  if (!p.backPick) return [];
+  return techPool(S).filter(t =>
+    t.f === p.backPick.f && t.age <= p.backPick.age && !p.techs[t.k]);
 }
 function useBackPick(S, pi, tk) {
   const p = S.players[pi];
@@ -1044,27 +1060,42 @@ function controlledTiles(S, pi) {
 function cityAtSea(S, city) {
   return neighbors(city.r, city.c).some(([r, c]) => terrainAt(S, r, c) === 'M');
 }
-/* Wikinger "Beutezüge": je Armee, die neben einer gegnerischen Armee oder Stadt steht,
-   1 Wissenschaft/Nahrung/Münze pro Punkt Überlegenheit. Gegen Städte zählt der
-   Verteidigungswert, gegen Armeen der Machtwert. Mehrere Nachbarn: der größte Vorsprung.
-   Bewertet wird beim Einkommen (Zugbeginn) – Ressourcen verfallen am Zugende, ein
-   Ertrag in der Kampfphase wäre nicht mehr ausgebbar. */
-function raidBonus(S, pi) {
-  const p = S.players[pi];
-  if (!isAbil(p, 'kampfertrag')) return 0;
-  const mine = powerOf(S, pi);
-  let sum = 0;
-  for (const a of armiesOf(S, pi)) {
-    let best = 0;
-    for (const [r, c] of neighbors(a.r, a.c)) {
-      const ec = cityAt(S, r, c), ea = armyAt(S, r, c);
-      if (ec && ec.owner !== pi) best = Math.max(best, mine - defenseValue(S, ec));
-      if (ea && ea.owner !== pi) best = Math.max(best, mine - powerOf(S, ea.owner));
-    }
-    if (best > 0) sum += best;
-  }
-  return sum;
+/* Wikinger "Beutezüge": Am Ende des eigenen Zuges wird für jede gegnerische Stadt und
+   für jedes Feld mit gegnerischer Armee, an denen eigene Armeen stehen, gerechnet
+   Angriffswert − Verteidigungswert. Positive Differenzen ergeben zusammen den Ertrag, der
+   zu Beginn der nächsten Runde als Wissenschaft, Nahrung und Münzen ausgezahlt wird.
+   Es sind dieselben Werte wie im Kampf: mehrere angreifende Armeen addieren sich im
+   Angriffswert, mehrere verteidigende im Verteidigungswert. Gerechnet wird VOR den
+   Belagerungen, der Ertrag entsteht also auch für eine Stadt, die im selben Zug fällt. */
+function armyDefenseValue(S, army) {
+  const oi = army.owner;
+  const rng = projectRange(S, oi);
+  let helpers = 0;
+  for (const a of armiesOf(S, oi)) if (hexDistance(a.r, a.c, army.r, army.c) <= rng) helpers++;
+  return powerOf(S, oi) * (COMBAT.defenseStacks ? helpers : 1);
 }
+function raidYield(S, pi) {
+  const p = S.players[pi];
+  const out = { sum: 0, parts: [] };
+  if (!isAbil(p, 'kampfertrag')) return out;
+  const rng = attackRange(S, pi);
+  for (const city of S.cities) {
+    if (city.owner === pi) continue;
+    const atk = attackersOn(S, pi, city);
+    if (!atk.length) continue;
+    const diff = attackValue(S, pi, atk.length) - defenseValue(S, city);
+    if (diff > 0) { out.sum += diff; out.parts.push(`Stadt ${city.r}/${city.c}: +${diff}`); }
+  }
+  for (const enemy of S.armies) {
+    if (enemy.owner === pi) continue;
+    const atk = armiesOf(S, pi).filter(a => hexDistance(a.r, a.c, enemy.r, enemy.c) <= rng);
+    if (!atk.length) continue;
+    const diff = attackValue(S, pi, atk.length) - armyDefenseValue(S, enemy);
+    if (diff > 0) { out.sum += diff; out.parts.push(`Armee ${enemy.r}/${enemy.c}: +${diff}`); }
+  }
+  return out;
+}
+
 /* Aufschlüsselung des Einkommens für die Übersicht: je Geländetyp die Anzahl
    kontrollierter Felder und ihr Gesamtertrag, dazu Sonderzeilen, die Stadtbevölkerung
    und die Summe. Die Summe ist per Definition das Einkommen – income() liest sie hier ab,
@@ -1105,8 +1136,11 @@ function incomeBreakdown(S, pi) {
     pyy[2] += py[2] * city.pop * mult;
   }
   if (sea) extra.push({ name: 'Städte am Meer', glyph: '⚓', count: sea, y: [2 * sea, 2 * sea, 2 * sea] });
-  const raid = raidBonus(S, pi);
-  if (raid) extra.push({ name: 'Beutezüge', glyph: '⚔︎', count: null, y: [raid, raid, raid] });
+  // Wallfahrt (Erweiterung): je eigenem Weltwunder +3 auf alle drei Erträge
+  if (has(p, 'wallfahrt')) {
+    const w = wondersOf(S, pi).length;
+    if (w) extra.push({ name: 'Wallfahrt', glyph: '⛪', count: w, y: [3 * w, 3 * w, 3 * w] });
+  }
   // Summe, danach die Ereignis- und Wundereffekte auf das Gesamteinkommen
   const total = [0, 0, 0];
   for (const r of rows) for (let i = 0; i < 3; i++) total[i] += r.y[i];
@@ -1115,7 +1149,12 @@ function incomeBreakdown(S, pi) {
   if (evActive(S, pi, 'hungersnot')) total[1] = 0;        // keine Nahrung produziert
   if (evActive(S, pi, 'wirtschaftskrise')) total[2] = 0;  // keine Münzen produziert
   if (p.doubleIncome === S.round) for (let i = 0; i < 3; i++) total[i] *= 2;   // Taj Mahal
-  return { rows, extra, pop: { count: pop, y: pyy }, total };
+  // Vorschau, kein Einkommen: was die Armeen bei jetziger Stellung zu Zugende erbeuten
+  const preview = [];
+  const raid = raidYield(S, pi);
+  if (raid.sum) preview.push({ name: 'Beutezüge zu Zugende', glyph: '⚔︎', y: [raid.sum, raid.sum, raid.sum] });
+  if (p.raidPending) preview.push({ name: 'Beute (schon gutgeschrieben)', glyph: '⚔︎', y: [p.raidPending, p.raidPending, p.raidPending] });
+  return { rows, extra, preview, pop: { count: pop, y: pyy }, total };
 }
 function income(S, pi) {
   const t = incomeBreakdown(S, pi).total;
@@ -1242,6 +1281,13 @@ function beginTurn(S) {
     p.power -= loss;
     if (loss) log(S, 'info', `Macht −${loss} (1/${div}, aufgerundet) → ${powerOf(S, S.cur)}.`);
   }
+  // 3 Beute des letzten Zuges auszahlen (Wikinger-Alternative "Beutezüge")
+  if (p.raidPending > 0) {
+    const n = p.raidPending;
+    p.res.sci += n; p.res.food += n; p.res.coins += n;
+    log(S, 'act', `Beutezüge des letzten Zuges: je ${n} Wissenschaft, Nahrung und Münzen.`);
+  }
+  p.raidPending = 0;
   // Zustände zurücksetzen
   S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
   S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
@@ -1251,7 +1297,9 @@ function beginTurn(S) {
 /* ------------------------------------------------------------ Bewegung */
 function moveAllowance(S, pi) {
   const p = S.players[pi];
-  return has(p, 'luftwaffe') ? 9 : has(p, 'panzerschiff') ? 6 : 3;
+  const base = has(p, 'luftwaffe') ? 9 : has(p, 'panzerschiff') ? 6 : 3;
+  // Militärlogistik (Erweiterung): jedes eigene Weltwunder gibt +1 Bewegungsweite
+  return base + (has(p, 'militaerlogistik') ? wondersOf(S, pi).length : 0);
 }
 // Darf das Feld auf dem Weg durchquert werden? Navigation/Panzerschiff/Luftwaffe erlauben Wasser.
 function canPass(S, pi, r, c) {
@@ -1427,12 +1475,21 @@ function foundCost(S, pi, r, c) {
   const n = citiesOf(S, pi).length;
   let base = n * (n + 1) / 2;                        // 1/3/6/10/15 …
   if (isAbil(p, 'gruenden')) base = 0;               // England: keine Basiskosten
-  if (has(p, 'kartografie')) return base;
+  // Gründen kostet immer mindestens 1 Nahrung – sonst wäre es mit Englands Alternative
+  // plus Kartografie (keine Distanzkosten) vollständig gratis.
+  if (has(p, 'kartografie')) return Math.max(1, base);
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
-  if (!cap) return base;
+  if (!cap) return Math.max(1, base);
   const dist = pathSteps(cap.r, cap.c, r, c,
     (rr, cc) => { const t = terrainAt(S, rr, cc); return t && (TERRAIN[t].land || has(p, 'navigation') || has(p, 'panzerschiff')); });
-  return base + (dist == null ? hexDistance(cap.r, cap.c, r, c) : dist);
+  return Math.max(1, base + (dist == null ? hexDistance(cap.r, cap.c, r, c) : dist));
+}
+/* Steht auf einem Nachbarfeld eine fremde Armee? Dort wird nicht gesiedelt. */
+function enemyArmyAdjacent(S, pi, r, c) {
+  return neighbors(r, c).some(([nr, nc]) => {
+    const a = armyAt(S, nr, nc);
+    return a && a.owner !== pi;
+  });
 }
 function canFound(S, pi, r, c) {
   const t = terrainAt(S, r, c);
@@ -1440,6 +1497,7 @@ function canFound(S, pi, r, c) {
   if (!TERRAIN[t].land) return 'Nicht auf Meer.';
   if (TERRAIN[t].block) return 'Nicht auf einem Vulkan.';
   if (armyAt(S, r, c)) return 'Feld besetzt.';
+  if (enemyArmyAdjacent(S, pi, r, c)) return 'Nicht direkt neben einer gegnerischen Armee.';
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return 'Mindestens 3 Felder Abstand zu allen Städten.';
   const cost = foundCost(S, pi, r, c);
   if (available(S, pi, 'food') < cost) return `Zu wenig Nahrung (${cost} nötig).`;
@@ -1510,7 +1568,7 @@ function buildRoad(S, pi, r, c, target) {
   return null;
 }
 function hasModernTech(p) {
-  return TECHS_ACTIVE.some(t => t.age === 3 && p.techs[t.k]);
+  return TECHS.some(t => t.age === 3 && p.techs[t.k]);
 }
 function slaveryUsable(p) {
   if (!has(p, 'sklaverei')) return false;
@@ -1598,7 +1656,7 @@ function copyTech(S, pi, tk, mode) {
     p.techs[tk] = true;
     log(S, 'act', `${civOf(p).n}: ${opt.tech.n} kopiert (${opt.paidCoins} Münzen).`);
   }
-  const same = TECHS_ACTIVE.filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
+  const same = techPool(S).filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
   if (same.length === 1) rollAvailability(S, pi, opt.tech.f, opt.tech.age + 1);
   return null;
 }
@@ -1653,6 +1711,12 @@ function defenseValue(S, city) {
 }
 function combatPhase(S, pi) {
   const p = S.players[pi];
+  // Wikinger "Beutezüge": Stand vor den Belagerungen festhalten, Auszahlung nächste Runde
+  if (isAbil(p, 'kampfertrag')) {
+    const raid = raidYield(S, pi);
+    p.raidPending = raid.sum;
+    if (raid.sum) log(S, 'act', `${civOf(p).n}: Beutezüge ergeben ${raid.sum} (${raid.parts.join(', ')}) – gutgeschrieben zu Beginn der nächsten Runde.`);
+  }
   // Belagerungen
   for (const city of S.cities.slice()) {
     if (city.owner === pi) continue;
@@ -1981,8 +2045,14 @@ function wonderCounts(S, pi) {
   return c;
 }
 /* Kosten: 10 für das erste eigene Wunder, dann 20/30/40 … Zerstörte und verlorene
-   Wunder zählen nicht mehr mit, der Preis sinkt also wieder. */
-function wonderCost(S, pi) { return WONDER_STEP * (wondersOf(S, pi).length + 1); }
+   Wunder zählen nicht mehr mit, der Preis sinkt also wieder.
+   Baukräne senkt den Preis des 1./2./3./… Wunders um 2/4/6/… – also 8/16/24/… statt
+   10/20/30/…; das Muster setzt sich über das sechste Wunder hinaus fort. */
+function wonderCost(S, pi) {
+  const idx = wondersOf(S, pi).length + 1;
+  const step = has(S.players[pi], 'baukraene') ? WONDER_STEP - 2 : WONDER_STEP;
+  return step * idx;
+}
 /* Pyramidenregel: Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. */
 function wonderLevelOk(S, pi, lvl) {
   if (lvl === 1) return true;
@@ -2032,10 +2102,23 @@ function buildWonder(S, pi, city, wk, opts) {
   const p = S.players[pi], w = WONDER_BY_KEY[wk];
   let cost = 0;
   if (!(opts && opts.free)) { cost = wonderCost(S, pi); pay(S, pi, 'coins', cost); }
+  const rangeBefore = moveAllowance(S, pi);
   S.wonders.push({ k: wk, lvl: w.lvl, owner: pi, cityId: city.id, r: city.r, c: city.c });
   S.wpool[w.lvl] = poolOf(S, w.lvl).filter(k => k !== wk);
   refillPool(S, w.lvl);
   log(S, 'act', `${civOf(p).n}: ${w.n} gebaut (Stufe ${w.lvl}${cost ? `, ${cost} Münzen` : ''}).`);
+  // Militärlogistik: die größere Reichweite wirkt sofort, wie bei einem Reichweitensprung
+  const gained = moveAllowance(S, pi) - rangeBefore;
+  if (gained > 0) for (const a of armiesOf(S, pi)) a.mp += gained;
+  // Raumfahrt: bei jedem Wunderbau eine Technologie gratis (kein neues Zeitalter,
+  // keine Singularität). Bots würfeln sie nach den normalen Bot-Forschungsregeln aus.
+  if (has(p, 'raumfahrt')) {
+    if (p.kind === 'bot') botResearch(S, pi, [], true);
+    else {
+      addFreePick(S, pi, { n: 1, unlockedOnly: true, why: 'Raumfahrt' });
+      log(S, 'info', `${civOf(p).n}: Raumfahrt – eine Technologie gratis erforschbar.`);
+    }
+  }
   if (!(opts && opts.noEffect)) applyWonderEffect(S, pi, city, w);
   if (w.lvl === 3) {
     p.cultureWin = S.round;
@@ -2048,10 +2131,10 @@ function applyWonderEffect(S, pi, city, w) {
   const p = S.players[pi];
   switch (w.k) {
     case 'bibliothek':
-      p.freePick = { n: 1, maxAge: 1, any: true, why: 'Die große Bibliothek' };
+      addFreePick(S, pi, { n: 1, maxAge: 1, why: 'Die große Bibliothek' });
       break;
     case 'oxford':
-      p.freePick = { n: 2, availOnly: true, why: 'Universität von Oxford' };
+      addFreePick(S, pi, { n: 2, availOnly: true, why: 'Universität von Oxford' });
       break;
     case 'gaerten':
       for (const c of citiesOf(S, pi)) growFree(S, pi, c, 1, 'Hängende Gärten');
@@ -2091,23 +2174,47 @@ function applyWonderEffect(S, pi, city, w) {
   }
 }
 /* Kostenlose Forschung aus Wundern (Bibliothek/Oxford). */
+/* Höchstes Zeitalter, das ein Reich in diesem Technologiefeld freigeschaltet hat:
+   ein Zeitalter gilt als freigeschaltet, sobald dort eine Technologie verfügbar oder
+   erforscht ist. Bots führen kein avail, bei ihnen zählen die erforschten Techs. */
+function unlockedAge(S, pi, field) {
+  const p = S.players[pi];
+  let best = 0;
+  for (const t of techPool(S))
+    if (t.f === field && (p.avail[t.k] || p.techs[t.k]) && t.age > best) best = t.age;
+  return best;
+}
+/* Offene Ansprüche auf kostenlose Forschung. Es können mehrere gleichzeitig sein –
+   ein Wunderbau kann über Raumfahrt und über das Wunder selbst (Bibliothek, Oxford)
+   zugleich einen Anspruch auslösen. Sie werden der Reihe nach abgearbeitet. */
+function addFreePick(S, pi, claim) {
+  const p = S.players[pi];
+  (p.freePicks = p.freePicks || []).push(claim);
+}
+function freePick(p) {
+  return (p.freePicks || []).find(c => c.n > 0) || null;
+}
 function freePickOptions(S, pi) {
   const p = S.players[pi];
-  if (!p.freePick || p.freePick.n <= 0) return [];
-  return TECHS_ACTIVE.filter(t => {
+  const pick = freePick(p);
+  if (!pick) return [];
+  return techPool(S).filter(t => {
     if (p.techs[t.k]) return false;
-    if (p.freePick.maxAge != null && t.age > p.freePick.maxAge) return false;
-    if (p.freePick.availOnly && !p.avail[t.k]) return false;
+    if (pick.maxAge != null && t.age > pick.maxAge) return false;
+    if (pick.availOnly && !p.avail[t.k]) return false;
+    // Raumfahrt: kein Zeitalter, das in diesem Feld noch nicht freigeschaltet ist
+    if (pick.unlockedOnly && t.age > unlockedAge(S, pi, t.f)) return false;
     return true;
   });
 }
 function useFreePick(S, pi, tk) {
   const p = S.players[pi];
-  if (!freePickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
-  const err = grantTech(S, pi, tk, p.freePick.why);
+  const pick = freePick(p);
+  if (!pick || !freePickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
+  const err = grantTech(S, pi, tk, pick.why);
   if (err) return err;
-  p.freePick.n--;
-  if (p.freePick.n <= 0) p.freePick = null;
+  pick.n--;
+  p.freePicks = p.freePicks.filter(c => c.n > 0);
   return null;
 }
 /* Erdbeben: ein zufälliges eigenes Wunder wird zerstört und ist für immer weg. */
@@ -2216,10 +2323,13 @@ function botTry(S, p, why) {
   const v = d6(S, `${why} (${need}+)`);
   return v >= need;
 }
-function settleable(S, r, c) {
+/* Bots siedeln nach genau denselben Regeln wie Menschen (canFound), nur ohne
+   Kostenprüfung – Bots zahlen nichts. */
+function settleable(S, pi, r, c) {
   const t = terrainAt(S, r, c);
-  if (!t || !TERRAIN[t].land) return false;
+  if (!t || !TERRAIN[t].land || TERRAIN[t].block) return false;   // kein Meer, kein Vulkan
   if (armyAt(S, r, c)) return false;
+  if (enemyArmyAdjacent(S, pi, r, c)) return false;               // nicht neben fremden Armeen
   return !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3);
 }
 // Bots bewegen sich nach genau denselben Regeln wie Menschen.
@@ -2266,28 +2376,84 @@ function botTurn(S, pi) {
 }
 
 /* ---------------------------------------------------- Siedler (Zufallswanderung) */
+/* Siedlerbewegung nach den Bot-Regeln des Regelhefts (Schritte 1–7):
+   Der Siedler zieht auf das durch Bewegung erreichbare siedelbare Feld, das der
+   Hauptstadt am nächsten liegt; bei mehreren gleich nahen wird ausgewürfelt. Steht er
+   auf einem siedelbaren Feld, würfelt er: bei 3+ siedelt er, sonst zieht er ein Feld in
+   eine ausgewürfelte Richtung und prüft erneut. Er geht nie direkt zurück, betritt Meer
+   nur mit passender Technologie, und trifft er auf eine eigene Stadt, beginnt er wieder
+   beim Zug zum nächstgelegenen siedelbaren Feld. */
+function settleDistances(S, pi, fromR, fromC) {
+  // Geländedistanz vom Startfeld aus, mit den Bewegungsregeln des Bots
+  const dist = new Map([[key(fromR, fromC), 0]]);
+  let front = [[fromR, fromC]];
+  while (front.length) {
+    const next = [];
+    for (const [r, c] of front) {
+      const d = dist.get(key(r, c));
+      for (const [nr, nc] of neighbors(r, c)) {
+        const k = key(nr, nc);
+        if (dist.has(k)) continue;
+        if (!botCanEnter(S, pi, nr, nc)) continue;
+        dist.set(k, d + 1);
+        next.push([nr, nc]);
+      }
+    }
+    front = next;
+  }
+  return dist;
+}
+/* Die erreichbaren siedelbaren Felder mit der kleinsten Distanz zur Hauptstadt. */
+function nearestSettleSpots(S, pi, capital) {
+  const dist = settleDistances(S, pi, capital.r, capital.c);
+  let best = Infinity, out = [];
+  for (const [k, d] of dist) {
+    const [r, c] = unkey(k);
+    if (!settleable(S, pi, r, c)) continue;
+    if (d < best) { best = d; out = [[r, c]]; }
+    else if (d === best) out.push([r, c]);
+  }
+  return out;
+}
 function botSettle(S, pi, capital) {
   const p = S.players[pi];
-  let r = capital.r, c = capital.c, prev = null, first = true;
+  let r = capital.r, c = capital.c, prev = null;
+  // Schritte 2–3: zum nächstgelegenen siedelbaren Feld, Gleichstände auswürfeln
+  const goToNearest = () => {
+    const spots = nearestSettleSpots(S, pi, capital);
+    if (!spots.length) return false;
+    let pick = spots[0];
+    if (spots.length > 1) {
+      let idx = 0;
+      do { idx = d6(S, `Siedlerziel auswürfeln (1–${Math.min(spots.length, 6)})`); } while (idx > spots.length);
+      pick = spots[idx - 1];
+    }
+    r = pick[0]; c = pick[1]; prev = null;
+    log(S, 'info', `${civOf(p).n}: Siedler zieht auf ${r}/${c} (nächstes siedelbares Feld).`);
+    return true;
+  };
+  if (!goToNearest()) { log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`); return; }
   for (let step = 0; step < 40; step++) {
-    if (settleable(S, r, c) && !(r === capital.r && c === capital.c)) {
+    // Schritt 5: auf siedelbarem Feld würfeln, bei 3+ siedeln
+    if (settleable(S, pi, r, c)) {
       if (d6(S, 'Siedeln? (3+)') >= 3) {
-        S.cities.push({ id: S.nextId++, owner: pi, r, c, pop: 1, cap: false, grown: 0, born: S.round });
+        const pop = isAbil(p, 'siedler') ? 2 : 1;
+        S.cities.push({ id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round });
         log(S, 'act', `${civOf(p).n}: Siedler gründet Stadt auf ${r}/${c}.`);
         return;
       }
     }
+    // Schritt 6: ein Feld in ausgewürfelter Richtung
     const dir = d6(S, 'Richtung ' + DIR_NAMES.map((n, i) => (i + 1) + '=' + n[0] + n[1].toLowerCase()).join(' ')) - 1;
-    const steps = first ? 3 : 1; first = false;
-    let moved = false;
-    for (let s = 0; s < steps; s++) {
-      const [nr, nc] = neighbor(r, c, dir);
-      if (prev && prev[0] === nr && prev[1] === nc) break;          // nie direkt zurück
-      if (!botCanEnter(S, pi, nr, nc)) break;
-      prev = [r, c]; r = nr; c = nc; moved = true;
-      if (settleable(S, r, c)) break;
+    const [nr, nc] = neighbor(r, c, dir);
+    const own = cityAt(S, nr, nc);
+    if (own && own.owner === pi) {                       // Schritt 4: eigene Stadt → von vorn
+      if (!goToNearest()) break;
+      continue;
     }
-    if (!moved) continue;
+    if (prev && prev[0] === nr && prev[1] === nc) continue;   // Schritt 7: nie direkt zurück
+    if (!botCanEnter(S, pi, nr, nc)) continue;
+    prev = [r, c]; r = nr; c = nc;
   }
   log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`);
 }
@@ -2436,7 +2602,7 @@ function botMoveArmy(S, pi, army) {
 }
 
 /* ---------------------------------------------------- Forschung */
-function botResearch(S, pi, avoidFields = []) {
+function botResearch(S, pi, avoidFields = [], noSingularity = false) {
   const p = S.players[pi];
   let f, field, guard = 0;
   do {
@@ -2444,7 +2610,7 @@ function botResearch(S, pi, avoidFields = []) {
     field = f - 1;
   } while (avoidFields.includes(field) && ++guard < 20);  // v2: anderes Feld als beim ersten Mal
   // Singularität, sobald ein Feld der Moderne schon beforscht ist
-  if (TECHS_ACTIVE.some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
+  if (!noSingularity && techPool(S).some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
     p.techs.singularitaet = true;
     S.over = { winner: pi, how: 'Forschungssieg (Singularität)' };
     log(S, 'act', `${civOf(p).n} erforscht die Singularität!`);
@@ -2452,10 +2618,10 @@ function botResearch(S, pi, avoidFields = []) {
   }
   // höchstes erforschbares Zeitalter in diesem Feld
   let age = 0;
-  for (let a = 1; a <= 3; a++) if (TECHS_ACTIVE.some(t => t.f === field && t.age === a - 1 && p.techs[t.k])) age = a;
-  while (age >= 0 && !techsIn(field, age).some(t => !p.techs[t.k])) age--;
+  for (let a = 1; a <= 3; a++) if (techPool(S).some(t => t.f === field && t.age === a - 1 && p.techs[t.k])) age = a;
+  while (age >= 0 && !techsIn(field, age, S).some(t => !p.techs[t.k])) age--;
   if (age < 0) { log(S, 'info', `${civOf(p).n}: nichts mehr zu forschen in ${FIELDS[field]}.`); return field; }
-  const list = techsIn(field, age);
+  const list = techsIn(field, age, S);
   let idx;
   for (let guard = 0; guard < 30; guard++) {
     idx = d6(S, `Technologie in ${FIELDS[field]} / ${AGES[age]} (1–${list.length})`);
@@ -2933,6 +3099,9 @@ function yieldOverview(S, pi) {
     h += yieldRow(e.name, e.glyph || '✦', '#c8a86a', e.count, e.y);
   h += yieldRow('Bevölkerung', '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
   h += yieldRow('Summe', '∑', '#6b5d47', null, b.total, { cls: 'sum' });
+  // Vorschau: kein Einkommen, sondern was die Armeen zu Zugende erbeuten (Wikinger)
+  for (const e of (b.preview || []))
+    h += yieldRow(e.name, e.glyph || '⚔︎', '#b08a4a', null, e.y, { cls: 'prev' });
   h += '</div>';
   return h;
 }
@@ -2949,7 +3118,7 @@ function techModal() {
     grid += `<div class="age-label">${AGES[a]}</div>`;
     for (let f = 0; f < 4; f++) {
       grid += `<div class="techcol">${a === 0 ? `<h4>${FIELDS[f]}</h4>` : ''}`;
-      for (const t of techsIn(f, a)) {
+      for (const t of techsIn(f, a, S)) {
         const owned = has(p, t.k), avail = p.avail[t.k] && !owned;
         const cost = techCost(S, pi, t);
         const can = avail && available(S, pi, 'sci') >= cost;
@@ -2977,7 +3146,7 @@ function techModal() {
   }
   const bp = backPickOptions(S, pi);
   if (bp.length) {
-    grid += '<p class="sub" style="margin-top:14px">Rückschau: eine Technologie eines früheren Zeitalters, kostenlos</p>';
+    grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[p.backPick.f]}, früheres Zeitalter, kostenlos</p>`;
     grid += bp.map(t => `<button class="tech avail" data-backtech="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   }
@@ -3169,7 +3338,7 @@ function wonderSheet(city) {
     if (e) return toast(e);
     redraw();
     if (S.over) { closeSheet(); return gameOver(); }
-    if (P(S).freePick) return freePickModal();
+    if (freePick(P(S))) return freePickModal();
     openTile(city.r, city.c);
   });
 }
@@ -3199,12 +3368,12 @@ function feedSheet() {
 /* Auswahl kostenloser Technologien (Bibliothek, Oxford, Griechenland) */
 function freePickModal() {
   const pi = S.cur, p = P(S);
-  const pick = p.freePick;
+  const pick = freePick(p);
   const list = pick ? freePickOptions(S, pi) : backPickOptions(S, pi);
   const title = pick ? pick.why : 'Rückschau';
   if (!list.length) { closeModal(); return; }
   const h = `<p class="sub">${pick ? `Noch ${pick.n} kostenlose Technologie(n).` :
-    'Eine beliebige Technologie eines früheren Zeitalters, kostenlos.'}</p>` +
+    'Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.'}</p>` +
     list.map(t => `<button class="tech avail" data-free="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   modal(title, h);
@@ -3212,7 +3381,7 @@ function freePickModal() {
     const e = pick ? useFreePick(S, S.cur, b.dataset.free) : useBackPick(S, S.cur, b.dataset.free);
     if (e) return toast(e);
     redraw();
-    if (P(S).freePick || (P(S).backPick != null && backPickOptions(S, S.cur).length)) freePickModal();
+    if (freePick(P(S)) || backPickOptions(S, S.cur).length) freePickModal();
     else closeModal();
   });
 }
@@ -3224,7 +3393,7 @@ function humanTurnStart() {
   const ev = curEvent();
   toast(ev ? `${civOf(p).n} ist am Zug · Ereignis: ${ev.n}` : civOf(p).n + ' ist am Zug');
   if (p.foodDeficit > 0 && canFeed(p)) feedSheet();
-  else if (p.freePick) freePickModal();
+  else if (freePick(p)) freePickModal();
 }
 
 /* ------------------------------------------------------------------ Aufbau */
