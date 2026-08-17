@@ -952,17 +952,68 @@ const setEvent = (S, k) => {
   eq(freePick(p), null, 'danach ist die Warteschlange leer');
 }
 
-/* Raumfahrt bei Bots: sie würfeln die Gratis-Tech aus, aber nie die Singularität */
+/* Freies Feld mit Mindestabstand 3 zu allen Städten (ohne Kostenprüfung – Bots zahlen nichts) */
+const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
+  isLand(S, r, c) && !TERRAIN[terrainAt(S, r, c)].block && !cityAt(S, r, c) && !armyAt(S, r, c) &&
+  !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
+
+/* Bots erhalten keine Wundereffekte und keine Effekte der neuen Technologien –
+   einzige Ausnahme ist Militärlogistik (zählt nur die eigenen Wunder). */
 {
   const S = newGame({ seed: 31, wonders: true, players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })) });
-  const pi = 0, p = S.players[pi];
+  const pi = 0, p = S.players[pi], cap = capitalOf(S, pi);
+  const add = (k, lvl) => S.wonders.push({ k, lvl, owner: pi, cityId: cap.id, r: cap.r, c: cap.c });
+  // Raumfahrt: keine Gratis-Tech beim Wunderbau
   p.techs.raumfahrt = true;
-  FIELDS.forEach((_, f) => { techsIn(f, 3, S).forEach(t => { p.techs[t.k] = true; }); });  // Moderne überall
+  FIELDS.forEach((_, f) => { techsIn(f, 3, S).forEach(t => { p.techs[t.k] = true; }); });
   const before = Object.keys(p.techs).length;
-  buildWonder(S, pi, capitalOf(S, pi), poolOf(S, 1)[0], { free: true, noEffect: true });
-  eq(Object.keys(p.techs).length > before, true, 'der Bot erforscht eine Gratis-Tech');
-  eq(!p.techs.singularitaet, true, 'aber nicht die Singularität');
-  eq(!S.over, true, 'und gewinnt damit nicht');
+  buildWonder(S, pi, cap, poolOf(S, 1)[0], { free: true, noEffect: true });
+  eq(Object.keys(p.techs).length, before, 'Bot bekommt durch Raumfahrt keine Gratis-Technologie');
+  eq(freePickOptions(S, pi).length, 0, 'und keinen offenen Anspruch');
+  // Baukräne: kein Rabatt (Bots zahlen ohnehin nichts)
+  p.techs.baukraene = true;
+  const n = wondersOf(S, pi).length;
+  eq(wonderCost(S, pi), WONDER_STEP * (n + 1), 'Bot bekommt keinen Baukräne-Rabatt');
+  // Wallfahrt: kein Ertrag
+  p.techs.wallfahrt = true;
+  eq(incomeBreakdown(S, pi).extra.some(e => e.name === 'Wallfahrt'), false, 'Bot bekommt keinen Wallfahrt-Ertrag');
+  // Große Mauer: Bot verteidigt weiter nur mit der Bevölkerung dieser Stadt
+  cap.pop = 3;
+  const spot = cityPlace(S, pi, cap);
+  eq(!!spot, true, 'ein Platz für die zweite Stadt gefunden');
+  S.cities.push({ id: S.nextId++, owner: pi, r: spot[0], c: spot[1], pop: 5, cap: false, grown: 0, born: 0 });
+  const other = cityAt(S, spot[0], spot[1]);
+  add('mauer', 1);
+  eq(ownsWonder(S, pi, 'mauer'), true, 'der Bot besitzt die Große Mauer');
+  eq(hasWonder(S, pi, 'mauer'), false, 'sie wirkt für ihn aber nicht');
+  eq(defenseValue(S, other), 5, 'Verteidigung bleibt die eigene Bevölkerung');
+  // Kreml eines Bots verteuert die Singularität für niemanden
+  add('kreml', 3);
+  const H = mkX('griechenland', { wonders: true });
+  eq(techCost(S, 1, SINGULARITY), SINGULARITY_BASE, 'Bot-Kreml verteuert die Singularität nicht');
+  H.wonders.push({ k: 'kreml', lvl: 3, owner: 0, cityId: capitalOf(H, 0).id, r: 0, c: 0 });
+  eq(techCost(H, 1, SINGULARITY), SINGULARITY_BASE + KREML_SURCHARGE, 'ein menschlicher Kreml sehr wohl');
+  // Militärlogistik bleibt die Ausnahme: sie wirkt auch für Bots
+  const baseRange = moveAllowance(S, pi);
+  p.techs.militaerlogistik = true;
+  eq(moveAllowance(S, pi), baseRange + wondersOf(S, pi).length, 'Militärlogistik wirkt auch beim Bot');
+  eq(wondersOf(S, pi).length > 0, true, 'der Bot besitzt dafür auch Wunder');
+}
+/* Stonehenge schützt die Wunder eines Bots nicht vor der Zerstörung seiner Stadt */
+{
+  const S = newGame({ seed: 33, wonders: true, players: CIVS.map((c, i) => ({ civ: c.k, kind: i ? 'bot' : 'human', diff: 'prinz' })) });
+  const bi = S.players.findIndex(p => p.kind === 'bot');
+  const cap = capitalOf(S, bi);
+  const spot = cityPlace(S, bi, cap);
+  eq(!!spot, true, 'ein Platz für die Bot-Stadt gefunden');
+  S.cities.push({ id: S.nextId++, owner: bi, r: spot[0], c: spot[1], pop: 1, cap: false, grown: 0, born: 0 });
+  const city = cityAt(S, spot[0], spot[1]);
+  S.wonders.push({ k: 'stonehenge', lvl: 1, owner: bi, cityId: city.id, r: city.r, c: city.c });
+  S.wonders.push({ k: 'leuchtturm', lvl: 1, owner: bi, cityId: city.id, r: city.r, c: city.c });
+  const other = S.players.findIndex((p, i) => i !== bi);
+  captureCity(S, other, city);      // Bevölkerung 1 − 2 → Stadt zerstört
+  eq(S.wonders.length, 0, 'die Wunder des Bots gehen mit der Stadt verloren');
+  eq(S.wgone.includes('stonehenge'), true, 'auch Stonehenge selbst');
 }
 
 /* ==================================================== Karte und Aufbau */
@@ -1460,7 +1511,10 @@ const setEvent = (S, k) => {
   S.wonders.push({ k: 'leuchtturm', lvl: 1, owner: 0, cityId: city.id, r: city.r, c: city.c });
   captureCity(S, 1, city);
   eq(city.owner, 1, 'Stadt erobert');
-  eq(hasWonder(S, 1, 'leuchtturm'), true, 'der Eroberer übernimmt das Wunder');
+  eq(ownsWonder(S, 1, 'leuchtturm'), true, 'der Eroberer übernimmt das Wunder');
+  eq(hasWonder(S, 1, 'leuchtturm'), false, 'ein Bot als Eroberer nutzt den Effekt aber nicht');
+  S.players[1].kind = 'human';
+  eq(hasWonder(S, 1, 'leuchtturm'), true, 'ein menschlicher Eroberer erhält den Effekt');
   eq(hasWonder(S, 0, 'leuchtturm'), false, 'der Verlierer verliert den Effekt');
   eq(wonderCost(S, 0), 10, 'nach dem Verlust kostet ein neues Wunder wieder 10');
 }
@@ -1492,7 +1546,7 @@ const setEvent = (S, k) => {
   // wer hier eine Stadt gründet, übernimmt sie
   S.players[1].res = { sci: 0, food: 99, coins: 99 };
   eq(foundCity(S, 1, spot[0], spot[1]), null, 'neue Stadt auf dem Feld gegründet');
-  eq(hasWonder(S, 1, 'leuchtturm'), true, 'die freistehenden Wunder gehen an die neue Stadt');
+  eq(ownsWonder(S, 1, 'leuchtturm'), true, 'die freistehenden Wunder gehen an die neue Stadt');
 }
 /* Kultursieg */
 {
