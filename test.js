@@ -800,6 +800,123 @@ const setEvent = (S, k) => {
   eq(foundCost(C, 0, spot[0], spot[1]), 1, 'Kartografie allein: Basiskosten der ersten Stadt = 1');
 }
 
+/* ============================== Alchemie: Wissenschaft über Münzen in Nahrung */
+{
+  const S = mk('griechenland');
+  const p = S.players[0];
+  p.res = { sci: 10, food: 0, coins: 0 };
+  eq(rates(S, 0).sciToFood === Infinity, true, 'ohne Alchemie kein Weg von Wissenschaft zu Nahrung');
+  eq(available(S, 0, 'food'), 0, 'also auch keine Nahrung verfügbar');
+  p.techs.alchemie = true;
+  eq(rates(S, 0).sciToFood, 2, 'mit Alchemie 2 Wissenschaft je Nahrung (über Münzen)');
+  eq(available(S, 0, 'food'), 5, '10 Wissenschaft ergeben 5 Nahrung');
+  eq(pay(S, 0, 'food', 3), true, 'Nahrung damit auch bezahlbar');
+  eq([p.res.sci, p.res.food], [4, 0], '3 Nahrung kosten 6 Wissenschaft');
+  // mit Gilden 1:1 auf dem zweiten Schritt
+  p.techs.gilden = true;
+  eq(rates(S, 0).sciToFood, 1, 'mit Gilden 1 Wissenschaft je Nahrung');
+  // Gentechnik bleibt kein Kurs
+  const G = mk('griechenland', ['gentechnik']);
+  eq(rates(G, 0).sciToFood === Infinity, true, 'Gentechnik allein ist weiter kein Umtauschkurs');
+  // Wachstum lässt sich damit bezahlen (der eigentliche Fehlerbericht)
+  const W = mk('griechenland', ['alchemie']);
+  const c = capitalOf(W, 0); c.pop = 2; c.grown = 0; c.born = 0;
+  W.players[0].res = { sci: 20, food: 0, coins: 0 };
+  eq(canGrow(W, 0, c), null, 'Wachstum ist mit Wissenschaft bezahlbar');
+  eq(growCity(W, 0, c), null, 'und geht durch');
+}
+
+/* ============================== Rundenwechsel und Ereignis beim Startspieler */
+{
+  // cfg.startPlayer zeigt in die Aufbauliste (CIVS-Reihenfolge). CIVS[0] ist Griechenland,
+  // in der festen Zugreihenfolge Russland→Griechenland→England→Wikinger also Index 1.
+  const S = newGame({
+    seed: 12, events: true, eventMode: 'hard', startPlayer: 0,
+    players: CIVS.map(c => ({ civ: c.k, kind: 'human' })),
+  });
+  eq(S.players[1].civ, 'griechenland', 'Index 1 ist Griechenland');
+  eq(S.startIdx, 1, 'der Startspieler ist gemerkt');
+  eq(S.cur, 1, 'Griechenland beginnt');
+  eq(S.round, 1, 'Runde 1');
+  const ev1 = S.event.k;
+  eq(S.event.round, 1, 'das Ereignis gehört zu Runde 1');
+  // eine volle Umdrehung: erst zurück beim Startspieler beginnt Runde 2
+  const seen = [];
+  for (let i = 0; i < 4; i++) {
+    seen.push([S.cur, S.round, S.event.round]);
+    advanceTurn(S);
+  }
+  eq(seen.map(x => x[0]), [1, 2, 3, 0], 'Reihenfolge ab dem Startspieler im Uhrzeigersinn');
+  eq(seen.map(x => x[1]), [1, 1, 1, 1], 'die Runde bleibt bis zur Umdrehung dieselbe');
+  eq(seen.every(x => x[2] === 1), true, 'und das Ereignis auch');
+  eq([S.cur, S.round], [1, 2], 'zurück beim Startspieler beginnt Runde 2');
+  eq(S.event.round, 2, 'jetzt wird das neue Ereignis ausgewürfelt – vor dem Startspieler');
+  // Gegenprobe: mit Russland als Startspieler wechselt es bei Index 0
+  const T = newGame({
+    seed: 12, events: true, eventMode: 'hard', startPlayer: CIVS.findIndex(c => c.k === 'russland'),
+    players: CIVS.map(c => ({ civ: c.k, kind: 'human' })),
+  });
+  eq(T.startIdx, 0, 'Russland als Startspieler');
+  for (let i = 0; i < 3; i++) advanceTurn(T);
+  eq([T.cur, T.round], [3, 1], 'nach drei Zügen noch Runde 1');
+  advanceTurn(T);
+  eq([T.cur, T.round, T.event.round], [0, 2, 2], 'Runde 2 beginnt bei Russland');
+}
+
+/* ============================== Rückschau: auch durch kostenlose Forschung */
+{
+  const S = mkX('griechenland', { wonders: true }, []);
+  S.players[0].ability = 'rueckschau';
+  const p = S.players[0], cap = capitalOf(S, 0);
+  // Voraussetzungen: Mittelalter im Feld Forschung verfügbar machen
+  p.avail.papier = true; p.avail.alchemie = true;
+  p.res = { sci: 0, food: 0, coins: 99 };
+  S.wpool[2] = ['oxford'];
+  for (const k of ['gaerten', 'koloss', 'zeus']) S.wonders.push({ k, lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 3, cap: false, grown: 0, born: 0 });
+  eq(buildWonder(S, 0, cityAt(S, spot[0], spot[1]), 'oxford'), null, 'Oxford gebaut');
+  eq(freePick(p).n, 2, 'zwei kostenlose Technologien');
+  // erste Gratis-Tech (Mittelalter) löst Rückschau aus
+  eq(useFreePick(S, 0, 'papier'), null, 'erste Gratis-Tech genommen');
+  eq((p.backPicks || []).length, 1, 'Rückschau wird von der kostenlosen Forschung ausgelöst');
+  // zweite Gratis-Tech ebenfalls
+  eq(useFreePick(S, 0, 'alchemie'), null, 'zweite Gratis-Tech genommen');
+  eq(p.backPicks.length, 2, 'Oxford löst die Rückschau zweimal aus');
+  // beide Ansprüche nacheinander nutzbar, ohne Kette
+  const first = backPickOptions(S, 0)[0];
+  eq(useBackPick(S, 0, first.k), null, 'erster Rückschau-Anspruch genutzt');
+  eq(p.backPicks.length, 1, 'der zweite bleibt offen');
+  const second = backPickOptions(S, 0)[0];
+  eq(useBackPick(S, 0, second.k), null, 'zweiter Rückschau-Anspruch genutzt');
+  eq(p.backPicks.length, 0, 'danach keine weiteren – keine Kette');
+}
+
+/* ============================== Oxford: die Auswahl wird beim Bau festgehalten */
+{
+  const S = mkX('griechenland', { wonders: true });
+  const p = S.players[0], cap = capitalOf(S, 0);
+  p.res = { sci: 0, food: 0, coins: 99 };
+  S.wpool[2] = ['oxford'];
+  for (const k of ['gaerten', 'koloss', 'zeus']) S.wonders.push({ k, lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  const spot = within(cap.r, cap.c, 5).find(([r, c]) => !canFound(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 3, cap: false, grown: 0, born: 0 });
+  eq(buildWonder(S, 0, cityAt(S, spot[0], spot[1]), 'oxford'), null, 'Oxford gebaut');
+  const snapshot = freePick(p).only.slice();
+  eq(snapshot.length > 0, true, 'die verfügbaren Technologien sind festgehalten');
+  eq(snapshot.every(k => p.avail[k]), true, 'es sind die beim Bau verfügbaren');
+  const first = freePickOptions(S, 0)[0];
+  eq(useFreePick(S, 0, first.k), null, 'erste Gratis-Tech genommen');
+  // die erste Tech kann ein neues Zeitalter aufgeschlossen haben – das darf die
+  // zweite Wahl nicht erweitern
+  const after = freePickOptions(S, 0);
+  eq(after.every(t => snapshot.includes(t.k)), true, 'die zweite Wahl bleibt in der Momentaufnahme');
+  eq(after.some(t => t.k === first.k), false, 'die schon erforschte fällt weg');
+  const newlyAvail = techPool(S).filter(t => p.avail[t.k] && !p.techs[t.k] && !snapshot.includes(t.k));
+  eq(newlyAvail.every(t => !after.some(x => x.k === t.k)), true,
+    'neu freigeschaltete Technologien sind nicht dabei');
+}
+
 /* ==================================== Siedlerbewegung nach den Bot-Regeln */
 {
   // Schritt 2–3: der Siedler zieht auf das erreichbare siedelbare Feld, das der
@@ -1160,7 +1277,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const p = S.players[0];
   p.avail.buchdruck = true; p.res = { sci: 99, food: 0, coins: 0 };
   eq(doResearch(S, 0, 'buchdruck'), null, 'Mittelalter-Tech erforscht');
-  eq([p.backPick.age, p.backPick.f], [0, TECH_BY_KEY.buchdruck.f],
+  eq([backPick(p).age, backPick(p).f], [0, TECH_BY_KEY.buchdruck.f],
     'Rückschau erlaubt ein früheres Zeitalter im selben Feld');
   const opts = backPickOptions(S, 0);
   eq(opts.every(t => t.age === 0), true, 'nur Techs der Antike zur Wahl');

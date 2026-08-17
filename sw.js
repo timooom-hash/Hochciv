@@ -1,5 +1,5 @@
 /* Offline-Cache. Bei Änderungen VERSION erhöhen. */
-const VERSION = 'hochciv-v17';
+const VERSION = 'hochciv-v18';
 const FILES = [
   './', './index.html', './css/style.css',
   './js/data.js', './js/hex.js', './js/engine.js', './js/expansion.js', './js/bots.js', './js/ui.js',

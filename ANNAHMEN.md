@@ -108,17 +108,23 @@ ebenfalls verbunden.
 * Der Machtwert eines Bots ist immer seine Gesamtbevölkerung (so das Regelheft) – das macht
   Bots früh militärisch stark. In 40 Testpartien gewannen sie überwiegend militärisch.
   Für ein längeres Spiel niedrigere Schwierigkeit wählen.
-* **Siedlerbewegung**: Hier stehen zwei Fassungen nebeneinander. Das ausgeführte Beispiel
-  zeigt die **ältere** Regel (Richtung würfeln, erst bis zu drei Felder, danach je ein Feld,
-  nach jedem Schritt eine Siedelprobe). Schritt 2–4 der Bot-Regeln sind die **neuere**
-  Fassung, die sie am Tisch ersetzt hat, weil sie deutlich weniger Würfe braucht.
-  Digital kostet Würfeln nichts, deshalb läuft hier bewusst die ältere Wanderung – sie
-  streut die Bot-Städte natürlicher über die Karte. Wer es umstellen will: `botSettle`
-  in `js/bots.js`.
-* Zur älteren Fassung gehört die Klausel „betritt keine durch Distanz nicht siedelbaren
-  Felder". Wörtlich genommen sperrt sie den Siedler in der Hauptstadt ein, denn jedes
-  Nachbarfeld liegt zu nah an der eigenen Stadt. Sie greift hier deshalb erst, sobald der
-  Siedler den Sperrbereich verlassen hat.
+* **Siedlerbewegung** (seit 17.8. nach den Schritten 1–7 der Bot-Regeln): Der Siedler zieht
+  auf das **durch Bewegung erreichbare siedelbare Feld, das der Hauptstadt am nächsten
+  liegt**; bei mehreren gleich nahen wird ausgewürfelt. Steht er auf einem siedelbaren Feld,
+  würfelt er – bei 3+ siedelt er, sonst zieht er ein Feld in eine ausgewürfelte Richtung und
+  prüft erneut. Er geht nie direkt zurück, betritt Meer nur mit Navigation/Panzerschiff/
+  Luftwaffe, und trifft er auf eine eigene Stadt, beginnt er wieder mit dem Zug zum
+  nächstgelegenen siedelbaren Feld. Erreichbarkeit ist Geländedistanz nach denselben
+  Bewegungsregeln, die auch für Armeen gelten (`settleDistances` in `js/bots.js`).
+  Vorher lief die ältere Fassung (nur würfelnde Wanderung ab der Hauptstadt). Die war
+  fehlerhaft schwach: Englands Hauptstadt liegt auf der Originalkarte in einer Bucht, in der
+  fünf von sechs Richtungen Meer sind, und der Siedler verschenkte jeden Schritt in eine
+  gesperrte Richtung – in 32 % der Partien meldete er schon in Runde 1 „findet keinen Platz",
+  obwohl 34 freie Plätze im Umkreis 5 lagen. Mit der neuen Fassung sind es **0 von 200**,
+  und die Bots gründen deutlich mehr Städte (10,2 → rund 12 je Partie, in Testpartien ohne
+  Kämpfe bis 17). Die Klausel „betritt keine durch Distanz nicht siedelbaren Felder" gilt
+  weiter nur für die Wanderung, nicht für den Zug zum Zielfeld – sonst käme der Siedler nicht
+  aus dem Sperrbereich der eigenen Stadt heraus.
 * **Armeeprioritäten** (Reihenfolge des Regelhefts): 1. belagerte eigene Städte
   verteidigen, 2. gegnerische Städte angreifen, 3. gegnerische Armeen flankieren,
   4. an den Reichsrand ziehen, möglichst nah an einer gegnerischen Stadt. Innerhalb einer
@@ -189,6 +195,10 @@ Grenze ist das **Einkommen** (Geländenahrung − Bevölkerung), nicht der Vorra
   Freiheitsstatue), wird **so weit ausgeführt, wie er passt**, und dann abgebrochen.
 - Ein bereits negatives Einkommen (nach Eroberung, Sturmflut, Revolution) wird auf 0
   gekappt. **Es verhungert niemand**, die Bevölkerung bleibt stehen.
+- **Wissenschaft → Nahrung** gibt es nur über die Münzen: mit **Alchemie** (Wissenschaft →
+  Münzen 1:1) kostet 1 Nahrung 2 Wissenschaft, mit Gilden oder als England 1 Wissenschaft.
+  Vorher war dieser Weg gar nicht möglich – ein Fehler, der beim Bezahlen von Wachstum und
+  Stadtgründungen auffiel (behoben 17.8.).
 - **Gentechnik** (aus Wissenschaft) und **Massenmedien** (aus Münzen) heben die Grenze auf.
   Beide sind ausdrücklich **kein allgemeiner Umtauschkurs**: sie stehen nicht in `rates()`,
   man kann mit ihnen also nichts kaufen. Sie füttern nur, 1:1, über den Knopf am
@@ -200,6 +210,27 @@ Grenze ist das **Einkommen** (Geländenahrung − Bevölkerung), nicht der Vorra
   Sollte die Grenze wirklich beißen, wäre die Regel „Wachstum nur so weit, wie der Spieler
   diese Runde auch füttern kann" oder „ungedecktes Defizit kostet Bevölkerung" – beides ist
   eine Zeile in `growthBlocked()` bzw. `beginTurn()`.
+
+## 10b. Stadtgründung
+
+Zusätzlich zu den bekannten Bedingungen (Landfeld, kein Vulkan, kein besetztes Feld,
+mindestens 3 Felder Abstand zu jeder Stadt):
+
+- **Nicht direkt neben einer gegnerischen Armee.** Gilt für Menschen (`canFound`) und Bots
+  (`settleable`) gleichermaßen; eigene Armeen stören nicht, zwei Felder Abstand genügt.
+- **Ausweichen des Bot-Siedlers** (Fehlerbehebung 17.8.): Zeigt die gewürfelte Richtung ins
+  Wasser, auf eine Stadt oder über den Kartenrand, weicht der Siedler im Uhrzeigersinn auf die
+  nächste begehbare Richtung aus, statt den Schritt zu verschenken; ist er völlig
+  eingeschlossen, darf er im zweiten Durchlauf auch zurück. Vorher blieb er in einer
+  Landtasche stecken – Englands Hauptstadt auf der Originalkarte liegt in einer Bucht, in der
+  fünf von sechs Richtungen Meer sind, und meldete in 32 % der Partien schon in Runde 1
+  „Siedler findet keinen Platz", obwohl 34 freie Plätze im Umkreis 5 lagen. Danach 2 %.
+  Gemeint ist die direkte Nachbarschaft (Distanz 1), unabhängig von Raketentechnik.
+- **Gründen kostet immer mindestens 1 Nahrung.** Ohne diese Untergrenze wäre es mit
+  Englands Alternative „Kolonisten" (keine Basiskosten) plus Kartografie (keine
+  Distanzkosten) vollständig gratis.
+- Bots siedeln jetzt ebenfalls nicht auf Vulkanfeldern (vorher möglich, weil `settleable`
+  nur auf „Landfeld" prüfte).
 
 ## 11. Zivilisationsfähigkeiten (Bogen „Civs")
 
@@ -216,18 +247,36 @@ Gratisarmee.
 
 Auslegungen:
 
-- **Wikinger „Beutezüge"**: je eigene Armee, die neben (Distanz 1) einer gegnerischen Armee
-  oder Stadt steht, 1 Wissenschaft/Nahrung/Münze pro Punkt Überlegenheit. Gegen Städte zählt
-  der **Verteidigungswert**, gegen Armeen der Machtwert. Steht eine Armee neben mehreren
-  Gegnern, zählt der größte Vorsprung, je Armee einmal.
-  **Abweichung vom Abgesprochenen:** bewertet wird beim **Einkommen zu Zugbeginn**, nicht in
-  der Kampfphase. Ressourcen verfallen am Zugende – ein Ertrag in der Kampfphase (Schritt 4
-  von 5) wäre nie ausgebbar. Der Ertrag steht als eigene Zeile in der Ertragsübersicht.
+- **Wikinger „Beutezüge"** (Fassung des Autors vom 17.8.): Am **Ende des eigenen Zuges** wird
+  für jedes Ziel, an dem eigene Armeen stehen, **Angriffswert − Verteidigungswert** gerechnet;
+  alle positiven Differenzen zusammen werden **zu Beginn der nächsten Runde** als
+  Wissenschaft, Nahrung und Münzen ausgezahlt. Ziele sind jede gegnerische **Stadt** und jedes
+  **Feld mit gegnerischer Armee**.
+  Verwendet werden exakt die Kampfwerte des Spiels (`attackValue` / `defenseValue` bzw.
+  `armyDefenseValue`): mehrere angreifende Armeen addieren sich im Angriffswert, mehrere
+  verteidigende im Verteidigungswert, Belagerung/Dynamit/Stadtmauern/Burgenbau zählen mit,
+  und mit Raketentechnik reicht die Projektion zwei Ringe weit. Ein Feld mit gegnerischer
+  Armee ist ein **eigenes Ziel** – stehen zwei Gegnerarmeen nebeneinander, gibt es zwei
+  Erträge, jeder um den zusätzlichen Verteidiger geringer.
+  Gerechnet wird **vor** den Belagerungen: eine Stadt, die im selben Zug fällt, bringt noch
+  Beute. Ausgezahlt wird über `p.raidPending`; die Ertragsübersicht zeigt den zu erwartenden
+  Betrag als **Vorschauzeile unterhalb der Summe** (kein Einkommen, wird nicht mitgezählt).
+  **Messung**: mit einem militärisch starken Reich (Macht 30) flossen über 20 Partien 1809
+  Punkte Beute. Mit normal gekaufter Macht (0–2, halbiert sich jede Runde, 5 Münzen je Punkt)
+  war es **0** – der Ertrag setzt voraus, dass man das Ziel tatsächlich überbietet, und
+  Bot-Reiche haben als Machtwert ihre gesamte Bevölkerung. Das ist die Regel, kein Fehler.
 - **Wikinger „Kriegerkultur"**: +1 Machtwert je Armee. Der Zuschlag erhöht den
   Machtverlust zu Zugbeginn (er rechnet auf den Gesamtwert), kann selbst aber nicht verloren
   gehen – abgezogen wird nur von der gekauften Macht. Genauso die Zeusstatue (+3).
 - **Griechenland „Rückschau"**: die Gratis-Tech kommt aus einem Zeitalter unterhalb der
-  gerade erforschten, ignoriert die Verfügbarkeit und löst **keine Kette** aus.
+  gerade erforschten **im selben Technologiefeld**, ignoriert die Verfügbarkeit und löst
+  **keine Kette** aus. Ausgelöst wird sie von **jeder** erforschten Technologie, auch von
+  kostenlosen aus Großer Bibliothek, Oxford oder Raumfahrt (seit 17.8.; vorher hing der
+  Auslöser nur an `doResearch`, kostenlose Forschung ging leer aus). Oxford gibt zwei
+  Technologien und damit zwei Rückschau-Ansprüche – sie stehen in einer Warteschlange
+  (`p.backPicks`) und werden nacheinander abgearbeitet; offene Ansprüche verfallen zum
+  Zugende. Das **Kopieren** von Technologien (Spionage/Kundschafterei/Internet) löst keine
+  Rückschau aus – kopieren ist kein Erforschen.
 - **Griechenland „Freie Forschung"**: 1× pro Runde, nur **verfügbare** Techs bis
   Industrialisierung (Zeitalter 0–2). Zusätzlich zur normalen Forschung.
 - **England „Seemacht"**: „an Wasser" heißt hier **Meer**. Der Ereignisbogen unterscheidet
@@ -240,7 +289,10 @@ Auslegungen:
 
 Im Aufbau zuschaltbar, mit Stärke **hart** (jede Runde ein Ereignis) oder **leicht** (beim
 Spaltenwurf treffen nur 1/3/5, 2/4/6 gehen ins Leere – etwa halb so viele Ereignisse).
-Gewürfelt wird **einmal pro Runde** zu Rundenbeginn: erst die Zeile, dann die Spalte. Das
+Gewürfelt wird **einmal pro Runde** unmittelbar vor dem Zug des **Startspielers**: erst die
+Zeile, dann die Spalte. Auch der Rundenzähler springt dort (`S.startIdx`); vorher hing beides
+an Russland als Index 0, sodass mitten in der Umdrehung eine neue Runde begann, wenn jemand
+anders Startspieler war (behoben 17.8.). Das
 Ergebnis gilt **gleichzeitig für alle menschlichen Reiche**; Effekte wie „würfle eine deiner
 Städte aus" werden für jedes Reich einzeln gewürfelt. **Bots sind nie betroffen.**
 
@@ -273,6 +325,29 @@ Auslegungen:
   Hauptstadt angreifen. Ihre Bevölkerung zählt weiter zur **Weltbevölkerung**, macht den
   Wirtschaftssieg also etwas schwerer.
 
+## 12b. Technologien der Weltwunder-Erweiterung
+
+Diese vier existieren **nur in einer Partie mit Weltwundern** (`wo: true` in `TECHS`,
+gefiltert über `techPool(S)`); ohne Erweiterung erscheinen sie nicht im Bogen, werden nicht
+ausgewürfelt und können auch nicht kopiert oder gratis genommen werden. Das Zeitalter war
+nicht vorgegeben, folgt aber eindeutig den Kostenbereichen des Regelhefts
+(Antike 1–5, Mittelalter 6–10, Industrialisierung 11–15, Moderne 16–20):
+
+| Technologie | Feld | Zeitalter | Kosten | Wirkung |
+|---|---|---|---|---|
+| Baukräne | Produktion | Mittelalter | 9 | Wunder kosten 2/4/6/8/… weniger, also 8/16/24/32/… statt 10/20/30/40/… Das Muster setzt sich über das sechste Wunder hinaus fort. |
+| Wallfahrt | Spezial | Antike | 4 | Je eigenem Weltwunder +3 Wissenschaft, Nahrung und Münzen. Eigene Zeile in der Ertragsübersicht. |
+| Militärlogistik | Militär | Mittelalter | 6 | +1 Bewegungsweite je eigenem Weltwunder. Wirkt sofort: baut man ein Wunder, bekommen die eigenen Armeen die Bewegung noch im selben Zug gutgeschrieben (wie bei Luftwaffe/Panzerschiff). |
+| Raumfahrt | Forschung | Moderne | 19 | Bei jedem Wunderbau eine Technologie gratis – nicht die Singularität und kein Zeitalter, das in diesem Feld noch nicht freigeschaltet ist (`unlockedAge`: freigeschaltet = dort ist etwas verfügbar oder erforscht). Verfügbarkeit der Tech selbst ist nicht nötig. Bots würfeln sie nach den normalen Bot-Forschungsregeln aus, ohne Singularitäts-Abkürzung. |
+
+Raumfahrt stand in den Errata als wirkungslos und war deshalb entfernt; sie kommt hier mit
+der neuen Wirkung zurück. Kernphysik bleibt gestrichen.
+
+**Ansprüche auf kostenlose Forschung sind jetzt eine Warteschlange** (`p.freePicks`).
+Vorher gab es nur einen Platz, und ein Wunderbau konnte zwei Ansprüche gleichzeitig
+auslösen – Raumfahrt und das Wunder selbst (Große Bibliothek, Oxford). Der zweite
+überschrieb den ersten; das ist behoben und mit Test abgesichert.
+
 ## 13. Weltwunder (Bogen „Wunder")
 
 Im Aufbau zuschaltbar. Kosten 10/20/30/40 … Münzen für das 1./2./3./4. Wunder eines
@@ -298,7 +373,9 @@ Stufe-3-Wunder (mehr gibt es nicht). Der Pool ist für alle Reiche gemeinsam.
 - **Große Mauer** rechnet die Verteidigung **jeder** eigenen Stadt mit der Gesamtbevölkerung
   des Reiches.
 - **Große Bibliothek** ignoriert die Verfügbarkeit (Mittelalter oder früher), **Oxford** nur
-  momentan verfügbare Techs.
+  momentan verfügbare Techs. Bei Oxford wird die Auswahl **beim Bau festgehalten**
+  (`only`-Liste): schließt die erste Gratis-Tech ein neues Zeitalter auf, erweitert das die
+  zweite Wahl nicht – „momentan verfügbar" meint den Moment des Baus (behoben 17.8.).
 - **Canal du Midi** gibt 40 Münzen, die wie jede Ressource am Zugende verfallen.
 - **Taj Mahal** verdoppelt das Einkommen der nächsten eigenen Runde.
 - **Koloss** stellt zwei Armeen auf freie Landfelder neben der Baustadt (Armeen dürfen nicht
@@ -307,7 +384,23 @@ Stufe-3-Wunder (mehr gibt es nicht). Der Pool ist für alle Reiche gemeinsam.
   einmal vorgewürfelt und zu Rundenbeginn genau so verwendet.
 - **Apostolischer Palast** macht sein Reich immun gegen alle Ereignisse.
 - **Bots** würfeln nach dem Siedeln einmal (gegen den Schwierigkeitsgrad) und bauen dann ein
-  zufälliges verfügbares und baubares Wunder – **kostenlos**, wie alle Bot-Aktionen, und
-  **ohne Effekte**. Gebaut wird in der Hauptstadt, sonst in der bevölkerungsreichsten Stadt
-  (Gleichstand wird ausgewürfelt). Ein Stufe-3-Wunder gewinnt auch für sie. Erobert ein
-  Mensch eine Bot-Stadt mit Wundern, werden die Effekte für ihn aktiv.
+  zufälliges verfügbares und baubares Wunder – **kostenlos**, wie alle Bot-Aktionen. Gebaut
+  wird in der Hauptstadt, sonst in der bevölkerungsreichsten Stadt (Gleichstand wird
+  ausgewürfelt). Ein Stufe-3-Wunder gewinnt auch für sie.
+- **Bots erhalten grundsätzlich keine Wundereffekte** (Stand 17.8., ausdrücklich vom Autor
+  festgelegt). Umgesetzt an einer Stelle: `hasWonder(S, pi, k)` heißt „wirkt dieses Wunder
+  für dieses Reich" und ist für Bots und Barbaren immer falsch; für die reine Eigentumsfrage
+  (Kosten, Stufenregel, Kultursieg, Kartenmarker) gibt es `ownsWonder`. Damit entfallen für
+  Bots auch die dauerhaften Effekte, die vorher über Umwege wirkten:
+  Große Mauer (Verteidigung mit der Gesamtbevölkerung), Stonehenge (Wunder überleben die
+  Zerstörung der Stadt), Apostolischer Palast, Zeusstatue, Leuchtturm, Pyramiden,
+  Burg Himeji, Orakel. Auch ein **Kreml in Bot-Besitz verteuert die Singularität für
+  niemanden**.
+- Ebenso erhalten Bots **keine Effekte der vier Erweiterungs-Technologien** – mit der
+  **einen Ausnahme Militärlogistik**, die nur die Anzahl der eigenen Wunder zählt und
+  deshalb bewusst nicht über `hasWonder` läuft (das Regelheft erlaubt Bots ausdrücklich
+  passive Technologieeffekte wie mehr Bewegungsreichweite). Baukräne, Wallfahrt und
+  Raumfahrt sind bei Bots wirkungslos; sie können sie weiter erforschen, verschenken damit
+  aber einen Forschungsschritt – genau wie mit Alchemie oder Gilden, die Bots ebenfalls
+  nichts bringen, weil sie keine Ressourcen verwalten.
+- Erobert ein **Mensch** eine Bot-Stadt mit Wundern, werden die Effekte für ihn aktiv.
