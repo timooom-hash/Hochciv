@@ -166,7 +166,7 @@ const CIVS = [
     abilities: [
       { k: 'basis', n: 'Seefahrer', e: 'Kostenlose Armee am Start; eine Armee zählt nicht für Baukosten von Armeen' },
       { k: 'kampfertrag', n: 'Beutezüge', e: 'Steht eine Armee neben einer gegnerischen Armee oder Stadt, bringt sie je Punkt Überlegenheit 1 Wissenschaft, Nahrung und Münze' },
-      { k: 'armeemacht', n: 'Kriegerkultur', e: 'Jede eigene Armee gibt +1 Macht' },
+      { k: 'armeemacht', n: 'Kriegerkultur', e: 'Jede eigene Armee gibt +2 Macht' },
     ],
   },
 ];

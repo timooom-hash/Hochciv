@@ -58,7 +58,7 @@ function isAbil(p, k) { return abilityOf(p) === k; }
 function powerBonus(S, pi) {
   const p = S.players[pi];
   let b = 0;
-  if (isAbil(p, 'armeemacht')) b += armiesOf(S, pi).length;
+  if (isAbil(p, 'armeemacht')) b += 2 * armiesOf(S, pi).length;   // 2 Macht je Armee
   if (hasWonder(S, pi, 'zeus')) b += 3;
   return b;
 }
@@ -173,7 +173,6 @@ function doResearch(S, pi, tk) {
   if (available(S, pi, 'sci') < cost) return 'Nicht genug Wissenschaft.';
   pay(S, pi, 'sci', cost);
   applyTech(S, pi, tech, `${cost} Wissenschaft`);
-  if (tk === 'singularitaet') { S.over = { winner: pi, how: 'Forschungssieg (Singularität)' }; return null; }
   return null;
 }
 /* Technologie eintragen (bezahlt oder gratis) samt Folgewirkungen.
@@ -184,12 +183,16 @@ function applyTech(S, pi, tech, note, opts) {
   const rangeBefore = moveAllowance(S, pi);
   p.techs[tech.k] = true;
   log(S, 'act', `${civOf(p).n} erforscht ${tech.n} (${note}).`);
+  // Die Singularität gewinnt das Spiel, egal ob bezahlt oder kostenlos (z. B. Oxford).
+  if (tech.k === 'singularitaet') {
+    S.over = { winner: pi, how: 'Forschungssieg (Singularität)' };
+    return;
+  }
   // Griechenland "Rückschau": jede erforschte Technologie – auch eine kostenlose aus
   // Bibliothek, Oxford oder Raumfahrt – gibt zusätzlich eine beliebige Technologie eines
   // früheren Zeitalters im selben Feld gratis.
   if (isAbil(p, 'rueckschau') && tech.age > 0 && !(opts && opts.noBack))
     (p.backPicks = p.backPicks || []).push({ age: tech.age - 1, f: tech.f });
-  if (tech.k === 'singularitaet') return;
   // Reichweitensprung (Luftwaffe/Panzerschiff) sofort wirksam machen: die Erhöhung der
   // Maximalweite wird der Restbewegung der eigenen Armeen dieser Runde gutgeschrieben.
   const gained = moveAllowance(S, pi) - rangeBefore;
@@ -202,7 +205,7 @@ function applyTech(S, pi, tech, note, opts) {
    quelle beschreibt, woher der Anspruch kommt (nur für das Protokoll). */
 function grantTech(S, pi, tk, quelle, opts) {
   const p = S.players[pi];
-  const tech = TECH_BY_KEY[tk];
+  const tech = tk === 'singularitaet' ? SINGULARITY : TECH_BY_KEY[tk];
   if (!tech) return 'Unbekannte Technologie.';
   if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   if (p.techs[tk]) return 'Schon erforscht.';
@@ -718,6 +721,24 @@ function growFree(S, pi, city, n, why) {
   else log(S, 'info', `${civOf(S.players[pi]).n}: kostenloses Wachstum (${why}) nicht möglich – Nahrungsgrenze.`);
   return done;
 }
+/* Darf der Siedlerweg über dieses Feld laufen? Land immer; Wasser nur mit Navigation,
+   Panzerschiff oder Luftwaffe; Vulkane nie; Felder mit gegnerischen Armeen nie
+   (Regelheft: „Von gegnerischen Armeen besetzte Felder … zählen als unpassierbar"). */
+function foundPassable(S, pi, r, c) {
+  const p = S.players[pi];
+  const t = terrainAt(S, r, c);
+  if (!t || TERRAIN[t].block) return false;
+  if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff') || has(p, 'luftwaffe'))) return false;
+  const a = armyAt(S, r, c);
+  if (a && a.owner !== pi) return false;
+  return true;
+}
+/* Distanz zur Hauptstadt in passierbaren Feldern, oder null, wenn es keinen Weg gibt. */
+function foundDistance(S, pi, r, c) {
+  const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
+  if (!cap) return 0;
+  return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc));
+}
 function foundCost(S, pi, r, c) {
   const p = S.players[pi];
   const n = citiesOf(S, pi).length;
@@ -726,11 +747,11 @@ function foundCost(S, pi, r, c) {
   // Gründen kostet immer mindestens 1 Nahrung – sonst wäre es mit Englands Alternative
   // plus Kartografie (keine Distanzkosten) vollständig gratis.
   if (has(p, 'kartografie')) return Math.max(1, base);
-  const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
-  if (!cap) return Math.max(1, base);
-  const dist = pathSteps(cap.r, cap.c, r, c,
-    (rr, cc) => { const t = terrainAt(S, rr, cc); return t && (TERRAIN[t].land || has(p, 'navigation') || has(p, 'panzerschiff')); });
-  return Math.max(1, base + (dist == null ? hexDistance(cap.r, cap.c, r, c) : dist));
+  const dist = foundDistance(S, pi, r, c);
+  // Kein Weg = nicht gründbar. Früher wurde hier auf die Luftlinie ausgewichen, wodurch
+  // man ohne Navigation auf Inseln siedeln konnte.
+  if (dist == null) return Infinity;
+  return Math.max(1, base + dist);
 }
 /* Steht auf einem Nachbarfeld eine fremde Armee? Dort wird nicht gesiedelt. */
 function enemyArmyAdjacent(S, pi, r, c) {
@@ -746,6 +767,10 @@ function canFound(S, pi, r, c) {
   if (TERRAIN[t].block) return 'Nicht auf einem Vulkan.';
   if (armyAt(S, r, c)) return 'Feld besetzt.';
   if (enemyArmyAdjacent(S, pi, r, c)) return 'Nicht direkt neben einer gegnerischen Armee.';
+  // Es muss einen Weg über passierbare Felder von der Hauptstadt aus geben – auch mit
+  // Kartografie, die nur die Distanzkosten erlässt, nicht die Erreichbarkeit.
+  if (foundDistance(S, pi, r, c) == null)
+    return 'Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.';
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return 'Mindestens 3 Felder Abstand zu allen Städten.';
   const cost = foundCost(S, pi, r, c);
   if (available(S, pi, 'food') < cost) return `Zu wenig Nahrung (${cost} nötig).`;

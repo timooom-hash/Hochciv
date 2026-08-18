@@ -372,7 +372,8 @@ function openTile(r, c) {
         () => { ui.army = army; closeSheet(); redraw(); toast('Zielfeld antippen'); }, army.mp <= 0);
   } else {
     const cost = foundCost(S, pi, r, c), ferr = canFound(S, pi, r, c);
-    btn('Stadt gründen', ferr || 'Grundkosten + Distanz zur Hauptstadt', `${cost}🌾`,
+    const costLabel = cost === Infinity ? '—' : `${cost}🌾`;
+    btn('Stadt gründen', ferr || 'Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)', costLabel,
       () => { const e = foundCity(S, pi, r, c); e ? toast(e) : redraw(); closeSheet(); }, !!ferr);
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
@@ -380,13 +381,18 @@ function openTile(r, c) {
         () => { const e = buyTile(S, pi, r, c); e ? toast(e) : redraw(); openTile(r, c); }, owned);
     }
   }
-  if (has(p, 'atomwaffen'))
-    btn('Atomschlag auf dieses Feld', p.nuked ? 'diese Runde schon eingesetzt'
-      : 'zerstört alle Armeen hier und ringsum, auch eigene', '☢︎',
+  if (has(p, 'atomwaffen')) {
+    // Atomwaffenproteste sperren den Einsatz dauerhaft – dann ist der Knopf auch aus
+    const banned = evNukeBan(S, pi);
+    btn('Atomschlag auf dieses Feld',
+      banned ? 'durch Atomwaffenproteste dauerhaft gesperrt'
+        : p.nuked ? 'diese Runde schon eingesetzt'
+          : 'zerstört alle Armeen hier und ringsum, auch eigene', '☢︎',
       () => {
         const e = nuke(S, S.cur, r, c);
         toast(e || 'Atomschlag ausgeführt'); redraw(); openTile(r, c);
-      }, p.nuked);
+      }, p.nuked || banned);
+  }
   if (has(p, 'rad') && !city)
     btn(roadLevel(S, r, c) >= 1 ? 'Eisenbahn bauen' : 'Straße bauen',
       roadLevel(S, r, c) >= 1 ? 'Bewegung kostenlos' : 'Bewegung ½ Punkt',

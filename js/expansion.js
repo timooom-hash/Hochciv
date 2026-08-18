@@ -316,9 +316,12 @@ function applyWonderEffect(S, pi, city, w) {
       // "zwei momentan verfügbare Technologien": die Auswahl wird beim Bau festgehalten.
       // Sonst könnte die erste Gratis-Tech ein neues Zeitalter aufschließen und die
       // zweite Wahl um Technologien erweitern, die vorher nicht verfügbar waren.
+      // Die Singularität gilt als verfügbar, sobald ihre Voraussetzungen erfüllt sind –
+      // sie steht in keiner Techliste und braucht deshalb einen eigenen Eintrag.
       addFreePick(S, pi, {
         n: 2, why: 'Universität von Oxford',
-        only: techPool(S).filter(t => p.avail[t.k] && !p.techs[t.k]).map(t => t.k),
+        only: techPool(S).filter(t => p.avail[t.k] && !p.techs[t.k]).map(t => t.k)
+          .concat(singularityReady(p) && !p.techs.singularitaet ? ['singularitaet'] : []),
       });
       break;
     case 'gaerten':
@@ -383,7 +386,12 @@ function freePickOptions(S, pi) {
   const p = S.players[pi];
   const pick = freePick(p);
   if (!pick) return [];
-  return techPool(S).filter(t => {
+  // Die Singularität kann nur über eine ausdrücklich festgehaltene Auswahl kommen
+  // (Oxford). Raumfahrt schließt sie aus, für die Bibliothek ist sie zu spät.
+  const pool = techPool(S).slice();
+  if (pick.only && pick.only.includes('singularitaet') && !p.techs.singularitaet)
+    pool.push(SINGULARITY);
+  return pool.filter(t => {
     if (p.techs[t.k]) return false;
     if (pick.maxAge != null && t.age > pick.maxAge) return false;
     if (pick.availOnly && !p.avail[t.k]) return false;
