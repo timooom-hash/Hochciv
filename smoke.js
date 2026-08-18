@@ -226,9 +226,18 @@ step('Atomwaffen: Knopf vorhanden und wirksam', () => {
   const cap = G('capitalOf')(S, S.cur);
   const spot = G('neighbors')(cap.r, cap.c).find(([r, c]) => G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && !G('armyAt')(S, r, c));
   S.armies.push({ id: 9999, owner: (S.cur + 1) % S.players.length, r: spot[0], c: spot[1], mp: 0, born: 0 });
+  // Läuft gerade das Ereignis Atomwaffenproteste, muss der Knopf gesperrt sein
+  if (S.nukeBan) {
+    G('tapHex')(spot[0], spot[1]);
+    const locked = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Atomschlag/.test(x.textContent));
+    if (!locked || !locked.disabled) throw new Error('Atomschlag trotz Atomwaffenprotesten möglich');
+    console.log('       Atomwaffenproteste aktiv: Knopf korrekt gesperrt');
+    S.nukeBan = false;   // für den eigentlichen Test aufheben
+  }
   G('tapHex')(spot[0], spot[1]);
   const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Atomschlag/.test(x.textContent));
   if (!b) throw new Error('kein Atomschlag-Knopf im Aktionsblatt');
+  if (b.disabled) throw new Error('Atomschlag-Knopf ohne Grund gesperrt');
   b.onclick();
   if (S.armies.some(a => a.id === 9999)) throw new Error('Armee wurde nicht zerstört');
   const again = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Atomschlag/.test(x.textContent));

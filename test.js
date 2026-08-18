@@ -800,6 +800,78 @@ const setEvent = (S, k) => {
   eq(foundCost(C, 0, spot[0], spot[1]), 1, 'Kartografie allein: Basiskosten der ersten Stadt = 1');
 }
 
+/* ============================== Gründungsdistanz nur über passierbare Felder */
+{
+  const S = mk('england');
+  const cap = capitalOf(S, 0);
+  S.players[0].res = { sci: 0, food: 99, coins: 99 };
+  // Inseln ohne Landweg: nicht gründbar, egal wie kurz die Luftlinie ist
+  const island = within(cap.r, cap.c, 9).find(([r, c]) => terrainAt(S, r, c) === 'I' &&
+    foundDistance(S, 0, r, c) == null && !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
+  eq(!!island, true, 'es gibt eine Insel ohne Landweg');
+  eq(hexDistance(cap.r, cap.c, island[0], island[1]) < 99, true, 'die Luftlinie wäre kurz');
+  eq(foundCost(S, 0, island[0], island[1]) === Infinity, true, 'ohne Weg keine Kosten, sondern unmöglich');
+  eq(typeof canFound(S, 0, island[0], island[1]), 'string', 'ohne Navigation nicht gründbar');
+  eq(foundCity(S, 0, island[0], island[1]) !== null, true, 'Gründen wird abgelehnt');
+  // mit Navigation geht es, und die Distanz zählt über das Wasser
+  S.players[0].techs.navigation = true;
+  const d = foundDistance(S, 0, island[0], island[1]);
+  eq(typeof d === 'number', true, 'mit Navigation gibt es einen Weg');
+  eq(canFound(S, 0, island[0], island[1]), null, 'und die Gründung ist erlaubt');
+  eq(foundCost(S, 0, island[0], island[1]), 1 + d, 'Kosten = Basiskosten + Weglänge');
+  // Landziele: der Weg über passierbare Felder kann länger sein als die Luftlinie
+  const land = within(cap.r, cap.c, 8).find(([r, c]) => isLand(S, r, c) && !canFound(S, 0, r, c) &&
+    foundDistance(S, 0, r, c) > hexDistance(cap.r, cap.c, r, c));
+  if (land) eq(foundCost(S, 0, land[0], land[1]) > 1 + hexDistance(cap.r, cap.c, land[0], land[1]), true,
+    'gerechnet wird der Weg, nicht die Luftlinie');
+  // Kartografie erlässt die Distanzkosten, aber nicht die Erreichbarkeit
+  const K = mk('england', ['kartografie']);
+  const kcap = capitalOf(K, 0);
+  const kisle = within(kcap.r, kcap.c, 9).find(([r, c]) => terrainAt(K, r, c) === 'I' &&
+    foundDistance(K, 0, r, c) == null && !K.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
+  if (kisle) eq(typeof canFound(K, 0, kisle[0], kisle[1]), 'string',
+    'mit Kartografie bleibt eine unerreichbare Insel gesperrt');
+  // gegnerische Armeen machen Felder unpassierbar
+  const A = mk('england');
+  const acap = capitalOf(A, 0);
+  const path = within(acap.r, acap.c, 3).find(([r, c]) => isLand(A, r, c) && !cityAt(A, r, c));
+  eq(foundPassable(A, 0, path[0], path[1]), true, 'freies Landfeld ist passierbar');
+  A.armies.push({ id: 810, owner: 1, r: path[0], c: path[1], mp: 0, born: 0 });
+  eq(foundPassable(A, 0, path[0], path[1]), false, 'Feld mit gegnerischer Armee nicht');
+}
+
+/* ============================== Oxford kann die Singularität erforschen */
+{
+  const S = mkX('griechenland', { wonders: true });
+  const p = S.players[0], cap = capitalOf(S, 0);
+  FIELDS.forEach((_, f) => { techsIn(f, 3, S).slice(0, 1).forEach(t => { p.techs[t.k] = true; }); });
+  eq(singularityReady(p), true, 'die Voraussetzungen für die Singularität sind erfüllt');
+  p.res = { sci: 0, food: 99, coins: 999 };
+  const spot = within(cap.r, cap.c, 7).find(([r, c]) => !canFound(S, 0, r, c));
+  foundCity(S, 0, spot[0], spot[1]);
+  const c2 = cityAt(S, spot[0], spot[1]);
+  S.wonders.push({ k: 'gaerten', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  S.wonders.push({ k: 'koloss', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+  S.wonders.push({ k: 'zeus', lvl: 1, owner: 0, cityId: c2.id, r: c2.r, c: c2.c });
+  S.wpool[2] = ['oxford'];
+  eq(buildWonder(S, 0, c2, 'oxford'), null, 'Oxford gebaut');
+  eq(freePickOptions(S, 0).some(t => t.k === 'singularitaet'), true, 'die Singularität steht zur Wahl');
+  eq(useFreePick(S, 0, 'singularitaet'), null, 'sie ist kostenlos erforschbar');
+  eq(has(p, 'singularitaet'), true, 'sie ist erforscht');
+  eq(S.over && S.over.how.startsWith('Forschungssieg'), true, 'und gewinnt das Spiel');
+}
+/* Bibliothek und Raumfahrt bieten die Singularität nicht an */
+{
+  const S = mkX('griechenland', { wonders: true }, ['raumfahrt']);
+  const p = S.players[0], cap = capitalOf(S, 0);
+  FIELDS.forEach((_, f) => { techsIn(f, 3, S).slice(0, 1).forEach(t => { p.techs[t.k] = true; }); });
+  eq(singularityReady(p), true, 'Voraussetzungen erfüllt');
+  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.bibliothek);
+  eq(freePickOptions(S, 0).some(t => t.k === 'singularitaet'), false, 'die Bibliothek nicht');
+  p.freePicks = [{ n: 1, unlockedOnly: true, why: 'Raumfahrt' }];
+  eq(freePickOptions(S, 0).some(t => t.k === 'singularitaet'), false, 'Raumfahrt auch nicht');
+}
+
 /* ============================== Alchemie: Wissenschaft über Münzen in Nahrung */
 {
   const S = mk('griechenland');
@@ -1172,12 +1244,15 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const S = mkA('wikinger', 'armeemacht');
   const cap = capitalOf(S, 0), sp = spotBy(S, cap);
   S.armies.push({ id: 90, owner: 0, r: sp[0], c: sp[1], mp: 0, born: 0 });
-  eq(powerOf(S, 0), 1, 'eine Armee gibt +1 Macht');
+  eq(powerOf(S, 0), 2, 'eine Armee gibt +2 Macht');
+  S.armies.push({ id: 89, owner: 0, r: sp[0], c: sp[1] + 1, mp: 0, born: 0 });
+  eq(powerOf(S, 0), 4, 'zwei Armeen geben +4 Macht');
+  S.armies.pop();
   S.players[0].power = 4;
-  eq(powerOf(S, 0), 5, 'Machtwert = eigene Macht + Armeen');
+  eq(powerOf(S, 0), 6, 'Machtwert = eigene Macht + 2 je Armee');
   beginTurn(S);
-  eq(S.players[0].power, 1, 'Machtverlust rechnet mit 5 (aufgerundet 3) auf die eigene Macht');
-  eq(powerOf(S, 0), 2, 'der Armeezuschlag bleibt erhalten');
+  eq(S.players[0].power, 1, 'Machtverlust rechnet mit 6 (halbiert 3) auf die eigene Macht');
+  eq(powerOf(S, 0), 3, 'der Armeezuschlag bleibt erhalten');
 }
 
 /* Wikinger "Beutezüge": Angriffswert − Verteidigungswert je Ziel, Auszahlung nächste Runde */
@@ -1294,6 +1369,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const A = mkA('england', 'gruenden'), B = mkA('england', 'basis');
   const cap = capitalOf(A, 0);
   const far = within(cap.r, cap.c, 6).find(([r, c]) => isLand(A, r, c) &&
+    foundDistance(A, 0, r, c) != null &&           // erreichbar, sonst gibt es keine Kosten
     !A.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
   // Basiskosten bei einer Stadt = 1; die Distanzkosten sind in beiden Spielen gleich
   eq(foundCost(B, 0, far[0], far[1]) - foundCost(A, 0, far[0], far[1]), 1,
