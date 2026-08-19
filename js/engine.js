@@ -83,6 +83,8 @@ function newGame(cfg) {
     map: JSON.parse(JSON.stringify(cfg.map || DEFAULT_MAP)),
     roads: {}, sieges: {}, bought: {},
     cities: [], armies: [], nextId: 1,
+    // 1-gegen-1: nur zwei Reiche, kleinere Karte, höhere Siegschwelle
+    duel: !!cfg.duel,
     // Erweiterungen: Ereignisse und Weltwunder werden im Aufbau zugeschaltet
     ev: cfg.events ? { mode: cfg.eventMode === 'easy' ? 'easy' : 'hard' } : null,
     wo: !!cfg.wonders,
@@ -95,7 +97,9 @@ function newGame(cfg) {
       copies: 0, nuked: false, dead: false,
     })),
   };
-  log(S, 'head', 'Neues Spiel — ' + S.players.map(p => civOf(p).n + (p.kind === 'bot' ? ' (Bot)' : '')).join(', ') +
+  log(S, 'head', 'Neues Spiel — ' + (S.duel ? '1 gegen 1: ' : '') +
+    S.players.map(p => civOf(p).n + (p.kind === 'bot' ? ' (Bot)' : '')).join(', ') +
+    ` · ${S.map.name}` +
     (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? ' · Weltwunder' : ''));
 
   // Aufbau 3: Starttechnologien der Antike auswürfeln
@@ -1058,16 +1062,22 @@ function captureCity(S, pi, city) {
 /* ------------------------------------------------------------ Sieg & Zugende */
 /* Alle verfügbaren Siegschwellen. UN und Theologie senken die Standardschwelle von ⅔;
    es gilt immer die niedrigste. UN/Theologie sind „mehr als", der Standard „mindestens". */
-function victoryOption(p) {
-  const opts = [{ frac: VICTORY_FRAC, strict: false, label: '2/3' }];
-  if (has(p, 'un')) opts.push({ frac: UN_FRAC, strict: true, label: '1/2' });
-  if (has(p, 'theologie')) opts.push({ frac: THEOLOGY_FRAC, strict: true, label: '3/5' });
+function victoryOption(S, p) {
+  const duel = !!(S && S.duel);
+  // Im Duell liegen alle Schwellen höher: >3/4 statt >=2/3, Theologie 7/10, UN 2/3
+  const opts = duel
+    ? [{ frac: DUEL_VICTORY_FRAC, strict: true, label: '3/4' }]
+    : [{ frac: VICTORY_FRAC, strict: false, label: '2/3' }];
+  if (has(p, 'un'))
+    opts.push({ frac: duel ? DUEL_UN_FRAC : UN_FRAC, strict: true, label: duel ? '2/3' : '1/2' });
+  if (has(p, 'theologie'))
+    opts.push({ frac: duel ? DUEL_THEOLOGY_FRAC : THEOLOGY_FRAC, strict: true, label: duel ? '7/10' : '3/5' });
   return opts.sort((a, b) => a.frac - b.frac)[0];
 }
 function checkVictory(S, pi) {
   if (S.over) return S.over;
   const p = S.players[pi], w = worldPop(S), mine = popOf(S, pi);
-  const o = victoryOption(p);
+  const o = victoryOption(S, p);
   const enough = o.strict ? mine > w * o.frac : mine >= w * o.frac;
   if (w > 0 && enough && S.cities.length > 1) {
     S.over = { winner: pi, how: `Wirtschaftssieg (${mine} von ${w} Weltbevölkerung, Schwelle ${o.label})` };

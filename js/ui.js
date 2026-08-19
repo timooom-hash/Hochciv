@@ -765,10 +765,13 @@ function humanTurnStart() {
 }
 
 /* ------------------------------------------------------------------ Aufbau */
+let setupMode = 'vier';        // 'vier' = alle vier Reiche, 'duell' = 1 gegen 1
+
 function setupScreen() {
   const sel = $('setup-map');
   // MAPS[0] ist die Originalkarte – damit ist sie im Menü vorausgewählt.
   sel.innerHTML = MAPS.map((m, i) => `<option value="${i}">${m.name}</option>`).join('') +
+    '<option value="zufall">Zufallskarte (12 × 18)</option>' +
     (customMap ? '<option value="eigene">Eigene Karte</option>' : '');
   sel.value = '0';
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
@@ -777,11 +780,37 @@ function setupScreen() {
   const evBox = $('setup-events');
   evBox.onchange = () => { $('setup-evmode-row').hidden = !evBox.checked; };
   $('setup-evmode-row').hidden = !evBox.checked;
-  const list = $('setup-list'); list.innerHTML = '';
-  CIVS.forEach((civ, i) => {
-    const d = document.createElement('div'); d.className = 'slot';
-    d.innerHTML = `<h3>${SYM[civ.sym]} ${civ.n}</h3>
-      <div class="seg" data-civ="${civ.k}">
+  // Der gewählte Modus bleibt erhalten, wenn man den Aufbau erneut öffnet
+  $('setup-mode').querySelectorAll('[data-mode]').forEach(b =>
+    b.classList.toggle('on', b.dataset.mode === setupMode));
+  $('setup-mode').querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+    $('setup-mode').querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
+    setupMode = b.dataset.mode;
+    renderSlots();
+  });
+  renderSlots();
+}
+/* Zeichnet die Reichs-Karteikarten. Bei vier Reichen liegt die Zivilisation fest,
+   im Duell wählt jeder Platz seine eigene aus – beide Plätze nie dieselbe. */
+function renderSlots() {
+  const duel = setupMode === 'duell';
+  $('setup-map-row').hidden = duel;
+  $('setup-duel-hint').hidden = !duel;
+  const list = $('setup-list');
+  const chosen = duel ? duelChoice() : CIVS.map(c => c.k);
+  list.innerHTML = '';
+  chosen.forEach((civKey, i) => {
+    const civ = CIV_BY_KEY[civKey];
+    const d = document.createElement('div');
+    d.className = 'slot'; d.dataset.civ = civKey;
+    d.innerHTML = (duel
+      ? `<h3>${SYM[civ.sym]} Platz ${i + 1}</h3>
+         <label class="row"><span>Zivilisation</span>
+           <select data-civpick>${CIVS.map(c =>
+             `<option value="${c.k}"${c.k === civKey ? ' selected' : ''}>${c.n}</option>`).join('')}
+           </select></label>`
+      : `<h3>${SYM[civ.sym]} ${civ.n}</h3>`) +
+      `<div class="seg">
         <button data-kind="human" class="${i === 0 ? 'on' : ''}">Mensch</button>
         <button data-kind="bot" class="${i === 0 ? '' : 'on'}">Bot</button>
       </div>
@@ -804,22 +833,39 @@ function setupScreen() {
       d.querySelectorAll('[data-kind]').forEach(x => x.classList.toggle('on', x === b));
       paint(); refreshStart();
     });
+    const pick = d.querySelector('[data-civpick]');
+    if (pick) pick.onchange = () => {
+      // Kinds und Fähigkeiten bleiben erhalten, die Zivilisation wechselt
+      const kinds = [...list.children].map(x => x.querySelector('[data-kind].on').dataset.kind);
+      duelCivs[i] = pick.value;
+      const other = 1 - i;
+      if (duelCivs[other] === pick.value)                    // Kollision: anderen Platz umsetzen
+        duelCivs[other] = CIVS.map(c => c.k).find(k => k !== pick.value);
+      renderSlots();
+      [...list.children].forEach((x, j) => x.querySelectorAll('[data-kind]')
+        .forEach(b => b.classList.toggle('on', b.dataset.kind === kinds[j])));
+      [...list.children].forEach(x => x.querySelector('[data-abil]').onchange());
+      refreshStart();
+    };
     paint();
   });
   refreshStart();
 }
+let duelCivs = ['griechenland', 'wikinger'];
+function duelChoice() { return duelCivs.slice(0, 2); }
 function setupConfig() {
   const diff = $('setup-diff').value;    // ein Schwierigkeitsgrad für alle Bots
-  return CIVS.map((civ, i) => {
-    const slot = $('setup-list').children[i];
-    const kind = slot.querySelector('[data-kind].on').dataset.kind;
-    const ability = slot.querySelector('[data-abil]').value;
-    return { civ: civ.k, kind, diff, ability };
-  });
+  return [...$('setup-list').children].map(slot => ({
+    civ: slot.dataset.civ,
+    kind: slot.querySelector('[data-kind].on').dataset.kind,
+    diff,
+    ability: slot.querySelector('[data-abil]').value,
+  }));
 }
 function refreshStart() {
   const cfg = setupConfig(), sel = $('setup-start');
-  sel.innerHTML = cfg.map((p, i) => `<option value="${i}">${CIVS[i].n}${p.kind === 'bot' ? ' (Bot)' : ''}</option>`).join('');
+  sel.innerHTML = cfg.map((p, i) =>
+    `<option value="${i}">${CIV_BY_KEY[p.civ].n}${p.kind === 'bot' ? ' (Bot)' : ''}</option>`).join('');
   const firstHuman = cfg.findIndex(p => p.kind === 'human');
   sel.value = Math.max(0, firstHuman);
 }
@@ -881,10 +927,15 @@ function boot() {
   $('setup-go').onclick = () => {
     const players = setupConfig();
     if (!players.some(p => p.kind === 'human')) return toast('Mindestens eine menschliche Zivilisation.');
+    const duel = setupMode === 'duell';
     const pick = $('setup-map').value;
-    const map = pick === 'eigene' ? customMap : MAPS[+pick];
+    // Duell: immer eine frische 10 × 15-Zufallskarte mit festen Startpunkten
+    const map = duel ? duelMap(players[0].civ, players[1].civ)
+      : pick === 'eigene' ? customMap
+        : pick === 'zufall' ? randomMap()
+          : MAPS[+pick];
     S = newGame({
-      players, map, startPlayer: +$('setup-start').value,
+      players, map, duel, startPlayer: +$('setup-start').value,
       events: $('setup-events').checked, eventMode: $('setup-evmode').value,
       wonders: $('setup-wonders').checked,
     });
@@ -941,7 +992,8 @@ function rulesModal() {
       <li>Aktionen in beliebiger Reihenfolge, beliebig oft.</li>
       <li>Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen.
         Zwei Züge in Folge stärker → Stadt erobert.</li>
-      <li>Sieg: Singularität · 2/3 der Weltbevölkerung (UN 1/2, Theologie 3/5) ·
+      <li>Sieg: Singularität · ${S && S.duel ? 'über 3/4' : '2/3'} der Weltbevölkerung
+        (${S && S.duel ? 'UN 2/3, Theologie 7/10' : 'UN 1/2, Theologie 3/5'}) ·
         gegnerische Hauptstadt · Weltwunder der Stufe 3.</li>
     </ol>
     <p class="sub">Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
