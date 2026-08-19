@@ -216,6 +216,16 @@ Grenze ist das **Einkommen** (Geländenahrung − Bevölkerung), nicht der Vorra
 Zusätzlich zu den bekannten Bedingungen (Landfeld, kein Vulkan, kein besetztes Feld,
 mindestens 3 Felder Abstand zu jeder Stadt):
 
+- **Distanzkosten zählen den Weg, nicht die Luftlinie** (`foundDistance`). Passierbar sind
+  Landfelder, Wasser nur mit Navigation, Panzerschiff oder Luftwaffe, keine Vulkane und keine
+  Felder mit gegnerischen Armeen (Regelheft: „Von gegnerischen Armeen besetzte Felder …
+  zählen als unpassierbar"). **Gibt es keinen Weg, ist das Feld nicht gründbar** – vorher
+  wich die Rechnung auf die Luftlinie aus, wodurch man als England ohne Navigation auf einer
+  Insel siedeln konnte (behoben 17.8.). Kartografie erlässt nur die Distanzkosten, nicht die
+  Erreichbarkeit.
+  **Nicht umgesetzt, weil es eine echte Regeländerung wäre:** Das Regelheft zählt auch
+  „gegnerische Territorien" als unpassierbar und verbietet das Gründen daneben. Das würde die
+  Ausbreitung zwischen zwei Reichen stark einschränken – sag Bescheid, wenn es rein soll.
 - **Nicht direkt neben einer gegnerischen Armee.** Gilt für Menschen (`canFound`) und Bots
   (`settleable`) gleichermaßen; eigene Armeen stören nicht, zwei Felder Abstand genügt.
 - **Ausweichen des Bot-Siedlers** (Fehlerbehebung 17.8.): Zeigt die gewürfelte Richtung ins
@@ -231,6 +241,55 @@ mindestens 3 Felder Abstand zu jeder Stadt):
   Distanzkosten) vollständig gratis.
 - Bots siedeln jetzt ebenfalls nicht auf Vulkanfeldern (vorher möglich, weil `settleable`
   nur auf „Landfeld" prüfte).
+
+## 10c. Zufallskarte und 1 gegen 1 (neu am 17.8.)
+
+**Zufallskarte** (im Kartenmenü wählbar): feste Größe 12 × 18 und feste Startpunkte wie auf
+der Originalkarte, nur das Gelände wird gewürfelt. Die Mischung folgt der gemessenen
+Verteilung der Originalkarte – 36 % Grasland, 30 % Meer, 15 % Wald, 9 % Gebirge, 8 % Fluss,
+3 % Insel (`MAP_MIX`). Unter einer Hauptstadt liegt nie Meer; zusätzlich sind dort **Inseln
+ausgeschlossen**, weil eine Hauptstadt auf einer Insel ohne Navigation vollständig
+abgeschnitten wäre. Karten sind aus einem Startwert reproduzierbar (`randomMap(seed)`).
+
+**Mindestgüte jedes Startplatzes** (Vorgabe des Autors, 17.8.): Jede Hauptstadt muss im
+ersten Zug **mindestens 4 Nahrung** aufbringen können – Münzen zählen dabei **2:1** – und
+**mindestens ein siedelbares Feld in Distanz 3** haben. Gerechnet wird mit den
+Grunderträgen: keine Technologien, keine Zivilisationsfähigkeit, Stadt mit 1 Bevölkerung
+(verbraucht 1 Nahrung, bringt 1 Münze). Das ist genau die Zahl, die im Spiel als verfügbare
+Nahrung im ersten Zug erscheint (per Test gegen `available(S, pi, 'food')` abgeglichen).
+„Siedelbar" heißt: Landfeld, kein Vulkan, mindestens 3 Felder von jeder Hauptstadt entfernt
+und **über Land erreichbar** – ohne Erreichbarkeit würde `canFound` es ohnehin ablehnen.
+
+Erfüllt ein Startplatz das nicht, wird die Karte **nicht neu gewürfelt** – vier Startplätze
+gleichzeitig passen nur selten, die Ablehnungsquote wäre zu hoch. Stattdessen wird das
+Umland gezielt nachgebessert: erst legt `carveSpot` bei Bedarf einen Landweg zu einem Feld in
+Distanz 3, dann macht `boostFood` das nahrungsärmste Nachbarfeld zu Grasland, bis die
+Schwelle erreicht ist – Meer und Inseln zuletzt, damit Küsten möglichst erhalten bleiben.
+Die Geländemischung der Gesamtkarte verschiebt sich dadurch kaum (gemessen: Grasland 36 %,
+Meer 29 %, Wald 14 %, Gebirge 9 %, Fluss 8 %, Insel 3 %).
+
+Gemessen über 1600 Startplätze auf Zufallskarten und 400 auf Duellkarten: **keiner** unter
+4 Nahrung, **keiner** ohne Gründungsfeld; Startnahrung median 4, höchstens 7 – die
+Originalkarte liegt bei 4/5/5/4, der Startplatz ist also vergleichbar. Vorher waren es 2 %
+mit negativem Nahrungseinkommen, 12 % ohne Wachstumsmöglichkeit in Runde 1 und 1 % ohne
+jedes erreichbare Gründungsfeld; alle drei Werte sind jetzt 0.
+
+Ein Sonderfall bleibt und ist keine Kartenfrage: die **Gratis-Armee der Wikinger** steht zu
+Beginn neben der Hauptstadt und kann einen einzelnen Landkorridor für den eigenen Siedler
+blockieren (4 von 1200 Startplätzen). Die Armee muss die Stadt ohnehin verlassen, spätestens
+in der nächsten Runde ist der Weg frei.
+
+**1 gegen 1** (Umschalter oben im Aufbau): genau zwei Reiche, jeder Platz wählt frei eine der
+vier Zivilisationen mit allen drei Fähigkeiten, jeder Platz ist Mensch oder Bot. Zwei Plätze
+können nicht dieselbe Zivilisation nehmen – sie teilen sich Farbe und Symbol und wären auf der
+Karte nicht unterscheidbar; wählt man die des anderen, wechselt der andere Platz automatisch.
+Die Karte ist immer eine frische **Zufallskarte 10 × 15** mit zwei festen, weit
+auseinanderliegenden Startpunkten (`DUEL_STARTS`, Distanz 12); Platz 1 bekommt den ersten.
+Die **Siegschwellen liegen höher**: Wirtschaftssieg erst über 3/4 der Weltbevölkerung, mit
+Theologie über 7/10, mit Vereinten Nationen über 2/3 – auch hier gilt der niedrigste
+verfügbare Wert, und alle drei sind strikt („mehr als"). Militär-, Forschungs- und Kultursieg
+bleiben unverändert. Der Modus steht als `S.duel` im Spielstand; die Schwellen der
+Vier-Reiche-Partie bleiben unberührt.
 
 ## 11. Zivilisationsfähigkeiten (Bogen „Civs")
 
@@ -265,7 +324,7 @@ Auslegungen:
   Punkte Beute. Mit normal gekaufter Macht (0–2, halbiert sich jede Runde, 5 Münzen je Punkt)
   war es **0** – der Ertrag setzt voraus, dass man das Ziel tatsächlich überbietet, und
   Bot-Reiche haben als Machtwert ihre gesamte Bevölkerung. Das ist die Regel, kein Fehler.
-- **Wikinger „Kriegerkultur"**: +1 Machtwert je Armee. Der Zuschlag erhöht den
+- **Wikinger „Kriegerkultur"**: **+2** Machtwert je Armee (seit 17.8., vorher +1). Der Zuschlag erhöht den
   Machtverlust zu Zugbeginn (er rechnet auf den Gesamtwert), kann selbst aber nicht verloren
   gehen – abgezogen wird nur von der gekauften Macht. Genauso die Zeusstatue (+3).
 - **Griechenland „Rückschau"**: die Gratis-Tech kommt aus einem Zeitalter unterhalb der
@@ -373,7 +432,12 @@ Stufe-3-Wunder (mehr gibt es nicht). Der Pool ist für alle Reiche gemeinsam.
 - **Große Mauer** rechnet die Verteidigung **jeder** eigenen Stadt mit der Gesamtbevölkerung
   des Reiches.
 - **Große Bibliothek** ignoriert die Verfügbarkeit (Mittelalter oder früher), **Oxford** nur
-  momentan verfügbare Techs. Bei Oxford wird die Auswahl **beim Bau festgehalten**
+  momentan verfügbare Techs – **einschließlich der Singularität**, sobald ihre
+  Voraussetzungen erfüllt sind; sie steht in keiner Techliste und brauchte dafür einen
+  eigenen Eintrag in der Auswahl (behoben 17.8.). Kostenlos erforscht gewinnt sie das Spiel
+  genauso wie bezahlt. Die Bibliothek (Mittelalter oder früher) und Raumfahrt (ausdrücklich
+  „außer Singularität") bieten sie nicht an.
+  Bei Oxford wird die Auswahl **beim Bau festgehalten**
   (`only`-Liste): schließt die erste Gratis-Tech ein neues Zeitalter auf, erweitert das die
   zweite Wahl nicht – „momentan verfügbar" meint den Moment des Baus (behoben 17.8.).
 - **Canal du Midi** gibt 40 Münzen, die wie jede Ressource am Zugende verfallen.

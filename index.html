@@ -40,9 +40,16 @@
   <div class="pad">
     <p class="hint">Wer zuletzt ein Weltwunder gebaut hat, beginnt. Ansonsten: die erste
       menschliche Zivilisation in der Liste.</p>
+    <div class="seg wide" id="setup-mode">
+      <button data-mode="vier" class="on">Vier Reiche</button>
+      <button data-mode="duell">1 gegen 1</button>
+    </div>
     <div id="setup-list"></div>
-    <label class="row"><span>Karte</span>
+    <label class="row" id="setup-map-row"><span>Karte</span>
       <select id="setup-map"></select></label>
+    <p class="hint" id="setup-duel-hint" hidden>1 gegen 1: zufällige Karte 10 × 15 mit festen
+      Startpunkten. Wirtschaftssieg erst über 3/4 der Weltbevölkerung (mit Theologie 7/10,
+      mit Vereinten Nationen 2/3).</p>
     <label class="row"><span>Mit Ereignissen</span>
       <input type="checkbox" id="setup-events"></label>
     <label class="row" id="setup-evmode-row" hidden><span>Ereignisstärke</span>

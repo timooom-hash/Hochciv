@@ -49,6 +49,31 @@ step('Schwierigkeit ist global (ein Dropdown)', () => {
   if ($('setup-list').querySelector('[data-diff]')) throw new Error('noch Pro-Bot-Schwierigkeit vorhanden');
   console.log('       ' + [...sel.options].map(o => o.text).join(' · '));
 });
+step('Zufallskarte im Menü wählbar', () => {
+  const opts = [...$('setup-map').options].map(o => o.value);
+  if (!opts.includes('zufall')) throw new Error('keine Zufallskarte im Kartenmenü');
+  console.log('       ' + [...$('setup-map').options].map(o => o.text).join(' · '));
+});
+step('1-gegen-1-Modus im Aufbau', () => {
+  $('setup-mode').querySelector('[data-mode=duell]').onclick();
+  const slots = [...$('setup-list').children];
+  if (slots.length !== 2) throw new Error('nicht zwei Plätze, sondern ' + slots.length);
+  if (!$('setup-map-row').hidden) throw new Error('Kartenauswahl im Duell nicht versteckt');
+  if ($('setup-duel-hint').hidden) throw new Error('kein Hinweis auf die Duellregeln');
+  const picks = slots.map(x => x.querySelector('[data-civpick]'));
+  if (picks.some(p => !p) || picks[0].options.length !== 4)
+    throw new Error('nicht alle vier Zivilisationen wählbar');
+  // Kollision muss aufgelöst werden
+  picks[0].value = slots[1].dataset.civ; picks[0].onchange();
+  const now = [...$('setup-list').children].map(x => x.dataset.civ);
+  if (now[0] === now[1]) throw new Error('beide Plätze mit derselben Zivilisation');
+  if (![...$('setup-list').children][1].querySelector('[data-abil]').options.length)
+    throw new Error('keine Fähigkeiten im zweiten Platz');
+  console.log('       ' + now.join(' gegen ') + ', Startspieler-Auswahl: ' +
+    [...$('setup-start').options].map(o => o.text).join('/'));
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  if ($('setup-list').children.length !== 4) throw new Error('Rückschalten auf vier Reiche misslingt');
+});
 step('Originalkarte ist vorausgewählt', () => {
   const sel = $('setup-map');
   const chosen = sel.options[sel.selectedIndex >= 0 ? sel.selectedIndex : 0].text;

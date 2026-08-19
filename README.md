@@ -23,6 +23,8 @@ sonst behalten installierte Geräte die alte Fassung.
 |---|---|
 | Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
+| Spielart | „Vier Reiche“ oder „1 gegen 1“ (zwei frei gewählte Zivilisationen, Karte 10 × 15, Wirtschaftssieg erst über 3/4) |
+| Karte | Originalkarte, Große Karte, Zufallskarte oder eigene aus dem Editor |
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
 | 🌾 in der Kopfzeile | Städte füttern (nur mit Gentechnik oder Massenmedien) |
 | Weltwunder bauen | im Stadtblatt, wenn die Erweiterung an ist |

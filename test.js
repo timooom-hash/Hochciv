@@ -427,9 +427,9 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 /* Theologie senkt die Siegschwelle auf 3/5, UN gewinnt bei Gleichstand die niedrigere */
 {
   const S = mk('griechenland', ['theologie']);
-  eq(victoryOption(S.players[0]).frac, 3 / 5, 'Theologie setzt Schwelle auf 3/5');
+  eq(victoryOption(S, S.players[0]).frac, 3 / 5, 'Theologie setzt Schwelle auf 3/5');
   S.players[0].techs.un = true;
-  eq(victoryOption(S.players[0]).frac, 0.5, 'UN (1/2) schlägt Theologie (3/5)');
+  eq(victoryOption(S, S.players[0]).frac, 0.5, 'UN (1/2) schlägt Theologie (3/5)');
 }
 
 /* Keramik + Verbundwerkstoffe: bis 3x wachsen, davon 1x gratis */
@@ -1203,6 +1203,179 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   captureCity(S, other, city);      // Bevölkerung 1 − 2 → Stadt zerstört
   eq(S.wonders.length, 0, 'die Wunder des Bots gehen mit der Stadt verloren');
   eq(S.wgone.includes('stonehenge'), true, 'auch Stonehenge selbst');
+}
+
+/* ==================================================== Zufallskarten */
+{
+  const m = randomMap(4242);
+  eq([m.rows.length, m.rows[0].length], [12, 18], 'Zufallskarte hat die feste Größe 12 × 18');
+  eq(m.rows.every(r => r.length === 18), true, 'alle Zeilen gleich lang');
+  eq(Object.keys(m.capitals).sort(), CIVS.map(c => c.k).sort(), 'alle vier Startpunkte vorhanden');
+  eq(JSON.stringify(m.capitals), JSON.stringify(RANDOM_CAPITALS), 'die Startpunkte liegen fest');
+  eq(m.rows.every(r => [...r].every(t => TERRAIN[t])), true, 'nur bekanntes Gelände');
+  // kein Meer und keine Insel unter einer Hauptstadt
+  for (const [civ, [r, c]] of Object.entries(m.capitals))
+    eq(['G', 'W', 'B', 'F'].includes(m.rows[r][c]), true, `Hauptstadt ${civ} liegt auf Land`);
+  // Mindestgüte: 4 Nahrung (Münzen 2:1) und ein siedelbares Feld in Distanz 3
+  {
+    const grid = m.rows.map(r => r.split(''));
+    for (const [civ, [r, c]] of Object.entries(m.capitals)) {
+      eq(startFood(grid, r, c) >= START_MIN_FOOD, true, `${civ} startet mit mindestens 4 Nahrung`);
+      eq(startSpots(grid, r, c, m.capitals).length > 0, true, `${civ} hat ein Gründungsfeld in Distanz 3`);
+    }
+  }
+  // gleicher Startwert = gleiche Karte, anderer = andere
+  eq(randomMap(4242).rows.join(''), m.rows.join(''), 'gleicher Startwert ergibt dieselbe Karte');
+  eq(randomMap(99).rows.join('') !== m.rows.join(''), true, 'anderer Startwert ergibt eine andere');
+  // über viele Karten liegt die Mischung nahe an der Vorlage
+  let count = {}, total = 0;
+  for (let g = 0; g < 40; g++) for (const t of randomMap(g).rows.join('')) { count[t] = (count[t] || 0) + 1; total++; }
+  for (const [k, w] of MAP_MIX) {
+    const pct = 100 * count[k] / total;
+    eq(Math.abs(pct - w) < 3, true, `${TERRAIN[k].name} liegt bei ${pct.toFixed(0)} % (Vorlage ${w} %)`);
+  }
+  // ein Spiel darauf läuft
+  const S = newGame({ seed: 5, map: randomMap(7), players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })) });
+  eq(S.cities.length, 4, 'vier Hauptstädte gesetzt');
+  let guard = 0;
+  while (!S.over && guard++ < 400) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+  eq(!!S.over, true, 'die Partie auf der Zufallskarte endet regulär');
+}
+
+/* Mindestgüte über viele Karten und Startwerte, auch auf der Duellkarte */
+{
+  let checked = 0, badFood = 0, badSpot = 0, foods = [];
+  for (let g = 0; g < 120; g++) {
+    const maps = [randomMap(12000 + g), duelMap(CIVS[g % 4].k, CIVS[(g + 1) % 4].k, 12000 + g)];
+    for (const m of maps) {
+      const grid = m.rows.map(r => r.split(''));
+      for (const [, [r, c]] of Object.entries(m.capitals)) {
+        checked++;
+        const f = startFood(grid, r, c);
+        foods.push(f);
+        if (f < START_MIN_FOOD) badFood++;
+        if (!startSpots(grid, r, c, m.capitals).length) badSpot++;
+        // die Gründungsfelder liegen genau 3 Felder weg (näher wäre ohnehin verboten)
+        if (!startSpots(grid, r, c, m.capitals).every(([sr, sc]) => hexDistance(r, c, sr, sc) === 3)) badSpot++;
+      }
+    }
+  }
+  eq(checked >= 700, true, `${checked} Startplätze geprüft`);
+  eq(badFood, 0, 'kein Startplatz unter 4 Nahrung');
+  eq(badSpot, 0, 'kein Startplatz ohne Gründungsfeld');
+  foods.sort((a, b) => a - b);
+  console.log('       Startnahrung auf Zufallskarten: min ' + foods[0] +
+    ', median ' + foods[foods.length >> 1] + ', max ' + foods[foods.length - 1]);
+}
+/* Die Schwelle rechnet Münzen 2:1 – gleiche Zahl wie im Spiel verfügbar */
+{
+  const m = randomMap(777);
+  const S = newGame({ seed: 3, map: m, players: CIVS.map(c => ({ civ: c.k, kind: 'human', ability: 'basis' })) });
+  const gi = S.players.findIndex(p => p.civ === 'griechenland');   // ohne Ertragsfähigkeit
+  S.cur = gi; beginTurn(S);
+  const cap = capitalOf(S, gi);
+  const grid = m.rows.map(r => r.split(''));
+  eq(available(S, gi, 'food'), startFood(grid, cap.r, cap.c),
+    'die Kartenprüfung entspricht der im Spiel verfügbaren Nahrung');
+  eq(available(S, gi, 'food') >= 4, true, 'und liegt bei mindestens 4');
+  // im echten Spiel ist damit auch Wachstum möglich
+  eq(foodAfterGrowth(S, gi, cap, 1) >= 0, true, 'die Stadt kann in Runde 1 wachsen');
+  eq(canGrow(S, gi, cap), null, 'Wachstum wird nicht blockiert');
+}
+/* Nachbesserung verändert die Geländemischung nur geringfügig */
+{
+  let count = {}, total = 0;
+  for (let g = 0; g < 40; g++) for (const t of randomMap(20000 + g).rows.join('')) { count[t] = (count[t] || 0) + 1; total++; }
+  for (const [k, w] of MAP_MIX) {
+    const pct = 100 * count[k] / total;
+    eq(Math.abs(pct - w) < 4, true, `${TERRAIN[k].name} bleibt bei ${pct.toFixed(0)} % (Vorlage ${w} %)`);
+  }
+}
+
+/* ==================================================== 1 gegen 1 */
+{
+  const m = duelMap('england', 'russland', 11);
+  eq([m.rows.length, m.rows[0].length], [10, 15], 'Duellkarte ist 10 × 15');
+  eq(Object.keys(m.capitals).sort(), ['england', 'russland'], 'nur die beiden gewählten Reiche');
+  eq(m.capitals.england, DUEL_STARTS[0], 'Platz 1 sitzt auf dem ersten festen Startpunkt');
+  eq(m.capitals.russland, DUEL_STARTS[1], 'Platz 2 auf dem zweiten');
+  eq(hexDistance(...m.capitals.england, ...m.capitals.russland) >= 8, true, 'die Startpunkte liegen weit auseinander');
+  for (const [civ, [r, c]] of Object.entries(m.capitals))
+    eq(['G', 'W', 'B', 'F'].includes(m.rows[r][c]), true, `Hauptstadt ${civ} liegt auf Land`);
+  // alle vier Zivilisationen sind auf beiden Plätzen möglich
+  for (const a of CIVS) for (const b of CIVS) {
+    if (a.k === b.k) continue;
+    const d = duelMap(a.k, b.k, 3);
+    eq(Object.keys(d.capitals).length, 2, `${a.n} gegen ${b.n} bekommt zwei Startpunkte`);
+  }
+}
+/* Siegschwellen im Duell: >3/4, mit Theologie >7/10, mit UN >2/3 – niedrigste gilt */
+{
+  const S = newGame({
+    seed: 8, duel: true, map: duelMap('griechenland', 'england', 8),
+    players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }],
+  });
+  eq(S.duel, true, 'der Duellmodus steht im Spielstand');
+  eq(S.players.length, 2, 'nur zwei Reiche');
+  const p = S.players[0];
+  const o = victoryOption(S, p);
+  eq([o.frac, o.strict, o.label], [3 / 4, true, '3/4'], 'Grundschwelle im Duell ist >3/4');
+  p.techs.theologie = true;
+  eq(victoryOption(S, p).label, '7/10', 'mit Theologie >7/10');
+  p.techs.un = true;
+  eq(victoryOption(S, p).label, '2/3', 'mit Vereinten Nationen >2/3, die niedrigste gilt');
+  // im normalen Spiel bleiben die alten Schwellen
+  const N = mk('griechenland', ['theologie', 'un']);
+  eq(victoryOption(N, N.players[0]).label, '1/2', 'ohne Duell weiter UN 1/2');
+  eq(victoryOption(N, mk('griechenland').players[0]).label, '2/3', 'und Grundschwelle 2/3');
+}
+/* Wirtschaftssieg im Duell greift erst über 3/4 */
+{
+  const S = newGame({
+    seed: 9, duel: true, map: duelMap('griechenland', 'england', 9),
+    players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }],
+  });
+  const a = capitalOf(S, 0), b = capitalOf(S, 1);
+  a.pop = 3; b.pop = 1;                     // genau 3/4
+  eq(checkVictory(S, 0), null, 'genau 3/4 reicht nicht (strikt größer)');
+  a.pop = 4;                                 // 4/5 > 3/4
+  eq(!!checkVictory(S, 0), true, 'über 3/4 gewinnt');
+  // im Vier-Reiche-Spiel hätte 3/4 schon gereicht
+  const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
+  N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = 2/3
+  eq(!!checkVictory(N, 0), true, 'ohne Duell genügen 2/3');
+}
+/* Eine vollständige 1-gegen-1-Partie Mensch gegen Bot läuft durch */
+{
+  let ended = 0, howto = {};
+  for (let g = 0; g < 20; g++) {
+    const civs = [CIVS[g % 4].k, CIVS[(g + 1) % 4].k];
+    const S = newGame({
+      seed: 400 + g, duel: true, map: duelMap(civs[0], civs[1], 400 + g),
+      events: g % 2 === 0, eventMode: 'hard', wonders: g % 3 === 0,
+      players: [
+        { civ: civs[0], kind: 'human', ability: CIV_BY_KEY[civs[0]].abilities[g % 3].k },
+        { civ: civs[1], kind: 'bot', diff: 'david' },
+      ],
+    });
+    let guard = 0;
+    while (!S.over && guard++ < 400) {
+      const pi = S.cur;
+      if (S.players[pi].kind === 'bot') { botTurn(S, pi); if (S.over) break; endTurn(S); continue; }
+      // einfache menschliche Züge
+      feedSources(S, pi).forEach(x => feed(S, pi, x.kind, x.have));
+      citiesOf(S, pi).forEach(c => growCity(S, pi, c));
+      researchable(S, pi).sort((x, y) => techCost(S, pi, x) - techCost(S, pi, y))
+        .forEach(t => { if (available(S, pi, 'sci') >= techCost(S, pi, t)) doResearch(S, pi, t.k); });
+      const cap = capitalOf(S, pi);
+      if (cap) for (const [r, c] of within(cap.r, cap.c, 5)) if (!canFound(S, pi, r, c)) { foundCity(S, pi, r, c); break; }
+      if (S.over) break;
+      endTurn(S);
+    }
+    if (S.over) { ended++; const k = S.over.how.split(' (')[0]; howto[k] = (howto[k] || 0) + 1; }
+  }
+  eq(ended, 20, '20 Duellpartien enden regulär');
+  console.log('       Duell-Siegarten: ' + JSON.stringify(howto));
 }
 
 /* ==================================================== Karte und Aufbau */
