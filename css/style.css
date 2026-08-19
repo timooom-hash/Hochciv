@@ -208,3 +208,6 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
 .res.food{border:0;background:none;cursor:pointer}
 
 .yrow.prev{color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--rule)}
+
+.seg.wide{display:flex;margin:0 0 12px}
+.seg.wide button{flex:1;padding:10px}
