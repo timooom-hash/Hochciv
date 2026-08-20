@@ -23,6 +23,7 @@
     <div class="menu-actions">
       <button class="btn primary" id="m-new">Neues Spiel</button>
       <button class="btn" id="m-continue" hidden>Spiel fortsetzen</button>
+      <button class="btn" id="m-tutorial">Tutorial</button>
       <button class="btn" id="m-editor">Karte bearbeiten</button>
       <button class="btn ghost" id="m-rules">Regeln &amp; Technologien</button>
       <button class="btn ghost" id="m-load">Spielstand laden</button>
@@ -86,6 +87,24 @@
     <div id="sheet-body"></div>
   </div>
 
+  <section id="tut-panel" hidden>
+    <div class="tut-bar"><div class="tut-bar-fill" id="tut-bar-fill"></div></div>
+    <div class="tut-head">
+      <span class="tut-sub" id="tut-sub"></span>
+      <button class="btn small ghost" id="tut-quit">Tutorial beenden</button>
+    </div>
+    <div class="tut-scroll">
+      <h3 class="tut-h" id="tut-title"></h3>
+      <div id="tut-body"></div>
+    </div>
+    <p class="tut-task" id="tut-task" hidden></p>
+    <div class="tut-nav">
+      <button class="btn small" id="tut-prev">‹</button>
+      <span class="tut-count" id="tut-count"></span>
+      <button class="btn small primary" id="tut-next">Weiter ›</button>
+    </div>
+  </section>
+
   <nav class="actionbar">
     <button class="btn small" id="a-tech">Forschen</button>
     <button class="btn small" id="a-power">Macht</button>
@@ -123,6 +142,7 @@
 <script src="js/engine.js"></script>
 <script src="js/expansion.js"></script>
 <script src="js/bots.js"></script>
+<script src="js/tutorial.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

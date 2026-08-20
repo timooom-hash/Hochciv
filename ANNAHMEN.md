@@ -291,6 +291,82 @@ verfügbare Wert, und alle drei sind strikt („mehr als"). Militär-, Forschung
 bleiben unverändert. Der Modus steht als `S.duel` im Spielstand; die Schwellen der
 Vier-Reiche-Partie bleiben unberührt.
 
+## 10d. Tutorial als geführtes Übungsspiel
+
+Kein Textbildschirm, sondern die **normale Spieloberfläche**: echte Karte, echte Kopfzeile,
+echte Aktionsleiste, darunter ein Erklärpanel (höchstens 46 % der Höhe). 25 Schritte, davon
+16 mit Aufgabe, die der Spieler **selbst** ausführen muss; „Weiter" bleibt gesperrt, bis sie
+erledigt ist. Einen „Für mich machen"-Ausweg gibt es bewusst **nicht** – die Schritt-Skripte
+(`auto`) existieren nur noch als Testtreiber. Jede Aktionsart nennt den **Klickweg**
+(„Stadt antippen → im Blatt auf Armee bauen"); ein Test prüft, dass kein Aufgabenschritt
+ohne solchen Weg auskommt.
+
+**Alles läuft auf Schienen.** Drei Mechanismen zusammen:
+
+1. **Feste Würfelfolge** (`TUT_DICE`): solange das Tutorial läuft, zieht `d6()` seine Werte
+   aus dieser Liste statt aus dem Zufallsgenerator (`tutNextDie`, eingehängt in `d6`). Damit
+   sind auch alle **Bot-Entscheidungen** identisch – Wachstum, Siedeln, Forschen,
+   Armeebewegung. Die Folge wurde aus mehreren Kandidaten so gewählt, dass die Beispielpartie
+   erzählerisch aufgeht (siehe unten); jede Zahl 1–6 kommt vor, sonst könnten
+   Auswürfel-Schleifen im Kreis laufen. `ui.tut` wird **vor** `newGame` gesetzt, damit schon
+   die Aufbauwürfe daraus kommen.
+2. **Festgelegte Startverfügbarkeit** (`TUT_START_AVAIL`) statt gewürfelter: Schrift,
+   Fischerei, Rad, Keramik, Eisenverarbeitung, Belagerungsmaschinen, Stadtmauern, Demokratie
+   – wie im Beispielprotokoll. Später nötige Technologien (Papier, Wissenschaftliche Methode,
+   Burgenbau) werden im jeweiligen Schritt freigeschaltet.
+3. **Schienen in der Oberfläche** (`allow` je Schritt): erlaubt sind nur die vorgesehene
+   Leistentaste, die vorgesehenen Blatt-Knöpfe, Technologiekacheln, Zielfelder. **Leseschritte
+   und bereits erledigte Aufgaben erlauben gar keine Aktion** (nur Welt und Protokoll) –
+   sonst könnte man in einem Erklärschritt irgendwo gründen oder den Zug ein zweites Mal
+   beenden. Gegatet wird zentral in `sheet()`, also auch Macht- und Armeeblatt.
+4. **Vorgegebene Würfe je Schritt** (`dice`): wo eine Technologie des nächsten Zeitalters
+   gebraucht wird (Papier, Wissenschaftliche Methode, Burgenbau), ist der zugehörige
+   Verfügbarkeitswurf gesetzt. Vorher wurde die Verfügbarkeit still überschrieben – im
+   Protokoll stand dann ein misslungener Wurf und die Technologie war trotzdem da.
+
+`test.js` startet den Ablauf **zweimal** über dieselbe Funktion, die auch die App benutzt
+(`tutorialSetup`), und vergleicht Protokoll und Endzustand Zeichen für Zeichen.
+
+**Der Bogen der Beispielpartie** (Runden 1–3): Einkommen 1/5/3 verstehen · Stadt auf 3/12
+(1 Basiskosten + 3 Weg) · Schrift · Hauptstadt wachsen · Zug beenden und Bots lesen ·
+Zinseszins in Runde 2 · Papier · dritte Stadt · zweimal wachsen · erste Armee bauen und an
+den Reichsrand ziehen · Griechenland belagert die Grenzstadt aus eigenem Antrieb
+(„Angriff 5 > Verteidigung 1 (Zug 1/2)") · Wissenschaftliche Methode, danach zwei
+Technologien für null · **Stadtmauern und Burgenbau** · vier Macht · Zug beenden, und die
+Belagerung bricht („Angriff 9 ≤ Verteidigung 14"). Danach Nahrungsgrenze, Siegwege,
+Anfängerfehler, Abschluss.
+
+Die Belagerung wird **nicht gestellt**: der Schritt übernimmt die Armee, die der griechische
+Bot von sich aus neben die Stadt gezogen hat (Notfallpfad mit eigener Protokollzeile bleibt
+für den Fall, dass sie fehlt). Burgenbau ist der Grund, warum gekaufte Macht der Verteidigung
+hilft – ohne die virtuelle Armee in der Stadt wäre die Stadt in Runde 3 gefallen; das war
+gemessen und hat die Auswahl der Würfelfolge mitbestimmt.
+
+**Bewusst nicht erwähnt:** Ereignisse, Weltwunder, 1 gegen 1, Zufallskarten, Karteneditor,
+Kultursieg – das Tutorial bleibt in der Grundform. Ebenso stehen **keine Feldkoordinaten** in
+den Texten: es wird immer über die **goldene Umrandung** gesprochen. Beides prüft `test.js`. Auch Verweise auf „die Partie des Autors"
+kommen nicht vor; die zitierten Protokollzeilen sind die des laufenden Übungsspiels. Beides
+ist per Test abgesichert.
+
+**Alle Zahlen im Text** kommen aus dem laufenden Spielstand (`incomeBreakdown`, `techCost`,
+`growPrice`, `defenseValue`, `attackValue`, `powerPrice`, `foodAfterGrowth`, `victoryOption`)
+und können deshalb nicht veralten. „Fertig" oder „Tutorial beenden" schließt nur das Panel –
+das Übungsspiel läuft ohne Einschränkungen weiter.
+
+## 10e. Blätter und Fenster überlagern die Aktionsleiste nicht mehr
+
+Zusätzlich war das **geschlossene** Blatt nicht wirklich weg: `translateY(110 %)` schiebt es
+um die eigene Höhe nach unten, und bei kurzem Inhalt blieb ein leerer Kasten über der
+Aktionsleiste stehen. Geschlossen ist es jetzt `visibility: hidden` (verzögert, damit die
+Animation erhalten bleibt).
+
+Auf breiten Geräten schwebt das Aktionsblatt in der rechten unteren Ecke – es lag damit genau
+über „Protokoll" und „Zug beenden". Jetzt endet es **über** der Leiste
+(`bottom: 74px + safe`), und solange ein Blatt oder ein Fenster offen ist, ist die Leiste
+**gesperrt und abgeblendet** (`body.blocked`, gesetzt in `sheet`/`closeSheet`/`modal`/
+`closeModal`). Das betrifft auch das Bot-Zug-Fenster, das dasselbe Blatt benutzt. Ein
+Fehlgriff auf „Zug beenden" neben dem Blatt ist damit ausgeschlossen.
+
 ## 11. Zivilisationsfähigkeiten (Bogen „Civs")
 
 Der Bogen nennt andere Völkernamen als das Spiel; zugeordnet über die identischen

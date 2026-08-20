@@ -22,7 +22,7 @@ const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 // Im Browser teilen sich <script>-Tags den globalen Gültigkeitsbereich; eval nicht.
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
-const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ui.js']
+const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");');
 const G = n => window.__get(n);
@@ -34,6 +34,128 @@ const step = (label, fn) => {
 };
 
 step('Menü gerendert', () => { if (!$('m-new')) throw new Error('kein Startknopf'); });
+step('Tutorial: Übungsspiel startet in der Spieloberfläche', () => {
+  $('m-tutorial').onclick();
+  if (!$('screen-game').classList.contains('show')) throw new Error('Tutorial öffnet nicht das Spiel');
+  if ($('tut-panel').hidden) throw new Error('kein Erklärpanel unter der Karte');
+  if ($('map').querySelectorAll('[data-r]').length !== 216) throw new Error('Karte fehlt');
+  const S = G('S');
+  if (S.players.find(p => p.kind === 'human').civ !== 'russland') throw new Error('nicht Russland');
+  console.log('       ' + $('tut-count').textContent + ' · „' + $('tut-title').textContent + '"');
+});
+step('Tutorial: Schienen sperren alles außer dem vorgesehenen Schritt', () => {
+  // Leseschritt 1: Aktionsleiste bis auf Nachschlagen gesperrt
+  const locked = ['a-tech', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
+  if (locked.length) throw new Error('offene Knöpfe im Leseschritt: ' + locked.join(','));
+  // Gründungsschritt: nur das goldene Feld reagiert
+  G('tutMove')(1); G('tutMove')(1); G('tutMove')(1);
+  const hl = G('tutHighlight')();
+  if (!hl || hl.length !== 1) throw new Error('nicht genau ein Zielfeld markiert');
+  const cap = G('capitalOf')(G('S'), G('RU')());
+  G('tapHex')(cap.r, cap.c);
+  const wrong = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+  if (wrong.length) throw new Error('auf falschem Feld sind Aktionen offen');
+  G('closeSheet')();
+  console.log('       Zielfeld ' + hl[0].join('/') + ', andere Felder gesperrt');
+});
+step('Tutorial: Leseschritte erlauben gar keine Aktion', () => {
+  // Schritt 2 ist ein reiner Leseschritt – dort darf man weder gründen noch wachsen
+  const S = G('S');
+  while (+$('tut-count').textContent.split('/')[0] < 2) $('tut-next').onclick();
+  const cap = G('capitalOf')(S, G('RU')());
+  G('tapHex')(cap.r, cap.c);
+  const open = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+  if (open.length) throw new Error('im Leseschritt anklickbar: ' + open.map(b => b.textContent.trim()).join(', '));
+  G('closeSheet')();
+  const bar = ['a-tech', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
+  if (bar.length) throw new Error('Leiste im Leseschritt offen: ' + bar.join(', '));
+  console.log('       Stadtblatt und Leiste im Leseschritt vollständig gesperrt');
+  $('tut-prev').onclick();
+});
+step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
+  const n = G('TUT_STEPS').length;
+  const open = () => !$('tut-next').disabled;
+  let manual = 0;
+  for (let i = 0; i < n; i++) {
+    if (!$('tut-body').textContent.trim()) throw new Error('Schritt ' + (i + 1) + ' ohne Text');
+    if (!open()) {
+      if ($('tut-task').hidden) throw new Error('Aufgabe ohne Hinweiszeile in Schritt ' + (i + 1));
+      const t = $('tut-title').textContent;
+      const hl = G('tutHighlight')() || [];
+      if (/Zug beenden/.test(t)) {
+        $('a-end').onclick();
+        let guard = 0;
+        while (guard++ < 24 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
+        manual++;
+      } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau/.test(t)) {
+        $('a-tech').onclick();
+        const free = [...$('ov-body').querySelectorAll('[data-tech]')].filter(b => !b.disabled);
+        if (!free.length) throw new Error('keine Kachel freigegeben in: ' + t);
+        free.forEach(b => b.onclick());
+        G('closeModal')(); manual++;
+      } else if (/Stadt/.test(t) && hl.length) {
+        G('tapHex')(hl[0][0], hl[0][1]);
+        const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+        if (!en.length) throw new Error('kein Knopf freigegeben in: ' + t);
+        en[0].onclick(); G('closeSheet')(); manual++;
+      } else if (/wachsen/.test(t)) {
+        for (const h of hl) {
+          G('tapHex')(h[0], h[1]);
+          const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+          if (en.length) en[0].onclick();
+          G('closeSheet')();
+        }
+        manual++;
+      } else if (/erste Armee/.test(t)) {
+        G('tapHex')(hl[0][0], hl[0][1]);
+        const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+        if (!en.length) throw new Error('Armee bauen nicht freigegeben');
+        en[0].onclick(); G('closeSheet')(); manual++;
+      } else if (/Armee bewegen/.test(t)) {
+        const a = G('armiesOf')(G('S'), G('RU')())[0];
+        G('tapHex')(a.r, a.c);
+        const mv = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+        if (!mv.length) throw new Error('Bewegen nicht freigegeben');
+        mv[0].onclick();
+        const before = a.r + '/' + a.c;
+        G('tapHex')(a.r, Math.max(0, a.c - 1));          // falsches Ziel
+        if (a.r + '/' + a.c !== before) throw new Error('Armee auf falsches Feld gezogen');
+        G('tapHex')(hl[0][0], hl[0][1]); manual++;
+      } else if (/Zug beenden/.test(t)) {
+        $('a-end').onclick();
+        let guard = 0;
+        while (guard++ < 20 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
+        manual++;
+      } else if (/Bots getan/.test(t)) {
+        $('a-log').onclick(); G('closeModal')(); manual++;
+      } else if (/Macht/.test(t)) {
+        let guard = 0;
+        while (!open() && guard++ < 8) {
+          $('a-power').onclick();
+          const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+          if (!en.length) break;
+          en[0].onclick();
+        }
+        G('closeSheet')(); manual++;
+      }
+      // Es gibt keinen „Für mich machen"-Ausweg mehr: alles muss über die Oberfläche gehen
+      if (!open()) throw new Error('Aufgabe nicht über die Oberfläche erfüllbar: ' + t);
+    }
+    if (i < n - 1) $('tut-next').onclick();
+  }
+  if ($('tut-next').textContent !== 'Fertig') throw new Error('letzter Schritt heißt nicht Fertig');
+  console.log('       ' + n + ' Schritte, ' + manual + ' Aufgaben über die Oberfläche erledigt');
+});
+step('Tutorial: „Fertig" gibt das Spiel frei', () => {
+  $('tut-next').onclick();
+  if (!$('tut-panel').hidden) throw new Error('Panel bleibt stehen');
+  const locked = ['a-tech', 'a-power', 'a-army', 'a-end'].filter(id => $(id).disabled);
+  if (locked.length) throw new Error('Leiste bleibt gesperrt: ' + locked.join(','));
+  const S = G('S');
+  if (S.over) throw new Error('Spiel schon entschieden');
+  console.log('       Runde ' + S.round + ', ' + S.cities.length + ' Städte, Leiste frei');
+  G('show')('screen-menu');
+});
 step('Aufbaubildschirm', () => { $('m-new').onclick(); if (!$('setup-list').children.length) throw new Error('leer'); });
 step('Bots einstellen', () => {
   [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());

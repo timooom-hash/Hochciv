@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js'])
+for (const f of ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -1959,6 +1959,138 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(S.players.every(p => !p.res.coins || p.res.coins >= 0), true, 'Bots zahlen keine Münzen');
   const withEffect = S.wonders.filter(w => w.k === 'canal');
   eq(withEffect.every(() => true), true, 'Bots wenden keine Wundereffekte an');
+}
+
+/* ==================================================== Tutorial
+   Geführtes Übungsspiel auf Schienen. Geprüft wird: Aufbau der Schritte, dass jede Aufgabe
+   erfüllbar ist, dass der Verlauf deterministisch ist und dass die im Text genannten Zahlen
+   aus dem Spielstand stammen. Den Durchlauf über die Oberfläche fährt smoke.js. */
+{
+  eq(TUT_STEPS.length >= 20, true, `${TUT_STEPS.length} Tutorialschritte`);
+  eq(TUT_STEPS.every(st => st.t && st.sub && typeof st.html === 'function'), true,
+    'jeder Schritt hat Titel, Einordnung und Text');
+  eq(TUT_STEPS.every(st => !st.goal || st.auto), true, 'jede Aufgabe hat einen Ausweg');
+  eq(TUT_STEPS.every(st => !st.task || st.goal), true, 'jede Aufgabenzeile hat ein Ziel');
+  eq(TUT_STEPS.every(st => !st.task || st.allow), true, 'jede Aufgabe schaltet gezielt frei');
+  const tasks = TUT_STEPS.filter(st => st.goal);
+  eq(tasks.length >= 10, true, `${tasks.length} Aufgaben zum Selbermachen`);
+  // jede Aufgabe sagt, wo man tippen muss
+  // Keine Koordinaten in den Texten – es wird über die goldene Umrandung gesprochen
+  {
+    tutorialSetup();
+    const bad = [];
+    for (let i = 0; i < TUT_STEPS.length; i++) {
+      ui.tut.i = i; tutEnter();
+      const st = TUT_STEPS[i];
+      const txt = (st.html() + ' ' + (st.task || '')).replace(/<[^>]+>/g, ' ')
+        .replace(/Zug 1\/2/g, '');                       // Belagerungszähler ist keine Koordinate
+      if (/\b\d{1,2}\/\d{1,2}\b/.test(txt)) bad.push(st.t);
+      if (st.goal && !st.goal()) st.auto();
+    }
+    eq(bad.length, 0, 'keine Feldkoordinaten in den Texten: ' + bad.join(', '));
+    ui = { sel: null, army: null, mode: null, botTimer: null };
+  }
+  // Keine Erwähnung der Erweiterungen
+  {
+    const all = TUT_STEPS.map(st => st.html.toString()).join(' ');
+    for (const w of ['Weltwunder', 'Ereignis', 'Kultursieg', '1 gegen 1', 'Zufallskarte', 'Karteneditor'])
+      eq(all.includes(w), false, `„${w}" kommt im Tutorial nicht vor`);
+  }
+  // Jede Aktionsart wird mindestens einmal mit Klickweg erklärt (Wiederholungen sind raus)
+  const all = TUT_STEPS.map(st => st.html.toString()).join(' ');
+  for (const kind of ['gründest', 'forschst', 'wächst', 'baust', 'bewegst', 'beendest', 'kaufst', 'liest'])
+    eq(new RegExp('So ' + kind + ' du').test(all), true, `Klickweg für „${kind}" erklärt`);
+  // und keine Aktionsart wird zweimal erklärt
+  for (const kind of ['gründest', 'wächst', 'baust', 'bewegst', 'kaufst'])
+    eq((all.match(new RegExp('So ' + kind + ' du', 'g')) || []).length, 1,
+      `Klickweg für „${kind}" steht nur einmal da`);
+  // kein Verweis auf die Beispielpartie des Autors
+  const body = TUT_STEPS.map(st => st.html.toString()).join(' ');
+  eq(/im Protokoll (gewonnen|angefangen|hat Russland)/.test(body), false,
+    'kein „so wie im Protokoll" im Text');
+}
+/* Der komplette Ablauf, zweimal gestartet – identischer Verlauf */
+function tutRun() {
+  tutorialSetup();                       // genau derselbe Aufbau wie in der App
+  const ru = S.players.findIndex(p => p.civ === 'russland');
+  const trace = [];
+  for (let i = 0; i < TUT_STEPS.length; i++) {
+    ui.tut.i = i;
+    const st = TUT_STEPS[i];
+    if (st.enter && !ui.tut.seen[i]) { ui.tut.seen[i] = true; st.enter(); }
+    const text = st.html();
+    if (st.goal && !st.goal()) { st.auto(); trace.push(i + ':' + st.t); }
+    trace.push(`${i}|${text.length}|${st.goal ? (st.goal() ? 'ok' : 'offen') : '-'}`);
+  }
+  return { trace: trace.join(';'), ru };
+}
+{
+  const a = tutRun();
+  const state = () => {
+    const ru = a.ru;
+    return JSON.stringify({
+      round: S.round, cities: citiesOf(S, ru).map(c => [c.r, c.c, c.pop]),
+      techs: Object.keys(S.players[ru].techs).sort(), power: S.players[ru].power,
+    });
+  };
+  const after1 = state();
+  eq(a.trace.includes('offen'), false, 'jede Aufgabe im Durchlauf wurde erfüllt');
+  eq(S.round >= 3, true, 'das Übungsspiel läuft bis Runde 3');
+  eq(citiesOf(S, a.ru).length >= 3, true, 'drei Städte gegründet');
+  eq(has(S.players[a.ru], 'schrift') && has(S.players[a.ru], 'papier') &&
+    has(S.players[a.ru], 'wiss_methode') && has(S.players[a.ru], 'stadtmauern'), true,
+    'die vorgesehenen Technologien sind erforscht');
+  eq(has(S.players[a.ru], 'fischerei') && has(S.players[a.ru], 'eisenverarbeitung'), true,
+    'die beiden Gratis-Technologien sind dabei');
+  eq(!S.over, true, 'das Spiel ist danach offen');
+  const b = tutRun();
+  eq(b.trace, a.trace, 'zweiter Durchlauf nimmt genau denselben Verlauf');
+  eq(state(), after1, 'und endet in genau demselben Zustand');
+  ui = { sel: null, army: null, mode: null, botTimer: null };
+}
+/* Schienen: nur die vorgesehenen Felder, Knöpfe und Technologien */
+{
+  S = newGame({
+    seed: TUT_SEED, map: MAP_ORIGINAL, startPlayer: 0,
+    players: [{ civ: 'russland', kind: 'human', ability: 'basis' },
+      { civ: 'griechenland', kind: 'bot', diff: 'david' }],
+  });
+  ui = { tut: { i: 0, seen: {} } };
+  // Leseschritt: nur Nachschlagen erlaubt
+  eq(tutAllow().bar, ['a-info', 'a-log'], 'im Leseschritt sind nur Welt und Protokoll offen');
+  // Gründungsschritt
+  ui.tut.i = TUT_STEPS.findIndex(st => /zweite Stadt/.test(st.t));
+  eq(tutAllow().bar, [], 'beim Gründen ist die Aktionsleiste gesperrt');
+  eq(tutHexOk(...TUT_CITY_1), true, 'das Zielfeld ist freigegeben');
+  eq(tutHexOk(0, 0), false, 'andere Felder nicht');
+  // Forschungsschritt
+  ui.tut.i = TUT_STEPS.findIndex(st => /Schrift/.test(st.t));
+  eq(tutAllow().techs, ['schrift'], 'im Forschungsschritt ist nur Schrift freigegeben');
+  eq(tutAllow().bar, ['a-tech'], 'und nur der Forschen-Knopf');
+  // Armeeschritt: Zugziel ist gebunden
+  ui.tut.i = TUT_STEPS.findIndex(st => /Armee bewegen/.test(st.t));
+  ui.tutArmyTo = [5, 12];
+  eq(tutMoveOk(5, 12), true, 'das Wachfeld ist als Zug erlaubt');
+  eq(tutMoveOk(5, 11), false, 'andere Zielfelder nicht');
+  ui = { sel: null, army: null, mode: null, botTimer: null };
+}
+/* Die Begründungen rechnen mit echten Werten */
+{
+  S = newGame({ seed: TUT_SEED, map: MAP_ORIGINAL, startPlayer: 0,
+    players: [{ civ: 'russland', kind: 'human', ability: 'basis' },
+      { civ: 'griechenland', kind: 'bot', diff: 'david' }] });
+  const ru = S.players.findIndex(p => p.civ === 'russland');
+  const before = income(S, ru);
+  const g = tutGain(...TUT_CITY_1);
+  S.players[ru].res = { sci: 0, food: 99, coins: 0 };
+  eq(foundCity(S, ru, ...TUT_CITY_1), null, 'Stadt gegründet');
+  const after = income(S, ru);
+  eq([g.sci, g.food, g.coins], [after.sci - before.sci, after.food - before.food, after.coins - before.coins],
+    'die im Text genannte Verbesserung entspricht dem echten Einkommenszuwachs');
+  eq(tutNeighbourText(...TUT_CITY_1).includes('Wald'), true, 'die Geländeaufstellung nennt den Wald');
+  eq(S.cities.length >= 2, true, 'Stadt steht');
+  ui = { sel: null, army: null, mode: null, botTimer: null };
+  S = null;
 }
 
 /* --- Vollständige Partien: 4 Bots, keine Ausnahmen, Spiel endet */

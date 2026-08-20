@@ -23,6 +23,7 @@ sonst behalten installierte Geräte die alte Fassung.
 |---|---|
 | Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
+| Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
 | Spielart | „Vier Reiche“ oder „1 gegen 1“ (zwei frei gewählte Zivilisationen, Karte 10 × 15, Wirtschaftssieg erst über 3/4) |
 | Karte | Originalkarte, Große Karte, Zufallskarte oder eigene aus dem Editor |
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
