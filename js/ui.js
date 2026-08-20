@@ -24,9 +24,9 @@ function closeModal() { $('overlay').classList.remove('show'); $('overlay').clas
 function sheet(html) {
   $('sheet-body').innerHTML = html;
   $('sheet').classList.add('open');
-  // Im Tutorial sind auch Macht- und Armeeblatt an die Schienen gebunden
-  if (typeof ui !== 'undefined' && ui && ui.tut)
-    tutGateSheet(ui.sel ? ui.sel[0] : null, ui.sel ? ui.sel[1] : null);
+  // Im Tutorial sind auch Macht- und Armeeblatt an die Schienen gebunden. Hier zählt nur
+  // die Beschriftung – die Feldprüfung macht openTile für das Aktionsblatt selbst.
+  if (typeof ui !== 'undefined' && ui && ui.tut) tutGateSheet(null, null);
   lockBar();
 }
 function closeSheet() { if (ui.botLock) return; $('sheet').classList.remove('open'); lockBar(); }
@@ -835,7 +835,10 @@ function setupScreen() {
    im Duell wählt jeder Platz seine eigene aus – beide Plätze nie dieselbe. */
 function renderSlots() {
   const duel = setupMode === 'duell';
+  // Im Duell gibt es keine Kartenwahl: Zeile ausblenden und Auswahl abschalten,
+  // damit sie auch per Tastatur nicht erreichbar ist.
   $('setup-map-row').hidden = duel;
+  $('setup-map').disabled = duel;
   $('setup-duel-hint').hidden = !duel;
   const list = $('setup-list');
   const chosen = duel ? duelChoice() : CIVS.map(c => c.k);

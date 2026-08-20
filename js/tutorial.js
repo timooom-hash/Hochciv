@@ -42,6 +42,7 @@ const TUT_START_AVAIL = ['schrift', 'fischerei', 'rad', 'keramik',
 // Die Felder, auf denen im Tutorial gegründet wird
 const TUT_CITY_1 = [3, 12];
 const TUT_CITY_2 = [6, 13];
+const TUT_CITY_3 = [7, 15];
 const TUT_ARMY_TO = [5, 12];
 
 /* Was ein Feld als Stadtplatz tatsächlich bringt: Geländemischung ringsum und der
@@ -266,7 +267,9 @@ const TUT_STEPS = [
       <p>Drei Dinge greifen zusammen: die zweite Stadt brachte sechs neue Felder, die
       Hauptstadt hat 2 Bevölkerung, und <b>Schrift</b> verdoppelt deren Wissenschaft. Genau
       dieser Effekt entscheidet die Partie – nicht die Armeen.</p>
-      <p>Faustregel: erst die <b>Multiplikatoren</b> kaufen, dann die Masse.</p>`;
+      <p>Faustregel: die wichtigsten <b>Multiplikatoren</b> und <b>viele Städte</b> in
+      Kombination – eines ohne das andere bringt wenig. Papier auf drei Grasland ist wenig
+      wert, zehn Städte ohne Landwirtschaft verhungern.</p>`;
     },
   },
   {
@@ -556,6 +559,56 @@ const TUT_STEPS = [
     },
   },
   {
+    sub: 'Zugablauf 3 von 5 · Aktion',
+    t: 'Zwei billige Technologien für den Rest',
+    html: () => `
+      <p>Übrig sind ${tutRes().sci} Wissenschaft – genau der Preis für
+      <b>Demokratie</b> (${techCost(S, RU(), TECH_BY_KEY.demokratie)}) und <b>Keramik</b>
+      (${techCost(S, RU(), TECH_BY_KEY.keramik)}). Beides würde sonst verfallen.</p>
+      <p><b>Warum Demokratie?</b> Armeen kosten damit 4 statt 5 Münzen je eigener Armee –
+      deine nächste Armee also ${4 * (armiesOf(S, RU()).length + 1)} statt
+      ${armyCost(S, RU())}. Außerdem ist es deine erste Technologie im Feld <b>Spezial</b>:
+      damit schaltest du dort das Mittelalter auf. Für die Singularität brauchst du am Ende
+      in <i>jedem</i> der vier Felder ein Zeitalter der Moderne – wer ein Feld gar nicht
+      anfängt, kommt dort nie an.</p>
+      <p><b>Warum Keramik?</b> Jede Stadt darf damit <b>zweimal pro Runde</b> wachsen. Deine
+      Nahrung wächst schneller als du sie ausgeben kannst – Keramik verdoppelt die
+      Ausgabemöglichkeit, ohne laufende Kosten.</p>`,
+    task: 'Kaufe <b>Demokratie</b> und <b>Keramik</b>.',
+    allow: { bar: ['a-tech'], techs: ['demokratie', 'keramik'] },
+    goal: () => has(tutP(), 'demokratie') && has(tutP(), 'keramik'),
+    auto: () => { doResearch(S, RU(), 'demokratie'); doResearch(S, RU(), 'keramik'); },
+  },
+  {
+    sub: 'Zugablauf 3 von 5 · Aktion',
+    t: 'Die vierte Stadt',
+    html: () => {
+      const sp = ui.tutSpot3 || TUT_CITY_3;
+      return `
+      <p>Auch die ${tutRes().food} Nahrung sollen nicht verfallen. Eine vierte Stadt kostet
+      <b>${foundCost(S, RU(), ...sp)} Nahrung</b> – 6 Basiskosten bei drei bestehenden
+      Städten plus Weg. Teuer, aber es ist die einzige Ausgabe, die dauerhaft etwas
+      zurückgibt.</p>
+      <p><b>Warum dieses Feld?</b> Ringsum liegen ${tutNeighbourText(...sp)}, das bringt
+      <b>${tutGainText(...sp)}</b> je Runde. Es liegt südlich deiner Hauptstadt, also im
+      Rücken – weg von der griechischen Grenze, wo gerade gekämpft wird.
+      ${sp[0] === TUT_CITY_3[0] && sp[1] === TUT_CITY_3[1] ? '' :
+        '<br><i>Hinweis: Der vorgesehene Platz ist inzwischen belegt – deshalb dieses Feld.</i>'}</p>
+      <div class="tut-key"><b>Merke</b> Vier Städte sind fast immer besser als zwei große:
+      jede bringt eigene Felder, wächst billiger und verteilt das Risiko. Die Basiskosten
+      steigen zwar (1/3/6/10), aber sie sind einmalig – der Ertrag bleibt.</div>`;
+    },
+    enter: () => { ui.tutSpot3 = tutSpot(TUT_CITY_3); },
+    task: 'Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.',
+    hl: () => [ui.tutSpot3 || TUT_CITY_3],
+    allow: { bar: [], labels: [/Stadt gründen/], hex: () => [ui.tutSpot3 || TUT_CITY_3] },
+    goal: () => {
+      const c = cityOn(...(ui.tutSpot3 || TUT_CITY_3));
+      return !!c && c.owner === RU();
+    },
+    auto: () => foundCity(S, RU(), ...(ui.tutSpot3 || TUT_CITY_3)),
+  },
+  {
     sub: 'Zugablauf 4 von 5 · Kampf',
     t: 'Zug beenden – und die Belagerung bricht',
     html: () => {
@@ -642,9 +695,11 @@ const TUT_STEPS = [
       <p><b>Wachsen ohne Nahrung.</b> Jede Bevölkerung isst dauerhaft 1 Nahrung. Ohne
       Landwirtschaft, Kunstdünger, Bewässerung oder Ökologie steht das Wachstum nach wenigen
       Punkten still.</p>
-      <div class="tut-key"><b>Und die Faustregel</b> Erst die Multiplikatoren – Schrift,
-      Landwirtschaft, Wissenschaftliche Methode, Dampfmaschine –, dann Städte und
-      Bevölkerung. Militär nur so viel, wie du zum Überleben brauchst.</div>`,
+      <div class="tut-key"><b>Und die Faustregel</b> Am stärksten ist die <b>Kombination</b>:
+      die wichtigsten Multiplikatoren – Schrift, Landwirtschaft, Papier, Wissenschaftliche
+      Methode – <b>zusammen mit vielen Städten</b>. Jede Technologie wirkt auf jedes Feld und
+      jede Bevölkerung, die du besitzt; jede neue Stadt vervielfacht rückwirkend alles, was du
+      schon erforscht hast. Militär nur so viel, wie du zum Überleben brauchst.</div>`,
   },
   {
     sub: 'Fertig',
@@ -676,17 +731,20 @@ function tutStep() { return ui.tut ? TUT_STEPS[ui.tut.i] : null; }
    Leseschritte und bereits erledigte Aufgaben erlauben nur Nachschlagen – sonst könnte man
    den Verlauf verlassen (Stadt irgendwo gründen, Zug ein zweites Mal beenden). */
 const TUT_LOOK_ONLY = { bar: ['a-info', 'a-log'], labels: [], hex: () => [], techs: [] };
+/* Fehlt ein Schlüssel im allow-Block, heißt das „nichts erlaubt" – nicht „alles erlaubt".
+   Sonst schlüpft man z. B. im Protokoll-Schritt (nur bar: ['a-log']) über das Stadtblatt
+   an den Schienen vorbei. */
 function tutAllow() {
   const st = tutStep();
-  if (!st) return { bar: ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'] };
-  if (!st.allow) return TUT_LOOK_ONLY;
-  if (st.goal && st.goal()) return TUT_LOOK_ONLY;          // Aufgabe erledigt: Schienen zu
-  return st.allow;
+  if (!st) return { bar: ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
+  if (!st.allow || (st.goal && st.goal())) return TUT_LOOK_ONLY;   // Leseschritt oder erledigt
+  return Object.assign({ bar: [], labels: [], techs: [] }, st.allow);
 }
 function sameHex(a, r, c) { return a && a[0] === r && a[1] === c; }
 function tutHexOk(r, c) {
   const al = tutAllow();
   if (!al.hex) return true;
+  if (r == null || c == null) return true;   // Aufruf ohne Feld (Macht-/Armeeblatt)
   return al.hex().some(h => sameHex(h, r, c));
 }
 function tutMoveOk(r, c) {
@@ -701,7 +759,7 @@ function tutGateSheet(r, c) {
   if (!body) return;
   body.querySelectorAll('.opt').forEach(b => {
     const txt = b.textContent || '';
-    const okLabel = !al.labels || al.labels.some(rx => rx.test(txt));
+    const okLabel = al.labels === null || al.labels.some(rx => rx.test(txt));
     if (!okLabel || !tutHexOk(r, c)) b.disabled = true;
   });
 }
@@ -711,7 +769,7 @@ function tutGateTechs() {
   const body = $('ov-body');
   if (!body) return;
   body.querySelectorAll('[data-tech]').forEach(b => {
-    if (!al.techs || !al.techs.includes(b.dataset.tech)) b.disabled = true;
+    if (al.techs !== null && !al.techs.includes(b.dataset.tech)) b.disabled = true;
   });
   body.querySelectorAll('[data-copy], [data-freetech], [data-backtech], [data-free]')
     .forEach(b => { b.disabled = true; });

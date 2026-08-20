@@ -324,9 +324,10 @@ const WONDER_STEP = 10;          // Kosten je weiteres Wunder
 const MAP_MIX = [['G', 36], ['M', 30], ['W', 15], ['B', 9], ['F', 8], ['I', 3]];
 // Startpunkte der Zufallskarte im Format der Originalkarte (12 × 18)
 const RANDOM_CAPITALS = { wikinger: [1, 8], russland: [4, 15], england: [5, 3], griechenland: [9, 10] };
-// Duellkarte 10 × 15: zwei feste, weit auseinanderliegende Startpunkte (Slot 1, Slot 2)
-const DUEL_SIZE = { rows: 10, cols: 15 };
-const DUEL_STARTS = [[2, 2], [7, 12]];
+// Duellkarte 12 × 8 (Spalten × Zeilen): zwei feste, weit auseinanderliegende Startpunkte.
+// Beide liegen ein Feld vom Rand entfernt, damit sie sechs Nachbarfelder haben.
+const DUEL_SIZE = { rows: 8, cols: 12 };
+const DUEL_STARTS = [[1, 10], [6, 1]];
 
 // Kleiner eigener Zufallsgenerator, damit eine Karte aus einem Startwert reproduzierbar ist
 function mapRng(seed) {
@@ -452,7 +453,7 @@ function duelMap(civA, civB, seed) {
   const capitals = {};
   capitals[civA] = DUEL_STARTS[0].slice();
   capitals[civB] = DUEL_STARTS[1].slice();
-  return makeRandomMap('Duellkarte (10 × 15)', DUEL_SIZE.rows, DUEL_SIZE.cols, capitals, seed);
+  return makeRandomMap('Duellkarte (12 × 8)', DUEL_SIZE.rows, DUEL_SIZE.cols, capitals, seed);
 }
 /* Siegschwellen im Duell: 3/4 statt 2/3, mit Theologie 7/10, mit Vereinten Nationen 2/3 */
 const DUEL_VICTORY_FRAC = 3 / 4;
