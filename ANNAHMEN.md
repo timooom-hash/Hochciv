@@ -283,8 +283,11 @@ in der nächsten Runde ist der Weg frei.
 vier Zivilisationen mit allen drei Fähigkeiten, jeder Platz ist Mensch oder Bot. Zwei Plätze
 können nicht dieselbe Zivilisation nehmen – sie teilen sich Farbe und Symbol und wären auf der
 Karte nicht unterscheidbar; wählt man die des anderen, wechselt der andere Platz automatisch.
-Die Karte ist immer eine frische **Zufallskarte 10 × 15** mit zwei festen, weit
-auseinanderliegenden Startpunkten (`DUEL_STARTS`, Distanz 12); Platz 1 bekommt den ersten.
+Die Karte ist immer eine frische **Zufallskarte 12 × 8** (Spalten × Zeilen) mit zwei festen,
+weit auseinanderliegenden Startpunkten (`DUEL_STARTS`, Distanz 12); Platz 1 bekommt den
+ersten. Beide liegen ein Feld vom Rand entfernt, damit sie sechs Nachbarfelder haben und die
+Mindestgüte aus Abschnitt 10c erreichen können. **Eine Kartenwahl gibt es im Duell nicht** –
+die Zeile ist ausgeblendet und das Auswahlfeld abgeschaltet.
 Die **Siegschwellen liegen höher**: Wirtschaftssieg erst über 3/4 der Weltbevölkerung, mit
 Theologie über 7/10, mit Vereinten Nationen über 2/3 – auch hier gilt der niedrigste
 verfügbare Wert, und alle drei sind strikt („mehr als"). Militär-, Forschungs- und Kultursieg
@@ -294,8 +297,8 @@ Vier-Reiche-Partie bleiben unberührt.
 ## 10d. Tutorial als geführtes Übungsspiel
 
 Kein Textbildschirm, sondern die **normale Spieloberfläche**: echte Karte, echte Kopfzeile,
-echte Aktionsleiste, darunter ein Erklärpanel (höchstens 46 % der Höhe). 25 Schritte, davon
-16 mit Aufgabe, die der Spieler **selbst** ausführen muss; „Weiter" bleibt gesperrt, bis sie
+echte Aktionsleiste, darunter ein Erklärpanel (höchstens 46 % der Höhe). 27 Schritte, davon
+18 mit Aufgabe, die der Spieler **selbst** ausführen muss; „Weiter" bleibt gesperrt, bis sie
 erledigt ist. Einen „Für mich machen"-Ausweg gibt es bewusst **nicht** – die Schritt-Skripte
 (`auto`) existieren nur noch als Testtreiber. Jede Aktionsart nennt den **Klickweg**
 („Stadt antippen → im Blatt auf Armee bauen"); ein Test prüft, dass kein Aufgabenschritt
@@ -315,7 +318,10 @@ ohne solchen Weg auskommt.
    – wie im Beispielprotokoll. Später nötige Technologien (Papier, Wissenschaftliche Methode,
    Burgenbau) werden im jeweiligen Schritt freigeschaltet.
 3. **Schienen in der Oberfläche** (`allow` je Schritt): erlaubt sind nur die vorgesehene
-   Leistentaste, die vorgesehenen Blatt-Knöpfe, Technologiekacheln, Zielfelder. **Leseschritte
+   Leistentaste, die vorgesehenen Blatt-Knöpfe, Technologiekacheln, Zielfelder. **Ein
+   fehlender Schlüssel im allow-Block heißt „nichts erlaubt", nicht „alles erlaubt"** – über
+   diese Lücke kam man im Protokoll-Schritt (nur `bar: ['a-log']`) über das Stadtblatt an den
+   Schienen vorbei. **Leseschritte
    und bereits erledigte Aufgaben erlauben gar keine Aktion** (nur Welt und Protokoll) –
    sonst könnte man in einem Erklärschritt irgendwo gründen oder den Zug ein zweites Mal
    beenden. Gegatet wird zentral in `sheet()`, also auch Macht- und Armeeblatt.
@@ -332,8 +338,9 @@ ohne solchen Weg auskommt.
 Zinseszins in Runde 2 · Papier · dritte Stadt · zweimal wachsen · erste Armee bauen und an
 den Reichsrand ziehen · Griechenland belagert die Grenzstadt aus eigenem Antrieb
 („Angriff 5 > Verteidigung 1 (Zug 1/2)") · Wissenschaftliche Methode, danach zwei
-Technologien für null · **Stadtmauern und Burgenbau** · vier Macht · Zug beenden, und die
-Belagerung bricht („Angriff 9 ≤ Verteidigung 14"). Danach Nahrungsgrenze, Siegwege,
+Technologien für null · **Stadtmauern und Burgenbau** · vier Macht · **Demokratie und
+Keramik** vom Rest der Wissenschaft · **vierte Stadt** vom Rest der Nahrung · Zug beenden, und
+die Belagerung bricht („Angriff 9 ≤ Verteidigung 14"). Danach Nahrungsgrenze, Siegwege,
 Anfängerfehler, Abschluss.
 
 Die Belagerung wird **nicht gestellt**: der Schritt übernimmt die Armee, die der griechische

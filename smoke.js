@@ -24,7 +24,8 @@ window.addEventListener('error', e => errors.push(e.message));
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
 const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
-window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");');
+window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
+  + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
 const G = n => window.__get(n);
 
 const $ = id => window.document.getElementById(id);
@@ -72,7 +73,66 @@ step('Tutorial: Leseschritte erlauben gar keine Aktion', () => {
   console.log('       Stadtblatt und Leiste im Leseschritt vollständig gesperrt');
   $('tut-prev').onclick();
 });
+step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
+  // Systematische Prüfung: Leiste, Stadtblatt (eigene, fremde, leere Felder), Armee- und
+  // Machtblatt, Technologiebogen – in allen Schritten.
+  G('tutorialStart')();                     // sauber bei Schritt 1 beginnen
+  const n = G('TUT_STEPS').length, problems = [];
+  const labelsOk = (al, txt) => (al.labels || []).some(rx => new RegExp(rx.source || rx).test(txt));
+  for (let i = 0; i < n; i++) {
+    const t = $('tut-title').textContent, al = G('tutAllow')();
+    const barOn = ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].filter(id => !$(id).disabled);
+    const extra = barOn.filter(id => !al.bar.includes(id));
+    if (extra.length) problems.push((i + 1) + ' „' + t + '": Leiste offen: ' + extra);
+    const S = G('S'), ru = G('RU')();
+    const spots = S.cities.map(c => [c.r, c.c])
+      .concat(G('within')(G('tutCap')().r, G('tutCap')().c, 2)
+        .filter(([r, c]) => G('isLand')(S, r, c) && !G('cityAt')(S, r, c)).slice(0, 3));
+    for (const [r, c] of spots) {
+      G('tapHex')(r, c);
+      const on = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled)
+        .map(b => b.textContent.trim().split('\n')[0]);
+      const bad = on.filter(x => !labelsOk(al, x));
+      if (bad.length) problems.push((i + 1) + ' „' + t + '": Blatt offen auf ' + r + '/' + c + ': ' + bad);
+      G('closeSheet')();
+    }
+    for (const id of ['a-army', 'a-power']) {
+      if ($(id).disabled) continue;
+      $(id).onclick();
+      const on = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled)
+        .map(b => b.textContent.trim().split('\n')[0]);
+      const bad = on.filter(x => !labelsOk(al, x));
+      if (bad.length) problems.push((i + 1) + ' „' + t + '": ' + id + ' offen: ' + bad);
+      G('closeSheet')();
+    }
+    if (!$('a-tech').disabled) {
+      $('a-tech').onclick();
+      const on = [...$('ov-body').querySelectorAll('[data-tech]')].filter(b => !b.disabled).map(b => b.dataset.tech);
+      const bad = on.filter(k => !(al.techs || []).includes(k));
+      if (bad.length) problems.push((i + 1) + ' „' + t + '": Techs offen: ' + bad);
+      G('closeModal')();
+    }
+    // Aufgabe per Skript erledigen (nur hier im Test), Index aus dem Panel lesen
+    // Gegenprobe: bei offener Aufgabe muss auch wirklich etwas bedienbar sein
+    if ($('tut-next').disabled) {
+      const anyBar = ['a-tech', 'a-power', 'a-army', 'a-end', 'a-log', 'a-info']
+        .some(id => !$(id).disabled);
+      let anySheet = false;
+      for (const [r, c] of spots.concat(G('tutHighlight')() || [])) {
+        G('tapHex')(r, c);
+        if ([...$('sheet-body').querySelectorAll('.opt')].some(b => !b.disabled)) anySheet = true;
+        G('closeSheet')();
+      }
+      if (!anyBar && !anySheet) problems.push((i + 1) + ' „' + t + '": nichts bedienbar – Sackgasse');
+      G('__runAuto')(+$('tut-count').textContent.split('/')[0] - 1);
+    }
+    if (i < n - 1) $('tut-next').onclick();
+  }
+  if (problems.length) throw new Error(problems.slice(0, 3).join(' | '));
+  console.log('       ' + n + ' Schritte geprüft, keine Lücke in den Schienen');
+});
 step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
+  G('tutorialStart')();                     // frisches Übungsspiel, wieder bei Schritt 1
   const n = G('TUT_STEPS').length;
   const open = () => !$('tut-next').disabled;
   let manual = 0;
@@ -87,7 +147,7 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
         let guard = 0;
         while (guard++ < 24 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
         manual++;
-      } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau/.test(t)) {
+      } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau|Technologien/.test(t)) {
         $('a-tech').onclick();
         const free = [...$('ov-body').querySelectorAll('[data-tech]')].filter(b => !b.disabled);
         if (!free.length) throw new Error('keine Kachel freigegeben in: ' + t);

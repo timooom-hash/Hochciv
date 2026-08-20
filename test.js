@@ -1295,11 +1295,16 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
 /* ==================================================== 1 gegen 1 */
 {
   const m = duelMap('england', 'russland', 11);
-  eq([m.rows.length, m.rows[0].length], [10, 15], 'Duellkarte ist 10 × 15');
+  eq([m.rows.length, m.rows[0].length], [DUEL_SIZE.rows, DUEL_SIZE.cols], 'Duellkarte ist 12 × 8');
+  eq([DUEL_SIZE.cols, DUEL_SIZE.rows], [12, 8], 'zwölf Spalten, acht Zeilen');
   eq(Object.keys(m.capitals).sort(), ['england', 'russland'], 'nur die beiden gewählten Reiche');
   eq(m.capitals.england, DUEL_STARTS[0], 'Platz 1 sitzt auf dem ersten festen Startpunkt');
   eq(m.capitals.russland, DUEL_STARTS[1], 'Platz 2 auf dem zweiten');
-  eq(hexDistance(...m.capitals.england, ...m.capitals.russland) >= 8, true, 'die Startpunkte liegen weit auseinander');
+  eq(hexDistance(...m.capitals.england, ...m.capitals.russland) >= 10, true, 'die Startpunkte liegen weit auseinander');
+  // beide Startpunkte liegen mindestens ein Feld vom Rand entfernt (sechs Nachbarfelder)
+  for (const [, [r, c]] of Object.entries(m.capitals))
+    eq(r > 0 && c > 0 && r < DUEL_SIZE.rows - 1 && c < DUEL_SIZE.cols - 1, true,
+      'Startpunkt liegt nicht am Kartenrand');
   for (const [civ, [r, c]] of Object.entries(m.capitals))
     eq(['G', 'W', 'B', 'F'].includes(m.rows[r][c]), true, `Hauptstadt ${civ} liegt auf Land`);
   // alle vier Zivilisationen sind auf beiden Plätzen möglich
@@ -1983,7 +1988,8 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
       ui.tut.i = i; tutEnter();
       const st = TUT_STEPS[i];
       const txt = (st.html() + ' ' + (st.task || '')).replace(/<[^>]+>/g, ' ')
-        .replace(/Zug 1\/2/g, '');                       // Belagerungszähler ist keine Koordinate
+        .replace(/Zug 1\/2/g, '')                        // Belagerungszähler ist keine Koordinate
+        .replace(/\d+(\/\d+)+\)/g, ')');                 // Kostenstaffeln wie (1/3/6/10) auch nicht
       if (/\b\d{1,2}\/\d{1,2}\b/.test(txt)) bad.push(st.t);
       if (st.goal && !st.goal()) st.auto();
     }
