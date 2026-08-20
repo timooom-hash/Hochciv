@@ -18,10 +18,24 @@ function modal(title, html) {
   $('ov-title').textContent = title; $('ov-body').innerHTML = html;
   $('overlay').classList.remove('wide');
   $('overlay').classList.add('show');
+  lockBar();
 }
-function closeModal() { $('overlay').classList.remove('show'); $('overlay').classList.remove('wide'); }
-function sheet(html) { $('sheet-body').innerHTML = html; $('sheet').classList.add('open'); }
-function closeSheet() { if (ui.botLock) return; $('sheet').classList.remove('open'); }
+function closeModal() { $('overlay').classList.remove('show'); $('overlay').classList.remove('wide'); lockBar(); }
+function sheet(html) {
+  $('sheet-body').innerHTML = html;
+  $('sheet').classList.add('open');
+  // Im Tutorial sind auch Macht- und Armeeblatt an die Schienen gebunden
+  if (typeof ui !== 'undefined' && ui && ui.tut)
+    tutGateSheet(ui.sel ? ui.sel[0] : null, ui.sel ? ui.sel[1] : null);
+  lockBar();
+}
+function closeSheet() { if (ui.botLock) return; $('sheet').classList.remove('open'); lockBar(); }
+/* Aktionsleiste sperren, solange ein Blatt oder Fenster offen ist – gegen Fehlgriffe
+   auf „Zug beenden" direkt neben dem schwebenden Blatt. */
+function lockBar() {
+  const busy = $('sheet').classList.contains('open') || $('overlay').classList.contains('show');
+  document.body.classList.toggle('blocked', busy);
+}
 
 function store(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
 function load(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
@@ -158,6 +172,14 @@ function drawMap(svg, map, opts) {
         stroke: '#2a2721', 'stroke-width': 2, 'stroke-dasharray': '5 4', 'pointer-events': 'none'
       }));
     });
+    // 4b Tutorial-Hervorhebung: goldener Rahmen um die Felder, um die es gerade geht
+    (opts.tutHl || []).forEach(([r, c]) => {
+      const [x, y] = hexCenter(r, c, HEX);
+      world.appendChild(svgEl('polygon', {
+        points: pts, transform: `translate(${x},${y})`, fill: 'rgba(255,214,102,.30)',
+        stroke: '#b8860b', 'stroke-width': 3.4, 'stroke-linejoin': 'round', 'pointer-events': 'none'
+      }));
+    });
     // 5 Armeen
     S2.armies.forEach(a => {
       const [x, y] = hexCenter(a.r, a.c, HEX);
@@ -277,7 +299,10 @@ function currentMap() { return customMap || DEFAULT_MAP; }
 function redraw() {
   if (ui.army && !S.armies.includes(ui.army)) ui.army = null;
   const highlight = ui.army ? [...armyReach(S, ui.army).keys()].map(unkey) : [];
-  drawMap($('map'), S.map, { state: S, sel: ui.sel, highlight, turn: P(S).kind === 'bot' ? -1 : S.cur });
+  drawMap($('map'), S.map, {
+    state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : null,
+    turn: P(S).kind === 'bot' ? -1 : S.cur,
+  });
   applyView($('map'), view);
   const p = P(S), civ = civOf(p);
   $('hud-sym').textContent = SYM[civ.sym];
@@ -291,6 +316,12 @@ function redraw() {
   $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
   const human = p.kind !== 'bot' && !S.over;
   ['a-tech', 'a-power', 'a-army', 'a-end'].forEach(id => $(id).disabled = !human);
+  if (ui.tut) {
+    const bar = tutAllow().bar;
+    ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].forEach(id =>
+      $(id).disabled = !human || (bar ? !bar.includes(id) : true));
+    renderTutPanel();
+  }
   saveGame();
 }
 function fitMap(svg, v) {
@@ -300,9 +331,17 @@ function fitMap(svg, v) {
   applyView(svg, v);
 }
 
+/* Beim Start eines normalen Spiels darf kein Tutorial-Panel stehen bleiben. */
+function endTutorialPanel() {
+  ui = { sel: null, army: null, mode: null, botTimer: null };
+  const panel = $('tut-panel');
+  if (panel) panel.hidden = true;
+  document.body.classList.remove('tut');
+}
 function tapHex(r, c) {
   if (S.over || P(S).kind === 'bot') return;
   if (ui.army) {
+    if (ui.tut && !tutMoveOk(r, c)) return toast('Im Tutorial: ziehe die Armee auf das goldene Feld.');
     const e = moveArmy(S, ui.army, r, c);
     if (e) { toast(e); } else { ui.army = null; ui.sel = [r, c]; redraw(); return; }
   }
@@ -399,6 +438,7 @@ function openTile(r, c) {
       (roadPrice(S, pi, r, c, roadLevel(S, r, c) >= 1 ? 2 : 1) ?? '–') + '🪙',
       () => doRoad(r, c), roadLevel(S, r, c) >= 2 || (roadLevel(S, r, c) >= 1 && !has(p, 'eisenbahn')));
   sheet(head + rows.join(''));
+  if (ui.tut) tutGateSheet(r, c);
   handlers.forEach(([id, fn]) => { const el = $(id); if (el) el.onclick = fn; });
 }
 function doRoad(r, c) {
@@ -544,6 +584,7 @@ function techModal() {
   </div>`;
   modal(`Technologien · ${available(S, pi, 'sci')} Wissenschaft verfügbar`, layout);
   $('overlay').classList.add('wide');
+  if (ui.tut) tutGateTechs();
   $('ov-body').querySelectorAll('[data-tech]').forEach(b => b.onclick = () => {
     const e = doResearch(S, S.cur, b.dataset.tech);
     if (e) return toast(e);
@@ -909,13 +950,19 @@ function boot() {
   customMap = load('hochciv.map');
   const saved = load('hochciv.save');
   $('m-continue').hidden = !saved;
+  $('m-tutorial').textContent = 'Tutorial – geführtes Übungsspiel';
 
   $('m-new').onclick = () => { show('screen-setup'); setupScreen(); };
+  // Tutorial: geführtes Übungsspiel in der normalen Oberfläche
+  $('m-tutorial').onclick = () => tutorialStart();
+  $('tut-prev').onclick = () => tutMove(-1);
+  $('tut-next').onclick = () => tutMove(1);
+  $('tut-quit').onclick = () => tutorialQuit();
   $('m-editor').onclick = () => { show('screen-editor'); editorScreen(); setTimeout(() => fitMap($('ed-map'), edView), 30); };
   $('m-rules').onclick = () => rulesModal();
-  $('m-continue').onclick = () => { S = load('hochciv.save'); startGameScreen(); };
+  $('m-continue').onclick = () => { endTutorialPanel(); S = load('hochciv.save'); startGameScreen(); };
   $('m-load').onclick = () => upload(txt => {
-    try { S = JSON.parse(txt); saveGame(); startGameScreen(); toast('Spielstand geladen'); }
+    try { endTutorialPanel(); S = JSON.parse(txt); saveGame(); startGameScreen(); toast('Spielstand geladen'); }
     catch (e) { toast('Datei nicht lesbar'); }
   });
   document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => show('screen-menu'));
@@ -934,6 +981,7 @@ function boot() {
       : pick === 'eigene' ? customMap
         : pick === 'zufall' ? randomMap()
           : MAPS[+pick];
+    endTutorialPanel();
     S = newGame({
       players, map, duel, startPlayer: +$('setup-start').value,
       events: $('setup-events').checked, eventMode: $('setup-evmode').value,
@@ -946,7 +994,7 @@ function boot() {
   $('a-army').onclick = armySheet;
   $('a-info').onclick = worldModal;
   $('hud-feed').onclick = () => { if (P(S).kind !== 'bot' && !S.over) feedSheet(); };
-  $('a-log').onclick = logModal;
+  $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };
   $('a-end').onclick = endHumanTurn;
   $('g-menu').onclick = () => {
     modal('Menü', `<button class="btn wide" id="mm-rules">Regeln &amp; Technologien</button>
@@ -1020,7 +1068,20 @@ function rulesModal() {
       Ein Wunder der Stufe 3 gewinnt zu Beginn des nächsten Zuges.</p>
     <p class="sub">Ereignisse (Erweiterung)</p>
     <p style="font-size:13px;margin:4px 0">Zu Rundenbeginn wird gewürfelt: Zeile, dann Spalte.
-      Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.</p>`);
+      Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.</p>
+    <p class="sub">Alle Technologien</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">Kosten links, Wirkung rechts.
+      Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.</p>
+    ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
+      AGES.map((an, a) => {
+        const list = techsIn(f, a, S);
+        if (!list.length) return '';
+        return `<p class="rule-age">${an}</p>` + list.map(t =>
+          `<div class="rule-tech"><span class="c">${t.c}</span><b>${t.n}</b><i>${t.e}</i></div>`).join('');
+      }).join('')).join('')}
+    <p class="rule-field">Sieg</p>
+    <div class="rule-tech"><span class="c">${SINGULARITY.c}</span><b>${SINGULARITY.n}</b>
+      <i>${SINGULARITY.e}</i></div>`);
 }
 function download(name, text) {
   const a = document.createElement('a');

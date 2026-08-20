@@ -12,7 +12,10 @@ function nextRand(S) {
   return ((t ^ t >>> 14) >>> 0) / 4294967296;
 }
 function d6(S, why) {
-  const v = 1 + Math.floor(nextRand(S) * 6);
+  // Im Tutorial kommen die Würfe aus einer festen Folge (tutNextDie), damit die Partie –
+  // inklusive aller Bot-Entscheidungen – bei jedem Durchlauf identisch abläuft.
+  let v = (typeof tutNextDie === 'function') ? tutNextDie() : null;
+  if (!v) v = 1 + Math.floor(nextRand(S) * 6);
   log(S, 'roll', '🎲 ' + v + (why ? ' — ' + why : ''));
   return v;
 }
