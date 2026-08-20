@@ -73,12 +73,17 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
 #map-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:none}
 #map{position:absolute;inset:0;width:100%;height:100%}
 .actionbar{display:flex;gap:6px;padding:8px 8px calc(8px + var(--safe-b));background:var(--paper);
-  border-top:1px solid var(--rule);flex:0 0 auto}
+  border-top:1px solid var(--rule);flex:0 0 auto;position:relative;z-index:1;transition:opacity .15s}
+/* Solange ein Blatt oder Fenster offen ist, ist die Aktionsleiste gesperrt – sonst trifft
+   man neben dem Blatt versehentlich „Zug beenden". */
+body.blocked .actionbar{pointer-events:none;opacity:.4}
 
 .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-top:1px solid var(--rule);
   border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgba(60,48,20,.16);padding:6px 14px 14px;
-  max-height:52%;overflow:auto;transform:translateY(110%);transition:transform .18s ease;z-index:5}
-.sheet.open{transform:none}
+  max-height:52%;overflow:auto;transform:translateY(110%);z-index:25;
+  /* geschlossen wirklich weg: sonst lugt ein leerer Kasten über der Aktionsleiste hervor */
+  visibility:hidden;transition:transform .18s ease, visibility 0s linear .18s}
+.sheet.open{transform:none;visibility:visible;transition:transform .18s ease}
 .sheet-grip{width:44px;height:5px;background:var(--rule);border-radius:3px;margin:4px auto 10px;cursor:pointer}
 .sheet-grip::before{content:"";position:absolute;left:0;right:0;top:0;height:26px}
 .sheet-close{position:absolute;top:6px;right:8px;width:32px;height:32px;border:0;background:none;
@@ -95,7 +100,7 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
 .opt[disabled]{opacity:.45}
 
 /* ------------------------------------------------------------------ Protokoll & Modal */
-.overlay{position:fixed;inset:0;background:rgba(40,34,20,.42);display:none;z-index:20;
+.overlay{position:fixed;inset:0;background:rgba(40,34,20,.42);display:none;z-index:30;
   align-items:flex-end;justify-content:center;padding-top:var(--safe-t)}
 .overlay.show{display:flex}
 .modal{background:var(--paper);width:min(680px,100%);max-height:88%;display:flex;flex-direction:column;
@@ -177,14 +182,18 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
 .ed-tools{display:flex;gap:6px;padding:8px 8px calc(8px + var(--safe-b));background:var(--paper);
   border-top:1px solid var(--rule)}
 
-.toast{position:fixed;left:50%;bottom:calc(78px + var(--safe-b));transform:translateX(-50%) translateY(20px);
+/* Hinweise erscheinen oben unter der Kopfzeile. Unten würden sie die Aktionsleiste
+   überlagern – man trifft dann versehentlich „Zug beenden". */
+.toast{position:fixed;left:50%;top:calc(62px + var(--safe-t));transform:translateX(-50%) translateY(-18px);
   background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:20px;font-size:13px;
   opacity:0;transition:.2s;pointer-events:none;z-index:40;max-width:86%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%)}
 
 @media (min-width:820px){
-  .sheet{left:auto;right:12px;bottom:12px;width:360px;border-radius:14px;max-height:70%;
-    transform:translateY(130%)}
+  /* Auf breiten Geräten schwebt das Blatt – dann muss es über der Aktionsleiste enden,
+     nicht darauf liegen. */
+  .sheet{left:auto;right:12px;bottom:calc(74px + var(--safe-b));width:360px;border-radius:14px;
+    max-height:70%;transform:translateY(130%)}
   .sheet.open{transform:none}
   .overlay{align-items:center}
   .modal{border-radius:14px}
@@ -211,3 +220,44 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
 
 .seg.wide{display:flex;margin:0 0 12px}
 .seg.wide button{flex:1;padding:10px}
+
+/* ------------------------------------------------------------------ Tutorial */
+/* Das Panel sitzt zwischen Karte und Aktionsleiste und nimmt höchstens 46 % der Höhe ein,
+   damit die Karte immer sichtbar bleibt. */
+#tut-panel{flex:none;display:flex;flex-direction:column;max-height:46%;
+  background:var(--paper);border-top:1px solid var(--rule);box-shadow:0 -6px 18px rgba(60,48,20,.10)}
+#tut-panel[hidden]{display:none}
+.tut-bar{height:3px;background:var(--rule);flex:none}
+.tut-bar-fill{height:100%;background:var(--red);width:0;transition:width .25s}
+.tut-head{display:flex;align-items:center;gap:8px;padding:7px 12px 0}
+.tut-sub{flex:1;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+.tut-head .btn.small{flex:none;padding:5px 9px;font-size:11px}
+.tut-scroll{padding:2px 12px 8px;overflow:auto;-webkit-overflow-scrolling:touch}
+.tut-h{font-family:var(--serif);font-size:19px;line-height:1.2;margin:2px 0 8px;font-weight:600}
+#tut-body p{font-size:14px;line-height:1.5;margin:0 0 9px}
+#tut-body b{font-weight:600}
+.tut-task{flex:none;margin:0 12px 8px;font-size:14px;line-height:1.4;background:#f2e5cf;
+  border:1px solid var(--rule);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 10px}
+.tut-task b{color:var(--red)}
+.tut-key{background:#f2e5cf;border:1px solid var(--rule);border-radius:9px;padding:9px 11px;
+  margin:10px 0 2px;font-size:13px;line-height:1.45}
+.tut-key>b:first-child{font-family:var(--serif);display:block;font-size:12px;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--red);margin-bottom:3px}
+.tut-tab{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 10px}
+.tut-tab th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);
+  font-weight:600;padding:0 4px 3px}
+.tut-tab td{border-top:1px solid var(--rule);padding:4px;text-align:center}
+.tut-tab td:first-child{text-align:left}
+.tut-tab tr.sum td{border-top:2px solid var(--ink-soft);font-weight:600}
+.tut-nav{display:flex;align-items:center;gap:8px;padding:0 12px 10px}
+.tut-nav .btn.small{flex:none;padding:8px 12px}
+.tut-nav .btn.primary{flex:1}
+.tut-count{font-size:12px;color:var(--ink-soft);min-width:34px;text-align:center}
+
+/* Technologieliste in den Kurzregeln */
+.rule-field{font-family:var(--serif);font-size:15px;font-weight:600;margin:16px 0 2px}
+.rule-age{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:8px 0 2px}
+.rule-tech{display:grid;grid-template-columns:26px 1fr;gap:2px 8px;padding:5px 0;
+  border-top:1px solid var(--rule);font-size:13px}
+.rule-tech .c{grid-row:span 2;color:var(--ink-soft);font-size:12px;text-align:right;padding-top:1px}
+.rule-tech i{font-style:normal;color:var(--ink-soft);font-size:12px;line-height:1.35}
