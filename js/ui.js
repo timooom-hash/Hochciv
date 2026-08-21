@@ -8,6 +8,7 @@ let customMap = null, editMap = null, edTool = 'G';
 /* ------------------------------------------------------------------ Basics */
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('show', s.id === id));
+  if (typeof applyTurn === 'function') applyTurn();     // Drehung hängt am Bildschirm
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -56,6 +57,32 @@ function setBarHeight() {
    (installiertes Android/Chrome); iOS kennt sie nicht – weder über die API noch über
    das Manifest. Dort bleibt nur, die App im Hochformat selbst zu drehen (html.turn,
    siehe style.css). Abschalten lässt sich das im Spielmenü (☰); die Wahl wird gemerkt. */
+/* Querformat. Eine echte Sperre gibt es nur, wo screen.orientation.lock existiert
+   (installiertes Android/Chrome); iOS kennt sie nicht – weder über die API noch über
+   das Manifest. Dort bleibt nur, die App im Hochformat selbst zu drehen (html.turn,
+   siehe style.css). Abschalten lässt sich das im Spielmenü (☰); die Wahl wird gemerkt.
+
+   Gedreht wird NUR der Spielbildschirm. Menü, Aufbau, Editor und die Regelseite haben
+   keine feste Karte, die Platz in der Breite bräuchte – dort wäre der Zwang lästig.
+   Deshalb hängt html.turn am aktiven Bildschirm und wird aus show() nachgeführt. */
+const TURN_SCREENS = ['screen-game'];
+function turnWanted() { return !load('hochciv.noturn'); }
+function onTurnScreen() {
+  return TURN_SCREENS.some(id => { const el = $(id); return el && el.classList.contains('show'); });
+}
+function applyTurn() {
+  const on = turnWanted() && onTurnScreen();
+  document.documentElement.classList.toggle('turn', on);
+  try {
+    const so = screen && screen.orientation;
+    if (so && typeof so.lock === 'function') {
+      // Nur im Spiel sperren; beim Verlassen wieder freigeben.
+      if (on) so.lock('landscape').catch(() => { });
+      else if (typeof so.unlock === 'function') so.unlock();
+    }
+  } catch (e) { }
+  syncLayout();
+}
 function turning() {
   return document.documentElement.classList.contains('turn') &&
     window.innerHeight > window.innerWidth;
@@ -77,17 +104,10 @@ function syncLayout() {
 }
 function setTurn(on) {
   store('hochciv.noturn', on ? null : true);
-  document.documentElement.classList.toggle('turn', !!on);
-  if (on) {
-    try {
-      const so = screen && screen.orientation;
-      if (so && typeof so.lock === 'function') so.lock('landscape').catch(() => { });
-    } catch (e) { }
-  }
-  syncLayout();
+  applyTurn();
 }
 function initOrientation() {
-  setTurn(!load('hochciv.noturn'));
+  applyTurn();
   window.addEventListener('resize', syncLayout);
   window.addEventListener('orientationchange', syncLayout);
 }
@@ -413,9 +433,12 @@ function openTile(r, c) {
           () => wonderSheet(city), full || !any);
       }
       const ac = armyCost(S, pi);
-      btn('Armee bauen', 'muss die Stadt noch verlassen', `${ac}🪙`,
+      // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
+      const civil = payOpts(S, pi).foodOk;
+      btn('Armee bauen', civil ? 'Bürgerkrieg: auch mit Nahrung zahlbar'
+        : 'muss die Stadt noch verlassen', `${ac}🪙`,
         () => { const e = buildArmy(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
-        available(S, pi, 'coins') < ac || !!armyAt(S, r, c));
+        available(S, pi, 'coins', payOpts(S, pi)) < ac || !!armyAt(S, r, c));
       if (slaveryUsable(p))
         btn('Bevölkerung opfern', city.sacrificed === S.round ? 'diese Runde schon geopfert' : 'Sklaverei', '+10🪙',
           () => { const e = sacrifice(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
@@ -638,9 +661,12 @@ function techModal() {
   });
 }
 function powerSheet() {
-  const pi = S.cur, price = powerPrice(S, pi), maxN = Math.floor(available(S, pi, 'coins') / price);
+  // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
+  const pi = S.cur, price = powerPrice(S, pi);
+  const maxN = Math.floor(available(S, pi, 'coins', payOpts(S, pi)) / price);
   let h = `<h3>Macht kaufen</h3><p class="sub">${price} Münzen = 1 Macht · aktuell ${P(S).power} Macht.
-    Zu Zugbeginn verlierst du ${has(P(S), 'panzer') ? '1/4' : has(P(S), 'stahl') ? '1/3' : '1/2'} davon.</p>`;
+    Zu Zugbeginn verlierst du ${has(P(S), 'panzer') ? '1/4' : has(P(S), 'stahl') ? '1/3' : '1/2'} davon.` +
+    (payOpts(S, pi).foodOk ? ' Bürgerkrieg: auch mit Nahrung zahlbar.' : '') + '</p>';
   [1, 5, maxN].forEach((n, i) => {
     if (n <= 0 || (i === 2 && maxN <= 5)) return;
     h += `<button class="opt" data-n="${n}"><span>+${n} Macht${i === 2 ? '<small>alles ausgeben</small>' : ''}</span>
@@ -825,29 +851,71 @@ function wonderSheet(city) {
     openTile(city.r, city.c);
   });
 }
-/* Städte füttern: Gentechnik (Wissenschaft) und Massenmedien (Münzen), 1:1 */
-function feedSheet() {
-  const pi = S.cur, p = P(S);
+/* Nahrungsübersicht zu Zugbeginn: was das Land produziert, was die Bevölkerung isst
+   und – mit Gentechnik/Massenmedien – wie viel davon aus Wissenschaft oder Münzen
+   bestritten wird. Voreingestellt ist die Deckung aus Nahrung, also gar keine
+   Verschiebung; jede Änderung lässt sich zurücknehmen.
+   Kein Umtausch: gedeckt wird höchstens, was die Bevölkerung tatsächlich isst. */
+function foodSheet() {
+  const pi = S.cur, p = ensureFoodState(S, pi);
+  const b = incomeBreakdown(S, pi);
+  const isst = p.popFood || 0, gedeckt = p.popCovered || 0;
+  const land = (p.foodRaw || 0) + isst;              // Produktion ohne die Bevölkerung
+  const offen = Math.max(0, isst - gedeckt);
   const src = feedSources(S, pi);
-  if (!src.length) return toast('Dafür braucht es Gentechnik oder Massenmedien.');
-  let h = `<h3>Städte füttern</h3><p class="sub">1:1 in Nahrung. ` +
-    (p.foodDeficit ? `Offenes Nahrungsdefizit: <b>${p.foodDeficit}</b>. ` : 'Kein Defizit – zusätzliche Nahrung ist möglich. ') +
-    `Nahrung jetzt: ${p.res.food}</p>`;
+
+  const zeile = (n, v, cls) => `<div class="fl ${cls || ''}"><span>${n}</span>
+    <b>${v > 0 ? '+' : ''}${v} 🌾</b></div>`;
+  let h = `<h3>Nahrung diese Runde</h3>
+    <div class="foodcalc">
+      ${zeile('Das Land produziert', land)}
+      ${zeile(`Die Bevölkerung isst (${popOf(S, pi)})`, -isst)}
+      ${gedeckt ? zeile(`Davon aus ${p.popCoveredBy && p.popCoveredBy.sci ? 'Wissenschaft' : ''}${
+        p.popCoveredBy && p.popCoveredBy.sci && p.popCoveredBy.coins ? ' und ' : ''}${
+        p.popCoveredBy && p.popCoveredBy.coins ? 'Münzen' : ''} bestritten`, gedeckt, 'plus') : ''}
+      ${zeile('Bleibt nutzbar', p.res.food, 'sum')}
+      ${p.foodDeficit ? `<p class="hint warn-t">Ungedeckt: ${p.foodDeficit} 🌾 – die Nahrung
+        bleibt bei 0, die Bevölkerung nimmt keinen Schaden.</p>` : ''}
+    </div>`;
+
+  if (!src.length) {
+    h += `<p class="hint">Mit <b>Gentechnik</b> oder <b>Massenmedien</b> ließe sich ein Teil
+      davon aus Wissenschaft oder Münzen bestreiten.</p>`;
+    sheet(h); return;
+  }
+  h += `<p class="sub" style="margin-top:10px">Aus anderen Quellen bestreiten –
+    höchstens ${isst}, also nur die tatsächlichen Kosten.</p>`;
   src.forEach(x => {
-    const steps = [...new Set([p.foodDeficit || 0, 1, 5, x.have].filter(n => n > 0 && n <= x.have))];
-    h += `<p class="sub" style="margin-top:8px">${x.n} (${x.have} vorhanden)</p>`;
+    const have = p.res[x.kind];
+    const steps = [...new Set([1, 5, Math.min(offen, have)])]
+      .filter(n => n > 0 && n <= Math.min(offen, have)).sort((a, c) => a - c);
+    const schon = (p.popCoveredBy && p.popCoveredBy[x.kind]) || 0;
+    h += `<p class="sub" style="margin-top:8px">${x.n}: ${have} übrig${
+      schon ? ` · ${schon} eingesetzt` : ''}</p>`;
+    if (!steps.length && !schon) { h += '<p class="hint">Nichts einzusetzen.</p>'; return; }
     steps.forEach(n => {
-      h += `<button class="opt" data-k="${x.kind}" data-n="${n}"><span>${n} ${x.n} geben</span>
+      h += `<button class="opt" data-k="${x.kind}" data-n="${n}"><span>${n} ${x.n} einsetzen${
+        n === offen ? '<small>deckt alles, was die Bevölkerung isst</small>' : ''}</span>
         <span class="cost">+${n}🌾</span></button>`;
     });
+    if (schon)
+      h += `<button class="opt ghost" data-back="${x.kind}" data-n="${schon}">
+        <span>${schon} ${x.n} zurücknehmen</span><span class="cost">−${schon}🌾</span></button>`;
   });
   sheet(h);
-  $('sheet-body').querySelectorAll('[data-k]').forEach(b => b.onclick = () => {
-    const e = feed(S, S.cur, b.dataset.k, +b.dataset.n);
+  $('sheet-body').querySelectorAll('[data-k]').forEach(b2 => b2.onclick = () => {
+    const e = coverPop(S, S.cur, b2.dataset.k, +b2.dataset.n);
     if (e) return toast(e);
-    redraw(); feedSheet();
+    redraw(); foodSheet();
+  });
+  $('sheet-body').querySelectorAll('[data-back]').forEach(b2 => b2.onclick = () => {
+    const e = uncoverPop(S, S.cur, b2.dataset.back, +b2.dataset.n);
+    if (e) return toast(e);
+    redraw(); foodSheet();
   });
 }
+/* Alt-Name für Tests und ältere Aufrufe. */
+function feedSheet() { return foodSheet(); }
 /* Auswahl kostenloser Technologien (Bibliothek, Oxford, Griechenland) */
 function freePickModal() {
   const pi = S.cur, p = P(S);
@@ -875,7 +943,9 @@ function humanTurnStart() {
   if (S.over) return gameOver();
   const ev = curEvent();
   toast(ev ? `${civOf(p).n} ist am Zug · Ereignis: ${ev.n}` : civOf(p).n + ' ist am Zug');
-  if (p.foodDeficit > 0 && canFeed(p)) feedSheet();
+  // Mit Gentechnik/Massenmedien gehört die Nahrungsrechnung zu Zugbeginn entschieden.
+  if (canFeed(p) && popOpen(ensureFoodState(S, S.cur)) > 0) foodSheet();
+  else if (p.foodDeficit > 0) toast(`Nahrungsdefizit ${p.foodDeficit} – Nahrung bleibt bei 0.`);
   else if (freePick(p)) freePickModal();
 }
 
@@ -1067,19 +1137,22 @@ function boot() {
   $('a-power').onclick = powerSheet;
   $('a-army').onclick = armySheet;
   $('a-info').onclick = worldModal;
-  $('hud-feed').onclick = () => { if (P(S).kind !== 'bot' && !S.over) feedSheet(); };
+  $('hud-feed').onclick = () => { if (P(S).kind !== 'bot' && !S.over) foodSheet(); };
   $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };
   $('a-end').onclick = endHumanTurn;
   $('g-menu').onclick = () => {
-    const on = document.documentElement.classList.contains('turn');
+    // turnWanted() ist die gespeicherte Wahl – nicht html.turn, das zusätzlich vom
+    // Bildschirm abhängt (gedreht wird nur das Spiel).
+    const on = turnWanted();
     modal('Menü', `<button class="btn wide" id="mm-rules">Regeln &amp; Technologien</button>
       <button class="btn wide" id="mm-turn">Hochkant drehen: ${on ? 'an' : 'aus'}</button>
-      <p class="hint" style="margin:6px 2px 0">Hält man das Gerät hochkant, dreht die App
-        sich selbst quer. iOS erlaubt keine echte Orientierungssperre.</p>
+      <p class="hint" style="margin:6px 2px 0">Hält man das Gerät im <b>Spiel</b> hochkant,
+        dreht die App sich selbst quer, damit die Karte breit steht. Menü, Aufbau und
+        Editor bleiben unberührt. iOS erlaubt keine echte Orientierungssperre.</p>
       <button class="btn wide" id="mm-export">Spielstand exportieren</button>
       <button class="btn wide" id="mm-quit">Spiel beenden</button>`);
     $('mm-rules').onclick = rulesModal;
-    $('mm-turn').onclick = () => { setTurn(!document.documentElement.classList.contains('turn')); closeModal(); };
+    $('mm-turn').onclick = () => { setTurn(!turnWanted()); closeModal(); };
     $('mm-export').onclick = () => download('hochzeiv-spielstand.json', JSON.stringify(S));
     $('mm-quit').onclick = () => { store('hochciv.save', null); location.reload(); };
   };

@@ -28,8 +28,12 @@ function peekNextEvent(S) {
   if (!S.evNext) S.evNext = rollEvent(S);
   return S.evNext;
 }
-/* Wirkt das Ereignis in dieser Runde auf dieses Reich? */
+/* Wirkt das Ereignis in dieser Runde auf dieses Reich?
+   S.evMuted schaltet alle Ereigniswirkungen vorübergehend ab. Das braucht baseIncome()
+   in der engine, um den DAUERHAFTEN Wert zu berechnen – die Nahrungsgrenze darf nicht
+   an einer Dürre hängen, die nur diese eine Runde gilt. */
 function evActive(S, pi, k) {
+  if (S.evMuted) return false;
   if (!evOn(S) || !S.event || S.event.k !== k || S.event.round !== S.round) return false;
   const p = S.players[pi];
   if (!p || p.kind === 'bot' || p.kind === 'barbar') return false;
@@ -37,6 +41,7 @@ function evActive(S, pi, k) {
   return true;
 }
 function evTerrainDead(S, pi, t) {
+  if (S.evMuted) return false;
   if (!evOn(S) || !S.event) return false;
   const dead = EVENT_TERRAIN[S.event.k];
   return dead === t && evActive(S, pi, S.event.k);

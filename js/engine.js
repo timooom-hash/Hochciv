@@ -491,9 +491,15 @@ function pay(S, pi, kind, amount, opts) {
 /* --------------------------------------------- Nahrungsgrenze und Städte füttern
    Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald
    das Einkommen dadurch unter 0 fiele. Gentechnik (aus Wissenschaft) und Massenmedien
-   (aus Münzen) heben diese Grenze auf; gefüttert wird zu Zugbeginn, 1:1, nach Wahl
-   des Spielers. Ein nicht gedecktes Defizit lässt die Nahrung bei 0 stehen –
-   Bevölkerung verhungert nicht. */
+   (aus Münzen) heben diese Grenze auf.
+
+   Was die Bevölkerung isst, ist dann zu Zugbeginn KEIN fester Abzug mehr, sondern ein
+   Posten, den man wahlweise aus Nahrung, Wissenschaft oder Münzen bestreitet. Gedeckt
+   wird höchstens, was die Bevölkerung tatsächlich isst (popFoodCost) – es ist also kein
+   Umtausch, sondern eine Verschiebung innerhalb des Rundeneinkommens. Weil jeder
+   Bevölkerungspunkt +1 Wissenschaft und +1 Münze einbringt und 1 Nahrung isst, lässt
+   sich das im Zweifel immer decken; genau deshalb darf man mit diesen Techs auch in
+   rechnerisch negative Nahrung hineinwachsen oder siedeln. */
 function canFeed(p) { return has(p, 'gentechnik') || has(p, 'massenmedien'); }
 function feedSources(S, pi) {
   const p = S.players[pi], out = [];
@@ -501,25 +507,100 @@ function feedSources(S, pi) {
   if (has(p, 'gentechnik')) out.push({ kind: 'sci', n: 'Wissenschaft', have: p.res.sci });
   return out;
 }
-function feed(S, pi, kind, amount) {
+/* Wie viel Nahrung die Bevölkerung diese Runde isst – als positive Zahl.
+   Kommt aus der Bevölkerungszeile des Einkommens, enthält also Bürokratie (verdoppelt
+   auch den Verbrauch der Hauptstadt) und Ökologie (senkt ihn) genauso wie das Einkommen
+   selbst. Wo das Einkommen die Nahrung pauschal kappt (Hungersnot), ist auch hier
+   nichts zu decken – sonst liefen Anzeige und Rechnung auseinander. */
+function popFoodCost(S, pi) {
+  if (evActive(S, pi, 'hungersnot')) return 0;
+  const b = incomeBreakdown(S, pi);
+  return Math.max(0, -b.pop.y[1]);
+}
+/* Wie viel von den Bevölkerungskosten noch offen ist – das ist die Obergrenze fürs Decken. */
+function popOpen(p) { return Math.max(0, (p.popFood || 0) - (p.popCovered || 0)); }
+/* Spielstände aus älteren Fassungen kennen foodRaw/popFood nicht, und beim allerersten
+   Zug eines Spiels lief beginTurn für diesen Spieler noch nicht. Beides hier nachziehen,
+   damit die Nahrungsrechnung nicht stumm ausfällt. Der schon vorhandene Nahrungsvorrat
+   bleibt unangetastet – nur die fehlenden Kennzahlen werden ergänzt. */
+function ensureFoodState(S, pi) {
   const p = S.players[pi];
+  if (p.foodRaw == null) p.foodRaw = p.res.food - (p.foodDeficit || 0);
+  if (p.foodDeficit == null) p.foodDeficit = Math.max(0, -p.foodRaw);
+  if (p.popFood == null) p.popFood = popFoodCost(S, pi);
+  if (p.popCovered == null) p.popCovered = 0;
+  if (!p.popCoveredBy) p.popCoveredBy = { sci: 0, coins: 0 };
+  if (p.popDefPart == null) p.popDefPart = 0;
+  return p;
+}
+/* Deckt `amount` der Bevölkerungskosten aus Wissenschaft oder Münzen.
+   Obergrenzen: der noch ungedeckte Teil der Kosten und der eigene Vorrat.
+   Verbucht wird inkrementell, NICHT durch Neuberechnung aus dem Rohsaldo: sonst
+   käme Nahrung zurück, die in dieser Runde schon ausgegeben wurde.
+   Der Teil, der ein offenes Defizit tilgt, wird nicht zu nutzbarer Nahrung – nur der
+   Rest. Sonst entstünde aus dem Decken mehr Nahrung, als die Bevölkerung isst. */
+function coverPop(S, pi, kind, amount) {
+  const p = ensureFoodState(S, pi);
   if (kind === 'sci' && !has(p, 'gentechnik')) return 'Gentechnik nicht erforscht.';
   if (kind === 'coins' && !has(p, 'massenmedien')) return 'Massenmedien nicht erforscht.';
-  amount = Math.min(Math.floor(amount), p.res[kind]);
+  const open = popOpen(p);
+  if (open <= 0) return 'Die Bevölkerung ist schon vollständig versorgt.';
+  amount = Math.min(Math.floor(amount), p.res[kind], open);
   if (amount <= 0) return 'Nichts abzugeben.';
+  const deckt = Math.min(amount, p.foodDeficit || 0);
   p.res[kind] -= amount;
-  const cover = Math.min(amount, p.foodDeficit || 0);
-  p.foodDeficit = (p.foodDeficit || 0) - cover;
-  p.res.food += amount - cover;
-  log(S, 'act', `${civOf(p).n}: Städte gefüttert – ${amount} ${kind === 'sci' ? 'Wissenschaft' : 'Münzen'}` +
-    (cover ? ` (${cover} deckt das Nahrungsdefizit)` : '') + '.');
+  p.foodDeficit = (p.foodDeficit || 0) - deckt;
+  p.res.food += amount - deckt;
+  p.popCovered = (p.popCovered || 0) + amount;
+  p.popCoveredBy = p.popCoveredBy || { sci: 0, coins: 0 };
+  p.popCoveredBy[kind] = (p.popCoveredBy[kind] || 0) + amount;
+  p.popDefPart = (p.popDefPart || 0) + deckt;      // wie viel davon ins Defizit floss
+  log(S, 'act', `${civOf(p).n}: ${amount} ${kind === 'sci' ? 'Wissenschaft' : 'Münzen'} ` +
+    `versorgen die Bevölkerung – Nahrung ${p.res.food}` +
+    (p.foodDeficit ? ` (${p.foodDeficit} offen)` : '') + '.');
   return null;
 }
-/* Nahrungseinkommen, wenn die Stadt um delta wachsen würde. */
+/* Eine Deckung zurücknehmen – der Betrag geht in die ursprüngliche Quelle zurück.
+   Nötig, damit die Wahl zu Zugbeginn wirklich eine Wahl ist und nicht ein Einbahnweg.
+   Zurückgegeben wird nur, was noch da ist: wurde die so gewonnene Nahrung schon
+   ausgegeben, wird abgelehnt. Sonst ließe sich Nahrung ausgeben, die Deckung
+   zurücknehmen und die Wissenschaft behalten – das Defizit selbst kostet ja nichts. */
+function uncoverPop(S, pi, kind, amount) {
+  const p = ensureFoodState(S, pi);
+  const back = (p.popCoveredBy && p.popCoveredBy[kind]) || 0;
+  amount = Math.min(Math.floor(amount), back);
+  if (amount <= 0) return 'Nichts zurückzunehmen.';
+  // LIFO: beim Decken wurde erst das Defizit getilgt, dann Vorrat aufgebaut – also
+  // zuerst den Vorrat wieder abbauen, sonst stünden Nahrung und Defizit gleichzeitig da.
+  const vorratsAnteil = (p.popCovered || 0) - (p.popDefPart || 0);
+  const ausVorrat = Math.min(amount, vorratsAnteil);
+  const ausDefizit = amount - ausVorrat;
+  if (ausVorrat > p.res.food) return 'Diese Nahrung ist schon ausgegeben.';
+  p.res.food -= ausVorrat;
+  p.foodDeficit = (p.foodDeficit || 0) + ausDefizit;
+  p.popDefPart = (p.popDefPart || 0) - ausDefizit;
+  p.res[kind] += amount;
+  p.popCovered -= amount;
+  p.popCoveredBy[kind] -= amount;
+  return null;
+}
+/* Alt-Name, damit gespeicherte Abläufe und Tests weiterlaufen. */
+function feed(S, pi, kind, amount) { return coverPop(S, pi, kind, amount); }
+/* Nahrungseinkommen ohne die Wirkungen des laufenden Ereignisses und ohne den
+   Taj-Mahal-Rundenbonus – also der Wert, der auch nach dieser Runde noch gilt.
+   Die Nahrungsgrenze muss darauf beruhen: eine Dürre dauert eine Runde, die Stadt
+   bleibt aber für immer groß. Sonst verbietet ein Ereignis Wachstum und Siedeln,
+   obwohl es dauerhaft gedeckt wäre. */
+function baseIncome(S, pi) {
+  const wasEv = S.evMuted, p = S.players[pi], wasD = p.doubleIncome;
+  S.evMuted = true; p.doubleIncome = null;
+  try { return income(S, pi); } finally { S.evMuted = wasEv; p.doubleIncome = wasD; }
+}
+/* Nahrungseinkommen, wenn die Stadt um delta wachsen würde – auf dem dauerhaften Wert. */
 function foodAfterGrowth(S, pi, city, delta) {
   const before = city.pop;
   city.pop += delta;
-  const f = income(S, pi).food;
+  const f = baseIncome(S, pi).food;
   city.pop = before;
   return f;
 }
@@ -535,13 +616,22 @@ function beginTurn(S) {
   log(S, 'head', `Runde ${S.round} — ${civOf(p).n}${p.kind === 'bot' ? ' (Bot)' : ''}`);
   // 0 Kultursieg: ein Stufe-3-Wunder gewinnt zu Beginn des nächsten eigenen Zuges
   if (checkCultureVictory(S, S.cur)) return;
-  // 1 Einkommen
+  // 1 Einkommen. foodRaw ist der rohe Nahrungssaldo (darf negativ sein); daraus ergeben
+  // sich nutzbare Nahrung und Defizit. popFood ist der Teil davon, den die Bevölkerung
+  // isst – er lässt sich mit Gentechnik/Massenmedien aus Wissenschaft oder Münzen
+  // bestreiten (coverPop), was Nahrung freimacht, ohne mehr zu erzeugen als sie isst.
   const inc = income(S, S.cur);
   p.res = { sci: inc.sci, food: Math.max(0, inc.food), coins: inc.coins };
+  p.foodRaw = inc.food;
   p.foodDeficit = Math.max(0, -inc.food);
+  p.popFood = popFoodCost(S, S.cur);      // auch ohne die Techs – für die Übersicht
+  p.popCovered = 0;
+  p.popCoveredBy = { sci: 0, coins: 0 };
+  p.popDefPart = 0;
   if (p.foodDeficit)
     log(S, 'warn', `Nahrungsdefizit von ${p.foodDeficit}` +
-      (canFeed(p) ? ' – kann mit Wissenschaft/Münzen gefüttert werden.' : ' – Nahrung bleibt bei 0.'));
+      (canFeed(p) ? ' – die Bevölkerung kann aus Wissenschaft/Münzen versorgt werden.'
+        : ' – Nahrung bleibt bei 0.'));
   if (p.kind !== 'bot')
     log(S, 'info', `Einkommen: ${p.res.sci} Wissenschaft, ${p.res.food} Nahrung, ${p.res.coins} Münzen.`);
   // 2 Macht reduzieren. Zuschläge aus Armeen/Zeusstatue erhöhen den Verlust,
@@ -828,12 +918,18 @@ function armyCost(S, pi) {
   const mult = has(p, 'nationalismus') ? 2 : has(p, 'demokratie') ? 4 : 5;
   return mult * n;
 }
+/* Bezahloptionen für Armeen und Macht. Bürgerkrieg erlaubt in dieser Runde, beides
+   auch mit Nahrung zu zahlen (siehe rates(): foodToCoins 1:1).
+   WICHTIG: Diese Funktion ist die einzige Wahrheit dazu. Die Oberfläche muss sie für
+   ihre „kann ich mir das leisten?"-Prüfung genauso benutzen wie die Regelmaschine beim
+   Bezahlen – sonst sperrt der Knopf einen Kauf, den die Regel erlauben würde (genau
+   dieser Fehler trat im Bürgerkrieg auf). */
+function payOpts(S, pi) { return { foodOk: evActive(S, pi, 'buergerkrieg') }; }
 function buildArmy(S, pi, city) {
   if (!city || city.owner !== pi) return 'Nur in eigener Stadt.';
   if (armyAt(S, city.r, city.c)) return 'Dort steht schon eine Armee.';
   const cost = armyCost(S, pi);
-  const opts = { foodOk: evActive(S, pi, 'buergerkrieg') };   // Bürgerkrieg: auch mit Nahrung
-  if (!pay(S, pi, 'coins', cost, opts)) return `Zu wenig Münzen (${cost} nötig).`;
+  if (!pay(S, pi, 'coins', cost, payOpts(S, pi))) return `Zu wenig Münzen (${cost} nötig).`;
   S.armies.push({ id: S.nextId++, owner: pi, r: city.r, c: city.c, mp: moveAllowance(S, pi), born: S.round });
   log(S, 'act', `${civOf(S.players[pi]).n}: Armee gebaut (${cost} Münzen) – muss die Stadt noch verlassen.`);
   return null;
@@ -845,8 +941,7 @@ function powerPrice(S, pi) {
 }
 function buyPower(S, pi, n = 1) {
   const price = powerPrice(S, pi) * n;
-  const opts = { foodOk: evActive(S, pi, 'buergerkrieg') };   // Bürgerkrieg: auch mit Nahrung
-  if (!pay(S, pi, 'coins', price, opts)) return 'Zu wenig Münzen.';
+  if (!pay(S, pi, 'coins', price, payOpts(S, pi))) return 'Zu wenig Münzen.';
   S.players[pi].power += n;
   log(S, 'act', `${civOf(S.players[pi]).n}: +${n} Macht für ${price} Münzen → ${S.players[pi].power}.`);
   return null;
