@@ -141,6 +141,17 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
   padding:11px 12px;margin-bottom:7px;background:var(--paper-2);border:1px solid var(--rule);
   border-radius:9px;text-align:left;cursor:pointer}
 .opt small{display:block;color:var(--ink-soft);font-size:11px;margin-top:2px}
+/* Nahrungsrechnung zu Zugbeginn: eine kleine Aufstellung statt einer Zahlenwüste. */
+.foodcalc{background:var(--paper-2);border:1px solid var(--rule);border-radius:9px;
+  padding:7px 10px;margin:2px 0 4px}
+.fl{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-size:12px;line-height:1.7}
+.fl b{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.fl.plus b{color:#3f6b3a}
+.fl.sum{border-top:1px solid var(--rule);margin-top:3px;padding-top:4px;font-weight:600}
+.fl.sum b{font-size:15px}
+.warn-t{color:#8a5a12}
+.opt.ghost{background:none;border-style:dashed}
 /* Ein einzelnes Kästchen im Feldblatt: was das Reich an einer Stadt auf diesem Feld
    verdiente. Erscheint nur, wenn hier auch gegründet werden kann. */
 .tile-facts{display:flex;margin:0 0 9px}
