@@ -27,6 +27,10 @@ const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/b
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
   + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
 const G = n => window.__get(n);
+const SET = (n, v) => window.__set(n, v);
+// Das Auto-Weiterschalten im Tutorial läuft in der App über setTimeout. Im Test
+// wird die Verzögerung auf 0 gesetzt, damit es synchron und damit prüfbar abläuft.
+SET('TUT_AUTO_MS', 0);
 
 const $ = id => window.document.getElementById(id);
 const step = (label, fn) => {
@@ -126,7 +130,9 @@ step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
       if (!anyBar && !anySheet) problems.push((i + 1) + ' „' + t + '": nichts bedienbar – Sackgasse');
       G('__runAuto')(+$('tut-count').textContent.split('/')[0] - 1);
     }
-    if (i < n - 1) $('tut-next').onclick();
+    // __runAuto ruft redraw() – erledigte Aufgaben schalten dadurch von selbst weiter.
+    // Deshalb nur klicken, wenn der Schritt noch steht.
+    if (i < n - 1 && +$('tut-count').textContent.split('/')[0] - 1 === i) $('tut-next').onclick();
   }
   if (problems.length) throw new Error(problems.slice(0, 3).join(' | '));
   console.log('       ' + n + ' Schritte geprüft, keine Lücke in den Schienen');
@@ -135,8 +141,10 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
   G('tutorialStart')();                     // frisches Übungsspiel, wieder bei Schritt 1
   const n = G('TUT_STEPS').length;
   const open = () => !$('tut-next').disabled;
-  let manual = 0;
-  for (let i = 0; i < n; i++) {
+  const idx = () => +$('tut-count').textContent.split('/')[0] - 1;
+  let manual = 0, auto = 0, guard = 0;
+  while (guard++ < n * 3) {
+    const i = idx();
     if (!$('tut-body').textContent.trim()) throw new Error('Schritt ' + (i + 1) + ' ohne Text');
     if (!open()) {
       if ($('tut-task').hidden) throw new Error('Aufgabe ohne Hinweiszeile in Schritt ' + (i + 1));
@@ -144,8 +152,8 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
       const hl = G('tutHighlight')() || [];
       if (/Zug beenden/.test(t)) {
         $('a-end').onclick();
-        let guard = 0;
-        while (guard++ < 24 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
+        let g2 = 0;
+        while (g2++ < 24 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
         manual++;
       } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau|Technologien/.test(t)) {
         $('a-tech').onclick();
@@ -181,16 +189,11 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
         G('tapHex')(a.r, Math.max(0, a.c - 1));          // falsches Ziel
         if (a.r + '/' + a.c !== before) throw new Error('Armee auf falsches Feld gezogen');
         G('tapHex')(hl[0][0], hl[0][1]); manual++;
-      } else if (/Zug beenden/.test(t)) {
-        $('a-end').onclick();
-        let guard = 0;
-        while (guard++ < 20 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
-        manual++;
       } else if (/Bots getan/.test(t)) {
         $('a-log').onclick(); G('closeModal')(); manual++;
       } else if (/Macht/.test(t)) {
-        let guard = 0;
-        while (!open() && guard++ < 8) {
+        let g2 = 0;
+        while (!open() && idx() === i && g2++ < 8) {
           $('a-power').onclick();
           const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
           if (!en.length) break;
@@ -198,13 +201,24 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
         }
         G('closeSheet')(); manual++;
       }
-      // Es gibt keinen „Für mich machen"-Ausweg mehr: alles muss über die Oberfläche gehen
+      // Erledigte Aufgaben schalten von selbst weiter (TUT_AUTO_MS = 0 im Test).
+      // Bleibt der Schritt stehen, muss wenigstens „Weiter" freigegeben sein.
+      if (idx() > i) { auto++; continue; }
+      // Es gibt keinen „Für mich machen"-Ausweg: alles muss über die Oberfläche gehen
       if (!open()) throw new Error('Aufgabe nicht über die Oberfläche erfüllbar: ' + t);
+      throw new Error('Aufgabe erledigt, aber nicht automatisch weitergeschaltet: ' + t);
     }
-    if (i < n - 1) $('tut-next').onclick();
+    if (i >= n - 1) break;
+    $('tut-next').onclick();
+    if (idx() === i) throw new Error('„Weiter" bewegt sich nicht in Schritt ' + (i + 1));
   }
+  if (idx() !== n - 1) throw new Error('Durchlauf endet bei Schritt ' + (idx() + 1) + ' statt ' + n);
   if ($('tut-next').textContent !== 'Fertig') throw new Error('letzter Schritt heißt nicht Fertig');
-  console.log('       ' + n + ' Schritte, ' + manual + ' Aufgaben über die Oberfläche erledigt');
+  const tasks = G('TUT_STEPS').filter(st => st.goal).length;
+  if (auto !== manual) throw new Error(auto + ' von ' + manual + ' Aufgaben schalten automatisch weiter');
+  if (manual !== tasks) throw new Error(manual + ' Aufgaben erledigt, ' + tasks + ' erwartet');
+  console.log('       ' + n + ' Schritte, ' + manual + ' Aufgaben über die Oberfläche erledigt, '
+    + auto + '× automatisch weitergeschaltet');
 });
 step('Tutorial: „Fertig" gibt das Spiel frei', () => {
   $('tut-next').onclick();
@@ -532,6 +546,245 @@ step('Karteneditor', () => {
   window.__set('edTool', 'cap:england'); G('edTap')(8, 9);
   if (G('editMap').capitals.england[1] !== 9) throw new Error('Hauptstadt nicht gesetzt');
   $('ed-size').onclick && (window.prompt = () => '16');
+});
+
+/* ================================================ Die sieben Designänderungen
+   Frisches Spiel: die Läufe davor enden im Siegbildschirm oder bei einem Bot. */
+const frischesSpiel = () => {
+  $('m-new').onclick();
+  [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  $('setup-go').onclick();
+  const S = G('S');
+  if (S.over) throw new Error('frisches Spiel ist schon entschieden');
+  if (G('P')(S).kind === 'bot') throw new Error('frisches Spiel beginnt mit einem Bot');
+};
+step('Karte: kein Zoomen und Schieben mehr, Treffer direkt auf dem Feld', () => {
+  frischesSpiel();
+  if (G('typeof view') !== 'undefined') throw new Error('Ansichts-Zustand noch vorhanden');
+  if (G('typeof attachGestures') !== 'undefined') throw new Error('Gestenerkennung noch vorhanden');
+  const svg = $('map');
+  if (!svg.getAttribute('viewBox')) throw new Error('keine viewBox – Karte wird nicht eingepasst');
+  const world = svg.querySelector('#world');
+  if (world && world.getAttribute('transform')) throw new Error('Weltgruppe ist verschoben/skaliert');
+  // Klick auf ein Sechseck wählt genau dieses Feld – ohne Koordinatenrechnung
+  const S = G('S'); const cap = G('capitalOf')(S, S.cur);
+  if (!cap) throw new Error('keine Hauptstadt');
+  const poly = svg.querySelector(`[data-r="${cap.r}"][data-c="${cap.c}"]`);
+  if (!poly) throw new Error('Feld nicht im SVG');
+  poly.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  const sel = G('ui').sel;
+  if (!sel || sel[0] !== cap.r || sel[1] !== cap.c) throw new Error('Klick wählt das falsche Feld');
+  G('closeSheet')();
+  console.log('       viewBox gesetzt, Klick trifft ' + sel.join('/'));
+});
+step('Aktionsleiste bleibt bedienbar, solange ein Blatt offen ist (Punkt 3)', () => {
+  frischesSpiel();
+  const S = G('S');
+  const cap = G('capitalOf')(S, S.cur);
+  G('tapHex')(cap.r, cap.c);
+  if (!$('sheet').classList.contains('open')) throw new Error('Blatt öffnet nicht');
+  if (window.document.body.classList.contains('blocked'))
+    throw new Error('Blatt sperrt die Aktionsleiste weiterhin');
+  const aus = ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].filter(id => $(id).disabled);
+  if (aus.length) throw new Error('Menüpunkte gesperrt: ' + aus.join(', '));
+  G('closeSheet')();
+  // Das Bot-Fenster sperrt weiterhin – dort führt nur „Weiter" weiter
+  G('ui').botLock = true; G('lockBar')();
+  if (!window.document.body.classList.contains('blocked'))
+    throw new Error('Bot-Fenster sperrt die Leiste nicht mehr');
+  G('ui').botLock = false; G('lockBar')();
+  console.log('       Blatt offen, alle sechs Menüpunkte frei');
+});
+step('Kopfzeile: Weltbevölkerungsanteil in Prozent (Punkt 4)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur;
+  G('redraw')();
+  const txt = $('hud-round').textContent;
+  const mine = G('popOf')(S, pi), all = G('worldPop')(S);
+  const want = Math.round((mine / all) * 100);
+  if (!txt.includes(`${mine}/${all} (${want} %)`))
+    throw new Error('erwartet „' + mine + '/' + all + ' (' + want + ' %)", steht: ' + txt);
+  console.log('       ' + txt);
+});
+step('Ressourcenleiste: vier getrennte Werte mit Beschriftung (Punkt 2)', () => {
+  const res = $('screen-game').querySelectorAll('.hud-res .res');
+  if (res.length !== 4) throw new Error(res.length + ' statt 4 Ressourcenfelder');
+  const labels = [...res].map(r => r.querySelector('u') && r.querySelector('u').textContent);
+  if (labels.some(l => !l)) throw new Error('Beschriftung fehlt: ' + labels.join('|'));
+  const werte = [...res].map(r => r.querySelector('b') && r.querySelector('b').id);
+  const want = ['hud-sci', 'hud-food', 'hud-coins', 'hud-power'];
+  if (JSON.stringify(werte) !== JSON.stringify(want))
+    throw new Error('falsche Reihenfolge: ' + werte.join(','));
+  console.log('       ' + labels.join(' · '));
+});
+step('Feldblatt: Feldertrag klein, Siedelertrag nur wo siedelbar (Punkt 7)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
+  // Nahrung großzügig setzen: sonst hängt der Test davon ab, wie viel das ausgewürfelte
+  // Startreich in Runde 1 gerade übrig hat – das schlug in 4 von 8 Läufen fehl.
+  G('P')(S).res.food = 40;
+  const gut = G('within')(cap.r, cap.c, 7).find(([r, c]) => !G('canFound')(S, pi, r, c));
+  if (!gut) throw new Error('kein gründbares Feld trotz 40 Nahrung');
+  G('tapHex')(gut[0], gut[1]);
+  const txt = $('sheet-body').textContent;
+  // Feldertrag steht klein in der Unterzeile, nicht mehr im Kästchen
+  const sub = $('sheet-body').querySelector('p.sub');
+  if (!sub || !/Feld \d+\/\d+ · Ertrag /.test(sub.textContent))
+    throw new Error('Feldertrag steht nicht klein in der Unterzeile: ' + (sub && sub.textContent));
+  if (/FELDERTRAG/i.test(txt.replace(/Feld \d+\/\d+ · Ertrag/, '')))
+    throw new Error('Feldertrag steht immer noch als eigenes Kästchen da');
+  const facts = $('sheet-body').querySelectorAll('.tile-facts .fact');
+  if (facts.length !== 1) throw new Error(facts.length + ' statt 1 Kästchen');
+  if (facts[0].querySelector('.fact-n')) throw new Error('Untertext ist noch da');
+  const g = G('settleGain')(S, pi, gut[0], gut[1]);
+  const soll = (g.sci > 0 ? '+' : '') + g.sci + '🔬';
+  if (!facts[0].textContent.includes(soll))
+    throw new Error('Siedelertrag stimmt nicht: erwartet ' + soll);
+  // Wo nicht gesiedelt werden kann, fehlt das Kästchen ganz
+  const meer = G('within')(cap.r, cap.c, 6).find(([r, c]) => G('terrainAt')(S, r, c) === 'M');
+  if (!meer) throw new Error('kein Meerfeld in der Nähe');
+  G('tapHex')(meer[0], meer[1]);
+  if ($('sheet-body').querySelectorAll('.tile-facts').length)
+    throw new Error('Meerfeld zeigt trotzdem einen Siedelertrag');
+  if (!/· Ertrag /.test($('sheet-body').querySelector('p.sub').textContent))
+    throw new Error('Meerfeld zeigt keinen Feldertrag');
+  // Auch das eigene Stadtfeld nicht (zu nah an sich selbst)
+  G('tapHex')(cap.r, cap.c);
+  if ($('sheet-body').querySelectorAll('.tile-facts').length)
+    throw new Error('Stadtfeld zeigt einen Siedelertrag');
+  G('closeSheet')();
+  console.log('       Feld ' + gut.join('/') + ': Siedelertrag ' + soll + ', Meer und Stadt ohne');
+});
+step('Hauptmenü ohne Fußzeile (Punkt 3 der Nachbesserung)', () => {
+  if ($('screen-menu').querySelector('.foot')) throw new Error('Fußzeile steht noch da');
+  if (/Home-Bildschirm/.test($('screen-menu').textContent))
+    throw new Error('Hinweis auf den Home-Bildschirm steht noch da');
+});
+step('Technologiebogen unterscheidet bezahlbar von zu teuer (Punkt 4)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  // Ausgangslage selbst herstellen statt auf die ausgewürfelte Verfügbarkeit zu hoffen:
+  // zwei Technologien mit unterschiedlichen Kosten freischalten und die Wissenschaft
+  // exakt auf die billigere setzen. Münzen auf 0, sonst zählen sie 2:1 mit.
+  const alle = Object.values(G('TECH_BY_KEY'))
+    .filter(t => !p.techs[t.k])
+    .sort((a, b) => G('techCost')(S, pi, a) - G('techCost')(S, pi, b));
+  const billig = alle[0], teuer = alle[alle.length - 1];
+  if (G('techCost')(S, pi, billig) >= G('techCost')(S, pi, teuer))
+    throw new Error('keine zwei Technologien mit unterschiedlichen Kosten');
+  p.avail[billig.k] = true; p.avail[teuer.k] = true;
+  p.res.sci = G('techCost')(S, pi, billig);
+  p.res.coins = 0; p.res.food = 0;
+  G('techModal')();
+  const afford = $('ov-body').querySelectorAll('.tech.avail.afford');
+  const costly = $('ov-body').querySelectorAll('.tech.avail.costly');
+  if (!afford.length) throw new Error('keine bezahlbare Kachel markiert');
+  if (!costly.length) throw new Error('keine zu teure Kachel markiert');
+  // Die Einteilung muss der Rechnung folgen, nicht dem Zufall
+  const falsch = [...afford].filter(b => b.disabled).length
+    + [...costly].filter(b => !b.disabled).length;
+  if (falsch) throw new Error(falsch + ' Kacheln sind falsch einsortiert');
+  // Keine Kachel ist beides, und nicht verfügbare bleiben außen vor
+  if ($('ov-body').querySelectorAll('.tech.afford.costly').length) throw new Error('beides zugleich');
+  if ($('ov-body').querySelectorAll('.tech.locked.afford, .tech.locked.costly').length)
+    throw new Error('nicht verfügbare Kachel als bezahlbar/zu teuer markiert');
+  // Kein zusätzlicher Text – der Unterschied ist rein grafisch
+  const woerter = [...afford, ...costly].map(b => b.textContent);
+  if (woerter.some(t => /zu teuer|bezahlbar|reicht nicht|leistbar/i.test(t)))
+    throw new Error('die Kacheln tragen zusätzlichen Text');
+  G('closeModal')();
+  // Die drei Stufen müssen sich auch wirklich unterscheiden. jsdom rechnet kein CSS,
+  // deshalb wird das Regelwerk selbst geprüft – und zwar genau die Eigenschaft, an der
+  // v31 scheiterte: „zu teuer" darf nicht verblassen, sonst sieht es aus wie
+  // „nicht verfügbar" (der rote Rand verliert mit der Deckkraft seine Aussage).
+  const css = fs.readFileSync(__dirname + '/css/style.css', 'utf8');
+  const regel = sel => {
+    const m = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{([^}]*)\\}').exec(css);
+    if (!m) throw new Error('Regel fehlt: ' + sel);
+    return m[1];
+  };
+  const opac = sel => { const m = /opacity:([\d.]+)/.exec(regel(sel)); return m ? +m[1] : 1; };
+  if (opac('.tech.avail.costly') !== 1)
+    throw new Error('zu teure Kacheln sind gedämpft – dann verblasst auch der rote Rand');
+  if (opac('.tech.locked') > 0.4)
+    throw new Error('nicht verfügbare Kacheln heben sich zu wenig ab');
+  if (!/dashed/.test(regel('.tech.avail.costly')))
+    throw new Error('zu teure Kacheln sind nicht gestrichelt');
+  if (!/var\(--red\)/.test(regel('.tech.avail')))
+    throw new Error('verfügbare Kacheln haben keinen roten Rand');
+  if (/border-color/.test(regel('.tech.locked')))
+    throw new Error('nicht verfügbare Kacheln färben den Rand um – dann fällt der Unterschied weg');
+  console.log('       ' + afford.length + ' bezahlbar, ' + costly.length + ' zu teuer, ohne Zusatztext'
+    + ' · zu teuer voll deckend, nicht verfügbar bei ' + opac('.tech.locked'));
+});
+step('Protokoll: Würfe hängen eingeklappt an der Aktionszeile (Punkt 6)', () => {
+  const S = G('S');
+  const log = [
+    { c: 'head', m: 'Runde 1 — England (Bot)' },
+    { c: 'roll', m: '🎲 5 — Wachstum (4+)' },
+    { c: 'act', m: 'England: Stadt wächst auf 2.' },
+    { c: 'roll', m: '🎲 2 — Siedeln (4+)' },
+    { c: 'roll', m: '🎲 6 — Siedeln (4+)' },
+    { c: 'act', m: 'England: Siedler gründet Stadt.' },
+    { c: 'roll', m: '🎲 1 — Armee bauen (4+)' },
+  ];
+  const h = G('logHtml')(log);
+  const box = window.document.createElement('div'); box.innerHTML = h;
+  const det = box.querySelectorAll('details.rolls');
+  if (det.length !== 3) throw new Error(det.length + ' statt 3 Würfelblöcke');
+  if ([...det].some(d => d.hasAttribute('open'))) throw new Error('Block ist aufgeklappt');
+  // Eingeklappt sichtbar: die Aktionszeilen, nicht die Würfe
+  const summaries = [...det].map(d => d.querySelector('summary').textContent.trim());
+  if (!summaries[0].startsWith('England: Stadt wächst auf 2.'))
+    throw new Error('erste Zusammenfassung ist nicht die Aktion: ' + summaries[0]);
+  if (!summaries[1].startsWith('England: Siedler gründet Stadt.'))
+    throw new Error('zwei Würfe hängen nicht an ihrer Aktion: ' + summaries[1]);
+  // Der letzte Wurf hat keine Aktion – dann steht der Grund da
+  if (!/Armee bauen/.test(summaries[2])) throw new Error('Fehlwurf ohne Grund: ' + summaries[2]);
+  // Die Rundenüberschrift bekommt keine Würfe angehängt
+  if (box.querySelector('details.rolls summary').textContent.includes('Runde 1'))
+    throw new Error('Überschrift eingeklappt');
+  // Ausklappen zeigt die Würfe
+  if (det[1].querySelectorAll('.logline.roll').length !== 2)
+    throw new Error('Würfe fehlen im aufgeklappten Block');
+  if (/🎲 5/.test(summaries[0])) throw new Error('Wurf steht schon in der Zusammenfassung');
+  // Und im echten Protokoll läuft es genauso
+  G('logModal')();
+  if (!$('ov-body').querySelector('details.rolls')) throw new Error('Protokoll klappt nichts ein');
+  G('closeModal')();
+  console.log('       3 Blöcke, eingeklappt sichtbar: „' + summaries[0] + '"');
+});
+step('Layoutklassen richten sich nach der effektiven Größe, auch gedreht', () => {
+  const html = window.document.documentElement;
+  const w = window.innerWidth, h = window.innerHeight;
+  html.classList.remove('turn');
+  G('syncLayout')();
+  const quer = html.classList.contains('w-side');
+  // Gedreht sind Breite und Höhe vertauscht – die Klassen müssen umschlagen
+  html.classList.add('turn');
+  Object.defineProperty(window, 'innerWidth', { value: 500, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: 1000, configurable: true });
+  G('syncLayout')();
+  if (!html.classList.contains('w-side'))
+    throw new Error('gedreht wird die Querlage nicht erkannt (1000 × 500)');
+  if (!html.classList.contains('w-wide'))
+    throw new Error('gedreht wird die Breite nicht erkannt');
+  html.classList.remove('turn');
+  G('syncLayout')();
+  if (html.classList.contains('w-side'))
+    throw new Error('ohne Drehung gilt 500 × 1000 als quer');
+  Object.defineProperty(window, 'innerWidth', { value: w, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
+  G('setTurn')(true);
+  console.log('       500 × 1000 gedreht = quer und breit, ungedreht = hochkant'
+    + (quer ? '' : ''));
+});
+step('Blatt endet über der Aktionsleiste (Punkt 3, gemessen)', () => {
+  frischesSpiel(); G('setBarHeight')();
+  const v = window.document.documentElement.style.getPropertyValue('--bar-h');
+  if (!v) throw new Error('--bar-h wurde nicht gesetzt');
+  if (!/^\d+px$/.test(v)) throw new Error('--bar-h ist kein Pixelmaß: ' + v);
+  console.log('       --bar-h = ' + v);
 });
 
 console.log(errors.length ? '\n' + errors.length + ' Fehler' : '\nOberfläche läuft fehlerfrei durch');

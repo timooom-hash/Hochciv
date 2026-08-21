@@ -446,6 +446,47 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(typeof canGrow(S, 0, c), 'string', 'ein viertes Wachstum wird abgelehnt');
 }
 
+/* Verbundwerkstoffe gibt NUR ein zusätzliches kostenloses Wachstum – es lässt sich nicht
+   in einen zweiten bezahlten Schritt umwandeln. */
+{
+  const S = mk('griechenland', ['verbundwerkstoffe', 'gentechnik']);
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
+  S.players[0].res = { sci: 0, food: 999, coins: 999 };
+  const lim = growLimits(S, 0);
+  eq([lim.paid, lim.free, lim.max], [1, 1, 2], 'ein bezahlter und ein kostenloser Schritt');
+  eq(canGrowPaid(S, 0, c), null, 'der erste bezahlte Schritt geht');
+  eq(growCity(S, 0, c, 'paid'), null, 'und wird ausgeführt');
+  eq(typeof canGrowPaid(S, 0, c), 'string', 'ein zweiter bezahlter Schritt wird abgelehnt');
+  eq(canGrowPaid(S, 0, c), 'Diese Runde nur noch kostenloses Wachstum.', 'mit klarer Begründung');
+  eq(typeof growCity(S, 0, c, 'paid'), 'string', 'auch die Ausführung wird abgelehnt');
+  eq(freeGrowthAvailable(S, 0, c), true, 'das kostenlose Kontingent steht aber noch');
+  eq(growCity(S, 0, c, 'free'), null, 'und lässt sich nutzen');
+  eq(c.pop, 5, 'insgesamt zwei Schritte: 3 → 5');
+  eq(freeGrowthAvailable(S, 0, c), false, 'danach ist nichts mehr offen');
+  eq(typeof canGrow(S, 0, c), 'string', 'auch der automatische Weg ist zu');
+}
+/* Keramik verdoppelt nur das BEZAHLTE Kontingent */
+{
+  const S = mk('griechenland', ['keramik', 'verbundwerkstoffe', 'gentechnik']);
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
+  S.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq(growLimits(S, 0).paid, 2, 'mit Keramik zwei bezahlte Schritte');
+  eq(growCity(S, 0, c, 'paid'), null, 'erster bezahlter Schritt');
+  eq(growCity(S, 0, c, 'paid'), null, 'zweiter bezahlter Schritt');
+  eq(typeof canGrowPaid(S, 0, c), 'string', 'ein dritter bezahlter Schritt nicht mehr');
+  eq(growCity(S, 0, c, 'free'), null, 'der kostenlose bleibt übrig');
+  eq(c.pop, 6, 'drei Schritte insgesamt: 3 → 6');
+  // die Reihenfolge ändert daran nichts
+  const T = mk('griechenland', ['keramik', 'verbundwerkstoffe', 'gentechnik']);
+  const t = capitalOf(T, 0); t.pop = 3; t.grown = 0; t.freeUsed = 0; t.born = 0;
+  T.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq(growCity(T, 0, t, 'free'), null, 'erst kostenlos');
+  eq(growCity(T, 0, t, 'paid'), null, 'dann bezahlt');
+  eq(growCity(T, 0, t, 'paid'), null, 'und nochmal bezahlt');
+  eq(typeof growCity(T, 0, t, 'paid'), 'string', 'ein vierter Schritt wird abgelehnt');
+  eq(t.pop, 6, 'auch so drei Schritte');
+}
+
 /* nur Verbundwerkstoffe: normales Wachstum + 1x gratis = max 2 */
 {
   const S = mk('griechenland', ['verbundwerkstoffe']);
@@ -1964,6 +2005,88 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(S.players.every(p => !p.res.coins || p.res.coins >= 0), true, 'Bots zahlen keine Münzen');
   const withEffect = S.wonders.filter(w => w.k === 'canal');
   eq(withEffect.every(() => true), true, 'Bots wenden keine Wundereffekte an');
+}
+
+/* ==================================================== Siedelertrag (settleGain)
+   Was eine gedachte Stadt der Größe 1 auf einem Feld einbrächte. Die Oberfläche zeigt
+   das im Feldblatt an; das Tutorial rechnet damit seine Beispielzahlen aus. */
+{
+  const S = mk('russland');
+  const pi = 0, cap = capitalOf(S, pi);
+  // Erwartung aus der Regel: alle noch nicht kontrollierten Nachbarfelder (ohne Stadtfelder)
+  // plus der Ertrag des einen Bevölkerungspunkts – die Nahrung isst er selbst mit.
+  const expect = (r, c) => {
+    const own = controlledTiles(S, pi);
+    const y = [0, 0, 0];
+    for (const [nr, nc] of neighbors(r, c)) {
+      if (!terrainAt(S, nr, nc) || cityAt(S, nr, nc)) continue;
+      if (own.has(key(nr, nc))) continue;                 // zählt schon, nicht doppelt
+      const t = tileYieldAt(S, pi, nr, nc);
+      for (let i = 0; i < 3; i++) y[i] += t[i];
+    }
+    const py = cityPopYield(S, pi);
+    for (let i = 0; i < 3; i++) y[i] += py[i];
+    return { sci: y[0], food: y[1], coins: y[2] };
+  };
+  // Ein Feld weit weg von der Hauptstadt: alle sechs Nachbarn sind neu
+  const far = within(cap.r, cap.c, 5).filter(([r, c]) =>
+    isLand(S, r, c) && hexDistance(cap.r, cap.c, r, c) >= 4 &&
+    neighbors(r, c).every(([nr, nc]) => terrainAt(S, nr, nc)))[0];
+  eq(settleGain(S, pi, ...far), expect(...far), 'Siedelertrag = neues Umland + Bevölkerung');
+  // Die eine Bevölkerung isst mit: die Nahrung liegt genau 1 unter der Feldsumme
+  {
+    const felder = neighbors(...far).filter(([r, c]) => terrainAt(S, r, c) && !cityAt(S, r, c))
+      .reduce((a, [r, c]) => a + tileYieldAt(S, pi, r, c)[1], 0);
+    eq(settleGain(S, pi, ...far).food, felder - 1,
+      'die eine Bevölkerung isst im Siedelertrag schon mit (−1 Nahrung)');
+  }
+
+  // Ein Feld dicht an der Hauptstadt: das gemeinsame Umland darf NICHT doppelt zählen.
+  // (Distanz 2 wäre als Stadtplatz verboten – hier geht es nur um die Rechnung.)
+  const near = within(cap.r, cap.c, 2).filter(([r, c]) =>
+    isLand(S, r, c) && hexDistance(cap.r, cap.c, r, c) === 2 &&
+    neighbors(r, c).some(([nr, nc]) => controlledTiles(S, pi).has(key(nr, nc))))[0];
+  eq(settleGain(S, pi, ...near), expect(...near), 'überlappendes Umland zählt nur einmal');
+  // Exakte Gegenprobe: naive Summe minus Siedelertrag = genau die schon kontrollierten Felder
+  const own = controlledTiles(S, pi);
+  const dop = neighbors(...near).filter(([r, c]) => terrainAt(S, r, c) && own.has(key(r, c)));
+  eq(dop.length > 0, true, 'das nahe Feld teilt Umland mit der Hauptstadt');
+  const py = cityPopYield(S, pi);
+  const naiv = neighbors(...near).filter(([r, c]) => terrainAt(S, r, c) && !cityAt(S, r, c))
+    .reduce((a, [r, c]) => a.map((v, i) => v + tileYieldAt(S, pi, r, c)[i]), py.slice());
+  const g = settleGain(S, pi, ...near);
+  const diff = [naiv[0] - g.sci, naiv[1] - g.food, naiv[2] - g.coins];
+  const dopSum = dop.reduce((a, [r, c]) => a.map((v, i) => v + tileYieldAt(S, pi, r, c)[i]), [0, 0, 0]);
+  eq(diff, dopSum, 'die Differenz ist genau das gemeinsame Umland');
+
+  // Keine Nebenwirkung: Spielstand und Einkommen sind hinterher unverändert
+  const before = JSON.stringify(S);
+  settleGain(S, pi, ...far); settleGain(S, pi, ...near);
+  eq(JSON.stringify(S), before, 'settleGain verändert den Spielstand nicht');
+
+  // Fähigkeiten wirken mit: Russlands Grundfähigkeit gibt +1 Nahrung je Wald.
+  // Gegenprobe im selben Spielstand, nur mit umgeschalteter Fähigkeit.
+  {
+    const wald = within(cap.r, cap.c, 6).filter(([r, c]) =>
+      isLand(S, r, c) && hexDistance(cap.r, cap.c, r, c) >= 4 &&
+      neighbors(r, c).filter(([a, b]) => terrainAt(S, a, b) === 'W').length >= 1)[0];
+    eq(!!wald, true, 'ein Waldplatz zum Vergleich gefunden');
+    const n = neighbors(...wald).filter(([a, b]) => terrainAt(S, a, b) === 'W').length;
+    const mit = settleGain(S, pi, ...wald).food;
+    S.players[pi].ability = 'wachstum';                  // Alternative: kein Waldbonus
+    const ohne = settleGain(S, pi, ...wald).food;
+    S.players[pi].ability = 'basis';
+    eq(mit - ohne, n, `Waldfähigkeit bringt genau +1 je Wald (${n} Wälder)`);
+  }
+}
+/* Der Protokollschritt im Tutorial darf beim Weiterschalten nicht das offene Fenster
+   wegreißen – dafür gibt es keepOpen. */
+{
+  const look = TUT_STEPS.filter(st => st.keepOpen);
+  eq(look.length, 1, 'genau ein Leseschritt ist als keepOpen markiert');
+  eq(look.every(st => !!st.goal), true, 'der Leseschritt hat ein Ziel');
+  eq(TUT_STEPS[TUT_STEPS.length - 1].goal, undefined,
+    'der letzte Schritt hat keine Aufgabe – sonst würde er sich selbst beenden');
 }
 
 /* ==================================================== Tutorial

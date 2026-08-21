@@ -32,11 +32,12 @@ sonst behalten installierte Geräte die alte Fassung.
 | **Forschen** | links die Ertragsübersicht (Felder, Bevölkerung, Summe fürs nächste Einkommen), rechts der Technologiebogen |
 | **Armeen** | Übersicht aller eigenen Armeen; antippen wählt aus, dann Zielfeld antippen |
 | Armee auf der Karte | antippen → *Bewegen*; steht sie in der eigenen Stadt, steht die Aktion im Stadtblatt |
-| Zwei Finger | Zoomen, ein Finger schiebt die Karte |
-| **Forschen** | Technologiebogen; erforschbares ist rot umrandet. Kopieren (Spionage/Kundschafterei/Internet) erscheint unten im selben Fenster |
+| Feld antippen | Aktionsblatt mit dem Feldertrag; ist das Feld siedelbar, steht darunter der **Ertrag beim Siedeln** — was eine Stadt hier ab der nächsten Runde brächte |
+| Karte | fest und immer vollständig sichtbar – kein Zoomen, kein Schieben. Im Hochformat dreht die App sich selbst quer (im ☰-Menü abschaltbar) |
+| **Forschen** | Technologiebogen; erforschbares ist rot umrandet — durchgezogen heißt bezahlbar, gestrichelt zu teuer. Kopieren (Spionage/Kundschafterei/Internet) erscheint unten im selben Fenster |
 | Atomwaffen | Zielfeld antippen → *Atomschlag* im Aktionsblatt (einmal pro Runde) |
 | Sklaverei / Kolonialismus | im Aktionsblatt der Stadt bzw. eines herrenlosen Feldes |
-| **Protokoll** | jeder Würfelwurf, auch die der Bots |
+| **Protokoll** | jede Aktion; die Würfe dahinter hängen eingeklappt an der Zeile und lassen sich antippen |
 
 Straßen laufen durch Städte hindurch: ein Stadtfeld zählt selbst als Straße oder
 Eisenbahn, sobald ein solches Feld daran grenzt.

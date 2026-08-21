@@ -174,8 +174,14 @@ Die früher „experimentell v2" genannten Regeln **sind** jetzt die Regeln. Das
 - **Singularität** kostet 100 (Rabatte gelten weiter: Griechenland −5, Wiss. Methode −10).
 - **Keramik** (Produktion, Antike, 4) und **Theologie** (Spezial, Mittelalter, 10) sind
   normale Technologien.
-- **Verbundwerkstoffe**: 1× zusätzliches, kostenloses Wachstum pro Stadt und Runde. Allein
-  also 2×, mit Keramik bis 3×, davon eins gratis. Eigener Knopf „Kostenlos wachsen".
+- **Verbundwerkstoffe**: 1× zusätzliches, **kostenloses** Wachstum pro Stadt und Runde.
+  Allein also 2×, mit Keramik bis 3×, davon eins gratis. Eigener Knopf „Kostenlos wachsen".
+  Bezahltes und kostenloses Kontingent werden **getrennt** geführt (`growLimits().paid` bzw.
+  `.free`, verbraucht über `city.grown` und `city.freeUsed`): das Gratis-Kontingent lässt
+  sich nicht in einen zweiten **bezahlten** Schritt umwandeln. Vorher prüfte `canGrowPaid`
+  nur das Gesamtmaximum, sodass man mit Verbundwerkstoffen zweimal bezahlt wachsen konnte
+  (behoben 20.8.); der Knopf begründet die Sperre jetzt mit „Diese Runde nur noch
+  kostenloses Wachstum.".
 - **Sklaverei** wird obsolet, sobald ein Reich die erste Technologie der Moderne hat. Im
   Technologiebogen ist die Kachel dann durchgestrichen und trägt den Hinweis „obsolet".
 - **Siegschwellen** stapeln nicht: es gilt die niedrigste (Standard ≥2/3, Theologie >3/5,
@@ -551,3 +557,148 @@ Stufe-3-Wunder (mehr gibt es nicht). Der Pool ist für alle Reiche gemeinsam.
   aber einen Forschungsschritt – genau wie mit Alchemie oder Gilden, die Bots ebenfalls
   nichts bringen, weil sie keine Ressourcen verwalten.
 - Erobert ein **Mensch** eine Bot-Stadt mit Wundern, werden die Effekte für ihn aktiv.
+
+---
+
+## Oberfläche: Designänderungen vom 21.8.
+
+Sieben Änderungen auf Wunsch des Autors. Keine davon berührt die Regeln – bis auf
+`settleGain`, das eine reine Rechnung über bestehende Regeln ist.
+
+### 1 Feste Karte, erzwungenes Querformat
+
+- **Kein Zoomen und Schieben mehr.** Die `viewBox` des SVG umfasst immer das ganze
+  Spielfeld, der Browser passt sie ein (`xMidYMid meet`) – die Karte ist damit stets
+  vollständig sichtbar. `attachGestures`, `applyView`, `fitMap` und die Zustände
+  `view`/`edView` sind ersatzlos entfallen.
+- **Treffer statt Rechnung:** `attachTaps` hängt einen Klick-Zuhörer an das SVG und liest
+  `data-r`/`data-c` vom getroffenen Sechseck (`e.target.closest('[data-r]')`). Alles, was
+  darüber liegt (Glyphen, Straßen, Grenzen, Städte, Armeen, Markierungen), hat schon vorher
+  `pointer-events:none` – der Treffer landet also immer auf einem Feld. Das ist **genauer**
+  als die alte Suche nach dem nächstgelegenen Mittelpunkt (Ecken gehören jetzt dem richtigen
+  Feld) und funktioniert auch bei gedrehter Darstellung, weil der Browser die Trefferprüfung
+  macht und nicht wir.
+- **Die Editorkarte ist ebenfalls fest.** Entscheidung, nicht Vorgabe: der Autor sprach von
+  „der Karte". Konsistenz schien wichtiger als Zoom beim Bemalen kleiner Felder. Rückgängig
+  wäre es eine Zeile (`attachTaps` durch die alte Gestenfunktion ersetzen).
+- **Querformat lässt sich auf dem Zielgerät nicht erzwingen.** `screen.orientation.lock`
+  existiert auf iOS Safari nicht, und das Manifest-Feld `orientation` sperrt eine iOS-PWA
+  ebenfalls nicht. Umgesetzt sind deshalb drei Stufen:
+  1. `"orientation": "landscape"` im Manifest (greift bei installiertem Android/Chrome),
+  2. `screen.orientation.lock('landscape')`, wenn vorhanden – merkmalsgeprüft,
+  3. **Notfalls dreht die App sich selbst:** `html.turn` rotiert im Hochformat den `<body>`
+     um 90°. Abschaltbar im ☰-Menü, die Wahl liegt in `hochciv.noturn`.
+- **Die Drehung macht Media Queries unbrauchbar** – sie messen den *ungedrehten* Viewport
+  und lägen um 90° daneben. Deshalb setzt `syncLayout()` die Klassen `w-wide` (≥ 820),
+  `w-side` (≥ 600 und quer) und `w-narrow` (< 600) aus der **effektiven** Layoutgröße auf
+  `<html>`; die layoutkritischen Regeln hängen an diesen Klassen statt an `@media`.
+  Modalinterne Aufteilungen (Technologiebogen) dürfen weiter Media Queries nutzen, weil sie
+  in beiden Fällen dieselbe Seite wählen.
+- Die Drehung ist in Chromium geprüft, **nicht auf echtem iOS**. Safari-Eigenheiten bei
+  `position:fixed` in transformierten Vorfahren bleiben ein Restrisiko.
+
+### 2 Ressourcenleiste
+
+Vier eigene Kästchen (Symbol, große Zahl, Beschriftung) statt einer Zeile aus vier
+Zahlenpaaren. Unter 600 px effektiver Breite fällt die Beschriftung weg, die Zahl bleibt
+groß.
+
+### 3 Das Aktionsblatt sperrt die Menüpunkte nicht mehr
+
+Vorher galt: solange ein Blatt oder Fenster offen war, wurde die Aktionsleiste per
+`body.blocked` gesperrt – gedacht als Schutz vor Fehlgriffen auf „Zug beenden" neben dem
+schwebenden Blatt. Der Schutz ist jetzt **baulich** gelöst: das Blatt endet bei
+`var(--bar-h)`, also exakt über der Leiste, statt darauf zu liegen. `--bar-h` und `--hud-h`
+kommen aus `setBarHeight()` und werden aus der echten Höhe gemessen (`getBoundingClientRect`,
+damit auch gedreht korrekt), weil die Leiste mit Schriftgröße und Geräteeinfassung wächst.
+`body.blocked` bleibt nur noch für das **Bot-Fenster** – dort führt allein „Weiter" weiter.
+
+### 4 Prozentzahl in der Kopfzeile
+
+`Bevölkerung 8/18 (44 %)`. Kaufmännisch gerundet, bei leerer Welt 0 %. Begründung: die
+Siegschwelle ist ein Anteil, keine Stückzahl.
+
+### 5 Tutorial
+
+- **Erledigte Aufgaben schalten selbst weiter** (`tutMaybeAdvance`, aufgerufen am Ende von
+  `renderTutPanel` und aus `closeModal`). Verzögerung `TUT_AUTO_MS` = 900 ms, damit das
+  Ergebnis der eigenen Aktion noch zu sehen ist; in den Tests auf 0 gesetzt, damit der
+  Ablauf synchron prüfbar ist. Bewusst **nicht** automatisch:
+  - im letzten Schritt (dort heißt „Weiter" *Fertig* und beendet das Tutorial),
+  - solange ein Bot-Fenster offen ist,
+  - solange eine kostenlose Technologie oder eine Rückschau offen ist,
+  - in Leseschritten mit `keepOpen` (nur der Protokollschritt), solange das Fenster offen
+    ist – sonst risse es dem Leser das Protokoll weg. `closeModal` stößt die Prüfung dann
+    erneut an.
+  - Es wird höchstens **eine** Stufe je Aktion geschaltet (`ui.tutAuto` sperrt während
+    `tutMove`), damit kein Selbstlauf entsteht.
+- **Determinismus bleibt erhalten:** zwischen „Ziel erreicht" und dem Weiterschalten wird
+  nicht gewürfelt, weil erledigte Schritte über `TUT_LOOK_ONLY` ohnehin nur noch
+  Nachschlagen erlauben. Die feste Würfelfolge verschiebt sich dadurch nicht.
+- **Das Panel steht quer links neben der Karte** (`html.w-side`, `flex-direction:row-reverse`,
+  weil im Quelltext erst die Karte kommt). Gestapelt bleibt es wie bisher unter der Karte,
+  jetzt aber mit `min-height` für den Textbereich – ohne die quetschten Aufgabenzeile und
+  Navigation den Text auf flachen Schirmen vollständig weg.
+
+### 6 Protokoll: Würfe eingeklappt
+
+Die Würfe hängen als `<details>` an **der Aktionszeile, zu der sie geführt haben** – nicht
+als eigener Block. Eingeklappt sieht man nur, was passiert ist, plus ein `🎲 n`.
+Die Zuordnung „Würfe davor gehören zur nächsten Zeile" stimmt, weil die Regelmaschine erst
+würfelt und dann das Ergebnis protokolliert. Zwei Sonderfälle:
+- **Rundenüberschriften** (`head`) bekommen nichts angehängt – sie trennen die Züge.
+- **Würfe ohne folgende Aktion** (Fehlschläge am Zugende) stehen als eigener Sammelposten,
+  zusammengefasst über den Grund im Wurftext (`🎲 4 — Siedeln (2+)` → „Siedeln").
+Gilt für das Protokollfenster **und** das Bot-Fenster.
+
+### 7 Ertrag beim Siedeln im Feldblatt
+
+`settleGain(S, pi, r, c)` gibt den Einkommenszuwachs einer gedachten Stadt der Größe 1:
+Einkommen mit der Stadt minus Einkommen ohne. Rechnet am echten Spielstand, also inklusive
+Fähigkeiten, Wundern und Ereignissen, verändert ihn nicht (`try/finally`), und zählt
+**überlappendes Umland nicht doppelt** – das fällt automatisch heraus, weil
+`controlledTiles` eine Menge ist. Der eine Bevölkerungspunkt isst mit (−1 Nahrung).
+Das Tutorial rechnet seine Beispielzahlen jetzt über dieselbe Funktion (`tutGain`
+delegiert).
+
+**Nachgebessert am 21.8. (zweiter Durchgang):**
+- Der **Feldertrag steht wieder klein** in der Unterzeile (`Feld 6/9 · Ertrag 1🔬 0🌾 1🪙`),
+  so wie vor dem Umbau – nicht mehr als eigenes Kästchen.
+- Der **Siedelertrag erscheint nur, wenn hier auch gegründet werden kann**
+  (`canFound` liefert null). Sonst wäre es die Antwort auf eine Frage, die sich nicht
+  stellt; der Grund („Nicht auf Meer") steht ohnehin schon am Knopf *Stadt gründen*.
+  Damit entfällt auch der Fall „hier steht schon eine Stadt".
+- **Kein Untertext mehr** unter der Zahl (`.fact-n` ist entfallen).
+- Bei Armeefeldern hängt kein Kästchen mehr an der Kopfzeile – dort ist ohnehin nie
+  gründbar, und die Kopfzeile ist damit wieder wie im Original.
+
+### 8 Technologiebogen: bezahlbar oder zu teuer
+
+Verfügbare Technologien zerfielen bisher optisch in einen Topf, obwohl der Knopf bei zu
+wenig Wissenschaft schon `disabled` war. Jetzt gibt es drei sichtbare Stufen statt zwei:
+
+| Zustand | Klasse | Aussehen |
+|---|---|---|
+| erforscht | `owned` | grüner Grund, ✓ statt Kosten |
+| verfügbar **und bezahlbar** | `avail afford` | roter Rand durchgezogen mit innerer Linie, heller Grund, schwarzer Titel |
+| verfügbar, aber **zu teuer** | `avail costly` | derselbe rote Rand, nur gestrichelt und ohne innere Linie; **volle Deckkraft**, gedämpfter Titel, Kostenzahl rot und fett |
+| nicht verfügbar | `locked` | grauer Rand, 32 % Deckkraft |
+
+**Korrektur v32:** In v31 hatte `costly` 62 % Deckkraft. Damit verblasste auch der rote
+Rand so weit, dass die Kachel einer nicht verfügbaren (40 %) ähnelte – der Unterschied,
+auf den es ankommt, ging gerade verloren. Jetzt bleibt `costly` **voll deckend**; gedämpft
+wird nur der Text, und die Kostenzahl steht rot und fett da – sie ist ja der Grund. `locked`
+ist im Gegenzug auf 32 % gegangen. Ein Smoke-Test liest die CSS-Datei und schlägt Alarm,
+falls jemand `costly` wieder eine Deckkraft gibt oder `locked` anhebt.
+
+Rein grafisch, **ohne zusätzlichen Text** – die Kosten stehen schon in der Kachel.
+Maßgeblich ist `available(S, pi, 'sci')`, nicht `res.sci`: Münzen zählen über den
+Umrechnungskurs mit, eine Kachel kann also bezahlbar sein, obwohl die Wissenschaft allein
+nicht reicht. Bei den **Kopien** (Spionage, Kundschafterei, Internet) gilt dasselbe mit
+Münzen; **kostenlose** Angebote (Freie Forschung, Rückschau, Internet-Gratiskopie) sind
+immer `afford`. Die Singularitätskachel folgt der gleichen Regel.
+
+### 9 Hauptmenü
+
+Die Fußzeile „Offline spielbar · zum Home-Bildschirm hinzufügen" ist entfernt (samt
+`.foot`-Stil).

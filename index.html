@@ -28,7 +28,6 @@
       <button class="btn ghost" id="m-rules">Regeln &amp; Technologien</button>
       <button class="btn ghost" id="m-load">Spielstand laden</button>
     </div>
-    <p class="foot">Offline spielbar · zum Home-Bildschirm hinzufügen</p>
   </div>
 </section>
 
@@ -72,38 +71,40 @@
     <div class="hud-civ"><span id="hud-sym" class="civ-chip"></span>
       <div><strong id="hud-name">—</strong><small id="hud-round">Runde 1</small></div></div>
     <div class="hud-res">
-      <span class="res sci" title="Wissenschaft">🔬<b id="hud-sci">0</b></span>
-      <button class="res food" id="hud-feed" title="Nahrung">🌾<b id="hud-food">0</b></button>
-      <span class="res coin" title="Münzen">🪙<b id="hud-coins">0</b></span>
-      <span class="res pow" title="Macht">⚔︎<b id="hud-power">0</b></span>
+      <span class="res sci" title="Wissenschaft"><i>🔬</i><b id="hud-sci">0</b><u>Wissen</u></span>
+      <button class="res food" id="hud-feed" title="Nahrung"><i>🌾</i><b id="hud-food">0</b><u>Nahrung</u></button>
+      <span class="res coin" title="Münzen"><i>🪙</i><b id="hud-coins">0</b><u>Münzen</u></span>
+      <span class="res pow" title="Macht"><i>⚔︎</i><b id="hud-power">0</b><u>Macht</u></span>
     </div>
   </header>
 
-  <div id="map-host"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div id="stage">
+    <div id="map-host"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+    <section id="tut-panel" hidden>
+      <div class="tut-bar"><div class="tut-bar-fill" id="tut-bar-fill"></div></div>
+      <div class="tut-head">
+        <span class="tut-sub" id="tut-sub"></span>
+        <button class="btn small ghost" id="tut-quit">Tutorial beenden</button>
+      </div>
+      <div class="tut-scroll">
+        <h3 class="tut-h" id="tut-title"></h3>
+        <div id="tut-body"></div>
+      </div>
+      <p class="tut-task" id="tut-task" hidden></p>
+      <div class="tut-nav">
+        <button class="btn small" id="tut-prev">‹</button>
+        <span class="tut-count" id="tut-count"></span>
+        <button class="btn small primary" id="tut-next">Weiter ›</button>
+      </div>
+    </section>
+  </div>
 
   <div id="sheet" class="sheet">
     <button class="sheet-close" id="sheet-close" aria-label="Schließen">✕</button>
     <div class="sheet-grip" id="sheet-grip"></div>
     <div id="sheet-body"></div>
   </div>
-
-  <section id="tut-panel" hidden>
-    <div class="tut-bar"><div class="tut-bar-fill" id="tut-bar-fill"></div></div>
-    <div class="tut-head">
-      <span class="tut-sub" id="tut-sub"></span>
-      <button class="btn small ghost" id="tut-quit">Tutorial beenden</button>
-    </div>
-    <div class="tut-scroll">
-      <h3 class="tut-h" id="tut-title"></h3>
-      <div id="tut-body"></div>
-    </div>
-    <p class="tut-task" id="tut-task" hidden></p>
-    <div class="tut-nav">
-      <button class="btn small" id="tut-prev">‹</button>
-      <span class="tut-count" id="tut-count"></span>
-      <button class="btn small primary" id="tut-next">Weiter ›</button>
-    </div>
-  </section>
 
   <nav class="actionbar">
     <button class="btn small" id="a-tech">Forschen</button>
