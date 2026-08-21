@@ -56,14 +56,7 @@ function tutNeighbourText(r, c) {
   return Object.entries(cnt).sort((x, y) => y[1] - x[1])
     .map(([t, n]) => `${n} × ${TERRAIN[t].name}`).join(', ');
 }
-function tutGain(r, c) {
-  const before = income(S, RU());
-  const fake = { id: -999, owner: RU(), r, c, pop: 1, cap: false, grown: 0, born: -1 };
-  S.cities.push(fake);
-  const after = income(S, RU());
-  S.cities.pop();
-  return { sci: after.sci - before.sci, food: after.food - before.food, coins: after.coins - before.coins };
-}
+function tutGain(r, c) { return settleGain(S, RU(), r, c); }
 function tutGainText(r, c) {
   const g = tutGain(r, c);
   return `+${g.sci} 🔬, ${g.food >= 0 ? '+' : ''}${g.food} 🌾, +${g.coins} 🪙`;
@@ -102,7 +95,7 @@ const TUT_STEPS = [
       höchsten Grad „David". Gespielt wird auf der Originalkarte.</p>
       <p>Golden umrandet ist deine <b>Hauptstadt</b>: Kreis mit Symbol = Stadt, Striche
       daneben = Bevölkerung, dunkelrote Linie = Reichsgrenze.
-      Die Karte lässt sich schieben und zoomen, und du kannst jedes Feld antippen, um es
+      Die Karte ist immer vollständig zu sehen – du kannst jedes Feld antippen, um es
       anzusehen.</p>
       <p>Gezogen wird immer in derselben Reihenfolge:
       <b>Russland → Griechenland → England → Wikingerreich</b>. Wo die Runde beginnt, hängt
@@ -120,8 +113,9 @@ const TUT_STEPS = [
       nichts.</p>
       <p>Jede weitere Stadt bringt bis zu sechs neue Felder dazu. Deshalb ist Ausbreitung
       wichtiger als große Einzelstädte.</p>
-      <p><b>So siehst du ein Feld an:</b> Feld antippen – das Blatt von unten zeigt Gelände
-      und Ertrag. Mit ✕ oben rechts schließt du es wieder.</p>`,
+      <p><b>So siehst du ein Feld an:</b> Feld antippen – das Aktionsblatt zeigt den
+      <b>Feldertrag</b> und daneben, was eine Stadt auf diesem Feld einbrächte. Mit ✕ oben
+      rechts schließt du es wieder.</p>`,
     hl: () => [...controlledTiles(S, RU())].map(unkey),
   },
   {
@@ -253,6 +247,8 @@ const TUT_STEPS = [
     task: 'Öffne einmal das <b>Protokoll</b>.',
     allow: { bar: ['a-log'] },
     goal: () => !!ui.tutSawLog,
+    // Leseschritt: nicht weiterschalten, solange das Protokoll offen ist.
+    keepOpen: true,
     auto: () => { ui.tutSawLog = true; },
   },
   /* ------------------------------------------------------------------ Runde 2 */
@@ -836,6 +832,7 @@ function renderTutPanel() {
   $('tut-prev').disabled = ui.tut.i === 0;
   $('tut-next').disabled = !done;
   $('tut-next').textContent = last ? 'Fertig' : 'Weiter ›';
+  tutMaybeAdvance();
 }
 function tutMove(d) {
   if (!ui.tut) return;
@@ -847,6 +844,39 @@ function tutMove(d) {
   redraw();
   const sc = $('tut-panel').querySelector('.tut-scroll');
   if (sc) sc.scrollTop = 0;
+}
+/* Erledigte Aufgabe = nächster Schritt. Wer gerade gesiedelt oder geforscht hat, soll
+   nicht noch „Weiter" drücken müssen.
+   Bewusst nicht automatisch:
+   · der letzte Schritt – „Weiter" heißt dort „Fertig" und beendet das Tutorial,
+   · solange ein Bot-Fenster offen ist (dort führt allein „Weiter" weiter),
+   · solange eine kostenlose Technologie oder eine Rückschau offen ist,
+   · bei Leseschritten mit `keepOpen` – dort wird gewartet, bis das Fenster wieder zu ist
+     (closeModal stößt die Prüfung erneut an), sonst risse es dem Leser das Protokoll weg.
+   Die kurze Verzögerung lässt das Ergebnis der eigenen Aktion noch sehen. Sie ändert
+   nichts an der Würfelfolge: zwischen „Ziel erreicht" und dem Weiterschalten wird nicht
+   gewürfelt, weil erledigte Schritte ohnehin nur noch Nachschlagen erlauben. */
+let TUT_AUTO_MS = 900;                 // in Tests auf 0 → sofort, damit synchron prüfbar
+function tutMaybeAdvance() {
+  if (!ui || !ui.tut || ui.tutAuto) return;
+  const st = tutStep();
+  if (!st || !st.goal || !tutDone()) return;
+  if (ui.tut.i >= TUT_STEPS.length - 1) return;
+  if (ui.botLock) return;
+  const p = tutP();
+  if ((p.freePicks || []).some(c => c.n > 0) || (p.backPicks || []).length) return;
+  const overlayOpen = $('overlay') && $('overlay').classList.contains('show');
+  if (st.keepOpen && overlayOpen) return;
+  const from = ui.tut.i;
+  ui.tutAuto = true;
+  const go = () => {
+    if (!ui.tut || ui.tut.i !== from || !tutDone()) { ui.tutAuto = false; return; }
+    closeSheet(); closeModal();
+    tutMove(1);
+    ui.tutAuto = false;                // erst danach frei: eine Stufe je Aktion, keine Kette
+  };
+  if (TUT_AUTO_MS > 0 && typeof setTimeout === 'function') setTimeout(go, TUT_AUTO_MS);
+  else go();
 }
 function tutorialQuit() {
   ui.tut = null;

@@ -419,6 +419,19 @@ function income(S, pi) {
   const t = incomeBreakdown(S, pi).total;
   return { sci: t[0], food: t[1], coins: t[2] };
 }
+/* Was eine Stadt auf diesem Feld dem Reich ab der nächsten Runde einbrächte:
+   Differenz des Einkommens mit und ohne eine gedachte Stadt der Größe 1.
+   Rechnet am echten Spielstand, also inklusive Fähigkeiten, Wundern und Ereignissen,
+   und berücksichtigt automatisch, dass sich Umland überlappen kann. Der eine
+   Bevölkerungspunkt isst dabei schon mit. Verändert den Spielstand nicht. */
+function settleGain(S, pi, r, c) {
+  const before = income(S, pi);
+  const fake = { id: -999, owner: pi, r, c, pop: 1, cap: false, grown: 0, born: -1 };
+  S.cities.push(fake);
+  let after;
+  try { after = income(S, pi); } finally { S.cities.pop(); }
+  return { sci: after.sci - before.sci, food: after.food - before.food, coins: after.coins - before.coins };
+}
 
 /* ------------------------------------------------------------ Umrechnungskurse */
 /* Umrechnungskurse. Gentechnik und Massenmedien sind ausdrücklich KEIN allgemeiner
@@ -631,9 +644,18 @@ function moveArmy(S, army, r, c) {
    Keramik = 2× bezahlt, Verbundwerkstoffe = +1× gratis, beide zusammen bis 3×. */
 function growLimits(S, pi) {
   const p = S.players[pi];
-  const paidMax = has(p, 'keramik') ? 2 : 1;
-  const free = has(p, 'verbundwerkstoffe') ? 1 : 0;
-  return { max: paidMax + free, free };
+  const paid = has(p, 'keramik') ? 2 : 1;      // bezahlte Schritte je Runde
+  const free = has(p, 'verbundwerkstoffe') ? 1 : 0;   // zusätzlich, und nur kostenlos
+  return { max: paid + free, paid, free };
+}
+// Wie viele bezahlte Schritte hat die Stadt diese Runde schon genutzt?
+function paidGrowthUsed(city) { return (city.grown || 0) - (city.freeUsed || 0); }
+/* Steht der Stadt noch ein BEZAHLTES Wachstum zu? Das Kontingent aus Verbundwerkstoffen
+   ist ausdrücklich nur für kostenloses Wachstum – es lässt sich nicht in einen zweiten
+   bezahlten Schritt umwandeln. */
+function paidGrowthAvailable(S, pi, city) {
+  const lim = growLimits(S, pi);
+  return (city.grown || 0) < lim.max && paidGrowthUsed(city) < lim.paid;
 }
 /* Preis für bezahltes Wachstum. Russland "Fruchtbarkeit": keine Nahrungskosten. */
 function growPrice(S, pi, city) {
@@ -670,6 +692,9 @@ function canGrow(S, pi, city) {
   if (city.born === S.round) return 'Neue Städte wachsen erst nächste Runde.';
   const lim = growLimits(S, pi);
   if ((city.grown || 0) >= lim.max) return 'Diese Runde schon gewachsen.';
+  // Ist nur noch das Gratis-Kontingent offen, geht auch nur kostenloses Wachstum.
+  if (!freeGrowthAvailable(S, pi, city) && !paidGrowthAvailable(S, pi, city))
+    return 'Diese Runde schon gewachsen.';
   const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
   const c = growCost(S, pi, city);
   if (c.food && available(S, pi, 'food') < c.food) return 'Zu wenig Nahrung.';
@@ -680,8 +705,10 @@ function canGrow(S, pi, city) {
 function canGrowPaid(S, pi, city) {
   if (city.owner !== pi) return 'Fremde Stadt.';
   if (city.born === S.round) return 'Neue Städte wachsen erst nächste Runde.';
-  const lim = growLimits(S, pi);
-  if ((city.grown || 0) >= lim.max) return 'Diese Runde schon gewachsen.';
+  if (!paidGrowthAvailable(S, pi, city))
+    return freeGrowthAvailable(S, pi, city)
+      ? 'Diese Runde nur noch kostenloses Wachstum.'
+      : 'Diese Runde schon gewachsen.';
   const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
   const cost = growPrice(S, pi, city);
   if (cost.food && available(S, pi, 'food') < cost.food) return 'Zu wenig Nahrung.';

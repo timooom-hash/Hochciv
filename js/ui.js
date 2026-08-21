@@ -3,7 +3,6 @@ const $ = id => document.getElementById(id);
 const SYM = { star: '★', cross: '✕', square: '■', triangle: '▲', skull: '☠' };
 const HEX = 30;
 let S = null, ui = { sel: null, army: null, mode: null, botTimer: null };
-let view = { k: 1, x: 0, y: 0 }, edView = { k: 1, x: 0, y: 0 };
 let customMap = null, editMap = null, edTool = 'G';
 
 /* ------------------------------------------------------------------ Basics */
@@ -20,7 +19,11 @@ function modal(title, html) {
   $('overlay').classList.add('show');
   lockBar();
 }
-function closeModal() { $('overlay').classList.remove('show'); $('overlay').classList.remove('wide'); lockBar(); }
+function closeModal() {
+  $('overlay').classList.remove('show'); $('overlay').classList.remove('wide'); lockBar();
+  // Leseschritte im Tutorial warten darauf, dass das Fenster wieder zu ist.
+  if (typeof tutMaybeAdvance === 'function' && ui && ui.tut) tutMaybeAdvance();
+}
 function sheet(html) {
   $('sheet-body').innerHTML = html;
   $('sheet').classList.add('open');
@@ -30,11 +33,63 @@ function sheet(html) {
   lockBar();
 }
 function closeSheet() { if (ui.botLock) return; $('sheet').classList.remove('open'); lockBar(); }
-/* Aktionsleiste sperren, solange ein Blatt oder Fenster offen ist – gegen Fehlgriffe
-   auf „Zug beenden" direkt neben dem schwebenden Blatt. */
+/* Die Aktionsleiste wird nur noch vom Bot-Fenster gesperrt – dort führt allein
+   „Weiter" weiter. Ein normales Aktionsblatt sperrt sie NICHT mehr: es endet seit
+   dieser Fassung oberhalb der Leiste (--bar-h), liegt also nicht mehr darauf, und
+   die Menüpunkte unten bleiben durchweg bedienbar. */
 function lockBar() {
-  const busy = $('sheet').classList.contains('open') || $('overlay').classList.contains('show');
-  document.body.classList.toggle('blocked', busy);
+  document.body.classList.toggle('blocked', !!(ui && ui.botLock));
+}
+/* Echte Höhe von Kopf- und Aktionsleiste ins CSS spiegeln, damit das Blatt exakt
+   darüber endet – die Leiste wächst mit Schriftgröße und Geräteeinfassung. */
+function setBarHeight() {
+  const bar = document.querySelector('#screen-game .actionbar');
+  const hud = document.querySelector('#screen-game .hud');
+  const st = document.documentElement.style;
+  // getBoundingClientRect statt offsetHeight: subpixelgenau und auch dann korrekt,
+  // wenn die App gedreht dargestellt wird.
+  const hoch = el => el ? Math.round(el.getBoundingClientRect().height) : 0;
+  if (hoch(bar)) st.setProperty('--bar-h', hoch(bar) + 'px');
+  if (hoch(hud)) st.setProperty('--hud-h', hoch(hud) + 'px');
+}
+/* Querformat. Eine echte Sperre gibt es nur, wo screen.orientation.lock existiert
+   (installiertes Android/Chrome); iOS kennt sie nicht – weder über die API noch über
+   das Manifest. Dort bleibt nur, die App im Hochformat selbst zu drehen (html.turn,
+   siehe style.css). Abschalten lässt sich das im Spielmenü (☰); die Wahl wird gemerkt. */
+function turning() {
+  return document.documentElement.classList.contains('turn') &&
+    window.innerHeight > window.innerWidth;
+}
+/* Effektive Layoutgröße: im gedrehten Zustand sind Breite und Höhe vertauscht.
+   Media Queries können das nicht wissen – sie messen den ungedrehten Viewport und
+   lägen um 90° daneben. Deshalb setzt diese Funktion die Layoutklassen selbst. */
+function syncLayout() {
+  const t = turning();
+  const w = t ? window.innerHeight : window.innerWidth;
+  const h = t ? window.innerWidth : window.innerHeight;
+  const cl = document.documentElement.classList;
+  cl.toggle('w-wide', w >= 820);
+  // Neben der Karte statt darunter, sobald quer und breit genug: gestapelt bliebe auf
+  // flachen Schirmen (Telefon quer) fast nichts von der Karte übrig.
+  cl.toggle('w-side', w >= 600 && w > h);
+  cl.toggle('w-narrow', w < 600);
+  setBarHeight();
+}
+function setTurn(on) {
+  store('hochciv.noturn', on ? null : true);
+  document.documentElement.classList.toggle('turn', !!on);
+  if (on) {
+    try {
+      const so = screen && screen.orientation;
+      if (so && typeof so.lock === 'function') so.lock('landscape').catch(() => { });
+    } catch (e) { }
+  }
+  syncLayout();
+}
+function initOrientation() {
+  setTurn(!load('hochciv.noturn'));
+  window.addEventListener('resize', syncLayout);
+  window.addEventListener('orientationchange', syncLayout);
 }
 
 function store(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
@@ -235,63 +290,19 @@ function drawMap(svg, map, opts) {
   }
   return world;
 }
-function applyView(svg, v) {
-  const g = svg.querySelector('#world');
-  if (g) g.setAttribute('transform', `translate(${v.x},${v.y}) scale(${v.k})`);
-}
 
-/* ------------------------------------------------------------------ Gesten */
-function attachGestures(host, svg, v, onTap) {
-  const pts = new Map(); let moved = 0, last = null, lastDist = 0;
-  const toWorld = e => {
-    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
-    return pt.matrixTransform(svg.getScreenCTM().inverse());
-  };
-  const unit = () => { const m = svg.getScreenCTM(); return m ? 1 / m.a : 1; };  // viewBox-Einheiten je Bildschirmpixel
-  host.addEventListener('pointerdown', e => {
-    host.setPointerCapture(e.pointerId);
-    pts.set(e.pointerId, e); moved = 0; last = { x: e.clientX, y: e.clientY };
-    if (pts.size === 2) { const [a, b] = [...pts.values()]; lastDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+/* ------------------------------------------------------------------ Antippen
+   Die Karte wird nicht mehr geschoben oder gezoomt: sie ist immer vollständig
+   eingepasst. Deshalb braucht es auch keine Koordinatenrechnung mehr – der Treffer
+   wird direkt auf dem Sechseck ausgewertet. Das ist genauer als „nächster Mittelpunkt"
+   (die Ecken gehören jetzt dem richtigen Feld) und funktioniert auch dann, wenn die
+   App im Hochformat um 90° gedreht dargestellt wird. */
+function attachTaps(svg, onTap) {
+  svg.addEventListener('click', e => {
+    const el = e.target.closest ? e.target.closest('[data-r]') : null;
+    if (!el) return;
+    onTap(+el.dataset.r, +el.dataset.c);
   });
-  host.addEventListener('pointermove', e => {
-    if (!pts.has(e.pointerId)) return;
-    pts.set(e.pointerId, e);
-    if (pts.size === 2) {
-      const [a, b] = [...pts.values()];
-      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      if (lastDist) {
-        const f = d / lastDist, mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
-        const p = toWorld({ clientX: mx, clientY: my });
-        v.x = (v.x - p.x) * f + p.x; v.y = (v.y - p.y) * f + p.y;
-        v.k = Math.max(.35, Math.min(4, v.k * f));
-      }
-      lastDist = d; moved = 99; applyView(svg, v); return;
-    }
-    const dx = e.clientX - last.x, dy = e.clientY - last.y;
-    moved += Math.abs(dx) + Math.abs(dy);
-    const scale = unit();
-    v.x += dx * scale; v.y += dy * scale;
-    last = { x: e.clientX, y: e.clientY };
-    applyView(svg, v);
-  });
-  const up = e => {
-    if (!pts.has(e.pointerId)) return;
-    pts.delete(e.pointerId); lastDist = 0;
-    if (moved < 9 && pts.size === 0) {
-      const w = toWorld(e);
-      let best = null, bd = 1e9;
-      svg.querySelectorAll('[data-r]').forEach(el => {
-        const r = +el.dataset.r, c = +el.dataset.c;
-        const [hx, hy] = hexCenter(r, c, HEX);
-        const p = { x: hx * v.k + v.x, y: hy * v.k + v.y };
-        const d = Math.hypot(p.x - w.x, p.y - w.y);
-        if (d < bd) { bd = d; best = [r, c]; }
-      });
-      if (best && bd < HEX * v.k * 1.05) onTap(best[0], best[1]);
-    }
-  };
-  host.addEventListener('pointerup', up);
-  host.addEventListener('pointercancel', up);
 }
 
 /* ------------------------------------------------------------------ Spielansicht */
@@ -303,13 +314,16 @@ function redraw() {
     state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : null,
     turn: P(S).kind === 'bot' ? -1 : S.cur,
   });
-  applyView($('map'), view);
   const p = P(S), civ = civOf(p);
   $('hud-sym').textContent = SYM[civ.sym];
   $('hud-sym').style.borderColor = civ.color;
   $('hud-name').textContent = civ.n + (p.kind === 'bot' ? ' · Bot' : '');
   const ev = curEvent();
-  $('hud-round').textContent = `Runde ${S.round} · Bevölkerung ${popOf(S, S.cur)}/${worldPop(S)}` +
+  // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
+  // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet.
+  const mine = popOf(S, S.cur), all = worldPop(S);
+  const pct = all > 0 ? Math.round((mine / all) * 100) : 0;
+  $('hud-round').textContent = `Runde ${S.round} · Bevölkerung ${mine}/${all} (${pct} %)` +
     (ev ? ` · ${ev.n}` : '');
   $('hud-sci').textContent = p.res.sci;
   $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
@@ -323,12 +337,6 @@ function redraw() {
     renderTutPanel();
   }
   saveGame();
-}
-function fitMap(svg, v) {
-  // Die viewBox umfasst die ganze Karte und wird vom Browser eingepasst –
-  // Ansicht zurücksetzen zeigt also immer die komplette Karte.
-  v.k = 1; v.x = 0; v.y = 0;
-  applyView(svg, v);
 }
 
 /* Beim Start eines normalen Spiels darf kein Tutorial-Panel stehen bleiben. */
@@ -348,6 +356,24 @@ function tapHex(r, c) {
   ui.sel = [r, c]; redraw(); openTile(r, c);
 }
 function mp(a) { return 'Bewegung ' + String(a.mp).replace('.', ',') ; }
+const Y_ICON = ['🔬', '🌾', '🪙'];
+const fmtY = y => y.map((n, i) => n + Y_ICON[i]).join(' ');
+const fmtGain = g => [g.sci, g.food, g.coins]
+  .map((n, i) => (n > 0 ? '+' : '') + n + Y_ICON[i]).join(' ');
+/* Was eine Stadt auf diesem Feld dem Reich einbrächte – nur dann, wenn hier auch
+   wirklich gegründet werden kann. Sonst ist die Zahl eine Antwort auf eine Frage, die
+   sich gar nicht stellt, und der Grund („Nicht auf Meer") steht ohnehin schon am
+   Knopf „Stadt gründen".
+   Der Wert kommt aus settleGain: Umland, Fähigkeiten, Wunder und der eine mitessende
+   Bevölkerungspunkt sind darin verrechnet, überlappendes Umland zählt nicht doppelt. */
+function settleFact(r, c) {
+  const pi = S.cur;
+  if (canFound(S, pi, r, c)) return '';
+  const g = settleGain(S, pi, r, c);
+  return `<div class="tile-facts">
+    <span class="fact"><span class="fact-k">Ertrag beim Siedeln</span>
+      <span class="fact-v">${fmtGain(g)}</span></span></div>`;
+}
 function openTile(r, c) {
   const pi = S.cur, p = P(S);
   const t = terrainAt(S, r, c);
@@ -359,7 +385,8 @@ function openTile(r, c) {
     rows.push(`<button class="opt" id="${id}" ${off ? 'disabled' : ''}><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="cost">${cost || ''}</span></button>`);
     handlers.push([id, fn]);
   };
-  let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">Feld ${r}/${c} · Ertrag ${tileYieldAt(S, pi, r, c).map((n, i) => n + ['🔬', '🌾', '🪙'][i]).join(' ')}</p>`;
+  let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">Feld ${r}/${c} · Ertrag `
+    + fmtY(tileYieldAt(S, pi, r, c)) + '</p>' + settleFact(r, c);
 
   if (city) {
     const owner = civOf(S.players[city.owner]);
@@ -533,7 +560,10 @@ function techModal() {
         // Sklaverei wird mit der ersten Technologie der Moderne obsolet – im Bogen sichtbar.
         const dead = t.k === 'sklaverei' && owned && !slaveryUsable(p);
         const eff = dead ? 'obsolet – seit der Moderne nicht mehr nutzbar' : t.e;
-        grid += `<button class="tech ${owned ? 'owned' : avail ? 'avail' : 'locked'}${dead ? ' obsolete' : ''}"
+        // Verfügbar zerfällt in zwei Zustände: bezahlbar (afford) und zu teuer (costly).
+        // Rein grafisch – der Kostenwert steht ohnehin schon in der Kachel.
+        const state = owned ? 'owned' : avail ? (can ? 'avail afford' : 'avail costly') : 'locked';
+        grid += `<button class="tech ${state}${dead ? ' obsolete' : ''}"
           ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : cost}</span>
           <b>${t.n}</b><span class="eff">${eff}</span>${ownerMarks(S, t.k, pi)}</button>`;
       }
@@ -542,20 +572,23 @@ function techModal() {
   }
   grid += '</div>';
   const sing = singularityReady(p), sc = techCost(S, pi, SINGULARITY);
-  grid += `<button class="tech ${p.techs.singularitaet ? 'owned' : sing ? 'avail' : 'locked'}" style="margin-top:10px"
-      ${sing && available(S, pi, 'sci') >= sc && !p.techs.singularitaet ? 'data-tech="singularitaet"' : 'disabled'}>
+  const singCan = sing && available(S, pi, 'sci') >= sc && !p.techs.singularitaet;
+  const singState = p.techs.singularitaet ? 'owned'
+    : sing ? (singCan ? 'avail afford' : 'avail costly') : 'locked';
+  grid += `<button class="tech ${singState}" style="margin-top:10px"
+      ${singCan ? 'data-tech="singularitaet"' : 'disabled'}>
       <span class="c">${sc}</span><b>Singularität</b><span class="eff">${SINGULARITY.e}</span></button>`;
   // Griechenland "Freie Forschung": eine verfügbare Tech bis Industrialisierung gratis
   const ft = freeTechOptions(S, pi);
   if (ft.length) {
     grid += '<p class="sub" style="margin-top:14px">Freie Forschung (1× pro Runde, kostenlos)</p>';
-    grid += ft.map(t => `<button class="tech avail" data-freetech="${t.k}">
+    grid += ft.map(t => `<button class="tech avail afford" data-freetech="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   }
   const bp = backPickOptions(S, pi);
   if (bp.length) {
     grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[backPick(p).f]}, früheres Zeitalter, kostenlos</p>`;
-    grid += bp.map(t => `<button class="tech avail" data-backtech="${t.k}">
+    grid += bp.map(t => `<button class="tech avail afford" data-backtech="${t.k}">
       <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
   }
   const cop = copyableTechs(S, pi);
@@ -567,11 +600,12 @@ function techModal() {
       // je Technologie ggf. zwei Knöpfe: bezahlt und/oder gratis
       const buttons = [];
       if (o.paidCoins != null)
-        buttons.push(`<button class="tech avail" data-copy="${o.tech.k}" data-mode="paid">
+        buttons.push(`<button class="tech avail ${available(S, pi, 'coins') >= o.paidCoins
+          ? 'afford' : 'costly'}" data-copy="${o.tech.k}" data-mode="paid">
           <span class="c">${o.paidCoins}🪙</span><b>${o.tech.n}</b>
           <span class="eff">${o.tech.e}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
       if (o.freeOk)
-        buttons.push(`<button class="tech avail" data-copy="${o.tech.k}" data-mode="free">
+        buttons.push(`<button class="tech avail afford" data-copy="${o.tech.k}" data-mode="free">
           <span class="c">gratis</span><b>${o.tech.n}</b>
           <span class="eff">Internet · Gratiskopie${o.paidCoins != null ? '' : ''}</span>
           ${ownerMarks(S, o.tech.k, pi)}</button>`);
@@ -618,9 +652,49 @@ function powerSheet() {
     const e = buyPower(S, S.cur, +b.dataset.n); e ? toast(e) : null; redraw(); powerSheet();
   });
 }
+/* Protokollzeilen als HTML. Die Würfe, die zu einer Aktion geführt haben, hängen als
+   aufklappbares Detail an dieser Aktionszeile: sichtbar ist nur, was passiert ist,
+   die Würfe holt man sich per Antippen. Eine Bot-Runde besteht sonst zu gut der Hälfte
+   aus 🎲-Zeilen und man findet die eigentliche Aktion nicht mehr.
+   Die Zuordnung „Würfe davor gehören zur nächsten Aktionszeile" stimmt, weil die
+   Regelmaschine erst würfelt und dann das Ergebnis protokolliert. Würfe, auf die keine
+   Aktion folgt (Fehlschläge am Ende eines Zuges), stehen als eigener Sammelposten. */
+function rollSummary(rolls) {
+  // Aus „🎲 4 — Wachstum (2+)" wird der Grund gezogen; gleiche Gründe werden gezählt.
+  const why = [], seen = new Map();
+  for (const l of rolls) {
+    const m = /—\s*(.+?)\s*(?:\(\d(?:[–-]\d)?\+?\))?\s*$/.exec(l.m);
+    const w = m ? m[1] : 'Wurf';
+    if (!seen.has(w)) { seen.set(w, 1); why.push(w); } else seen.set(w, seen.get(w) + 1);
+  }
+  const parts = why.slice(0, 3).map(w => seen.get(w) > 1 ? `${w} ×${seen.get(w)}` : w);
+  if (why.length > 3) parts.push('…');
+  return parts.join(', ');
+}
+function rollsBlock(rolls, lead) {
+  const n = rolls.length;
+  const tag = `<em class="rtag">🎲 ${n}</em>`;
+  const inner = rolls.map(l => `<div class="logline roll">${l.m}</div>`).join('');
+  const head = lead
+    ? `<span class="lsum ${lead.c}">${lead.m}</span>${tag}`
+    : `<span class="lsum">${rollSummary(rolls)}</span>${tag}`;
+  return `<details class="rolls"><summary>${head}</summary>${inner}</details>`;
+}
+function logHtml(entries) {
+  const out = [];
+  let buf = [];
+  for (const l of entries) {
+    if (l.c === 'roll') { buf.push(l); continue; }
+    // Rundenüberschriften bekommen keine Würfe angehängt – sie trennen die Züge.
+    if (buf.length && l.c !== 'head') { out.push(rollsBlock(buf, l)); buf = []; continue; }
+    if (buf.length) { out.push(rollsBlock(buf, null)); buf = []; }
+    out.push(`<div class="logline ${l.c}">${l.m}</div>`);
+  }
+  if (buf.length) out.push(rollsBlock(buf, null));
+  return out.join('');
+}
 function logModal() {
-  const h = S.log.slice(-260).map(l => `<div class="logline ${l.c}">${l.m}</div>`).join('');
-  modal('Protokoll', h);
+  modal('Protokoll', logHtml(S.log.slice(-260)));
   const b = $('ov-body'); b.scrollTop = b.scrollHeight;
 }
 
@@ -654,7 +728,7 @@ function runBots() {
   redraw();
   const entries = logSince(S, sinceSeq);
   const lines = entries.length
-    ? entries.map(l => `<div class="logline ${l.c}">${l.m}</div>`).join('')
+    ? logHtml(entries)
     : '<div class="logline info">Keine Aktionen in dieser Runde.</div>';
   ui.botLock = true;                   // Sheet ist jetzt gesperrt: nur „Weiter" führt weiter
   sheet(`<h3>${civOf(p).n} (Bot)</h3><p class="sub">Runde ${S.round}</p>${lines}
@@ -929,10 +1003,7 @@ function editorScreen() {
   CIVS.forEach(c => add('cap:' + c.k, SYM[c.sym] + ' ' + c.n, c.color));
   drawEditor();
 }
-function drawEditor() {
-  drawMap($('ed-map'), editMap, {});
-  applyView($('ed-map'), edView);
-}
+function drawEditor() { drawMap($('ed-map'), editMap, {}); }
 function edTap(r, c) {
   if (r < 0 || r >= editMap.rows.length) return;
   if (c < 0 || c >= editMap.rows[r].length) return;
@@ -961,7 +1032,7 @@ function boot() {
   $('tut-prev').onclick = () => tutMove(-1);
   $('tut-next').onclick = () => tutMove(1);
   $('tut-quit').onclick = () => tutorialQuit();
-  $('m-editor').onclick = () => { show('screen-editor'); editorScreen(); setTimeout(() => fitMap($('ed-map'), edView), 30); };
+  $('m-editor').onclick = () => { show('screen-editor'); editorScreen(); };
   $('m-rules').onclick = () => rulesModal();
   $('m-continue').onclick = () => { endTutorialPanel(); S = load('hochciv.save'); startGameScreen(); };
   $('m-load').onclick = () => upload(txt => {
@@ -1000,10 +1071,15 @@ function boot() {
   $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };
   $('a-end').onclick = endHumanTurn;
   $('g-menu').onclick = () => {
+    const on = document.documentElement.classList.contains('turn');
     modal('Menü', `<button class="btn wide" id="mm-rules">Regeln &amp; Technologien</button>
+      <button class="btn wide" id="mm-turn">Hochkant drehen: ${on ? 'an' : 'aus'}</button>
+      <p class="hint" style="margin:6px 2px 0">Hält man das Gerät hochkant, dreht die App
+        sich selbst quer. iOS erlaubt keine echte Orientierungssperre.</p>
       <button class="btn wide" id="mm-export">Spielstand exportieren</button>
       <button class="btn wide" id="mm-quit">Spiel beenden</button>`);
     $('mm-rules').onclick = rulesModal;
+    $('mm-turn').onclick = () => { setTurn(!document.documentElement.classList.contains('turn')); closeModal(); };
     $('mm-export').onclick = () => download('hochzeiv-spielstand.json', JSON.stringify(S));
     $('mm-quit').onclick = () => { store('hochciv.save', null); location.reload(); };
   };
@@ -1023,14 +1099,15 @@ function boot() {
     editMap.rows = out; drawEditor();
   };
 
-  attachGestures($('map-host'), $('map'), view, tapHex);
-  attachGestures($('ed-host'), $('ed-map'), edView, edTap);
+  attachTaps($('map'), tapHex);
+  attachTaps($('ed-map'), edTap);
+  initOrientation();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 function startGameScreen() {
   show('screen-game');
   redraw();
-  setTimeout(() => { fitMap($('map'), view); }, 30);
+  setBarHeight();
   if (P(S).kind === 'bot') setTimeout(runBots, 400);
   else setTimeout(humanTurnStart, 60);
 }
