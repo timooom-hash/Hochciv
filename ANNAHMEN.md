@@ -581,6 +581,12 @@ Sieben Änderungen auf Wunsch des Autors. Keine davon berührt die Regeln – bi
 - **Die Editorkarte ist ebenfalls fest.** Entscheidung, nicht Vorgabe: der Autor sprach von
   „der Karte". Konsistenz schien wichtiger als Zoom beim Bemalen kleiner Felder. Rückgängig
   wäre es eine Zeile (`attachTaps` durch die alte Gestenfunktion ersetzen).
+- **Gedreht wird nur der Spielbildschirm.** Menü, Aufbau, Editor und Regelseite haben
+  keine feste Karte, die Breite bräuchte – dort wäre der Zwang lästig. `applyTurn()` setzt
+  `html.turn` deshalb aus zwei Bedingungen: gespeicherte Wahl (`turnWanted()`) **und**
+  aktiver Bildschirm in `TURN_SCREENS` (derzeit nur `screen-game`). Nachgeführt wird das
+  aus `show()`. Wo `screen.orientation.lock` existiert, wird beim Verlassen des Spiels
+  `unlock()` gerufen. Soll der Editor mitdrehen, genügt ein Eintrag in `TURN_SCREENS`.
 - **Querformat lässt sich auf dem Zielgerät nicht erzwingen.** `screen.orientation.lock`
   existiert auf iOS Safari nicht, und das Manifest-Feld `orientation` sperrt eine iOS-PWA
   ebenfalls nicht. Umgesetzt sind deshalb drei Stufen:
@@ -702,3 +708,103 @@ immer `afford`. Die Singularitätskachel folgt der gleichen Regel.
 
 Die Fußzeile „Offline spielbar · zum Home-Bildschirm hinzufügen" ist entfernt (samt
 `.foot`-Stil).
+
+
+---
+
+## Zwei gemeldete Fehler, behoben am 21.8. (v33)
+
+### Bürgerkrieg: Armee/Macht mit Nahrung **und** Münzen ließ sich nicht kaufen
+
+Nicht die Regel war falsch, sondern die Prüfung davor. `buildArmy` und `buyPower` zahlten
+korrekt mit `{foodOk: …}`; die Oberfläche fragte für „ist der Knopf bedienbar?" aber
+`available(S, pi, 'coins')` **ohne** diese Option. Bei reiner Nahrung fiel das nicht auf,
+weil man es gar nicht erst probierte – bei einer Mischung aus Münzen und Nahrung sperrte
+der Knopf einen Kauf, den die Regel erlaubt hätte. Dasselbe im Macht-Blatt (`maxN`).
+
+Behoben, indem die Option nur noch **an einer Stelle** entsteht: `payOpts(S, pi)` in
+`engine.js`. Regelmaschine und Oberfläche benutzen dieselbe Funktion. Ein Test prüft die
+Invariante über **alle** Aufteilungen von Münzen und Nahrung bis zu den Armeekosten:
+`available(…, payOpts) >= Kosten` genau dann, wenn `buildArmy` gelingt. Wer künftig eine
+weitere Kaufprüfung in die Oberfläche schreibt, muss `payOpts` mitgeben.
+
+### Gentechnik/Massenmedien tauschten doch in beliebiger Höhe
+
+`rates()` bot den Kurs korrekt nicht an – aber `feed()` nahm jede Menge entgegen und
+schrieb alles über dem Defizit in den Nahrungsvorrat (`p.res.food += amount - cover`).
+Damit war Gentechnik faktisch ein 1:1-Kurs Wissenschaft → Nahrung, also genau das, was
+seit der früheren Korrektur ausgeschlossen sein sollte. Der damalige Fix hatte nur die
+Kurstabelle bereinigt, nicht das Füttern selbst.
+
+**Jetzt gilt:** `feed()` nimmt höchstens so viel wie an Defizit offen ist, verbucht es
+ausschließlich gegen `foodDeficit` und erhöht `p.res.food` **nicht mehr**. Ohne offenes
+Defizit lehnt es ab. Das Blatt bietet entsprechend nur noch Beträge bis zum Defizit an.
+
+**Getroffene Auslegung – der Autor kann sie ändern:** „füttern" heißt hier *das offene
+Nahrungsdefizit decken*. Denkbar wäre auch *die laufende Nahrungsaufnahme der Bevölkerung
+decken* – dann dürfte man über das Defizit hinaus geben, bekäme echten Nahrungsvorrat und
+könnte in derselben Runde weiterwachsen.
+
+**Drei Tests hatten den Fehler festgeschrieben** („3 deckt das Defizit, 2 werden Nahrung")
+und mussten mitkorrigiert werden – das Verhalten war also getestet, nur gegen die falsche
+Erwartung.
+
+
+---
+
+## Nahrung neu gedacht (v35)
+
+### Bevölkerungskosten sind ein deckbarer Posten, kein fester Abzug
+
+Bisher war die Bevölkerung ein Minusposten im Nahrungseinkommen, und mit Gentechnik/
+Massenmedien durfte man ein entstandenes **Defizit** decken. Jetzt gilt: was die
+Bevölkerung isst (`popFood`), ist ein eigener Posten, den man wahlweise aus Nahrung,
+Wissenschaft oder Münzen bestreitet.
+
+- `popFoodCost(S, pi)` kommt aus der Bevölkerungszeile von `incomeBreakdown` – enthält
+  also Bürokratie (verdoppelt auch den Verbrauch der Hauptstadt) und Ökologie (senkt ihn)
+  genau wie das Einkommen selbst. Bei Hungersnot ist er 0, weil dort das Einkommen
+  ohnehin pauschal gekappt wird; sonst liefen Anzeige und Rechnung auseinander.
+- `coverPop(S, pi, kind, n)` deckt `n` davon aus Wissenschaft oder Münzen. Obergrenzen:
+  der noch offene Teil der Kosten und der eigene Vorrat. **Kein Umtausch:** mehr als die
+  Bevölkerung isst geht nicht, es wird nur innerhalb des Rundeneinkommens verschoben.
+- Der Anteil, der ein offenes Defizit tilgt, wird **nicht** zu nutzbarer Nahrung – nur
+  der Rest. Sonst entstünde aus dem Decken mehr Nahrung, als verbraucht wird.
+- `uncoverPop` nimmt zurück, **LIFO**: erst der Vorratsanteil, dann der Defizitanteil.
+  Andersherum stünden Nahrung und Defizit gleichzeitig da. Zurückgenommen wird nur, was
+  noch da ist: ist die gewonnene Nahrung schon ausgegeben, wird abgelehnt – sonst ließe
+  sich Nahrung ausgeben, die Deckung zurückholen und die Wissenschaft behalten, da ein
+  Defizit selbst nichts kostet.
+- Verbucht wird **inkrementell**, nicht durch Neuberechnung aus dem Rohsaldo. Eine
+  Neuberechnung machte Ausgaben derselben Runde rückgängig (im Bau gefunden und behoben).
+- `ensureFoodState` zieht `foodRaw`/`popFood`/`popCovered` nach, wo sie fehlen: im
+  allerersten Zug und in **Spielständen aus älteren Fassungen**.
+- **Bots decken nichts.** Sie verhalten sich wie bisher – passend dazu, dass Bots auch
+  sonst keine Fähigkeiten und keine Wundereffekte bekommen.
+
+Damit ist auch begründet, warum man mit einer der beiden Techs in rechnerisch negative
+Nahrung wachsen und siedeln darf: jeder Bevölkerungspunkt bringt +1 Wissenschaft und
++1 Münze und isst 1 Nahrung, lässt sich also im Zweifel immer selbst tragen.
+
+### Das Fenster zu Zugbeginn
+
+`foodSheet()` geht zu Zugbeginn auf, sobald Gentechnik oder Massenmedien erforscht sind
+und Kosten offen sind. Es zeigt die Rechnung – Land produziert, Bevölkerung isst, davon
+bestritten, bleibt nutzbar – und darunter Knöpfe zum Einsetzen und Zurücknehmen.
+Voreingestellt ist **keine** Verschiebung, also Deckung aus Nahrung. Ohne die Techs zeigt
+es nur die Übersicht. Über den Nahrungswert in der Kopfzeile lässt es sich jederzeit
+wieder öffnen.
+
+### Ereignisse verschieben die Nahrungsgrenze nicht mehr
+
+Gemeldeter Fehler: Dürre oder Revolution machten das Nahrungseinkommen für **eine** Runde
+negativ, und `growthBlocked` verbot daraufhin Wachstum und Siedeln – obwohl die Stadt
+dauerhaft gedeckt gewesen wäre. Reproduziert für Dürre und Revolution.
+
+Behoben über `baseIncome(S, pi)`: es rechnet mit `S.evMuted = true` (alle Ereigniswirkungen
+aus, geprüft in `evActive` und `evTerrainDead`) und ohne den Taj-Mahal-Rundenbonus.
+`foodAfterGrowth` und damit `growthBlocked` beruhen jetzt darauf.
+
+**Was sich bewusst NICHT ändert:** die *Kosten* für Wachstum und Gründen kommen weiter aus
+dem tatsächlichen Rundeneinkommen. Eine Hungersnot lässt also weiter wenig übrig – sonst
+wären die Ereignisse wirkungslos. Die Grenze und die Kasse sind zwei verschiedene Dinge.

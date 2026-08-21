@@ -387,17 +387,32 @@ step('Weltwunder in der Stadt bauen', () => {
     ' · Marker auf der Karte: ' + $('map').querySelectorAll('rect').length);
   G('closeModal')(); G('closeSheet')();
 });
-step('Städte füttern (Gentechnik/Massenmedien)', () => {
-  const S = G('S'), pi = S.cur;
-  if (S.players[pi].kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
-  S.players[pi].techs.massenmedien = true;
-  S.players[pi].res.coins = 12; S.players[pi].foodDeficit = 3;
+step('Nahrungsfenster: Bevölkerungskosten aus Münzen bestreiten', () => {
+  const S = G('S'), pi = S.cur, p = S.players[pi];
+  if (p.kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  p.techs.massenmedien = true;
+  // Lage von Hand stellen: Saldo −3, Bevölkerung isst 5
+  p.res.coins = 12; p.res.food = 0; p.foodDeficit = 3; p.foodRaw = -3;
+  p.popFood = 5; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
   $('hud-feed').onclick();
+  const txt = $('sheet-body').textContent;
+  if (!/Das Land produziert/.test(txt)) throw new Error('keine Produktionszeile');
+  if (!/Die Bevölkerung isst/.test(txt)) throw new Error('keine Kostenzeile');
   const b = [...$('sheet-body').querySelectorAll('[data-k]')];
-  if (!b.length) throw new Error('kein Futter-Knopf');
-  b[0].onclick();
-  if (S.players[pi].foodDeficit !== 0) throw new Error('Defizit nicht gedeckt');
-  console.log('       Defizit gedeckt, Nahrung ' + S.players[pi].res.food);
+  if (!b.length) throw new Error('kein Deckungsknopf');
+  // größten Knopf wählen: deckt alles, was die Bevölkerung isst
+  b.sort((x, y) => +y.dataset.n - +x.dataset.n)[0].onclick();
+  if (p.popCovered !== 5) throw new Error('nicht voll gedeckt: ' + p.popCovered);
+  if (p.foodDeficit !== 0) throw new Error('Defizit nicht gedeckt');
+  if (p.res.food !== 2) throw new Error('falsche Nahrung: ' + p.res.food + ' statt 2');
+  if (p.res.coins !== 7) throw new Error('falscher Münzabzug: ' + p.res.coins);
+  // Zurücknehmen muss angeboten werden und wirken
+  const zurueck = $('sheet-body').querySelector('[data-back]');
+  if (!zurueck) throw new Error('kein Rücknahmeknopf');
+  zurueck.onclick();
+  if (p.popCovered !== 0 || p.res.coins !== 12)
+    throw new Error('Rücknahme unvollständig: ' + p.popCovered + '/' + p.res.coins);
+  console.log('       Land 2, isst 5 → voll gedeckt: 2 Nahrung, 7 Münzen; Rücknahme klappt');
   G('closeSheet')();
 });
 step('Sklaverei wird im Techbogen als obsolet markiert', () => {
@@ -655,6 +670,80 @@ step('Feldblatt: Feldertrag klein, Siedelertrag nur wo siedelbar (Punkt 7)', () 
   G('closeSheet')();
   console.log('       Feld ' + gut.join('/') + ': Siedelertrag ' + soll + ', Meer und Stadt ohne');
 });
+step('Bürgerkrieg: Armee-Knopf ist mit Nahrung + Münzen bedienbar (gemeldeter Fehler)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S), cap = G('capitalOf')(S, pi);
+  // Ereignis direkt setzen (setEvent ist ein reiner Testhelfer aus test.js)
+  S.ev = S.ev || { mode: 'hard' };
+  S.event = { round: S.round, k: 'buergerkrieg', row: 0, col: 0 };
+  if (!G('payOpts')(S, pi).foodOk) throw new Error('Bürgerkrieg ist nicht aktiv');
+  const cost = G('armyCost')(S, pi);
+  // Genau die gemeldete Lage: Münzen allein reichen nicht, zusammen mit Nahrung schon
+  const c = Math.floor(cost / 2);
+  p.res = { sci: 0, food: cost - c, coins: c };
+  if (G('available')(S, pi, 'coins') >= cost)
+    throw new Error('Testaufbau untauglich – die Münzen allein reichen schon');
+  G('tapHex')(cap.r, cap.c);
+  const knopf = [...$('sheet-body').querySelectorAll('.opt')]
+    .find(b => /Armee bauen/.test(b.textContent));
+  if (!knopf) throw new Error('kein Armee-Knopf im Stadtblatt');
+  if (knopf.disabled)
+    throw new Error('Armee-Knopf gesperrt, obwohl Nahrung + Münzen reichen');
+  knopf.onclick();
+  if (!G('armiesOf')(S, pi).length) throw new Error('Armee wurde nicht gebaut');
+  // Macht-Blatt muss dieselbe Rechnung machen
+  p.res = { sci: 0, food: G('powerPrice')(S, pi) - 1, coins: 1 };
+  G('powerSheet')();
+  const mk = [...$('sheet-body').querySelectorAll('[data-n]')];
+  if (!mk.length) throw new Error('Macht-Blatt bietet nichts an, obwohl Nahrung mitzählt');
+  G('closeSheet')();
+  console.log('       ' + c + ' Münzen + ' + (cost - c) + ' Nahrung bei Kosten ' + cost + ': Knopf frei');
+});
+step('Nahrungsfenster geht zu Zugbeginn von selbst auf', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  p.techs.gentechnik = true;
+  G('closeSheet')();
+  if ($('sheet').classList.contains('open')) throw new Error('Blatt war schon offen');
+  G('humanTurnStart')();
+  if (!$('sheet').classList.contains('open'))
+    throw new Error('Nahrungsfenster geht zu Zugbeginn nicht auf');
+  if (!/Nahrung diese Runde/.test($('sheet-body').textContent))
+    throw new Error('es ist ein anderes Blatt: ' + $('sheet-body').textContent.slice(0, 40));
+  // Ohne die Techs bleibt es zu
+  delete p.techs.gentechnik; delete p.techs.massenmedien;
+  G('closeSheet')();
+  G('humanTurnStart')();
+  if ($('sheet').classList.contains('open'))
+    throw new Error('ohne Gentechnik/Massenmedien geht trotzdem ein Blatt auf');
+  console.log('       mit Tech: geht auf · ohne Tech: bleibt zu');
+});
+step('Nahrungsfenster deckt nur die echten Kosten, kein Umtausch', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  p.techs.gentechnik = true;
+  // Saldo +4, Bevölkerung isst 2: es gibt kein Defizit, aber etwas zu verschieben
+  p.res = { sci: 50, food: 4, coins: 0 };
+  p.foodRaw = 4; p.foodDeficit = 0;
+  p.popFood = 2; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  G('foodSheet')();
+  const n = [...$('sheet-body').querySelectorAll('[data-k]')].map(b => +b.dataset.n);
+  if (!n.length) throw new Error('nichts angeboten, obwohl Kosten offen sind');
+  if (Math.max(...n) > 2)
+    throw new Error('mehr angeboten als die Bevölkerung isst: ' + n.join(','));
+  [...$('sheet-body').querySelectorAll('[data-k]')]
+    .sort((x, y) => +y.dataset.n - +x.dataset.n)[0].onclick();
+  if (p.res.food !== 6) throw new Error('Nahrung falsch: ' + p.res.food + ' statt 6');
+  if (p.res.sci !== 48) throw new Error('Wissenschaft falsch: ' + p.res.sci);
+  // Jetzt ist alles gedeckt – kein weiterer Umtausch möglich
+  if ($('sheet-body').querySelectorAll('[data-k]').length)
+    throw new Error('bietet weiteren Umtausch an, obwohl die Kosten gedeckt sind');
+  if (G('coverPop')(S, pi, 'sci', 10) === null)
+    throw new Error('coverPop lässt über die Kosten hinaus decken');
+  if (p.res.food !== 6) throw new Error('doch mehr Nahrung entstanden');
+  G('closeSheet')();
+  console.log('       50 Wissenschaft, Kosten 2 → genau 2 einsetzbar, Nahrung 4→6');
+});
 step('Hauptmenü ohne Fußzeile (Punkt 3 der Nachbesserung)', () => {
   if ($('screen-menu').querySelector('.foot')) throw new Error('Fußzeile steht noch da');
   if (/Home-Bildschirm/.test($('screen-menu').textContent))
@@ -778,6 +867,28 @@ step('Layoutklassen richten sich nach der effektiven Größe, auch gedreht', () 
   G('setTurn')(true);
   console.log('       500 × 1000 gedreht = quer und breit, ungedreht = hochkant'
     + (quer ? '' : ''));
+});
+step('Querformat wird nur im Spiel erzwungen, nicht im Menü oder Aufbau', () => {
+  const html = window.document.documentElement;
+  G('setTurn')(true);
+  if (!G('turnWanted')()) throw new Error('Drehung ist gar nicht gewünscht');
+  const dreht = id => { G('show')(id); return html.classList.contains('turn'); };
+  if (dreht('screen-menu')) throw new Error('Hauptmenü wird gedreht');
+  if (dreht('screen-setup')) throw new Error('Aufbaubildschirm wird gedreht');
+  if (dreht('screen-editor')) throw new Error('Editor wird gedreht');
+  if (!dreht('screen-game')) throw new Error('Spielbildschirm wird nicht gedreht');
+  // Abschalten wirkt auch im Spiel, und die Wahl überlebt einen Bildschirmwechsel
+  G('setTurn')(false);
+  if (html.classList.contains('turn')) throw new Error('Abschalten wirkt nicht');
+  G('show')('screen-menu'); G('show')('screen-game');
+  if (html.classList.contains('turn')) throw new Error('abgeschaltete Drehung kehrt zurück');
+  G('setTurn')(true);
+  if (!html.classList.contains('turn')) throw new Error('Wiedereinschalten wirkt nicht');
+  // Der Menüeintrag muss die gespeicherte Wahl zeigen, nicht den Bildschirmzustand
+  G('show')('screen-menu');
+  if (!G('turnWanted')()) throw new Error('Wahl ging beim Verlassen des Spiels verloren');
+  G('show')('screen-game');
+  console.log('       gedreht: nur screen-game · Wahl überlebt Bildschirmwechsel');
 });
 step('Blatt endet über der Aktionsleiste (Punkt 3, gemessen)', () => {
   frischesSpiel(); G('setBarHeight')();

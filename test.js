@@ -770,18 +770,119 @@ const setEvent = (S, k) => {
   eq(rates(G, 0).coinsToFood, 1, 'Gilden bleibt ein echter 1:1-Kurs');
 }
 
-/* Füttern: deckt zuerst das Defizit, dann kommt Nahrung obendrauf */
+/* Bevölkerungskosten aus Wissenschaft/Münzen decken (coverPop).
+   Kein Umtausch: gedeckt wird höchstens, was die Bevölkerung tatsächlich isst. Der
+   Anteil, der ein offenes Defizit tilgt, wird NICHT zu nutzbarer Nahrung – sonst
+   entstünde aus dem Decken mehr Nahrung, als verbraucht wird. */
 {
   const S = mk('griechenland', ['massenmedien']);
   const p = S.players[0];
-  p.res = { sci: 0, food: 0, coins: 5 }; p.foodDeficit = 3;
-  eq(feed(S, 0, 'coins', 5), null, 'Füttern mit Münzen klappt');
-  eq([p.foodDeficit, p.res.food, p.res.coins], [0, 2, 0], '3 deckt das Defizit, 2 werden Nahrung');
-  eq(typeof feed(S, 0, 'sci', 1), 'string', 'ohne Gentechnik kein Füttern mit Wissenschaft');
+  // Lage von Hand stellen: Produktion 2, Bevölkerung isst 5, also Saldo −3
+  p.res = { sci: 0, food: 0, coins: 9 }; p.foodDeficit = 3; p.popFood = 5;
+  p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  eq(coverPop(S, 0, 'coins', 3), null, 'drei Münzen decken das Defizit');
+  eq([p.foodDeficit, p.res.food, p.res.coins], [0, 0, 6],
+    'das Defizit ist weg, aber es entsteht noch keine nutzbare Nahrung');
+  eq(coverPop(S, 0, 'coins', 5), null, 'weiter decken bis zur Höhe der Kosten');
+  eq([p.res.food, p.res.coins, p.popCovered], [2, 4, 5],
+    'die restlichen 2 werden echte Nahrung, insgesamt 5 gedeckt');
+  eq(typeof coverPop(S, 0, 'coins', 1), 'string', 'mehr als die Bevölkerung isst geht nicht');
+  eq(typeof coverPop(S, 0, 'sci', 1), 'string', 'ohne Gentechnik nicht mit Wissenschaft');
+  // Gegenprobe: nie mehr Nahrung als Produktion + gedeckte Kosten
+  eq(p.res.food, (p.foodDeficit === 0 ? -3 : 0) + p.popCovered, 'Saldo geht auf: −3 + 5 = 2');
+
+  // Zurücknehmen: LIFO, und nur solange die Nahrung noch da ist
+  eq(uncoverPop(S, 0, 'coins', 2), null, 'zwei zurücknehmen klappt');
+  eq([p.res.food, p.res.coins, p.foodDeficit], [0, 6, 0],
+    'zuerst geht der Vorratsanteil zurück – kein Vorrat UND Defizit gleichzeitig');
+  eq(uncoverPop(S, 0, 'coins', 3), null, 'auch der Defizitanteil lässt sich zurückgeben');
+  eq([p.res.food, p.res.coins, p.foodDeficit], [0, 9, 3], 'Ausgangslage wieder hergestellt');
+  eq(typeof uncoverPop(S, 0, 'coins', 1), 'string', 'nichts mehr zurückzunehmen');
+
+  // Kein Schlupfloch: gedeckte Nahrung ausgeben und dann die Deckung zurückholen
+  eq(coverPop(S, 0, 'coins', 5), null, 'noch einmal voll decken');
+  eq(p.res.food, 2, 'zwei nutzbare Nahrung');
+  p.res.food = 0;                                   // ausgegeben (z. B. Wachstum)
+  eq(typeof uncoverPop(S, 0, 'coins', 5), 'string',
+    'ausgegebene Nahrung lässt sich nicht zurücktauschen');
+
+  // Ohne die Techs bleibt alles wie zuvor
+  const N = mk('griechenland');
+  const q = N.players[0];
+  q.res = { sci: 9, food: 0, coins: 9 }; q.foodDeficit = 3; q.popFood = 5;
+  q.popCovered = 0; q.popCoveredBy = { sci: 0, coins: 0 }; q.popDefPart = 0;
+  eq(typeof coverPop(N, 0, 'sci', 1), 'string', 'ohne Gentechnik keine Deckung');
+  eq(typeof coverPop(N, 0, 'coins', 1), 'string', 'ohne Massenmedien auch nicht');
+  eq([q.res.sci, q.res.coins, q.foodDeficit], [9, 9, 3], 'und nichts wird abgebucht');
+
+  // Und der allgemeine Umtauschweg bleibt zu
   const T = mk('griechenland', ['gentechnik']);
-  T.players[0].res = { sci: 4, food: 1, coins: 0 }; T.players[0].foodDeficit = 0;
-  eq(feed(T, 0, 'sci', 4), null, 'Füttern mit Wissenschaft klappt');
-  eq([T.players[0].res.sci, T.players[0].res.food], [0, 5], 'Wissenschaft wandert 1:1 in Nahrung');
+  T.players[0].res = { sci: 10, food: 0, coins: 0 };
+  eq(rates(T, 0).sciToFood, Infinity, 'Gentechnik ist kein Wissenschaft→Nahrung-Kurs');
+  eq(available(T, 0, 'food'), 0, 'zehn Wissenschaft ergeben ohne Alchemie null Nahrung');
+}
+
+/* Alte Spielstände kennen die neuen Felder nicht – sie müssen nachgezogen werden,
+   sonst fällt die Nahrungsrechnung stumm aus. */
+{
+  const S = mk('griechenland', ['gentechnik']);
+  const p = S.players[0];
+  // Zustand wie aus einer älteren Fassung: nur res und foodDeficit
+  p.res = { sci: 6, food: 0, coins: 0 }; p.foodDeficit = 2;
+  delete p.foodRaw; delete p.popFood; delete p.popCovered;
+  delete p.popCoveredBy; delete p.popDefPart;
+  ensureFoodState(S, 0);
+  eq(p.foodRaw, -2, 'foodRaw wird aus Vorrat minus Defizit rekonstruiert');
+  eq(p.popFood, popFoodCost(S, 0), 'popFood wird aus dem Einkommen nachgerechnet');
+  eq(p.popCovered, 0, 'noch nichts gedeckt');
+  eq(coverPop(S, 0, 'sci', 1), null, 'und Decken funktioniert danach');
+  // Ein vollständiger Zustand wird nicht angetastet
+  const q = mk('griechenland', ['gentechnik']).players[0];
+  q.res = { sci: 5, food: 4, coins: 0 };
+  q.foodRaw = 4; q.foodDeficit = 0; q.popFood = 3; q.popCovered = 1;
+  q.popCoveredBy = { sci: 1, coins: 0 }; q.popDefPart = 0;
+  const vorher = JSON.stringify(q);
+  ensureFoodState({ players: [q] }, 0);
+  eq(JSON.stringify(q), vorher, 'ein vollständiger Zustand bleibt unverändert');
+}
+
+/* popFood kommt aus der Bevölkerungszeile des Einkommens und passt zum Saldo. */
+{
+  const S = mk('griechenland', ['gentechnik']);
+  const c = capitalOf(S, 0); c.pop = 7;
+  beginTurn(S);
+  const p = S.players[0], b = incomeBreakdown(S, 0);
+  eq(p.popFood, Math.max(0, -b.pop.y[1]), 'popFood ist genau, was die Bevölkerung isst');
+  eq(p.foodRaw, b.total[1], 'foodRaw ist der rohe Nahrungssaldo');
+  eq(p.res.food, Math.max(0, p.foodRaw), 'nutzbare Nahrung ist der gekappte Saldo');
+  eq(p.foodDeficit, Math.max(0, -p.foodRaw), 'das Defizit ist der abgeschnittene Teil');
+  // Voll decken ergibt genau die Bruttoproduktion aus dem Land
+  const brutto = b.total[1] + Math.max(0, -b.pop.y[1]);
+  let guard = 0;
+  while (coverPop(S, 0, 'sci', 99) === null && guard++ < 20) { }
+  if (p.popCovered === p.popFood)
+    eq(p.res.food, brutto, 'voll gedeckt bleibt genau die Produktion aus dem Land übrig');
+  eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
+}
+
+/* Bug: ein Ereignis darf die Nahrungsgrenze nicht verschieben – sie gilt dauerhaft. */
+{
+  const S = mkX('griechenland', { events: true });
+  const c = capitalOf(S, 0);
+  while (foodAfterGrowth(S, 0, c, 1) >= 0) c.pop++;
+  c.pop--;                                    // eine Stufe unter der Grenze
+  c.grown = 0; c.freeUsed = 0;
+  eq(growthBlocked(S, 0, c), false, 'ohne Ereignis ist Wachstum erlaubt');
+  for (const k of ['duerre', 'revolution', 'waldbrand', 'hungersnot', 'piraterie']) {
+    setEvent(S, k);
+    eq(growthBlocked(S, 0, c), false, `${k} blockiert das Wachstum nicht mehr`);
+  }
+  setEvent(S, 'duerre');
+  eq(income(S, 0).food < baseIncome(S, 0).food, true,
+    'die Dürre senkt das Einkommen dieser Runde sehr wohl');
+  eq(baseIncome(S, 0).food >= 0, true, 'der dauerhafte Wert bleibt aber gedeckt');
+  S.event = null;
+  eq(baseIncome(S, 0).food, income(S, 0).food, 'ohne Ereignis sind beide gleich');
 }
 
 /* Kostenloses Wunder-Wachstum respektiert die Grenze und wächst nur so weit wie möglich */
@@ -1730,6 +1831,61 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const T = mkX('griechenland', { events: true });
   T.players[0].res = { sci: 0, food: 20, coins: 0 };
   eq(typeof buildArmy(T, 0, capitalOf(T, 0)), 'string', 'ohne Bürgerkrieg geht das nicht');
+}
+/* Bürgerkrieg: die gemeldete Mischzahlung aus Nahrung und Münzen.
+   Der eigentliche Fehler saß nicht im Bezahlen, sondern in der Prüfung davor: die
+   Oberfläche fragte `available(…, 'coins')` OHNE payOpts und sperrte den Knopf.
+   Diese Invariante bindet beide Seiten aneinander. */
+{
+  const mkCivil = () => {
+    const S = mkX('griechenland', { events: true });
+    setEvent(S, 'buergerkrieg'); applyEvent(S);
+    return S;
+  };
+  const S0 = mkCivil();
+  eq(payOpts(S0, 0).foodOk, true, 'payOpts meldet den Bürgerkrieg');
+  eq(payOpts(mkX('griechenland', { events: true }), 0).foodOk, false, 'sonst nicht');
+  const cost = armyCost(S0, 0);
+  eq(cost >= 2, true, 'die Armee kostet genug für eine Mischzahlung');
+
+  // Genau die gemeldete Lage: halb Münzen, halb Nahrung
+  {
+    const S = mkCivil(), c = Math.floor(cost / 2);
+    S.players[0].res = { sci: 0, food: cost - c, coins: c };
+    eq(available(S, 0, 'coins', payOpts(S, 0)) >= cost, true,
+      `${c} Münzen + ${cost - c} Nahrung reichen laut Prüfung`);
+    eq(buildArmy(S, 0, capitalOf(S, 0)), null, 'und der Kauf gelingt auch');
+    eq(S.players[0].res.coins + S.players[0].res.food, 0, 'beides wurde aufgebraucht');
+  }
+  // Eins zu wenig darf nicht gehen – und die Prüfung muss das genauso sehen
+  {
+    const S = mkCivil(), c = Math.floor(cost / 2);
+    S.players[0].res = { sci: 0, food: cost - c - 1, coins: c };
+    eq(available(S, 0, 'coins', payOpts(S, 0)) >= cost, false, 'eins zu wenig ist zu wenig');
+    eq(typeof buildArmy(S, 0, capitalOf(S, 0)), 'string', 'und der Kauf scheitert');
+  }
+  // Invariante über alle Aufteilungen: Prüfung und Bezahlung stimmen immer überein
+  {
+    let geprueft = 0;
+    for (let coins = 0; coins <= cost + 2; coins++)
+      for (let food = 0; food <= cost + 2; food++) {
+        const S = mkCivil();
+        S.players[0].res = { sci: 0, food, coins };
+        const darf = available(S, 0, 'coins', payOpts(S, 0)) >= cost;
+        const ging = buildArmy(S, 0, capitalOf(S, 0)) === null;
+        if (darf !== ging) throw new Error(`Prüfung ${darf} ≠ Kauf ${ging} bei ${coins}🪙 ${food}🌾`);
+        geprueft++;
+      }
+    eq(geprueft, (cost + 3) * (cost + 3), `${geprueft} Aufteilungen: Prüfung und Kauf stimmen überein`);
+  }
+  // Dasselbe für Macht
+  {
+    const S = mkCivil(), price = powerPrice(S, 0);
+    S.players[0].res = { sci: 0, food: price - 1, coins: 1 };
+    eq(Math.floor(available(S, 0, 'coins', payOpts(S, 0)) / price) >= 1, true,
+      'Macht: Nahrung zählt bei der Prüfung mit');
+    eq(buyPower(S, 0, 1), null, 'Macht lässt sich im Bürgerkrieg mischbezahlen');
+  }
 }
 {
   const S = mkX('griechenland', { events: true }, ['atomwaffen']);

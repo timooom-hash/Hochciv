@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v32)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v35)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -35,13 +35,13 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/bots.js` | 320 | Bot-Züge, Siedlerbewegung nach Regelheft, Armeeprioritäten, Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
 | `js/tutorial.js` | 857 | Geführtes Übungsspiel: 27 Schritte, feste Würfelfolge, Schienen |
-| `test.js` | 2310 | **641 Assertions**, `node test.js` |
-| `smoke.js` | 760 | **52 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 2450 | **687 Assertions**, `node test.js` |
+| `smoke.js` | 870 | **56 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v32`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v35`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -73,10 +73,10 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 641 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 687 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (52 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (56 Schritte), inklusive
    Tutorial-Audit: in jedem der 27 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -97,7 +97,9 @@ Gedächtnis rekonstruieren.
   Koordinatenrechnung. Gilt auch für den Karteneditor.
 - **Querformat:** Manifest `orientation: landscape`, dazu `screen.orientation.lock` wo
   vorhanden. **Auf iOS greift beides nicht** — dort dreht `html.turn` die App im Hochformat
-  selbst um 90°. Abschaltbar im ☰-Menü.
+  selbst um 90°. Abschaltbar im ☰-Menü. **Gedreht wird nur `screen-game`** (Liste
+  `TURN_SCREENS`, nachgeführt aus `show()` über `applyTurn()`); Menü, Aufbau und Editor
+  bleiben in der Lage, in der das Gerät gehalten wird.
 - **`syncLayout()` statt Media Queries** für alles Layoutkritische: gedreht messen Media
   Queries den falschen Viewport. Klassen auf `<html>`: `w-wide`, `w-side`, `w-narrow`.
 - **Das Aktionsblatt endet über der Leiste** (`--bar-h` aus `setBarHeight()`), sperrt sie
@@ -105,6 +107,10 @@ Gedächtnis rekonstruieren.
 - **Tutorial:** erledigte Aufgaben schalten selbst weiter (`tutMaybeAdvance`,
   `TUT_AUTO_MS`); das Panel steht quer links neben der Karte.
 - **Protokoll:** Würfe hängen eingeklappt an ihrer Aktionszeile (`logHtml`/`rollsBlock`).
+- **Nahrung:** Die Bevölkerungskosten (`popFood`) lassen sich mit Gentechnik/Massenmedien
+  aus Wissenschaft oder Münzen bestreiten (`coverPop`/`uncoverPop`), höchstens bis zur
+  Höhe der echten Kosten. Das Fenster (`foodSheet`) geht zu Zugbeginn auf.
+  `ensureFoodState` zieht die Felder in alten Spielständen nach.
 - **Feldblatt:** Feldertrag klein in der Unterzeile; **Ertrag beim Siedeln**
   (`settleGain` in `engine.js`) als Kästchen — aber nur, wo auch gegründet werden kann.
 - **Technologiebogen:** verfügbare Kacheln sind grafisch geteilt in bezahlbar (`afford`,
@@ -128,6 +134,8 @@ Alles Weitere dazu steht ausführlich in `ANNAHMEN.md`, Abschnitt „Designände
 - **Tutorial-Schienen:** Ein fehlender Schlüssel in `allow` heißt „nichts erlaubt". Wer neue
   Schritte hinzufügt, muss `bar`, `labels`, `techs`, ggf. `hex`/`moveTo` setzen — sonst ist
   der Schritt eine Sackgasse (das Smoke-Audit meldet beides).
+- **Jede neue Kaufprüfung in der Oberfläche muss `payOpts(S, pi)` mitgeben**, sonst
+  weicht sie von dem ab, was `pay()` tatsächlich erlaubt (das war der Bürgerkriegs-Fehler).
 - **Smoke-Tests, die auf einem frischen Spiel aufsetzen, müssen ihre Ausgangslage selbst
   herstellen** (Nahrung, Wissenschaft, Verfügbarkeit setzen). `frischesSpiel()` würfelt
   Startreich und Technologieverfügbarkeit aus; zwei Tests hingen daran und schlugen in
@@ -175,6 +183,17 @@ Aus diesem Chat:
 - Tutorial: Schienen-Lücke bei Schritten mit unvollständigem `allow`; Papier wurde still
   freigeschaltet statt ausgewürfelt.
 
+Aus dieser Sitzung (21.8.):
+- **Nahrungsgrenze hing am Ereignis der Runde:** Dürre und Revolution verboten Wachstum
+  und Siedeln, obwohl die Stadt dauerhaft gedeckt war. `growthBlocked` rechnet jetzt über
+  `baseIncome()` auf dem dauerhaften Wert (`S.evMuted`).
+- **Bürgerkrieg:** Armee/Macht ließen sich nicht mit einer Mischung aus Nahrung und Münzen
+  kaufen. Die Regelmaschine konnte es, die Oberfläche prüfte ohne die Bürgerkriegs-Option.
+  Es gibt jetzt `payOpts(S, pi)` als einzige Wahrheit — beide Seiten benutzen sie.
+- **Gentechnik/Massenmedien:** `feed()` schrieb alles über dem Defizit in den
+  Nahrungsvorrat und war damit doch ein 1:1-Umtausch. Füttern deckt jetzt nur noch das
+  offene Defizit.
+
 ## Offene Punkte / bewusst nicht umgesetzt
 
 0. **Die erzwungene Drehung ist nicht auf echtem iOS geprüft**, nur in Chromium mit
@@ -182,10 +201,19 @@ Aus diesem Chat:
    Vorfahren und bei `env(safe-area-inset-*)` sind ein Restrisiko. Auf dem iPad
    gegenprüfen.
 
-1. **Nahrungsgrenze verliert ihren Biss**, sobald Gentechnik oder Massenmedien erforscht ist:
-   die Techs heben die Grenze ganz auf, und ein nicht gefüttertes Defizit kostet nichts.
-   Alternativen wären „Wachstum nur so weit, wie diese Runde gefüttert werden kann" oder
-   „ungedecktes Defizit kostet Bevölkerung" — je eine Zeile.
+1. **Ein ungedecktes Nahrungsdefizit kostet nichts.** Seit v35 ist das weniger schlimm,
+   weil Decken echten Nutzen hat (es macht Nahrung frei, statt nur ein folgenloses Defizit
+   zu tilgen). Ein Rest bleibt: wer gar nichts deckt, verliert nichts außer der Nahrung.
+   Frühere Messung dazu: Gemessen: zwei identische Spielstände, eines füttert 3 Wissenschaft, das
+   andere nicht; nach der Runde unterscheiden sie sich **nur** in den 3 Wissenschaft,
+   Bevölkerung und Nahrung sind gleich. Vor v33 verdeckte der (fehlerhafte) Umtausch das,
+   weil Füttern echten Nahrungsvorrat brachte. Die Funktion braucht also eine Folge, sonst
+   ist sie Zierde. Alternativen, je etwa eine Zeile:
+   - „ungedecktes Defizit kostet Bevölkerung" (dann lohnt Füttern),
+   - „Wachstum nur so weit, wie diese Runde gefüttert werden kann",
+   - oder Füttern darf über das Defizit hinaus bis zur Nahrungsaufnahme der Bevölkerung
+     gehen und schafft echten Vorrat (dann ist es wieder ein begrenzter Umtausch).
+   **Entscheidung des Autors steht aus.**
 2. **Wikinger „Beutezüge"** funktioniert, zahlt aber selten: der Ertrag ist Angriffswert minus
    Verteidigungswert, und ein Mensch überbietet Bots (Machtwert = Gesamtbevölkerung) selten.
    Gemessen: mit Macht 30 über 20 Partien 1809 Beute, mit normal gekaufter Macht 0.
