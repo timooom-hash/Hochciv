@@ -14,6 +14,21 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--parchment);color:var(--ink);
   font-family:var(--sans);font-size:16px;-webkit-text-size-adjust:100%}
+
+/* ------------------------------------------------ Querformat erzwingen
+   iOS kennt keine Orientierungssperre (weder screen.orientation.lock noch das
+   Manifest-Feld wirken dort). Auf dem iPad hilft nur: die App selbst drehen.
+   Wo eine echte Sperre existiert (Android/Chrome, installiert), greift sie zuerst
+   und dieser Zweig kommt gar nicht zum Tragen.
+   Der 90°-Dreh macht den <body> zum umschließenden Block aller position:fixed-
+   Elemente – Karte, Blatt, Fenster und Toast drehen deshalb geschlossen mit. */
+@media (orientation:portrait){
+  html.turn,html.turn body{overflow:hidden}
+  html.turn body{position:fixed;top:0;left:0;width:100vh;height:100vw;
+    transform-origin:top left;transform:rotate(90deg) translateY(-100vw)}
+  /* Gedreht zeigen die Systemeinfassungen in die falsche Richtung – lieber keine. */
+  html.turn{--safe-t:0px;--safe-b:0px}
+}
 button,select,input{font:inherit;color:inherit}
 .screen{position:fixed;inset:0;display:none;flex-direction:column;padding-top:var(--safe-t)}
 .screen.show{display:flex}
@@ -27,7 +42,6 @@ button,select,input{font:inherit;color:inherit}
 .title::after{content:"";display:block;width:64px;height:3px;background:var(--red);margin:18px auto 0}
 .lede{color:var(--ink-soft);margin:18px 0 30px;font-size:15px}
 .menu-actions{display:grid;gap:10px}
-.foot{margin-top:28px;font-size:12px;color:var(--ink-soft)}
 
 /* ------------------------------------------------------------------ Bausteine */
 .btn{border:1px solid var(--rule);background:var(--paper);border-radius:10px;padding:13px 16px;
@@ -61,26 +75,57 @@ select{background:var(--paper);border:1px solid var(--rule);border-radius:8px;pa
 /* ------------------------------------------------------------------ Spiel */
 .hud{display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--paper);
   border-bottom:1px solid var(--rule);flex:0 0 auto}
-.hud-civ{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-.hud-civ strong{font-family:var(--serif);font-size:16px;display:block;line-height:1.15}
-.hud-civ small{font-size:11px;color:var(--ink-soft)}
+.hud-civ{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0}
+.hud-civ>div{min-width:0}
+.hud-civ strong{font-family:var(--serif);font-size:16px;display:block;line-height:1.15;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-civ small{font-size:11px;color:var(--ink-soft);display:block;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .civ-chip{width:26px;height:26px;border-radius:50%;border:2px solid var(--ink);display:grid;
   place-items:center;font-size:13px;flex:0 0 auto;background:var(--paper-2)}
-.hud-res{display:flex;gap:9px;font-size:13px;font-family:var(--mono)}
-.hud-res b{margin-left:2px;font-weight:600}
+/* Vier Werte, klar getrennt: jeder Wert steht in einem eigenen Kästchen mit Symbol,
+   großer Zahl und Beschriftung. Auf sehr schmalen Geräten fällt die Beschriftung weg. */
+.hud-res{display:flex;gap:6px;flex:0 0 auto}
+.hud-res .res{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;min-width:62px;padding:3px 8px 2px;background:var(--paper-2);
+  border:1px solid var(--rule);border-radius:9px;line-height:1.05;font-family:var(--mono)}
+.hud-res .res i{font-style:normal;font-size:13px;opacity:.85}
+.hud-res .res b{font-size:21px;font-weight:700;letter-spacing:-.01em}
+.hud-res .res u{text-decoration:none;font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-soft);font-family:var(--sans)}
 .res.pow b{color:var(--red)}
+.res.food{cursor:pointer}
+.res.food:active{background:var(--paper)}
+html.w-narrow .hud-res{gap:4px}
+html.w-narrow .hud-res .res{min-width:0;padding:3px 6px 2px}
+html.w-narrow .hud-res .res u{display:none}
+html.w-narrow .hud-res .res b{font-size:18px}
 
-#map-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:none}
+/* Karte und Tutorialpanel teilen sich die Fläche zwischen Kopf- und Aktionsleiste.
+   Hochkant/schmal untereinander, quer nebeneinander (siehe unten). */
+#stage{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+/* Die Karte ist fest: kein Schieben, kein Zoomen. Die viewBox umfasst immer das ganze
+   Spielfeld, der Browser passt sie ein – also ist stets alles sichtbar.
+   touch-action:manipulation statt none, sonst schluckt der Host das Tippen nicht,
+   aber das Doppeltipp-Zoom des Systems bliebe erlaubt. */
+#map-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;
+  touch-action:manipulation;min-height:0;min-width:0}
 #map{position:absolute;inset:0;width:100%;height:100%}
+#map [data-r]{cursor:pointer}
 .actionbar{display:flex;gap:6px;padding:8px 8px calc(8px + var(--safe-b));background:var(--paper);
-  border-top:1px solid var(--rule);flex:0 0 auto;position:relative;z-index:1;transition:opacity .15s}
-/* Solange ein Blatt oder Fenster offen ist, ist die Aktionsleiste gesperrt – sonst trifft
-   man neben dem Blatt versehentlich „Zug beenden". */
+  border-top:1px solid var(--rule);flex:0 0 auto;position:relative;z-index:26;transition:opacity .15s}
+/* Nur das Bot-Fenster sperrt die Leiste (dort führt allein „Weiter" weiter).
+   Ein normales Aktionsblatt sperrt sie NICHT mehr – es liegt jetzt über der Leiste,
+   nicht darauf, also ist kein Fehlgriff auf „Zug beenden" mehr möglich. */
 body.blocked .actionbar{pointer-events:none;opacity:.4}
 
-.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-top:1px solid var(--rule);
+/* Das Blatt endet oberhalb der Aktionsleiste. --bar-h wird aus der echten Höhe der
+   Leiste gesetzt (setBarHeight), damit die Menüpunkte unten immer frei bleiben. */
+.sheet{position:absolute;left:0;right:0;bottom:var(--bar-h,58px);background:var(--paper);
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
   border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgba(60,48,20,.16);padding:6px 14px 14px;
-  max-height:52%;overflow:auto;transform:translateY(110%);z-index:25;
+  max-height:calc(100% - var(--bar-h,58px) - var(--hud-h,54px));
+  overflow:auto;transform:translateY(130%);z-index:25;
   /* geschlossen wirklich weg: sonst lugt ein leerer Kasten über der Aktionsleiste hervor */
   visibility:hidden;transition:transform .18s ease, visibility 0s linear .18s}
 .sheet.open{transform:none;visibility:visible;transition:transform .18s ease}
@@ -96,6 +141,14 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
   padding:11px 12px;margin-bottom:7px;background:var(--paper-2);border:1px solid var(--rule);
   border-radius:9px;text-align:left;cursor:pointer}
 .opt small{display:block;color:var(--ink-soft);font-size:11px;margin-top:2px}
+/* Ein einzelnes Kästchen im Feldblatt: was das Reich an einer Stadt auf diesem Feld
+   verdiente. Erscheint nur, wenn hier auch gegründet werden kann. */
+.tile-facts{display:flex;margin:0 0 9px}
+.fact{flex:1 1 auto;background:var(--paper-2);border:1px solid var(--rule);
+  border-radius:9px;padding:5px 9px}
+.fact-k{display:block;font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-soft)}
+.fact-v{font-family:var(--mono);font-size:14px;font-weight:600}
 .opt .cost{font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--ink-soft)}
 .opt[disabled]{opacity:.45}
 
@@ -118,6 +171,25 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 .logline.roll{color:#6a5d3a}
 .logline.warn{color:#8a5a12}
 
+/* Würfe hängen an der Aktionszeile, zu der sie geführt haben: eingeklappt steht nur
+   die Aktion da, ein kleines 🎲 n zeigt, dass Würfe dahinterstecken. */
+.rolls{margin:0}
+.rolls>summary{display:flex;align-items:baseline;gap:8px;cursor:pointer;list-style:none;
+  padding:2px 0 2px 15px;position:relative;border-bottom:1px dotted var(--rule);
+  font-family:var(--mono);font-size:12px;line-height:1.5}
+.rolls>summary::-webkit-details-marker{display:none}
+.rolls>summary::before{content:"▸";position:absolute;left:2px;top:2px;font-size:10px;
+  color:var(--ink-soft)}
+.rolls[open]>summary::before{content:"▾"}
+.lsum{flex:1;min-width:0;color:var(--ink-soft)}
+.lsum.act{color:var(--ink)}
+.lsum.fight{color:var(--red)}
+.lsum.warn{color:#8a5a12}
+.rtag{flex:0 0 auto;font-style:normal;font-size:10px;color:var(--ink-soft);
+  border:1px solid var(--rule);border-radius:10px;padding:0 6px;background:var(--paper-2)}
+.rolls .logline.roll{padding-left:15px;border-bottom:0;font-size:11px}
+.rolls[open]{border-bottom:1px dotted var(--rule);margin-bottom:1px}
+
 /* Technologiebogen */
 .techgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .techcol h4{margin:0 0 6px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
@@ -129,7 +201,20 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 .tech .c{font-family:var(--mono);float:right}
 .tech.owned{background:#dfe7cf;border-color:#9fb37a}
 .tech.avail{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red-soft)}
-.tech.locked{opacity:.4;cursor:default}
+/* Drei sichtbare Stufen, bewusst ohne zusätzlichen Text – die Kosten stehen ohnehin
+   in der Kachel.
+   Bezahlbar: heller Grund, roter Rand doppelt gezogen – springt aus dem Raster heraus.
+   Zu teuer: derselbe rote Rand, nur gestrichelt und ohne die innere Linie. Die Deckkraft
+   bleibt VOLL. Sie zu senken war der Fehler in v31: damit verblasste auch der rote Rand
+   so weit, dass die Kachel einer nicht verfügbaren ähnelte. Gedämpft wird stattdessen
+   nur der Text, und die Kostenzahl steht rot da – sie ist ja der Grund.
+   Nicht verfügbar: grauer Rand, deutlich zurückgenommen. */
+.tech.avail.afford{background:#fbf3e6}
+.tech.avail.costly{border-style:dashed;box-shadow:none;background:var(--paper)}
+.tech.avail.costly b{color:var(--ink-soft)}
+.tech.avail.costly .eff{opacity:.75}
+.tech.avail.costly .c{color:var(--red);font-weight:700}
+.tech.locked{opacity:.32;cursor:default}
 .owner-marks{display:flex;gap:3px;margin-top:5px;flex-wrap:wrap;align-items:center}
 .owner-mark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
   font-size:11px;line-height:1;border-radius:50%;background:rgba(255,255,255,.55)}
@@ -171,8 +256,10 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 }
 
 /* Editor */
-#ed-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:none}
+#ed-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:manipulation;
+  min-height:0}
 #ed-map{position:absolute;inset:0;width:100%;height:100%}
+#ed-map [data-r]{cursor:pointer}
 .palette{display:flex;gap:6px;padding:8px;background:var(--paper);border-top:1px solid var(--rule);
   overflow-x:auto}
 .swatch{flex:0 0 auto;padding:8px 10px;border-radius:8px;border:2px solid transparent;font-size:12px;
@@ -188,16 +275,30 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
   background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:20px;font-size:13px;
   opacity:0;transition:.2s;pointer-events:none;z-index:40;max-width:86%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%)}
+/* Im Seitenlayout säße der Toast sonst über dem Tutorialkopf und verdeckte
+   „Tutorial beenden" – dort gehört er über die Karte. */
+html.w-side body.tut .toast{left:auto;right:16px;transform:translateY(-18px);max-width:58%}
+html.w-side body.tut .toast.show{transform:none}
 
-@media (min-width:820px){
-  /* Auf breiten Geräten schwebt das Blatt – dann muss es über der Aktionsleiste enden,
-     nicht darauf liegen. */
-  .sheet{left:auto;right:12px;bottom:calc(74px + var(--safe-b));width:360px;border-radius:14px;
-    max-height:70%;transform:translateY(130%)}
-  .sheet.open{transform:none}
-  .overlay{align-items:center}
-  .modal{border-radius:14px}
-}
+/* Die folgenden Klassen setzt syncLayout() auf <html>. Bewusst keine Media Queries:
+   im gedrehten Hochformat (html.turn) misst eine Media Query den ungedrehten Viewport
+   und läge damit um 90° daneben. syncLayout rechnet mit der EFFEKTIVEN Layoutgröße. */
+/* Breit: das Blatt schwebt rechts – und endet 12 px über der Aktionsleiste,
+   damit die Menüpunkte unten frei bleiben. */
+html.w-wide .sheet{left:auto;right:12px;bottom:calc(var(--bar-h,58px) + 12px);width:360px;
+  border-radius:14px;border:1px solid var(--rule);max-height:70%;transform:translateY(130%)}
+html.w-wide .sheet.open{transform:none}
+html.w-wide .overlay{align-items:center}
+html.w-wide .modal{border-radius:14px}
+/* Quer mit Platz: das Tutorialpanel steht links neben der Karte statt darunter.
+   Die Karte behält ihr Seitenverhältnis und wird eingepasst – auf 16:9 bleibt links
+   ohnehin Rand frei, den nutzt jetzt der Text. row-reverse, weil im Quelltext erst die
+   Karte kommt. */
+html.w-side body.tut #stage{flex-direction:row-reverse}
+html.w-side body.tut #tut-panel{flex:0 0 clamp(280px,32%,430px);max-height:none;height:100%;
+  border-top:0;border-right:1px solid var(--rule);
+  box-shadow:6px 0 18px rgba(60,48,20,.10)}
+html.w-side body.tut .sheet{left:auto;right:12px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* Aufbau: Fähigkeitswahl je Zivilisation */
@@ -214,7 +315,6 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
   border-radius:20px;margin:0 4px 4px 0;background:var(--paper)}
 .tech.obsolete{opacity:.55;text-decoration:line-through}
 .tech.obsolete .eff{text-decoration:none;font-style:italic}
-.res.food{border:0;background:none;cursor:pointer}
 
 .yrow.prev{color:var(--ink-soft);font-style:italic;border-top:1px dashed var(--rule)}
 
@@ -222,9 +322,10 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
 .seg.wide button{flex:1;padding:10px}
 
 /* ------------------------------------------------------------------ Tutorial */
-/* Das Panel sitzt zwischen Karte und Aktionsleiste und nimmt höchstens 46 % der Höhe ein,
-   damit die Karte immer sichtbar bleibt. */
-#tut-panel{flex:none;display:flex;flex-direction:column;max-height:46%;
+/* Gestapelt (hochkant/schmal) sitzt das Panel unter der Karte und nimmt höchstens 46 %
+   der Höhe ein, damit die Karte sichtbar bleibt. Quer steht es links daneben – siehe
+   die Regel weiter oben bei den Breitbild-Anpassungen. */
+#tut-panel{flex:none;display:flex;flex-direction:column;max-height:52%;min-height:0;
   background:var(--paper);border-top:1px solid var(--rule);box-shadow:0 -6px 18px rgba(60,48,20,.10)}
 #tut-panel[hidden]{display:none}
 .tut-bar{height:3px;background:var(--rule);flex:none}
@@ -232,7 +333,11 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--red)}
 .tut-head{display:flex;align-items:center;gap:8px;padding:7px 12px 0}
 .tut-sub{flex:1;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
 .tut-head .btn.small{flex:none;padding:5px 9px;font-size:11px}
-.tut-scroll{padding:2px 12px 8px;overflow:auto;-webkit-overflow-scrolling:touch}
+/* min-height muss > 0 sein: sonst quetschen Aufgabenzeile und Navigation den Text
+   auf flachen Schirmen vollständig weg (flex-shrink trifft zuerst den Scrollbereich). */
+.tut-scroll{padding:2px 12px 8px;overflow:auto;-webkit-overflow-scrolling:touch;
+  flex:1 1 auto;min-height:4.5em}
+html.w-side .tut-scroll{min-height:0}
 .tut-h{font-family:var(--serif);font-size:19px;line-height:1.2;margin:2px 0 8px;font-weight:600}
 #tut-body p{font-size:14px;line-height:1.5;margin:0 0 9px}
 #tut-body b{font-weight:600}
