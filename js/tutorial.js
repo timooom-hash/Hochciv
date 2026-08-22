@@ -132,19 +132,17 @@ function tutGuardSpot(army, pref) {
 const TUT_STEPS = [
   /* ------------------------------------------------------------------ Runde 1 */
   {
-    t: 'Das hier ist ein echtes Spiel',
+    t: 'Hochzeivilization',
     html: () => `
       <p>Du spielst <b>Russland</b>, die anderen drei Reiche übernehmen Bots auf dem
-      höchsten Grad „David". Gespielt wird auf der Originalkarte.</p>
-      <p>Golden umrandet ist deine <b>Hauptstadt</b>: Kreis mit Symbol = Stadt, Striche
-      daneben = Bevölkerung, dunkelrote Linie = Reichsgrenze.
-      Die Karte ist immer vollständig zu sehen – du kannst jedes Feld antippen, um es
-      anzusehen.</p>
+      höchsten Schwierigkeitsgrad „David".</p>
+      <p>Golden umrandet ist deine <b>Hauptstadt</b>: Der Kreis mit Symbol ist die Stadt, die Striche
+      daneben symbolisieren die Bevölkerung. Die Linie um die Felder darum ist die Reichsgrenze.
       <p>Gezogen wird immer in derselben Reihenfolge:
-      <b>Russland → Griechenland → England → Wikingerreich</b>. Wo die Runde beginnt, hängt
-      vom Startspieler ab – hier bist das du.</p>
+      <b>Russland (grün) → Griechenland (blau) → England (rot) → Wikingerreich (lila)</b>. Wo die Runde beginnt, hängt
+      vom Startspieler ab, hier bist das du.</p>
       <p class="tut-note">Im Tutorial sind nur die Schritte dieser Beispielpartie möglich –
-      so bleibt jede Zahl nachvollziehbar. „Tutorial beenden" gibt alles frei.</p>`,
+      so bleibt alles nachvollziehbar. „Tutorial beenden" gibt alles frei.</p>`,
     hl: () => [[tutCap().r, tutCap().c]],
   },
   {
@@ -154,14 +152,11 @@ const TUT_STEPS = [
       dir Einkommen – sie sind gerade golden umrandet. Das Feld <i>unter</i> der Stadt bringt
       nichts.</p>
       <p>Jede weitere Stadt bringt bis zu sechs neue Felder dazu. Deshalb ist Ausbreitung
-      wichtiger als große Einzelstädte.</p>
-      <p><b>So siehst du ein Feld an:</b> Feld antippen – das Aktionsblatt zeigt den
-      <b>Feldertrag</b> und daneben, was eine Stadt auf diesem Feld einbrächte. Mit ✕ oben
-      rechts schließt du es wieder.</p>`,
+      wichtiger als große Einzelstädte.</p>`,
     hl: () => [...controlledTiles(S, RU())].map(unkey),
   },
   {
-    t: 'Woher deine Zahlen kommen',
+    t: 'Woher deine Ressourcen kommen',
     html: () => `
       <p>Oben rechts in der Kopfzeile stehen 🔬 Wissenschaft, 🌾 Nahrung, 🪙 Münzen und
       ⚔︎ Macht.
@@ -172,27 +167,18 @@ const TUT_STEPS = [
         <tr><td>1 Bevölkerung</td><td>1</td><td>-1</td><td>1</td></tr>
         <tr class="sum"><td>Summe</td><td>1</td><td>5</td><td>3</td></tr>
       </table>
-      <p>Jeder Bevölkerungspunkt bringt <b>+1 Wissenschaft und +1 Münze</b> und <b>frisst
-      1 Nahrung</b> – jede Runde. Russland bekommt zusätzlich +1 Nahrung in jedem Wald.</p>
-      <div class="tut-key"><b>Merke</b> Ressourcen <b>verfallen am Zugende</b>. Nur Macht
-      bleibt liegen – gib also alles aus. Münzen können <b>2:1</b> als Nahrung oder
+     <div class="tut-key"><b>Merke</b> Ressourcen <b>verfallen am Zugende</b>. Nur Macht
+      bleibt liegen. Gib also alles aus. Münzen können <b>2:1</b> als Nahrung oder
       Wissenschaft verwendet werden.</div>`,
     hl: () => [...controlledTiles(S, RU())].map(unkey),
   },
   {
     t: 'Die zweite Stadt',
     html: () => `
-      <p>Das golden umrandete Feld kostet
+      <p>Es wird Zeit zu expandieren. Auf dem golden umrandeten Feld zu siedeln kostet insgesamt 
       <b>4 Nahrung</b> – 1 Basiskosten für die erste
-      zusätzliche Stadt plus 3 für den Weg dorthin (gerechnet wird der Weg über passierbare
-      Felder, nicht die Luftlinie).</p>
-      <p><b>Warum dieses Feld?</b> Ringsum liegen 5 × Wald, 1 × Grasland. Ab der
-      nächsten Runde bringt die Stadt dir <b>+1 🔬, +5 🌾, +6 🪙</b> – die eine
-      Bevölkerung isst dabei schon mit. Wälder sind für <i>dich</i> besonders viel wert: die
-      russische Grundfähigkeit gibt +1 Nahrung in jedem Wald, dazu kommt 1 Münze. Außerdem liegt das Feld genau die nötigen 3 Felder
-      von der Hauptstadt entfernt (näher ist verboten) und der Weg ist kurz, das drückt den
-      Preis.</p>
-      <p><b>So gründest du:</b> goldenes Feld antippen → im Blatt auf <b>Stadt gründen</b>.</p>`,
+      zusätzliche Stadt plus 3 Distanzkosten für den Weg dorthin von der Hauptstadt aus.</p>
+     <p><b>So gründest du:</b> goldenes Feld antippen → im Blatt auf <b>Stadt gründen</b>.</p>`,
     task: 'Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.',
     hl: () => [TUT_CITY_1],
     allow: { bar: [], labels: [/Stadt gründen/], hex: () => [TUT_CITY_1] },
@@ -200,17 +186,10 @@ const TUT_STEPS = [
     auto: () => foundCity(S, RU(), ...TUT_CITY_1),
   },
   {
-    t: 'Forschen: Schrift',
+    t: 'Forschung und Technologien',
     html: () => `
-      <p>Jede Technologie ist nur mit <b>50 % Wahrscheinlichkeit</b> in einer Partie
-      verfügbar. Die Technologien sind in <b>vier Feldern</b> organisiert, jedes Feld ist
-      nochmal in <b>vier Zeitalter</b> aufgeteilt. Sobald du die erste Technologie eines
-      Zeitalters und Feldes erforschst, würfelst du sofort die Verfügbarkeiten des nächsten
-      Zeitalters in diesem Feld aus. Es ist immer mindestens eine Technologie je Zeitalter
+      <p>Im Gegensatz zu anderen Spielen nutzt Hochzeivilization einen dynamischen Technologiebaum: Jede Technologie ist nur mit <b>50 % Wahrscheinlichkeit</b> in einer Partie
       verfügbar.</p>
-      <p><b>Warum Schrift?</b> Sie kostet 1
-      Wissenschaft und gibt <b>+1 Wissenschaft je Bevölkerung</b> – dauerhaft, in jeder
-      Runde. Das ist die billigste Verdopplung im Spiel, und sie wirkt sofort.</p>
       <p><b>So forschst du:</b> unten auf <b>Forschen</b> → im Bogen die Kachel
       <b>Schrift</b> antippen. Der Bogen zeigt Kosten oben links in der Kachel.</p>`,
     task: 'Öffne <b>Forschen</b> und kaufe <b>Schrift</b>.',
@@ -224,12 +203,12 @@ const TUT_STEPS = [
   {
     t: 'Die Hauptstadt wachsen lassen',
     html: () => `
-      <p>Wachsen kostet je <b>1 Nahrung und 1 Münze pro vorhandener Bevölkerung</b>. Deine
-      Hauptstadt hat 1, es kostet also 1 Nahrung und 1
-      Münzen. Von 2 auf 3 wären es 2 und 2.</p>
+      <p>Die Bevölkerung wachsen zu lassen kostet je <b>1 Nahrung und 1 Münze pro vorhandener Bevölkerung</b>. Deine
+      Hauptstadt hat aktuell 1 Bevölkerung, es kostet also 1 Nahrung und 1
+      Münzen.</p>
       <p><b>Warum jetzt?</b> Du hast noch 1 Nahrung und 3
       Münzen übrig, und beides verfällt am Zugende. Der Punkt bringt dir ab der nächsten
-      Runde jede Runde +1 Wissenschaft (mit Schrift +2) und +1 Münze.</p>
+      Runde jede Runde +2 Wissenschaft und +1 Münze. Es kostet dich zwar auch eine Nahrungsproduktion, aber davon hast du aktuell noch genug, um weiter schnell Städte gründen zu können.</p>
       <p><b>So wächst du:</b> Hauptstadt antippen → <b>Bevölkerung wachsen</b>.</p>`,
     task: 'Tippe deine <b>Hauptstadt</b> an und wähle <b>Bevölkerung wachsen</b>.',
     hl: () => [[tutCap().r, tutCap().c]],
@@ -240,12 +219,9 @@ const TUT_STEPS = [
   {
     t: 'Zug beenden',
     html: () => `
-      <p>Übrig sind 0 🔬, 0 🌾, 2 🪙. Für eine
-      Armee (5 Münzen) oder einen Punkt Macht
-      (5 Münzen) reicht es noch nicht – der Rest verfällt. Das ist
+      <p>Übrig sind 0 🔬, 0 🌾, 2 🪙. Damit kannst du aktuell nichts anfangen, der Rest verfällt. Das ist
       normal in Runde 1.</p>
-      <p>Nach deinem Zug folgen <b>Kampf</b> und <b>Siegprüfung</b>; du hast keine Armeen,
-      also passiert nichts. Danach ziehen die drei Bots, jeder in einem eigenen Fenster.</p>
+      <p>Danach ziehen die drei Bots.</p>
       <p><b>So beendest du:</b> unten rechts auf <b>Zug beenden</b>, dann im Bot-Fenster
       jeweils auf <b>Weiter</b>.</p>`,
     task: 'Tippe auf <b>Zug beenden</b> und klick dich durch die drei Bot-Fenster.',
@@ -262,13 +238,11 @@ const TUT_STEPS = [
   {
     t: 'Was die Bots getan haben',
     html: () => `
-      <p>Ein Bot würfelt für jede Aktion gegen seinen Schwierigkeitsgrad: Siedler braucht
-      eine 6, Häuptling 5+, Prinz 4+, König 3+, <b>David 2+</b>. Jeder Wurf steht im
+      <p>Ein Bot führt  immer dieselben Schritte aus: jede Stadt wachsen lassen, eine neue Stadt siedeln, eine Armee bauen, alle Armeen bewegen,
+      zweimal forschen. Allerdings führt er jede Aktion nur mit eine Wahrscheinlichkeit von 17% (leichtester Schwierigkeitsgrad) bis 83%(höchster Schwierigkeitsgrad) aus. Jeder Wurf steht im
       Protokoll.</p>
-      <p>Er geht immer dieselben Schritte: wachsen, siedeln, Armee bauen, Armeen bewegen,
-      zweimal forschen, Kampf.</p>
-      <p><b>So liest du mit:</b> unten auf <b>Protokoll</b> – dort steht jeder Würfelwurf
-      mit Grund. Mit ✕ schließen.</p>
+     <p><b>So liest du mit:</b> unten auf <b>Protokoll</b> – dort steht jeder Würfelwurf
+      mit Grund.</p>
       <div class="tut-key"><b>Merke</b> Der <b>Machtwert eines Bots ist immer seine
       Gesamtbevölkerung</b>. Griechenland hat gerade
       3.</div>`,
@@ -286,16 +260,15 @@ const TUT_STEPS = [
       <p>Dein Einkommen liegt jetzt bei <b>6 🔬, 9 🌾,
       10 🪙</b> – in Runde 1 waren es 1, 5 und 3.</p>
       <p>Drei Dinge greifen zusammen: die zweite Stadt brachte sechs neue Felder, die
-      Hauptstadt hat 2 Bevölkerung, und <b>Schrift</b> verdoppelt deren Wissenschaft. Genau
-      dieser Effekt entscheidet die Partie – nicht die Armeen.</p>
-      <p>Faustregel: die wichtigsten <b>Multiplikatoren</b> und <b>viele Städte</b> in
-      Kombination – eines ohne das andere bringt wenig. Papier auf drei Grasland ist wenig
-      wert, zehn Städte ohne Landwirtschaft verhungern.</p>`,
+      Hauptstadt hat 2 Bevölkerung, und <b>Schrift</b> erhöht deren Wissenschaft. Genau
+      dieser Effekt entscheidet die Partie, nicht unbedingt die Armeen.</p>
+      <p>Faustregel: die wichtigsten <b>Geländeverbesserungen</b> und <b>viele Städte</b> in
+      Kombination – eines ohne das andere bringt wenig.</p>`,
   },
   {
     t: 'Forschen: Papier',
     html: () => `
-      <p>Mit Schrift hat sich das Mittelalter der Forschung geöffnet – deshalb steht jetzt
+      <p>Mit dem Erforschen der Schrift hat sich das Mittelalter dieser Kategorie geöffnet. Deshalb steht jetzt
       <b>Papier</b> im Bogen. Es kostet
       6 Wissenschaft.</p>
       <p><b>Warum Papier?</b> Es gibt <b>+1 Wissenschaft auf jedem Grasland</b>. Du
@@ -313,14 +286,9 @@ const TUT_STEPS = [
     t: 'Die dritte Stadt',
     html: () => `
       <p>Die dritte Stadt kostet mehr: <b>6 Nahrung</b>
-      (3 Basiskosten bei zwei bestehenden Städten plus Weg). Die Basiskosten steigen
-      1 / 3 / 6 / 10 – Ausbreitung wird teurer, je weiter du kommst.</p>
-      <p><b>Warum dieses Feld?</b> Ringsum liegen 3 × Grasland, 2 × Fluss, 1 × Wald, das
-      bringt <b>+5 🔬, +5 🌾, +4 🪙</b> je Runde. Das Feld liegt an deinem bestehenden
-      Gebiet – es füllt die Lücke, statt eine dritte Front zu öffnen. Kompakte Reiche
-      verteidigen sich leichter.
-      </p>
-`,
+      (3 Basiskosten plus 3 Distanzkosten). Die Basiskosten steigen mit jeder gesiedelten Stadt:
+      1 / 3 / 6 / 10. Ausbreitung wird immer teurer.</p>
+      `,
     enter: () => { ui.tutSpot2 = tutSpot(TUT_CITY_2); },
     task: 'Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.',
     hl: () => [ui.tutSpot2 || TUT_CITY_2],
@@ -333,13 +301,13 @@ const TUT_STEPS = [
     auto: () => foundCity(S, RU(), ...(ui.tutSpot2 || TUT_CITY_2)),
   },
   {
-    t: 'Zweimal wachsen',
+    t: 'Zweimal Bevölkerung wachsen',
     html: () => `
       <p>Jede Stadt darf einmal pro Runde wachsen. Die Hauptstadt kostet
       2 Nahrung und 2 Münzen,
       die jüngere Stadt nur
-      1 und 1 –
-      kleine Städte wachsen billiger.</p>
+      jeweils 1.
+      Kleine Städte wachsen billiger.</p>
       <p><b>Warum beide?</b> Nahrung und Münzen verfallen sonst. Und weil die Kosten mit der
       Größe steigen, ist es effizienter, viele kleine Städte gleichmäßig zu vergrößern als
       eine große.</p>
@@ -360,12 +328,11 @@ const TUT_STEPS = [
   {
     t: 'Die erste Armee',
     html: () => `
-      <p>Eine Armee kostet <b>5 Münzen</b> – 5 je eigener Armee, die
-      zweite also 10. Sie erscheint <i>in</i> einer Stadt und <b>muss sie im selben Zug
+      <p>Eine Armee zu bauen kostet aktuell <b>5 Münzen</b>. Das steigt um weitere 5 je eigener Armee, die
+      zweite kostet also 10. Sie erscheint <i>in</i> einer Stadt und <b>muss sie im selben Zug
       verlassen</b>; Armeen stehen nie auf Städten, auch nicht auf eigenen.</p>
-      <p><b>Warum überhaupt eine Armee?</b> Ohne Armee kannst du nichts angreifen und keine
-      Stadt aktiv verteidigen – eine Armee neben einer eigenen Stadt addiert deinen
-      Machtwert zur Verteidigung.</p>
+      <p><b>Warum überhaupt eine Armee?</b> Ohne Armee kannst du weder angreifen aktiv eine
+      Stadt verteidigen.</p>
       <p><b>So baust du:</b> die golden umrandete Stadt antippen → im Blatt auf
       <b>Armee bauen</b>. Die Armee steht dann in der Stadt und muss sie noch in diesem Zug
       verlassen.</p>`,
@@ -379,9 +346,9 @@ const TUT_STEPS = [
     t: 'Die Armee bewegen',
     html: () => `
       <p>Armeen ziehen <b>3 Felder</b> weit, nicht über Wasser (bis eine Technologie das
-      ändert), nicht auf Städte und nicht auf andere Armeen. Später erhöhen Panzerschiff (6) und Luftwaffe (9)
-      die Weite, Straßen und Eisenbahn machen Schritte billiger.</p>
-      <p><b>Warum das goldene Feld?</b> Es liegt am Rand deines Reichs in Richtung
+      ändert), nicht auf Städte und nicht auf andere Armeen. Später erhöhen Panzerschiff und Luftwaffe
+      die Reichweite, Straßen und Eisenbahn ebenfalls.</p>
+      <p><b>Warum auf das goldene Feld?</b> Es liegt am Rand deines Reichs in Richtung
       Griechenland. Dort steht die Armee als Wache: sie verteidigt die Stadt nebenan mit und
       blockiert später ggf. mit <b>Schießpulver</b> den Durchmarsch.</p>
       <p><b>So bewegst du:</b> Deine Armee steht noch <i>in</i> der Stadt, in der du sie
@@ -413,7 +380,7 @@ const TUT_STEPS = [
     html: () => `
       <p>Übrig: 0 🔬, 0 🌾, 2 🪙 – das verfällt.
       Danach kommen Kampf und Siegprüfung, dann die Bots.</p>
-      <p>Achte im Protokoll auf die Zeilen der Bots: Griechenland zieht seine Armeen nach
+      <p>Achte im Protokoll auf die Zeilen der Bots: Ein Bot zieht seine Armeen nach
       vier Prioritäten – belagerte eigene Städte verteidigen, gegnerische Städte angreifen,
       Armeen flankieren, sonst an den Reichsrand.</p>
 `,
