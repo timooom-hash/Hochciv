@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v39)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v40)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -34,14 +34,14 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/expansion.js` | 508 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 450 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
-| `js/tutorial.js` | 857 | Geführtes Übungsspiel: 27 Schritte, feste Würfelfolge, Schienen |
+| `js/tutorial.js` | 1000 | Geführtes Übungsspiel: **29 Schritte**, feste Würfelfolge, Schienen |
 | `test.js` | 2810 | **769 Assertions**, `node test.js` |
 | `smoke.js` | 1060 | **62 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v39`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v40`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -69,7 +69,7 @@ Gedächtnis rekonstruieren.
   siedelbares Feld in Distanz 3.
 - **1 gegen 1:** zwei frei gewählte Reiche, Zufallskarte **12 × 8**, keine Kartenwahl,
   Wirtschaftssieg erst über 3/4 (Theologie 7/10, UN 2/3).
-- **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 27 Schritte, 18 mit Aufgabe.
+- **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
@@ -193,6 +193,10 @@ Aus diesem Chat:
   freigeschaltet statt ausgewürfelt.
 
 Aus dieser Sitzung (21.8.):
+- **Tutorial auf den neuen Bot-Ausgang umgebaut** (v40): Die Belagerung bricht nicht mehr
+  von selbst — der Spieler lernt stattdessen den Gegenangriff. Siehe ANNAHMEN.md.
+  Fragil: das Zielfeld neben Griechenlands Hauptstadt ist das einzige erreichbare
+  (`tutStrikeSpot` hat eine Rückfallebene).
 - **Bot-Armeeprioritäten neu** (neunstufig, siehe ANNAHMEN.md). 1–6 werden in
   `botPlanArmies` über alle Armeen abgestimmt, 7–9 bleiben je Armee einzeln.
 - **Wachstum für 2 statt 3 Münzen:** `canGrow` prüfte Nahrung und Münzen getrennt gegen

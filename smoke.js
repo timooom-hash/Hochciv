@@ -155,7 +155,7 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
         let g2 = 0;
         while (g2++ < 24 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
         manual++;
-      } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau|Technologien/.test(t)) {
+      } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau|Technologien|Rad/.test(t)) {
         $('a-tech').onclick();
         const free = [...$('ov-body').querySelectorAll('[data-tech]')].filter(b => !b.disabled);
         if (!free.length) throw new Error('keine Kachel freigegeben in: ' + t);
@@ -189,6 +189,35 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
         G('tapHex')(a.r, Math.max(0, a.c - 1));          // falsches Ziel
         if (a.r + '/' + a.c !== before) throw new Error('Armee auf falsches Feld gezogen');
         G('tapHex')(hl[0][0], hl[0][1]); manual++;
+      } else if (/Gegenangriff/.test(t)) {
+        // Drei Teilaufgaben in einem Schritt: forschen, Macht kaufen, Armee ziehen
+        $('a-tech').onclick();
+        [...$('ov-body').querySelectorAll('[data-tech]')].filter(b => !b.disabled)
+          .forEach(b => b.onclick());
+        G('closeModal')();
+        let g2 = 0;
+        while (G('tutP')().power < 3 && g2++ < 8) {
+          $('a-power').onclick();
+          const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+          if (!en.length) break;
+          en[0].onclick();
+        }
+        G('closeSheet')();
+        const arm = G('armiesOf')(G('S'), G('RU')())[0];
+        G('tapHex')(arm.r, arm.c);
+        const mv = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+        if (!mv.length) throw new Error('Bewegen nicht freigegeben');
+        mv[0].onclick();
+        G('tapHex')(hl[0][0], hl[0][1]);
+        manual++;
+      } else if (/Straßen/.test(t)) {
+        for (const h of hl.slice()) {
+          G('tapHex')(h[0], h[1]);
+          const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+          if (en.length) en[0].onclick();
+          G('closeSheet')();
+        }
+        manual++;
       } else if (/Bots getan/.test(t)) {
         $('a-log').onclick(); G('closeModal')(); manual++;
       } else if (/Macht/.test(t)) {
@@ -879,8 +908,11 @@ step('Wachstum: Nahrung und Münzen zählen nicht doppelt (gemeldeter Fehler)', 
   const S = G('S'), pi = S.cur, p = G('P')(S);
   const cap = G('capitalOf')(S, pi);
   cap.pop = 1; cap.grown = 0; cap.freeUsed = 0; cap.born = -1;
-  // Nahrungsgrenze aus dem Weg räumen – geprüft wird allein, ob das GELD reicht
+  // Nahrungsgrenze und Ereignisse aus dem Weg räumen – geprüft wird allein, ob das
+  // GELD reicht. Ein Ereignis aus einem früheren Test überlebte sonst gelegentlich
+  // („Sturmflut: Diese Stadt kann diese Runde nicht wachsen").
   p.techs.gentechnik = true;
+  S.event = null; S.ev = null; delete cap.noGrow;
   const blockiert = G('growBlockReason')(S, pi, cap);
   if (blockiert) throw new Error('Wachstum blockiert aus anderem Grund: ' + blockiert);
   const kosten = G('growPrice')(S, pi, cap);
@@ -946,11 +978,20 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   console.log('       Straße +1, Eisenbahn +2, Zeile im Forschungsbogen sichtbar');
 });
 step('Tutorialtext erklärt die Handelsrouten', () => {
-  const letzter = G('TUT_STEPS')[G('TUT_STEPS').length - 1];
-  const t = letzter.html().replace(/<[^>]+>/g, '');
-  if (!/Handelsrouten/.test(t)) throw new Error('Handelsrouten kommen im Abschlusstext nicht vor');
+  const schritt = G('TUT_STEPS').find(st => /Straßen/.test(st.t || ''));
+  if (!schritt) throw new Error('kein Straßenschritt im Tutorial');
+  G('tutorialStart')();
+  const idx = G('TUT_STEPS').indexOf(schritt);
+  G('ui').tut.i = idx; G('tutEnter')();
+  const t = schritt.html().replace(/<[^>]+>/g, ' ');
+  if (!/Handelsrouten/.test(t)) throw new Error('Handelsrouten werden nicht erklärt');
   if (!/\+2/.test(t) || !/\+1/.test(t)) throw new Error('die beiden Stufen fehlen');
   if (!/Eisenbahn/.test(t)) throw new Error('Eisenbahn nicht erwähnt');
+  // Im Abschlusstext soll die Erklärung NICHT mehr stehen
+  const letzterT = G('TUT_STEPS')[G('TUT_STEPS').length - 1].html().replace(/<[^>]+>/g, ' ');
+  if (/Jede deiner Städte außer der Hauptstadt/.test(letzterT))
+    throw new Error('die Erklärung steht doppelt – auch noch im Abschlusstext');
+  G('tutorialQuit')();
   // Auch die Kurzregeln müssen es nennen
   G('rulesModal')();
   if (!/Handelsrouten/.test($('ov-body').textContent))

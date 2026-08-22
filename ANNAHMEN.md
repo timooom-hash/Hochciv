@@ -1004,3 +1004,59 @@ Die Partien dauern länger und Militärsiege werden deutlich seltener. Das ist p
 Bots verteidigen jetzt zuerst und erobern sich dadurch langsamer gegenseitig. Der Effekt
 ist groß genug, dass er kein Rauschen ist. Ob er erwünscht ist, ist eine Balance-Frage –
 die Prioritätenliste selbst war die Vorgabe.
+
+
+---
+
+## Tutorial: Gegenangriff statt Verteidigung (v40)
+
+Die neuen Bot-Prioritäten aus v39 haben den Ausgang der Beispielpartie verändert:
+Griechenland schickt jetzt eine **zweite** Armee zur begonnenen Belagerung (Priorität 6),
+Angriff 16 gegen Verteidigung 14 – die Stadt fiel. Der Schritt hieß aber noch
+„Zug beenden – und die Belagerung bricht". Statt die Würfelfolge zu suchen, bis der alte
+Ausgang wieder passt, zeigt das Tutorial jetzt die stärkere Lektion.
+
+**Gemessener Vergleich, gleiche Würfelfolge:**
+
+| Strategie | Griechenlands Armeen danach | eigene Städte |
+|---|---|---|
+| 4 Macht kaufen, Armee bleibt stehen | 7/12 und 6/12 – Belagerung geht weiter | 3 → **2** |
+| Belagerungsmaschinen + 3 Macht + Armee neben die feindliche Hauptstadt | 9/11 und 9/10 – beide an der eigenen Hauptstadt | 3 → **3** |
+
+Im Protokoll steht dann wörtlich „Griechenland: Armee verteidigt die Hauptstadt". Der
+Effekt folgt direkt aus der Prioritätenliste: 2/3 (eigene Hauptstadt) stehen vor 6
+(Belagerung abschließen). Kein Sonderfall im Code.
+
+### Was sich geändert hat
+
+- **Reihenfolge:** Der Belagerungsschritt steht jetzt hinter „Wissenschaftliche Methode"
+  und „Zwei Technologien für null".
+- **„Macht kaufen – aber spät" → „Rechne nach, bevor du kaufst":** reiner Lesetext mit
+  zwei Rechentabellen (Verteidigung 14 mit 4 Macht · Angriff 10, wenn der Bot nachlegt).
+  Es wird **nichts mehr gekauft**.
+- **Neu: „Der Gegenangriff als Verteidigung"** – Belagerungsmaschinen forschen, 3 Macht
+  kaufen, Armee auf das Feld neben Griechenlands Hauptstadt.
+- **„Zwei billige Technologien" → „Der Rest der Wissenschaft: Rad"** – Rad statt
+  Demokratie und Keramik, weil gleich Straßen gebraucht werden.
+- **Neu: „Straßen: die Städte verbinden"** – vier Straßen für vier Münzen, die alle drei
+  Nebenstädte an die Hauptstadt hängen (+3 auf jeden Ertrag). Die Erklärung der
+  Handelsrouten ist damit aus dem Abschlusstext verschwunden.
+- **„Belagerung bricht" → „und der Rückzug"** – Text auf den neuen Ausgang.
+
+**Die Rechnung geht exakt auf** (gemessen, nicht geschätzt): 3 Wissenschaft →
+Belagerungsmaschinen (2) + Rad (1) = 0. 16 Münzen → 3 Macht (12) + 4 Straßen (4) = 0.
+
+### Fragile Stelle: das Zielfeld des Gegenangriffs
+
+Von der Armeeposition aus ist bei 3 Bewegungspunkten **nur ein einziges** Nachbarfeld der
+griechischen Hauptstadt erreichbar, mit Kosten von genau 3 – die übrigen sind Meer oder zu
+weit. Deshalb hat `tutStrikeSpot()` eine Rückfallebene: ist das vorgesehene Feld belegt
+oder unerreichbar, nimmt es das nächstbeste erreichbare Feld, das die Hauptstadt noch
+bedroht. Ohne diese Ebene wäre der Schritt eine Sackgasse.
+
+### Nebenbei behoben: „noch 33× wachsen"
+
+Der Schritt „Jede Bevölkerung isst" zählte je Stadt einzeln, wie oft sie noch wachsen
+könnte, und summierte. Jede Stadt tat dabei so, als wüchsen die anderen nicht – bei 11
+Nahrung kam so „33×" heraus. Jetzt wird reihum probiert, bis keine Stadt mehr kann, und
+der Text nennt zusätzlich die tatsächliche Produktion.
