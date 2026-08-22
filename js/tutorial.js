@@ -39,6 +39,22 @@ const tutSiegeArmy = () => ui.tutSiege && S.armies.find(a => a.id === ui.tutSieg
 // Startverfügbarkeit wie im Beispielspiel: in Forschung nur Schrift
 const TUT_START_AVAIL = ['schrift', 'fischerei', 'rad', 'keramik',
   'eisenverarbeitung', 'belagerung', 'stadtmauern', 'demokratie'];
+/* Was Griechenland im Militärfeld erforscht – vorgegeben statt gewürfelt.
+   Grund: Mit Stadtmauern und Burgenbau käme seine Hauptstadt auf 13 Verteidigung, und
+   die Drohung im Gegenangriffs-Schritt wäre bloß symbolisch. Mit Eisenverarbeitung und
+   Stahl bleibt sie bei ihrer Bevölkerung plus den Armeen daneben – zieht der Bot seine
+   Armeen nicht zurück, fällt sie tatsächlich.
+   WICHTIG: Die Würfe selbst laufen unverändert weiter (botResearch würfelt normal und
+   tauscht nur das Ergebnis), damit sich die feste Würfelfolge nicht verschiebt. */
+const TUT_FOE_MILITARY = ['eisenverarbeitung', 'stahl'];
+function tutBotTech(S, pi, field) {
+  if (typeof ui === 'undefined' || !ui || !ui.tut) return null;
+  if (field !== 2) return null;                                  // nur das Militärfeld
+  const p = S.players[pi];
+  if (!p || p.civ !== 'griechenland') return null;
+  const k = TUT_FOE_MILITARY.find(x => !p.techs[x]);
+  return k ? TECH_BY_KEY[k] : null;
+}
 // Die Felder, auf denen im Tutorial gegründet wird
 const TUT_CITY_1 = [3, 12];
 const TUT_CITY_2 = [6, 13];
@@ -567,6 +583,9 @@ const TUT_STEPS = [
       const feind = a ? a.owner : S.players.findIndex(x => x.civ === 'griechenland');
       const macht = powerOf(S, feind);
       const armeen = armiesOf(S, feind).length;
+      const staedte = citiesOf(S, feind).length;
+      const dann = macht + staedte + 1;          // je Stadt ein Wachstum, dazu eine Gründung
+      const wehr = (t ? t.pop : 1) + 13;         // Bevölkerung + Mauern 5 + Burgenbau 4 + Armee 4
       return `
       <p>Macht ist der Angriffswert <i>jeder</i> deiner Armeen und zählt zur Verteidigung
       benachbarter eigener Städte. Ein Punkt kostet dank Eisenverarbeitung
@@ -579,23 +598,29 @@ const TUT_STEPS = [
         <div><span>Stadtmauern</span><b>+5</b></div>
         <div><span>Burgenbau (virtuelle Armee = dein Machtwert)</span><b>+4</b></div>
         <div><span>deine Armee daneben</span><b>+4</b></div>
-        <div class="sum"><span>Verteidigung</span><b>${(t ? t.pop : 1) + 13}</b></div>
+        <div class="sum"><span>Verteidigung</span><b>${wehr}</b></div>
       </div>
       <p>Das sieht solide aus – <b>${def}</b> stehen ohne den Kauf schon da.</p>
-      <p><b>Und jetzt die Gegenrechnung.</b> Griechenland hat gerade ${armeen} Armee${
-        armeen === 1 ? '' : 'n'} und einen Machtwert von <b>${macht}</b> (bei Bots ist das
-      ihre Gesamtbevölkerung, die jede Runde wächst). Baut es diesen Zug eine <b>zweite
-      Armee</b> – wofür es jede Runde würfelt – und schickt beide auf deine Stadt, addieren
-      sich die Angriffswerte:</p>
+      <p><b>Und jetzt die Gegenrechnung.</b> Griechenland hat gerade
+      <b>${macht}</b> Machtwert – bei Bots ist das ihre Gesamtbevölkerung. Mit
+      ${armeen === 1 ? 'einer zweiten Armee, für die es jede Runde würfelt,' :
+        'seinen ' + armeen + ' Armeen'} stünde der Angriff bei <b>${2 * macht}</b>. Das
+      reicht gegen ${wehr} noch nicht.</p>
+      <p><b>Aber der Bot steht nicht still.</b> Er würfelt jede Runde für <i>jede</i> seiner
+      ${staedte} Städte auf Wachstum und einmal aufs Siedeln. Läuft das gut, wächst seine
+      Bevölkerung – und damit sein Machtwert – schon im nächsten Zug so:</p>
       <div class="tut-calc">
-        <div><span>Armee 1</span><b>${macht}</b></div>
-        <div><span>Armee 2</span><b>+${macht}</b></div>
-        <div class="sum"><span>Angriff</span><b>${2 * macht}</b></div>
+        <div><span>Machtwert jetzt</span><b>${macht}</b></div>
+        <div><span>${staedte} Städte wachsen je 1</span><b>+${staedte}</b></div>
+        <div><span>eine neue Stadt gegründet</span><b>+1</b></div>
+        <div class="sum"><span>Machtwert dann</span><b>${dann}</b></div>
+        <div><span>× 2 Armeen</span><b>${2 * dann}</b></div>
       </div>
-      <div class="tut-key"><b>Merke</b> ${2 * macht} gegen ${(t ? t.pop : 1) + 13}: die vier
-      Münzen wären verbrannt und die Stadt trotzdem weg. Gegen einen Gegner, der nachlegen
-      kann, ist reine Verteidigung ein Wettrennen, das du verlierst. <b>Kauf hier nichts.</b>
-      Der nächste Schritt zeigt den billigeren Weg.</div>`;
+      <div class="tut-key"><b>Merke</b> ${2 * dann} gegen ${wehr}: deine vier Münzen wären
+      verbrannt und die Stadt eine Runde später trotzdem weg. Gegen einen Gegner, der jede
+      Runde wächst, ist reine Verteidigung ein Wettrennen, das du verlierst – seine Zahlen
+      steigen von allein, deine nur, wenn du zahlst. <b>Kauf hier nichts.</b> Der nächste
+      Schritt zeigt den billigeren Weg.</div>`;
     },
     hl: () => { const t = tutSiegeCity(); return t ? [[t.r, t.c]] : []; },
   },

@@ -209,10 +209,22 @@ function botFlankOk(S, pi, army, e, t) {
   if (has(p, 'taktik')) return partners.length >= 1;
   return partners.some(([r, c]) => r === e.r + (e.r - t[0]) && c === e.c + (e.c - t[1]));
 }
-/* Feindliche Armeen, die diese eigene Stadt bedrohen (sie in Reichweite haben). */
+/* Feindliche Armeen, die diese eigene Stadt bedrohen.
+   Maßstab ist keine Kraftrechnung, sondern die **laufende Belagerung**: Erst wenn ein
+   Gegner den ersten Kampf gewonnen hat (Zähler 1/2), wird verteidigt.
+   Das genügt, weil eine Eroberung zwei erfolgreiche Züge in Folge braucht. Zieht man
+   Verteidiger ab und beginnt dadurch überhaupt erst eine Belagerung, bleibt immer noch
+   eine volle Runde, um sie zurückzuholen – dieselbe Vorwarnzeit, die auch der Mensch hat. */
 function threateningArmies(S, pi, city) {
-  return S.armies.filter(a => a.owner !== pi &&
-    hexDistance(a.r, a.c, city.r, city.c) <= attackRange(S, a.owner));
+  const out = [];
+  for (let i = 0; i < S.players.length; i++) {
+    if (i === pi) continue;
+    if ((S.sieges[i + '|' + city.id] || 0) < 1) continue;      // noch kein Treffer
+    for (const a of S.armies)
+      if (a.owner === i && hexDistance(a.r, a.c, city.r, city.c) <= attackRange(S, i))
+        out.push(a);
+  }
+  return out;
 }
 function botPlanArmies(S, pi) {
   const p = S.players[pi];
@@ -447,7 +459,10 @@ function botResearch(S, pi, avoidFields = []) {
     if (idx <= list.length && !p.techs[list[idx - 1].k]) break;
     idx = 0;
   }
-  const tech = idx ? list[idx - 1] : list.find(t => !p.techs[t.k]);
+  let tech = idx ? list[idx - 1] : list.find(t => !p.techs[t.k]);
+  // Im Tutorial darf ein Feld vorgegeben sein. Gewürfelt wird trotzdem ganz normal –
+  // nur das Ergebnis wird getauscht, damit die feste Würfelfolge unberührt bleibt.
+  if (typeof tutBotTech === 'function') tech = tutBotTech(S, pi, field) || tech;
   p.techs[tech.k] = true;
   log(S, 'act', `${civOf(p).n} erforscht ${tech.n}.`);
   return field;   // Bots bestimmen ihr Zeitalter aus den erforschten Techs, kein avail nötig
