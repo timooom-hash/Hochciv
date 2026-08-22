@@ -904,3 +904,103 @@ zurückgebautem Fehler schlägt er an.
 
 Nebenbei: die Untertexte am Knopf nennen jetzt auch den Handelsrouten-Bonus
 („Bewegung kostenlos · Handelsroute +2").
+
+
+---
+
+## Wachstum für 2 Münzen · beide Wege-Knöpfe (v38)
+
+### Fehler: mehrere Kosten aus einem Topf wurden doppelt gedeckt
+
+Gemeldet und reproduziert: Mit **2 Münzen** und ohne 1:1-Kurs wuchs eine Stadt von 1 auf 2,
+obwohl das 1 Nahrung **und** 1 Münze kostet – bei einem Kurs von 2:1 also 3 Münzen.
+
+Zwei Ursachen, die zusammenwirkten:
+1. `canGrow` prüfte `available(…,'food')` und `available(…,'coins')` **getrennt**, jeweils
+   gegen den vollen Vorrat. Da sich die Arten ineinander umtauschen lassen, griffen beide
+   Prüfungen auf dieselben zwei Münzen zu und meldeten beide „gedeckt".
+2. `growCity` rief `pay(…,'food',1)` und `pay(…,'coins',1)` nacheinander und **wertete den
+   Rückgabewert nicht aus**. Der zweite Aufruf lieferte `false`, die Stadt wuchs trotzdem.
+
+**Behoben mit `payAll` / `affordAll`** in `engine.js`: mehrere Kosten werden der Reihe nach
+(`food`, `coins`, `sci`) aus demselben Vorrat bezahlt und bei einem Fehlschlag **vollständig
+zurückgerollt**. `affordAll` ist dieselbe Rechnung ohne bleibende Wirkung. Prüfung und
+Bezahlung folgen damit demselben Weg – sonst gehen sie wieder auseinander, wie hier.
+
+Zusätzlich werten `foundCity`, `buildWonder` und der Technologiekauf den Rückgabewert von
+`pay` jetzt aus. Dort war es bisher folgenlos (nur eine Kostenart), aber es war dieselbe
+Zeitbombe.
+
+Abgesichert durch eine Invariante über **28 Kombinationen** aus Münzen und Nahrung:
+`canGrow` erlaubt genau dann, wenn `growCity` auch gelingt.
+
+### Beide Wege-Knöpfe auf leerem Feld
+
+`roadTargets(S, pi, r, c)` gibt jetzt **alle** jetzt baubaren Stufen zurück statt nur der
+günstigsten; `roadTarget` bleibt als „günstigste" erhalten. Auf einem leeren Feld mit Rad
+und Eisenbahn stehen damit beide Knöpfe: Straße für 1 Münze, Eisenbahn direkt für 2.
+
+**Der Preis wird immer frisch von `buildRoad` bestimmt**, nie vom Knopf übernommen. Wer im
+offenen Blatt erst die Straße baut und dann die Eisenbahn, zahlt 1 + 1 = 2 – nicht 1 + 2.
+Damit die **Anzeige** dazu passt, zeichnet `doRoad` das Blatt anschließend neu
+(`openTile`); vorher stand am Ausbau-Knopf noch der Direktbaupreis. Ein Smoke-Test prüft
+genau das, und mit zurückgebautem `openTile` schlägt er an.
+
+
+---
+
+## Neue Bot-Armeeprioritäten (v39)
+
+Auf Vorgabe des Autors ersetzt diese Reihenfolge die alte vierstufige:
+
+| # | Priorität |
+|---|---|
+| 1 | Gegnerische **Hauptstadt** erobern, die im letzten Zug erfolgreich belagert wurde |
+| 2 | Armee flankieren, die die **eigene Hauptstadt** angreift |
+| 3 | Eigene Hauptstadt verteidigen (möglichst neben dem Angreifer) |
+| 4 | Armee flankieren, die eine **andere eigene Stadt** angreift |
+| 5 | Andere eigene Stadt verteidigen |
+| 6 | Gegnerische Stadt erobern, die im letzten Zug belagert wurde |
+| 7 | Gegnerische Stadt angreifen |
+| 8 | Gegnerische Armee flankieren |
+| 9 | An den Reichsrand, am nächsten zum Gegner |
+
+**1–6 brauchen Absprache** zwischen den Armeen (wie viele reichen? wer verteidigt was?)
+und laufen deshalb in `botPlanArmies(S, pi)` über alle Armeen gemeinsam, vor den
+Einzelzügen. Was dort nicht gebunden wird (`army.botDone`), entscheidet wie bisher
+`botMoveArmy` für sich – das sind die Prioritäten 7–9. Die alte Priorität 1
+(„belagerte eigene Städte verteidigen") ist dort entfallen, sie steckt jetzt in 3 und 5.
+
+**Umsetzungsdetails:**
+- „Im letzten Zug belagert" heißt `S.sieges[pi+'|'+id] >= 1` – der nächste gewonnene
+  Kampf erobert (der Zähler läuft bis 2).
+- Prio 1 zieht **alle** erreichbaren Armeen zur Hauptstadt, Prio 6 nur so viele, wie für
+  `attackValue > defenseValue` nötig sind (`attackersNeeded`). Beides nur, wenn es
+  überhaupt reicht – sonst wird der Punkt übersprungen.
+- Zugewiesen wird **nacheinander**, nicht gleichzeitig: sonst wählen mehrere Armeen
+  dasselbe Feld und alle bis auf eine bleiben stehen (im Bau gefunden und behoben).
+- Verteidigen heißt: auf ein Feld in `projectRange` der Stadt, unter diesen bevorzugt das
+  dichteste am Angreifer. Flankieren rechnet mit derselben Formel wie die Kampfphase
+  (gegenüberliegend; mit **Taktik** von zwei beliebigen Seiten; mit **Burgenbau** zählen
+  eigene Städte als Partnerposition).
+- Verteidigung geht vor Eroberung; innerhalb einer Stufe zählt die **größere Stadt**
+  zuerst, die Hauptstadt immer vorher.
+- `botReach` nimmt das **eigene Feld** als Option auf. `reachable()` liefert es nicht mit,
+  weil es als besetzt gilt – ohne diese Ergänzung räumte eine Armee, die schon genau
+  richtig stand, ihren Platz und verschlechterte die Lage.
+- `botDone` wird nach dem Zug wieder entfernt und landet nicht im Spielstand.
+
+### Gemessener Balance-Effekt — der Autor sollte das wissen
+
+Je **200 vollständige Bot-Partien** (vier Bots, gleiche Seeds), mit und ohne die neue
+Planung:
+
+| | Median Runden | Militärsiege | Forschungssiege |
+|---|---|---|---|
+| alte Prioritäten | 5 | 187 | 13 |
+| neue Prioritäten | 7 | 130 | 70 |
+
+Die Partien dauern länger und Militärsiege werden deutlich seltener. Das ist plausibel:
+Bots verteidigen jetzt zuerst und erobern sich dadurch langsamer gegenseitig. Der Effekt
+ist groß genug, dass er kein Rauschen ist. Ob er erwünscht ist, ist eine Balance-Frage –
+die Prioritätenliste selbst war die Vorgabe.

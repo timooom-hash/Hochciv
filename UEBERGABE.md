@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v37)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v39)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -32,16 +32,16 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/engine.js` | 1133 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 508 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 320 | Bot-Züge, Siedlerbewegung nach Regelheft, Armeeprioritäten, Bot-Forschung |
+| `js/bots.js` | 450 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
 | `js/tutorial.js` | 857 | Geführtes Übungsspiel: 27 Schritte, feste Würfelfolge, Schienen |
-| `test.js` | 2590 | **720 Assertions**, `node test.js` |
-| `smoke.js` | 995 | **61 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 2810 | **769 Assertions**, `node test.js` |
+| `smoke.js` | 1060 | **62 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v37`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v39`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -73,10 +73,10 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 720 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 769 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (61 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (62 Schritte), inklusive
    Tutorial-Audit: in jedem der 27 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -137,6 +137,9 @@ Alles Weitere dazu steht ausführlich in `ANNAHMEN.md`, Abschnitt „Designände
 - **Tutorial-Schienen:** Ein fehlender Schlüssel in `allow` heißt „nichts erlaubt". Wer neue
   Schritte hinzufügt, muss `bar`, `labels`, `techs`, ggf. `hex`/`moveTo` setzen — sonst ist
   der Schritt eine Sackgasse (das Smoke-Audit meldet beides).
+- **Mehrere Kosten immer über `payAll`/`affordAll`.** Zwei einzelne `available`-Prüfungen
+  gegen denselben Vorrat sind falsch, weil sich die Ressourcen ineinander umtauschen
+  lassen. Und der Rückgabewert von `pay` gehört ausgewertet.
 - **Die Oberfläche darf Regelentscheidungen nicht selbst herleiten.** Zweimal derselbe
   Fehler: `payOpts` (Bürgerkrieg) und `roadTarget` (Eisenbahn ohne Rad). Wer im Blatt eine
   Bedingung schreibt, die die Regelmaschine auch kennt, muss deren Funktion benutzen.
@@ -190,6 +193,11 @@ Aus diesem Chat:
   freigeschaltet statt ausgewürfelt.
 
 Aus dieser Sitzung (21.8.):
+- **Bot-Armeeprioritäten neu** (neunstufig, siehe ANNAHMEN.md). 1–6 werden in
+  `botPlanArmies` über alle Armeen abgestimmt, 7–9 bleiben je Armee einzeln.
+- **Wachstum für 2 statt 3 Münzen:** `canGrow` prüfte Nahrung und Münzen getrennt gegen
+  denselben Vorrat, und `growCity` ignorierte den Rückgabewert des zweiten `pay`. Jetzt
+  `payAll`/`affordAll` — alles oder nichts, mit Rückrollen.
 - **Eisenbahn ohne Rad war nicht baubar:** Das Blatt zeigte den Knopf nur mit Rad und
   leitete die Zielstufe selbst her. Jetzt entscheidet `roadTarget(S, pi, r, c)` aus
   `engine.js`, und Blatt wie `doRoad` benutzen sie.
@@ -206,6 +214,10 @@ Aus dieser Sitzung (21.8.):
   offene Defizit.
 
 ## Offene Punkte / bewusst nicht umgesetzt
+
+0a. **Die neuen Armeeprioritäten verschieben die Balance deutlich.** Je 200 Bot-Partien:
+   Median 5 → 7 Runden, Militärsiege 187 → 130, Forschungssiege 13 → 70. Bots verteidigen
+   jetzt zuerst und erobern sich langsamer. Ob das so gewollt ist, muss der Autor sagen.
 
 0b. **Bots bauen keine Straßen** — gemessen über 25 vollständige Bot-Partien: null
    Straßen, null Handelsrouten. Die Regel ist damit praktisch ein reiner Vorteil für den

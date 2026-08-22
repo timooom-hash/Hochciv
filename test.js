@@ -245,6 +245,158 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(attackValue(S, 0, 2), 48, 'Dynamit verdoppelt danach');
 }
 
+/* ==================================================== Bot-Armeeprioritäten
+   1 belagerte gegnerische Hauptstadt stürmen · 2 Angreifer auf die eigene Hauptstadt
+   flankieren · 3 Hauptstadt verteidigen · 4/5 dasselbe für andere Städte (größte
+   zuerst) · 6 andere begonnene Belagerung abschließen · 7–9 wie zuvor.
+   Geprüft auf einer glattgezogenen Karte, damit nicht das Gelände das Ergebnis bestimmt. */
+{
+  const flach = () => {
+    const S = newGame({
+      players: [{ civ: 'russland', kind: 'bot' }, { civ: 'england', kind: 'human' }], seed: 7,
+    });
+    const g = S.map.grid || S.map;
+    for (let r = 0; r < g.length; r++) for (let c = 0; c < g[r].length; c++) g[r][c] = 'G';
+    S.cities.length = 0; S.armies.length = 0; S.sieges = {};
+    return S;
+  };
+  const stadt = (S, owner, r, c, pop, cap) => {
+    const city = { id: S.nextId++, owner, r, c, pop, cap: !!cap, grown: 0, born: -1 };
+    S.cities.push(city); return city;
+  };
+  const armee = (S, owner, r, c) => {
+    const a = { id: S.nextId++, owner, r, c, mp: 0, born: -1 };
+    S.armies.push(a); return a;
+  };
+  // nur die abgestimmten Prioritäten 1–6 ausführen; zurück kommen die freien Armeen
+  const plan = (S, pi) => {
+    for (const a of armiesOf(S, pi)) { a.mp = moveAllowance(S, pi); delete a.botDone; }
+    botPlanArmies(S, pi);
+    const frei = armiesOf(S, pi).filter(a => !a.botDone);
+    armiesOf(S, pi).forEach(a => delete a.botDone);
+    return frei;
+  };
+  const rng = S => attackRange(S, 0);
+  const inReichweite = (S, city) => armiesOf(S, 0)
+    .filter(a => hexDistance(a.r, a.c, city.r, city.c) <= rng(S)).length;
+
+  // Prio 1: belagerte gegnerische Hauptstadt – ALLE erreichbaren Armeen ziehen hin
+  {
+    const S = flach();
+    stadt(S, 0, 5, 5, 3, true);
+    const ziel = stadt(S, 1, 5, 10, 1, true);
+    armee(S, 0, 5, 9); armee(S, 0, 5, 7); armee(S, 0, 8, 5);
+    S.sieges['0|' + ziel.id] = 1;
+    const frei = plan(S, 0);
+    eq(inReichweite(S, ziel), 2, 'beide erreichbaren Armeen stürmen die Hauptstadt');
+    eq(frei.length, 1, 'die zu weit entfernte bleibt für andere Aufgaben frei');
+    eq(attackValue(S, 0, inReichweite(S, ziel)) > defenseValue(S, ziel), true,
+      'der Angriff reicht damit für die Eroberung');
+  }
+  // Ohne begonnene Belagerung greift Prio 1 nicht
+  {
+    const S = flach();
+    stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 1, 5, 10, 1, true);
+    const a = armee(S, 0, 5, 8);
+    eq(plan(S, 0).length, 1, 'ohne Belagerung bleibt die Armee für Prio 7–9 frei');
+    eq([a.r, a.c], [5, 8], 'und sie steht noch da');
+  }
+  // Prio 3: eigene Hauptstadt verteidigen, möglichst dicht am Angreifer
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 1, 5, 12, 3, true);
+    const feind = armee(S, 1, 5, 6);
+    armee(S, 0, 5, 8); armee(S, 0, 7, 5);
+    eq(plan(S, 0).length, 0, 'beide Armeen werden für die Verteidigung gebunden');
+    eq(armiesOf(S, 0).every(a => hexDistance(a.r, a.c, hs.r, hs.c) <= projectRange(S, 0)), true,
+      'beide zählen zur Verteidigung der Hauptstadt');
+    eq(armiesOf(S, 0).some(a => hexDistance(a.r, a.c, feind.r, feind.c) === 1), true,
+      'mindestens eine steht direkt neben dem Angreifer');
+  }
+  // Prio 2: flankieren geht vor verteidigen – und wirkt im Kampf
+  {
+    const S = flach();
+    stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 1, 5, 16, 3, true);
+    armee(S, 1, 5, 6);
+    armee(S, 0, 5, 5);                       // Partner steht schon neben dem Feind
+    armee(S, 0, 5, 8);                       // soll sich gegenüber stellen
+    plan(S, 0);
+    const feinde = S.armies.filter(a => a.owner === 1).length;
+    combatPhase(S, 0);
+    eq(S.armies.filter(a => a.owner === 1).length, feinde - 1,
+      'die angreifende Armee wird flankiert und zerstört');
+  }
+  // Prio 4/5: unter mehreren bedrohten Städten zuerst die größere
+  {
+    const S = flach();
+    stadt(S, 0, 2, 2, 3, true);              // Hauptstadt unbedroht
+    const klein = stadt(S, 0, 9, 5, 1, false);
+    const gross = stadt(S, 0, 9, 12, 4, false);
+    stadt(S, 1, 5, 16, 3, true);
+    armee(S, 1, 9, 6); armee(S, 1, 9, 13);
+    const v = armee(S, 0, 9, 9);             // genau dazwischen
+    plan(S, 0);
+    eq(hexDistance(v.r, v.c, gross.r, gross.c) <= projectRange(S, 0), true,
+      'die größere Stadt wird zuerst verteidigt');
+    eq(hexDistance(v.r, v.c, klein.r, klein.c) > projectRange(S, 0), true,
+      'die kleinere bleibt ungedeckt');
+  }
+  // Prio 6: nur so viele Armeen wie nötig, der Rest bleibt frei
+  {
+    const S = flach();
+    stadt(S, 0, 5, 2, 3, true);
+    const ziel = stadt(S, 1, 5, 10, 1, false);
+    stadt(S, 1, 5, 16, 3, true);
+    S.sieges['0|' + ziel.id] = 1;
+    armee(S, 0, 5, 9); armee(S, 0, 5, 8); armee(S, 0, 5, 7);
+    const noetig = attackersNeeded(S, 0, ziel, 3);
+    eq(noetig, 1, 'eine Armee reicht gegen diese kleine Stadt');
+    const frei = plan(S, 0);
+    eq(inReichweite(S, ziel), noetig, 'genau so viele wie nötig werden geschickt');
+    eq(frei.length, 3 - noetig, 'die übrigen bleiben für andere Aufgaben frei');
+  }
+  // Verteidigung geht vor Eroberung, wenn beides Nicht-Hauptstädte sind
+  {
+    const S = flach();
+    stadt(S, 0, 2, 2, 3, true);
+    const meine = stadt(S, 0, 5, 8, 2, false);
+    const ziel = stadt(S, 1, 5, 12, 1, false);
+    stadt(S, 1, 5, 16, 3, true);
+    S.sieges['0|' + ziel.id] = 1;
+    armee(S, 1, 5, 9);
+    const a = armee(S, 0, 5, 10);
+    plan(S, 0);
+    eq(hexDistance(a.r, a.c, meine.r, meine.c) <= projectRange(S, 0), true,
+      'die Armee verteidigt, statt die Belagerung abzuschließen');
+  }
+  // Eine Armee, die schon richtig steht, bleibt stehen
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 1, 5, 16, 3, true);
+    armee(S, 1, 5, 6);
+    const a = armee(S, 0, 5, 4);             // in Reichweite der Hauptstadt
+    const vorher = [a.r, a.c];
+    plan(S, 0);
+    eq(hexDistance(a.r, a.c, hs.r, hs.c) <= projectRange(S, 0), true,
+      'sie bleibt in Reichweite der Hauptstadt');
+    eq(hexDistance(a.r, a.c, 5, 6) <= hexDistance(vorher[0], vorher[1], 5, 6), true,
+      'und rückt höchstens näher an den Angreifer heran');
+  }
+  // Der Merker botDone bleibt nicht im Spielstand zurück
+  {
+    const S = flach();
+    stadt(S, 0, 5, 5, 3, true); stadt(S, 1, 5, 12, 3, true);
+    armee(S, 1, 5, 6); armee(S, 0, 5, 8);
+    botTurn(S, 0);
+    eq(S.armies.every(a => a.botDone === undefined), true,
+      'botDone wird nach dem Zug wieder entfernt');
+  }
+}
+
 /* --- Bots kämpfen genau einmal pro Zug (nicht in botTurn UND im Zugende) */
 {
   const B = newGame({ players: [{ civ: 'england', kind: 'bot', diff: 'siedler' }, { civ: 'griechenland', kind: 'human' }], seed: 11 });
@@ -907,22 +1059,103 @@ const setEvent = (S, k) => {
   eq(p1 + p2, roadPrice(mitTechs('rad', 'eisenbahn'), 0, fr, fc, 2),
     'zwei Schritte kosten zusammen so viel wie der Direktbau');
 
-  // Invariante: roadTarget schlägt nie etwas vor, das buildRoad ablehnt
+  // Beide Techs auf leerem Feld: beide Stufen stehen zur Wahl
+  const Z = mitTechs('rad', 'eisenbahn');
+  eq(roadTargets(Z, 0, fr, fc), [1, 2], 'mit beidem stehen Straße und Eisenbahn zur Wahl');
+  eq(roadTargets(mitTechs('rad'), 0, fr, fc), [1], 'nur Rad: nur die Straße');
+  eq(roadTargets(mitTechs('eisenbahn'), 0, fr, fc), [2], 'nur Eisenbahn: nur die Eisenbahn');
+  eq(roadTargets(mitTechs(), 0, fr, fc), [], 'ohne beides gar nichts');
+  Z.roads[key(fr, fc)] = 1;
+  eq(roadTargets(Z, 0, fr, fc), [2], 'auf der Straße bleibt nur der Ausbau');
+  Z.roads[key(fr, fc)] = 2;
+  eq(roadTargets(Z, 0, fr, fc), [], 'auf der Eisenbahn nichts mehr');
+
+  // Zwei Schritte kosten nicht mehr als einer: 1 + 1 statt 2
+  {
+    const S2 = mitTechs('rad', 'eisenbahn');
+    S2.players[0].res = { sci: 0, food: 0, coins: 10 };
+    eq(buildRoad(S2, 0, fr, fc, 1), null, 'Straße gebaut');
+    eq(S2.players[0].res.coins, 9, 'die Straße kostet 1');
+    eq(roadPrice(S2, 0, fr, fc, 2), 1, 'der Ausbau kostet danach nur noch 1');
+    eq(buildRoad(S2, 0, fr, fc, 2), null, 'Ausbau gebaut');
+    eq(S2.players[0].res.coins, 8, 'zusammen 2 Münzen – nicht 3');
+  }
+
+  // Invariante: roadTargets schlägt nie etwas vor, das buildRoad ablehnt
   let geprueft = 0;
   for (const techs of [[], ['rad'], ['eisenbahn'], ['rad', 'eisenbahn']])
     for (const lvl of [0, 1, 2]) {
       const S = mk('griechenland', techs);
       S.players[0].res.coins = 9;
       if (lvl) S.roads[key(fr, fc)] = lvl;
-      const ziel = roadTarget(S, 0, fr, fc);
-      if (ziel != null) {
-        const err = buildRoad(S, 0, fr, fc, ziel);
-        if (err) throw new Error(`roadTarget schlägt ${ziel} vor, buildRoad sagt: ${err}` +
+      for (const ziel of roadTargets(S, 0, fr, fc)) {
+        const T = mk('griechenland', techs);
+        T.players[0].res.coins = 9;
+        if (lvl) T.roads[key(fr, fc)] = lvl;
+        const err = buildRoad(T, 0, fr, fc, ziel);
+        if (err) throw new Error(`roadTargets schlägt ${ziel} vor, buildRoad sagt: ${err}` +
           ` (Techs ${techs.join('+') || 'keine'}, Level ${lvl})`);
       }
       geprueft++;
     }
   eq(geprueft, 12, '12 Kombinationen aus Technologien und Ausbaustufe geprüft');
+}
+
+/* Mehrere Kosten aus einem Topf: getrennte Prüfungen greifen auf dieselben Münzen zu.
+   Gemeldet: mit 2 Münzen wuchs eine Stadt von 1 auf 2, obwohl 1 Nahrung (= 2 Münzen)
+   plus 1 Münze zusammen 3 Münzen kosten. Der zweite pay() schlug fehl, sein
+   Rückgabewert wurde aber nicht ausgewertet. */
+{
+  const stadt = (muenzen, nahrung = 0) => {
+    const S = mk('griechenland');
+    const c = capitalOf(S, 0);
+    c.pop = 1; c.grown = 0; c.freeUsed = 0; c.born = -1;
+    S.players[0].res = { sci: 0, food: nahrung, coins: muenzen };
+    return { S, c, p: S.players[0] };
+  };
+  const { S, c } = stadt(2);
+  eq(rates(S, 0).coinsToFood, 2, 'ohne Gilden kosten 2 Münzen eine Nahrung');
+  eq(growPrice(S, 0, c), { food: 1, coins: 1 }, 'Wachstum 1→2 kostet 1 Nahrung + 1 Münze');
+  eq(typeof canGrow(S, 0, c), 'string', 'mit 2 Münzen reicht es NICHT');
+  eq(typeof growCity(S, 0, c, 'paid'), 'string', 'und das Wachstum wird abgelehnt');
+  eq(c.pop, 1, 'die Stadt ist nicht gewachsen');
+  eq(S.players[0].res.coins, 2, 'und die Münzen sind unangetastet');
+
+  const drei = stadt(3);
+  eq(canGrow(drei.S, 0, drei.c), null, 'mit 3 Münzen reicht es');
+  eq(growCity(drei.S, 0, drei.c, 'paid'), null, 'und die Stadt wächst');
+  eq([drei.c.pop, drei.p.res.coins], [2, 0], 'auf 2, alle drei Münzen weg');
+
+  // Direkt vorhandene Nahrung braucht keinen Umtausch
+  const gemischt = stadt(1, 1);
+  eq(canGrow(gemischt.S, 0, gemischt.c), null, '1 Nahrung + 1 Münze reicht direkt');
+  eq(growCity(gemischt.S, 0, gemischt.c, 'paid'), null, 'und wächst');
+  eq([gemischt.p.res.food, gemischt.p.res.coins], [0, 0], 'beides genau aufgebraucht');
+
+  // affordAll und payAll selbst
+  const T = mk('griechenland');
+  T.players[0].res = { sci: 0, food: 0, coins: 2 };
+  eq(affordAll(T, 0, { food: 1, coins: 1 }), false, 'affordAll sieht die Doppelzählung');
+  eq(available(T, 0, 'food') >= 1 && available(T, 0, 'coins') >= 1, true,
+    'einzeln geprüft sähe beides gedeckt aus – genau das war der Fehler');
+  eq(T.players[0].res.coins, 2, 'affordAll verändert nichts');
+  eq(payAll(T, 0, { food: 1, coins: 1 }), false, 'payAll scheitert ebenso');
+  eq(T.players[0].res.coins, 2, 'und rollt vollständig zurück');
+  T.players[0].res.coins = 3;
+  eq(payAll(T, 0, { food: 1, coins: 1 }), true, 'mit 3 Münzen gelingt es');
+  eq(T.players[0].res.coins, 0, 'und zieht alles ab');
+
+  // Prüfung und Bezahlung müssen immer übereinstimmen
+  let geprueft = 0;
+  for (let coins = 0; coins <= 6; coins++)
+    for (let food = 0; food <= 3; food++) {
+      const { S: X, c: cx } = stadt(coins, food);
+      const darf = canGrow(X, 0, cx) === null;
+      const ging = growCity(X, 0, cx, 'paid') === null;
+      if (darf !== ging) throw new Error(`canGrow ${darf} ≠ growCity ${ging} bei ${coins}🪙 ${food}🌾`);
+      geprueft++;
+    }
+  eq(geprueft, 28, `${geprueft} Kombinationen: Prüfung und Wachstum stimmen überein`);
 }
 
 /* ==================================================== Handelsrouten

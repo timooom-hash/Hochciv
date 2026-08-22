@@ -703,6 +703,9 @@ step('Nahrungsfenster geht zu Zugbeginn von selbst auf', () => {
   frischesSpiel();
   const S = G('S'), pi = S.cur, p = G('P')(S);
   p.techs.gentechnik = true;
+  // Ausgangslage selbst herstellen: popFood hängt am Startspieler und war in etwa
+  // einem von fünfzehn Läufen 0 (dann gibt es korrekterweise nichts zu entscheiden).
+  p.popFood = 3; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
   G('closeSheet')();
   if ($('sheet').classList.contains('open')) throw new Error('Blatt war schon offen');
   G('humanTurnStart')();
@@ -710,13 +713,20 @@ step('Nahrungsfenster geht zu Zugbeginn von selbst auf', () => {
     throw new Error('Nahrungsfenster geht zu Zugbeginn nicht auf');
   if (!/Nahrung diese Runde/.test($('sheet-body').textContent))
     throw new Error('es ist ein anderes Blatt: ' + $('sheet-body').textContent.slice(0, 40));
-  // Ohne die Techs bleibt es zu
+  // Ist alles gedeckt, gibt es nichts zu entscheiden – dann bleibt es zu
+  p.popCovered = p.popFood;
+  G('closeSheet')();
+  G('humanTurnStart')();
+  if ($('sheet').classList.contains('open'))
+    throw new Error('Fenster geht auf, obwohl nichts mehr zu entscheiden ist');
+  p.popCovered = 0;
+  // Ohne die Techs bleibt es ebenfalls zu
   delete p.techs.gentechnik; delete p.techs.massenmedien;
   G('closeSheet')();
   G('humanTurnStart')();
   if ($('sheet').classList.contains('open'))
     throw new Error('ohne Gentechnik/Massenmedien geht trotzdem ein Blatt auf');
-  console.log('       mit Tech: geht auf · ohne Tech: bleibt zu');
+  console.log('       mit Tech und offenen Kosten: geht auf · sonst: bleibt zu');
 });
 step('Nahrungsfenster deckt nur die echten Kosten, kein Umtausch', () => {
   frischesSpiel();
@@ -806,6 +816,36 @@ step('Eisenbahn ohne Rad lässt sich bauen (gemeldeter Fehler)', () => {
   knopf.onclick();
   if (G('roadLevel')(S, feld[0], feld[1]) !== 2)
     throw new Error('keine Eisenbahn entstanden: Stufe ' + G('roadLevel')(S, feld[0], feld[1]));
+  // Mit beiden Techs stehen auf einem leeren Feld beide Knöpfe – und zwei Schritte
+  // im offenen Blatt kosten zusammen 2, nicht 3.
+  const frei = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
+    G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && G('roadLevel')(S, r, c) === 0);
+  if (frei) {
+    p.techs.rad = true;
+    p.res.coins = 10;
+    G('tapHex')(frei[0], frei[1]);
+    const wege = () => [...$('sheet-body').querySelectorAll('.opt')]
+      .filter(b => /Straße bauen|Eisenbahn bauen/.test(b.textContent));
+    if (wege().length !== 2)
+      throw new Error(wege().length + ' statt 2 Knöpfe bei beiden Technologien');
+    const strasse = wege().find(b => /Straße bauen/.test(b.textContent));
+    const bahn = wege().find(b => /Eisenbahn bauen/.test(b.textContent));
+    if (!/1🪙/.test(strasse.textContent)) throw new Error('Straße kostet nicht 1');
+    if (!/2🪙/.test(bahn.textContent)) throw new Error('Eisenbahn-Direktbau kostet nicht 2');
+    strasse.onclick();
+    if (p.res.coins !== 9) throw new Error('Straße hat nicht 1 gekostet: ' + p.res.coins);
+    // Das Blatt muss sich neu gezeichnet haben – sonst steht dort noch der alte Preis
+    const bahn2 = wege().find(b => /Eisenbahn bauen/.test(b.textContent));
+    if (!bahn2) throw new Error('kein Ausbau-Knopf nach dem Straßenbau');
+    if (!/1🪙/.test(bahn2.textContent))
+      throw new Error('der Ausbau zeigt noch den alten Preis: ' + bahn2.textContent.replace(/\s+/g, ' '));
+    if (wege().some(b => /Straße bauen/.test(b.textContent)))
+      throw new Error('die Straße wird weiterhin angeboten, obwohl sie liegt');
+    bahn2.onclick();
+    if (p.res.coins !== 8)
+      throw new Error('zusammen ' + (10 - p.res.coins) + ' Münzen statt 2');
+    if (G('roadLevel')(S, frei[0], frei[1]) !== 2) throw new Error('keine Eisenbahn entstanden');
+  }
   // Umgekehrt: nur Rad bietet die Straße an und sperrt danach
   const feld2 = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
     G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && G('roadLevel')(S, r, c) === 0);
@@ -833,6 +873,50 @@ step('Eisenbahn ohne Rad lässt sich bauen (gemeldeter Fehler)', () => {
   }
   G('closeSheet')();
   console.log('       nur Eisenbahn → „Eisenbahn bauen" für 2🪙, Stufe 2 gesetzt');
+});
+step('Wachstum: Nahrung und Münzen zählen nicht doppelt (gemeldeter Fehler)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  const cap = G('capitalOf')(S, pi);
+  cap.pop = 1; cap.grown = 0; cap.freeUsed = 0; cap.born = -1;
+  // Nahrungsgrenze aus dem Weg räumen – geprüft wird allein, ob das GELD reicht
+  p.techs.gentechnik = true;
+  const blockiert = G('growBlockReason')(S, pi, cap);
+  if (blockiert) throw new Error('Wachstum blockiert aus anderem Grund: ' + blockiert);
+  const kosten = G('growPrice')(S, pi, cap);
+  const kurs = G('rates')(S, pi).coinsToFood;
+  // Die Schwelle selbst bestimmen, statt sie anzunehmen: sie hängt an Reich, Kurs
+  // und Fähigkeiten. Erwartet wird kosten.coins + kosten.food * kurs.
+  let noetig = null;
+  for (let m = 0; m <= 20 && noetig === null; m++) {
+    p.res = { sci: 0, food: 0, coins: m };
+    if (G('canGrow')(S, pi, cap) === null) noetig = m;
+  }
+  const soll = kosten.coins + kosten.food * kurs;
+  if (noetig !== soll)
+    throw new Error(`Schwelle ${noetig} statt ${soll} (Kosten ${JSON.stringify(kosten)}, Kurs ${kurs})`);
+  // Eine Münze unter der Schwelle: der Knopf muss gesperrt sein
+  if (noetig > 0) {
+    p.res = { sci: 0, food: 0, coins: noetig - 1 };
+    G('closeSheet')(); G('tapHex')(cap.r, cap.c);
+    const k = [...$('sheet-body').querySelectorAll('.opt')]
+      .find(b => /Bevölkerung wachsen/.test(b.textContent));
+    if (!k) throw new Error('kein Wachstumsknopf im Stadtblatt');
+    if (!k.disabled)
+      throw new Error(`Wachstum freigegeben mit ${noetig - 1} Münzen, nötig sind ${noetig}`);
+  }
+  // Genau auf der Schwelle: es geht, und alles wird verbraucht
+  p.res = { sci: 0, food: 0, coins: noetig };
+  G('closeSheet')(); G('tapHex')(cap.r, cap.c);
+  const k2 = [...$('sheet-body').querySelectorAll('.opt')]
+    .find(b => /Bevölkerung wachsen/.test(b.textContent));
+  if (k2.disabled) throw new Error(`mit ${noetig} Münzen bleibt es gesperrt`);
+  k2.onclick();
+  if (cap.pop !== 2) throw new Error('Stadt ist nicht gewachsen');
+  if (p.res.coins !== 0) throw new Error('falscher Abzug: ' + p.res.coins + ' statt 0');
+  G('closeSheet')();
+  console.log('       Kosten ' + JSON.stringify(kosten) + ' bei Kurs ' + kurs
+    + ' → Schwelle ' + noetig + ' Münzen, darunter gesperrt');
 });
 step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   frischesSpiel();
