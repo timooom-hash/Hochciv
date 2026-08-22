@@ -370,6 +370,14 @@ html.w-side .tut-scroll{min-height:0}
 .tut-task{flex:none;margin:0 12px 8px;font-size:14px;line-height:1.4;background:#f2e5cf;
   border:1px solid var(--rule);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:8px 10px}
 .tut-task b{color:var(--red)}
+/* Kleine Rechentabelle im Tutorial: Posten links, Wert rechts, Summe abgesetzt. */
+.tut-calc{background:var(--paper-2);border:1px solid var(--rule);border-radius:9px;
+  padding:6px 10px;margin:8px 0}
+.tut-calc>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  font-size:13px;line-height:1.8}
+.tut-calc>div>b{font-family:var(--mono);white-space:nowrap}
+.tut-calc>div.sum{border-top:1px solid var(--rule);margin-top:3px;padding-top:4px;
+  font-weight:600}
 .tut-key{background:#f2e5cf;border:1px solid var(--rule);border-radius:9px;padding:9px 11px;
   margin:10px 0 2px;font-size:13px;line-height:1.45}
 .tut-key>b:first-child{font-family:var(--serif);display:block;font-size:12px;letter-spacing:.04em;
