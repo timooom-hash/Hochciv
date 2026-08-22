@@ -808,3 +808,60 @@ aus, geprüft in `evActive` und `evTerrainDead`) und ohne den Taj-Mahal-Rundenbo
 **Was sich bewusst NICHT ändert:** die *Kosten* für Wachstum und Gründen kommen weiter aus
 dem tatsächlichen Rundeneinkommen. Eine Hungersnot lässt also weiter wenig übrig – sonst
 wären die Ereignisse wirkungslos. Die Grenze und die Kasse sind zwei verschiedene Dinge.
+
+
+---
+
+## Handelsrouten, Konfetti und der Oxford-Fehler (v36)
+
+### Neue Regel: Handelsrouten
+
+Jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr
+verbunden ist, bringt **+1** auf alle drei Erträge; ist der Weg durchgehend Eisenbahn,
+**+2**. Verbucht als eigene Zeile „Handelsrouten" in der Ertragsübersicht.
+
+Umgesetzt in `tradeRoutes(S, pi)` als **zwei getrennte Suchen** von der Hauptstadt aus –
+einmal nur über Eisenbahnfelder, einmal über Felder mit mindestens Straße. Die
+Mischungsregel ergibt sich damit von selbst: eine Stadt, die nur die zweite Suche
+erreicht, hängt an einer gemischten Strecke und bekommt +1. Es genügt also nicht, dass
+irgendwo Eisenbahn liegt – sie muss durchgehend sein.
+
+**Getroffene Auslegungen** (die Vorgabe lässt sie offen, der Autor kann sie ändern):
+- **Stadtfelder zählen über `effectiveRoad` mit**, wie überall sonst: ein Weg endet nicht
+  am Stadtrand, man muss auf dem Stadtfeld selbst keine Straße bauen. Konsequenz: grenzen
+  zwei Städte direkt aneinander und liegt an einer davon eine Eisenbahn, gilt die
+  Verbindung als reine Bahn. Praktisch irrelevant, weil zwischen zwei Städten mindestens
+  drei Felder liegen müssen – die Zwischenfelder werden nicht aufgewertet.
+- **Der Weg darf über neutrales Gebiet laufen**; nur **fremde Städte** sperren ihn.
+  (Passend dazu, dass die Regelheft-Klausel „gegnerische Territorien sind unpassierbar"
+  bewusst nicht umgesetzt ist.)
+- **Ohne Hauptstadt keine Routen** – wird sie erobert, brechen alle weg.
+- Es ist eine **Grundregel**, gilt also auch für Bots (anders als Wundereffekte).
+
+**Gemessene Schwäche:** In 25 vollständigen Bot-Partien haben Bots **kein einziges Mal**
+eine Straße gebaut – die Regel ist damit praktisch ein reiner Vorteil für den Menschen.
+Wer das ausgleichen will, müsste `bots.js` um Straßenbau erweitern; das ist bewusst nicht
+geschehen, weil es das Bot-Verhalten spürbar verändert.
+
+Aufwand: kein messbarer. Testlauf mit und ohne die Regel jeweils ~5,4 s – die Kurzschlüsse
+(keine zweite Stadt, keine Straßen auf der Karte) greifen fast immer.
+
+### Fehler: Oxford + Singularität ließ das Spiel hängen
+
+Die Universität von Oxford gibt zwei kostenlose Technologien, und die Singularität steht
+dabei ausdrücklich zur Wahl. Wählt man sie, setzt `applyTech` sofort `S.over` – aber der
+Klick-Handler in `freePickModal` prüfte das nicht. Er sah den **zweiten** offenen Anspruch,
+rief sich selbst auf, fand keine Optionen mehr und schloss das Fenster stumm. Ergebnis:
+Spiel vorbei, aber kein Siegbildschirm – es wirkte hängengeblieben. Reproduziert.
+
+Behoben durch eine `S.over`-Prüfung an beiden Stellen (am Anfang von `freePickModal` und
+nach jeder Wahl). Ein Smoke-Test spielt genau diesen Weg nach; mit künstlich
+zurückgebautem Fehler schlägt er an.
+
+### Konfetti
+
+`confetti(farbe)` hängt 40 Papierschnipsel in der Reichsfarbe in einen Kasten über allem,
+lässt sie gut zwei Sekunden fallen und räumt sich nach 3,4 s selbst ab. Bewusst klein.
+`pointer-events:none`, damit „Zurück zum Menü" sofort erreichbar bleibt; ein zweiter Aufruf
+ersetzt den alten Kasten, statt zu stapeln. Bei `prefers-reduced-motion: reduce` entfällt es.
+Die Fallhöhe hängt an `--fall`, weil im gedrehten Hochformat „unten" die kurze Seite ist.

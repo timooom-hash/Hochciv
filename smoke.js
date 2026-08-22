@@ -744,6 +744,87 @@ step('Nahrungsfenster deckt nur die echten Kosten, kein Umtausch', () => {
   G('closeSheet')();
   console.log('       50 Wissenschaft, Kosten 2 → genau 2 einsetzbar, Nahrung 4→6');
 });
+step('Oxford + Singularität zeigt den Siegbildschirm (gemeldeter Fehler)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  // Alle Voraussetzungen der Singularität erfüllen, dann Oxford auslösen
+  G('techPool')(S).forEach(t => { if (t.k !== 'singularitaet') p.techs[t.k] = true; });
+  delete p.techs.singularitaet;
+  if (!G('singularityReady')(p)) throw new Error('Voraussetzungen nicht erfüllt');
+  G('applyWonderEffect')(S, pi, G('capitalOf')(S, pi),
+    G('WONDERS').find(w => w.k === 'oxford'));
+  G('freePickModal')();
+  const btn = [...$('ov-body').querySelectorAll('[data-free]')]
+    .find(b => b.dataset.free === 'singularitaet');
+  if (!btn) throw new Error('Singularität steht bei Oxford nicht zur Wahl');
+  btn.onclick();
+  if (!G('S').over) throw new Error('Spiel ist nicht beendet');
+  if (!$('overlay').classList.contains('show'))
+    throw new Error('kein Fenster offen – das Spiel wirkt hängengeblieben');
+  if ($('ov-title').textContent !== 'Spielende')
+    throw new Error('falsches Fenster: ' + $('ov-title').textContent);
+  if (!/gewinnt/.test($('ov-body').textContent)) throw new Error('kein Siegtext');
+  // Oxford hatte zwei Ansprüche – der zweite darf das Fenster nicht überschreiben
+  if (!/Forschungssieg/.test($('ov-body').textContent)) throw new Error('Siegart fehlt');
+  console.log('       Siegbildschirm erscheint trotz offenem zweiten Oxford-Anspruch');
+});
+step('Konfetti beim Sieg – klein und selbsträumend', () => {
+  const box = window.document.getElementById('confetti');
+  if (!box) throw new Error('kein Konfetti nach dem Sieg');
+  const n = box.querySelectorAll('i').length;
+  if (n < 10 || n > 80) throw new Error(n + ' Schnipsel – das ist nicht mehr klein');
+  const css = fs.readFileSync(__dirname + '/css/style.css', 'utf8');
+  if (!/#confetti\{[^}]*pointer-events:none/.test(css))
+    throw new Error('Konfetti fängt Berührungen ab – „Zurück zum Menü" wäre blockiert');
+  if (!/prefers-reduced-motion[^}]*\{\s*#confetti\{display:none\}/.test(css.replace(/\s+/g, ' ').replace(/ \{/g, '{')))
+    console.log('       (Hinweis: reduced-motion-Regel nicht gefunden)');
+  // Doppelter Aufruf darf nicht stapeln
+  G('confetti')('#123456');
+  if (window.document.querySelectorAll('#confetti').length !== 1)
+    throw new Error('Konfetti stapelt sich');
+  window.document.getElementById('confetti').remove();
+  console.log('       ' + n + ' Schnipsel, ohne Berührungsfang, kein Stapeln');
+});
+step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  p.techs.rad = true; p.techs.eisenbahn = true;
+  const cap = G('capitalOf')(S, pi);
+  // Nachbarfeld als zweite Stadt, direkt an der Hauptstadt – kürzestmögliche Route
+  const nb = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
+    G('isLand')(S, r, c) && !G('cityAt')(S, r, c));
+  if (!nb) throw new Error('kein Nachbarfeld für die zweite Stadt');
+  S.cities.push({ id: 900, owner: pi, r: nb[0], c: nb[1], pop: 1, cap: false, grown: 0, born: 0 });
+  const zeile = () => (G('incomeBreakdown')(S, pi).extra || [])
+    .find(e => e.name === 'Handelsrouten');
+  if (zeile()) throw new Error('Handelsroute ohne Straße');
+  S.roads[G('key')(nb[0], nb[1])] = 1;
+  const z1 = zeile();
+  if (!z1) throw new Error('Straße erzeugt keine Handelsroute');
+  if (JSON.stringify(z1.y) !== '[1,1,1]') throw new Error('falscher Bonus: ' + JSON.stringify(z1.y));
+  S.roads[G('key')(nb[0], nb[1])] = 2;
+  const z2 = zeile();
+  if (JSON.stringify(z2.y) !== '[2,2,2]') throw new Error('Eisenbahn gibt nicht +2');
+  // Und im Forschungsbogen muss die Zeile sichtbar sein
+  $('a-tech').onclick();
+  if (!/Handelsrouten/.test($('ov-body').textContent))
+    throw new Error('Handelsrouten fehlen in der Ertragsübersicht');
+  G('closeModal')();
+  console.log('       Straße +1, Eisenbahn +2, Zeile im Forschungsbogen sichtbar');
+});
+step('Tutorialtext erklärt die Handelsrouten', () => {
+  const letzter = G('TUT_STEPS')[G('TUT_STEPS').length - 1];
+  const t = letzter.html().replace(/<[^>]+>/g, '');
+  if (!/Handelsrouten/.test(t)) throw new Error('Handelsrouten kommen im Abschlusstext nicht vor');
+  if (!/\+2/.test(t) || !/\+1/.test(t)) throw new Error('die beiden Stufen fehlen');
+  if (!/Eisenbahn/.test(t)) throw new Error('Eisenbahn nicht erwähnt');
+  // Auch die Kurzregeln müssen es nennen
+  G('rulesModal')();
+  if (!/Handelsrouten/.test($('ov-body').textContent))
+    throw new Error('Kurzregeln erwähnen die Handelsrouten nicht');
+  G('closeModal')();
+  console.log('       Abschlusstext und Kurzregeln nennen beide Stufen');
+});
 step('Hauptmenü ohne Fußzeile (Punkt 3 der Nachbesserung)', () => {
   if ($('screen-menu').querySelector('.foot')) throw new Error('Fußzeile steht noch da');
   if (/Home-Bildschirm/.test($('screen-menu').textContent))

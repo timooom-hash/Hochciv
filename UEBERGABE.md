@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v35)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v36)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -35,13 +35,13 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/bots.js` | 320 | Bot-Züge, Siedlerbewegung nach Regelheft, Armeeprioritäten, Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
 | `js/tutorial.js` | 857 | Geführtes Übungsspiel: 27 Schritte, feste Würfelfolge, Schienen |
-| `test.js` | 2450 | **687 Assertions**, `node test.js` |
-| `smoke.js` | 870 | **56 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 2530 | **705 Assertions**, `node test.js` |
+| `smoke.js` | 950 | **60 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v35`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v36`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -73,10 +73,10 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 687 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 705 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (56 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (60 Schritte), inklusive
    Tutorial-Audit: in jedem der 27 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -107,6 +107,9 @@ Gedächtnis rekonstruieren.
 - **Tutorial:** erledigte Aufgaben schalten selbst weiter (`tutMaybeAdvance`,
   `TUT_AUTO_MS`); das Panel steht quer links neben der Karte.
 - **Protokoll:** Würfe hängen eingeklappt an ihrer Aktionszeile (`logHtml`/`rollsBlock`).
+- **Handelsrouten** (`tradeRoutes` in `engine.js`): Städte, die über einen durchgehenden
+  Weg an der Hauptstadt hängen, bringen +1 (Straße) bzw. +2 (reine Eisenbahn) auf alle
+  Erträge. Zwei getrennte Suchen — daher greift die Mischungsregel von selbst.
 - **Nahrung:** Die Bevölkerungskosten (`popFood`) lassen sich mit Gentechnik/Massenmedien
   aus Wissenschaft oder Münzen bestreiten (`coverPop`/`uncoverPop`), höchstens bis zur
   Höhe der echten Kosten. Das Fenster (`foodSheet`) geht zu Zugbeginn auf.
@@ -184,6 +187,8 @@ Aus diesem Chat:
   freigeschaltet statt ausgewürfelt.
 
 Aus dieser Sitzung (21.8.):
+- **Oxford + Singularität:** `freePickModal` prüfte `S.over` nicht — das Spiel war vorbei,
+  aber der Siegbildschirm kam nie.
 - **Nahrungsgrenze hing am Ereignis der Runde:** Dürre und Revolution verboten Wachstum
   und Siedeln, obwohl die Stadt dauerhaft gedeckt war. `growthBlocked` rechnet jetzt über
   `baseIncome()` auf dem dauerhaften Wert (`S.evMuted`).
@@ -195,6 +200,10 @@ Aus dieser Sitzung (21.8.):
   offene Defizit.
 
 ## Offene Punkte / bewusst nicht umgesetzt
+
+0b. **Bots bauen keine Straßen** — gemessen über 25 vollständige Bot-Partien: null
+   Straßen, null Handelsrouten. Die Regel ist damit praktisch ein reiner Vorteil für den
+   Menschen. Ausgleich hieße `bots.js` um Straßenbau erweitern.
 
 0. **Die erzwungene Drehung ist nicht auf echtem iOS geprüft**, nur in Chromium mit
    Hochformat-Viewport. Safari-Eigenheiten bei `position:fixed` in transformierten

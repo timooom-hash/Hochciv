@@ -865,6 +865,105 @@ const setEvent = (S, k) => {
   eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
 }
 
+/* ==================================================== Handelsrouten
+   Jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg an die
+   Hauptstadt angebunden ist: +1 auf alle Erträge über Straße, +2 über reine Eisenbahn.
+   Eine Mischung gibt nur den kleineren Bonus. */
+{
+  const S = mk('griechenland', ['rad', 'eisenbahn']);
+  const cap = capitalOf(S, 0);
+  // Einen echten Korridor über Landfelder suchen (BFS mit Vorgängern). Nur so lässt
+  // sich die Mischungsregel prüfen: bei flächig verlegten Straßen gäbe es Umwege.
+  const korridor = (zr, zc) => {
+    const von = new Map([[key(cap.r, cap.c), null]]);
+    let rand = [[cap.r, cap.c]];
+    while (rand.length) {
+      const nächste = [];
+      for (const [r, c] of rand)
+        for (const [nr, nc] of neighbors(r, c)) {
+          const k = key(nr, nc);
+          if (von.has(k) || !isLand(S, nr, nc)) continue;
+          von.set(k, key(r, c));
+          if (nr === zr && nc === zc) {
+            const pfad = []; let k2 = k;
+            while (k2) { pfad.push(unkey(k2)); k2 = von.get(k2); }
+            return pfad.reverse();
+          }
+          nächste.push([nr, nc]);
+        }
+      rand = nächste;
+    }
+    return null;
+  };
+  let ziel = null, weg = null;
+  for (const [r, c] of within(cap.r, cap.c, 4)) {
+    if (!isLand(S, r, c) || cityAt(S, r, c)) continue;
+    if (hexDistance(cap.r, cap.c, r, c) < 3) continue;
+    const pfad = korridor(r, c);
+    if (pfad && pfad.length >= 4) { ziel = [r, c]; weg = pfad; break; }
+  }
+  eq(!!ziel, true, 'ein Platz für die zweite Stadt gefunden');
+  S.cities.push({ id: 500, owner: 0, r: ziel[0], c: ziel[1], pop: 1, cap: false, grown: 0, born: 0 });
+
+  const routen = () => tradeRoutes(S, 0);
+  const bonusZeile = () => (incomeBreakdown(S, 0).extra || []).find(e => e.name === 'Handelsrouten');
+  eq(routen().bonus, 0, 'ohne Straßen gibt es keine Handelsroute');
+  eq(bonusZeile(), undefined, 'und keine Zeile in der Übersicht');
+
+  // Straße auf allen Feldern des Weges (Stadtfelder zählen über effectiveRoad mit)
+  const zwischen = weg.filter(([r, c]) => !(r === cap.r && c === cap.c) && !cityAt(S, r, c));
+  zwischen.forEach(([r, c]) => S.roads[key(r, c)] = 1);
+  eq(routen().bonus, 1, 'durchgehende Straße: +1');
+  eq(routen().road, 1, 'als Straßenverbindung gezählt');
+  eq(bonusZeile().y, [1, 1, 1], 'die Zeile bringt +1 auf alle drei Erträge');
+  eq(income(S, 0).sci - income(mk('griechenland', ['rad', 'eisenbahn']), 0).sci >= 1, true,
+    'das Einkommen steigt tatsächlich');
+
+  // Eine Lücke im Weg trennt die Verbindung wieder
+  const lücke = zwischen[0];
+  delete S.roads[key(lücke[0], lücke[1])];
+  eq(routen().bonus, 0, 'eine Lücke unterbricht die Route');
+  S.roads[key(lücke[0], lücke[1])] = 1;
+
+  // Alles auf Eisenbahn: +2
+  zwischen.forEach(([r, c]) => S.roads[key(r, c)] = 2);
+  eq(routen().bonus, 2, 'durchgehende Eisenbahn: +2');
+  eq(routen().rail, 1, 'als Bahnverbindung gezählt');
+
+  // Mischung: ein einziges Straßenfeld drückt auf +1 zurück
+  if (zwischen.length) {
+    S.roads[key(zwischen[0][0], zwischen[0][1])] = 1;
+    eq(routen().bonus, 1, 'gemischte Strecke gibt nur den kleineren Bonus');
+    eq(routen().rail, 0, 'sie zählt nicht als Bahnverbindung');
+    zwischen.forEach(([r, c]) => S.roads[key(r, c)] = 2);
+  }
+
+  // Die Hauptstadt selbst bringt nichts, und ohne Hauptstadt bricht alles weg
+  eq(routen().count, 1, 'nur die zweite Stadt zählt, nicht die Hauptstadt');
+  const ohneCap = JSON.parse(JSON.stringify(S));
+  ohneCap.cities = ohneCap.cities.filter(c => !c.cap);
+  eq(tradeRoutes(ohneCap, 0).bonus, 0, 'ohne Hauptstadt gibt es keine Routen');
+
+  // Eine fremde Stadt auf dem Weg sperrt ihn
+  if (zwischen.length) {
+    const [br, bc] = zwischen[Math.floor(zwischen.length / 2)];
+    S.cities.push({ id: 501, owner: 1, r: br, c: bc, pop: 1, cap: false, grown: 0, born: 0 });
+    eq(tradeRoutes(S, 0).bonus, 0, 'eine fremde Stadt unterbricht die Route');
+    S.cities = S.cities.filter(c => c.id !== 501);
+    eq(tradeRoutes(S, 0).bonus, 2, 'ohne sie zählt die Route wieder');
+  }
+
+  // Zwei angebundene Städte zählen doppelt
+  const zweit = within(cap.r, cap.c, 2).find(([r, c]) =>
+    isLand(S, r, c) && !cityAt(S, r, c) && neighbors(r, c).some(([a2, b2]) => cityAt(S, a2, b2)));
+  if (zweit) {
+    S.cities.push({ id: 502, owner: 0, r: zweit[0], c: zweit[1], pop: 1, cap: false, grown: 0, born: 0 });
+    S.roads[key(zweit[0], zweit[1])] = 2;
+    eq(tradeRoutes(S, 0).count, 2, 'zwei angebundene Städte');
+    eq(tradeRoutes(S, 0).bonus, 4, 'zweimal Eisenbahn: +4');
+  }
+}
+
 /* Bug: ein Ereignis darf die Nahrungsgrenze nicht verschieben – sie gilt dauerhaft. */
 {
   const S = mkX('griechenland', { events: true });

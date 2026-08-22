@@ -29,7 +29,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
 | 🌾 in der Kopfzeile | Städte füttern (nur mit Gentechnik oder Massenmedien) |
 | Weltwunder bauen | im Stadtblatt, wenn die Erweiterung an ist |
-| **Forschen** | links die Ertragsübersicht (Felder, Bevölkerung, Summe fürs nächste Einkommen), rechts der Technologiebogen |
+| **Forschen** | links die Ertragsübersicht (Felder, **Handelsrouten**, Bevölkerung, Summe fürs nächste Einkommen), rechts der Technologiebogen |
 | **Armeen** | Übersicht aller eigenen Armeen; antippen wählt aus, dann Zielfeld antippen |
 | Armee auf der Karte | antippen → *Bewegen*; steht sie in der eigenen Stadt, steht die Aktion im Stadtblatt |
 | Feld antippen | Aktionsblatt mit dem Feldertrag; ist das Feld siedelbar, steht darunter der **Ertrag beim Siedeln** — was eine Stadt hier ab der nächsten Runde brächte |
