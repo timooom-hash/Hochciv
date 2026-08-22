@@ -482,29 +482,38 @@ function openTile(r, c) {
         toast(e || 'Atomschlag ausgeführt'); redraw(); openTile(r, c);
       }, p.nuked || banned);
   }
-  // Die Stufe kommt aus roadTarget, nicht aus einer eigenen Rechnung – sonst weicht das
-  // Blatt von dem ab, was buildRoad erlaubt (Eisenbahn ohne Rad war so unbaubar).
+  // Die Stufen kommen aus roadTargets, nicht aus einer eigenen Rechnung – sonst weicht
+  // das Blatt von dem ab, was buildRoad erlaubt (Eisenbahn ohne Rad war so unbaubar).
   if (canBuildRoads(p) && !city) {
-    const lvl = roadLevel(S, r, c), ziel = roadTarget(S, pi, r, c);
-    const stufe = ziel || (lvl >= 1 ? 2 : 1);
-    btn(stufe === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
-      lvl >= 2 ? 'hier liegt schon eine Eisenbahn'
-        : !ziel ? 'Eisenbahn noch nicht erforscht'
-          : stufe === 2 ? 'Bewegung kostenlos · Handelsroute +2'
-            : 'Bewegung ½ Punkt · Handelsroute +1',
-      ((ziel ? roadPrice(S, pi, r, c, ziel) : null) ?? '–') + '🪙',
-      () => doRoad(r, c), !ziel);
+    const ziele = roadTargets(S, pi, r, c);
+    const lvl = roadLevel(S, r, c);
+    if (!ziele.length) {
+      // Nichts baubar – trotzdem anzeigen, damit der Grund sichtbar ist.
+      btn(lvl >= 1 ? 'Eisenbahn bauen' : 'Straße bauen',
+        lvl >= 2 ? 'hier liegt schon eine Eisenbahn' : 'Eisenbahn noch nicht erforscht',
+        '–🪙', () => { }, true);
+    } else ziele.forEach(z => {
+      btn(z === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
+        z === 2 ? 'Bewegung kostenlos · Handelsroute +2' : 'Bewegung ½ Punkt · Handelsroute +1',
+        roadPrice(S, pi, r, c, z) + '🪙',
+        () => doRoad(r, c, z), available(S, pi, 'coins') < roadPrice(S, pi, r, c, z));
+    });
   }
   sheet(head + rows.join(''));
   if (ui.tut) tutGateSheet(r, c);
   handlers.forEach(([id, fn]) => { const el = $(id); if (el) el.onclick = fn; });
 }
-function doRoad(r, c) {
-  const target = roadTarget(S, S.cur, r, c);
+function doRoad(r, c, ziel) {
+  // Die Zielstufe kommt vom Knopf. Der Preis wird von buildRoad frisch bestimmt –
+  // wer erst die Straße baut und dann im selben Blatt die Eisenbahn, zahlt für den
+  // Ausbau nur noch 1 statt 2. Deshalb muss das Blatt danach neu gezeichnet werden,
+  // sonst steht am Knopf noch der alte Preis.
+  const target = ziel || roadTarget(S, S.cur, r, c);
   if (!target) return toast('Hier lässt sich nichts weiter bauen.');
   const e = buildRoad(S, S.cur, r, c, target);
   e ? toast(e) : toast(target === 2 ? 'Eisenbahn gebaut' : 'Straße gebaut');
   redraw();
+  openTile(r, c);
 }
 
 function armySheet() {

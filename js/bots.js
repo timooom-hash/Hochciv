@@ -40,8 +40,13 @@ function botTurn(S, pi) {
     log(S, 'act', `${civOf(p).n}: neue Armee in der Hauptstadt.`);
   }
 
-  // 4 Armeen bewegen
-  for (const army of armiesOf(S, pi)) { army.mp = moveAllowance(S, pi); botMoveArmy(S, pi, army); }
+  // 4 Armeen bewegen: erst die abgestimmten Prioritäten 1–6, dann jede übrige für sich
+  for (const army of armiesOf(S, pi)) { army.mp = moveAllowance(S, pi); delete army.botDone; }
+  botPlanArmies(S, pi);
+  for (const army of armiesOf(S, pi)) {
+    if (!army.botDone) botMoveArmy(S, pi, army);
+    delete army.botDone;                       // Merker nicht im Spielstand hinterlassen
+  }
 
   // 5 Forschen: der Bot würfelt zweimal, ob er forscht; bei zwei Erfolgen
   // erforscht er in zwei unterschiedlichen Technologiefeldern.
@@ -144,13 +149,153 @@ function botSettle(S, pi, capital) {
 }
 
 /* ---------------------------------------------------- Armeebewegung nach Prioritäten
-   Reihenfolge laut Regelheft:
-     1. angegriffene eigene Städte verteidigen
-     2. gegnerische Städte angreifen
-     3. gegnerische Armeen flankieren
-     4. an den Rand des Reiches (Feld am nächsten an einer gegnerischen Stadt)
-   Innerhalb einer Priorität: die Option mit dem geringsten gegnerischen Machtwert.
-   Bei Städten wird die Hauptstadt bevorzugt. Gleichstände werden ausgewürfelt. */
+   1. Gegnerische HAUPTSTADT erobern, die im letzten Zug erfolgreich belagert wurde
+   2. Armee flankieren, die die eigene Hauptstadt angreift
+   3. Eigene Hauptstadt verteidigen (möglichst neben dem Angreifer)
+   4. Armee flankieren, die eine andere eigene Stadt angreift
+   5. Andere eigene Stadt verteidigen
+   6. Gegnerische Stadt erobern, die im letzten Zug erfolgreich belagert wurde
+   7. Gegnerische Stadt angreifen
+   8. Gegnerische Armee flankieren
+   9. An den Reichsrand, am nächsten zum Gegner
+
+   1–6 brauchen Absprache zwischen den Armeen (wie viele reichen für die Eroberung? wer
+   verteidigt welche Stadt?) und laufen deshalb in botPlanArmies über alle Armeen
+   gemeinsam. 7–9 entscheidet jede übrige Armee für sich in botMoveArmy.
+   Verteidigung geht vor Eroberung; innerhalb einer Stufe zählt die größere Stadt zuerst. */
+
+/* Erreichbare Halteplätze einer Armee, mit Wegkosten.
+   Das eigene Feld gehört dazu: reachable() liefert es nicht mit (es gilt als besetzt),
+   aber „stehen bleiben" muss eine Option sein – sonst räumt eine Armee, die schon
+   genau richtig steht, ihren Platz und verschlechtert die Lage. */
+function botReach(S, pi, army) {
+  const reach = reachable(army.r, army.c, army.mp,
+    (r, c) => botCanEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
+    (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
+  const tiles = [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c));
+  const hier = key(army.r, army.c);
+  if (!reach.has(hier)) { tiles.push([army.r, army.c]); reach.set(hier, 0); }
+  return { tiles, cost: t => reach.get(key(t[0], t[1])) };
+}
+function botStep(S, pi, army, goal, why) {
+  if (goal[0] === army.r && goal[1] === army.c) return true;   // steht schon richtig
+  const { cost } = botReach(S, pi, army);
+  const c = cost(goal);
+  if (c == null) return false;
+  army.mp -= c; army.r = goal[0]; army.c = goal[1];
+  log(S, 'act', `${civOf(S.players[pi]).n}: Armee ${why} → ${goal[0]}/${goal[1]}.`);
+  return true;
+}
+/* Eine Stadt gilt als belagert, wenn der letzte Zugkampf gewonnen wurde – der nächste
+   Erfolg erobert sie (S.sieges zählt bis 2). */
+function siegeReady(S, pi, city) { return (S.sieges[pi + '|' + city.id] || 0) >= 1; }
+/* Wie viele eigene Armeen in Reichweite nötig wären, damit der Angriff durchkommt.
+   null, wenn es auch mit allen nicht reicht. */
+function attackersNeeded(S, pi, city, maxN) {
+  const d = defenseValue(S, city);
+  for (let n = 1; n <= maxN; n++) if (attackValue(S, pi, n) > d) return n;
+  return null;
+}
+/* Kann diese Armee von t aus die feindliche Armee e flankieren? Dieselbe Rechnung wie
+   in der Kampfphase: gegenüberliegend, mit Taktik von zwei beliebigen Seiten; mit
+   Burgenbau zählen auch die eigenen Städte als Partnerposition. */
+function botFlankOk(S, pi, army, e, t) {
+  const p = S.players[pi], rng = attackRange(S, pi);
+  const d = hexDistance(e.r, e.c, t[0], t[1]);
+  if (d < 1 || d > rng) return false;
+  const partners = armiesOf(S, pi).filter(a => a !== army).map(a => [a.r, a.c])
+    .concat(has(p, 'burgenbau') ? citiesOf(S, pi).map(c => [c.r, c.c]) : [])
+    .filter(([r, c]) => { const dd = hexDistance(r, c, e.r, e.c); return dd >= 1 && dd <= rng; });
+  if (has(p, 'taktik')) return partners.length >= 1;
+  return partners.some(([r, c]) => r === e.r + (e.r - t[0]) && c === e.c + (e.c - t[1]));
+}
+/* Feindliche Armeen, die diese eigene Stadt bedrohen (sie in Reichweite haben). */
+function threateningArmies(S, pi, city) {
+  return S.armies.filter(a => a.owner !== pi &&
+    hexDistance(a.r, a.c, city.r, city.c) <= attackRange(S, a.owner));
+}
+function botPlanArmies(S, pi) {
+  const p = S.players[pi];
+  const rng = attackRange(S, pi);
+  const offen = () => armiesOf(S, pi).filter(a => a.mp > 0 && !a.botDone);
+  const belege = a => { a.botDone = true; };
+
+  /* Prio 1 und 6: eine begonnene Belagerung abschließen.
+     Prio 1 nimmt ALLE erreichbaren Armeen (die Hauptstadt ist es wert), Prio 6 nur so
+     viele, wie für den Durchbruch nötig sind – der Rest wird anderswo gebraucht.
+     Zugewiesen wird nacheinander, nicht gleichzeitig: sonst wählen mehrere Armeen
+     dasselbe Feld, und alle bis auf eine bleiben stehen. */
+  const inRangeOf = city => armiesOf(S, pi)
+    .filter(a => hexDistance(a.r, a.c, city.r, city.c) <= rng);
+  const bestesFeld = (a, city) => {
+    const { tiles, cost } = botReach(S, pi, a);
+    const spots = tiles.filter(t => hexDistance(city.r, city.c, t[0], t[1]) <= rng);
+    if (!spots.length) return null;
+    const t = spots.reduce((x, y) => cost(y) < cost(x) ? y : x);
+    return { t, c: cost(t) };
+  };
+  const finishSiege = (city, alle) => {
+    const schon = inRangeOf(city);
+    // Optimistische Vorprüfung: wie viele könnten überhaupt hinkommen?
+    const koennen = offen().filter(a => !schon.includes(a) && bestesFeld(a, city));
+    const noetig = attackersNeeded(S, pi, city, schon.length + koennen.length);
+    if (noetig == null || schon.length + koennen.length < noetig) return false;
+    for (const a of schon) if (!a.botDone) belege(a);        // gut stehende bleiben stehen
+    let offenZiel = alle ? Infinity : Math.max(0, noetig - schon.length);
+    const why = alle ? 'stürmt die belagerte Hauptstadt' : 'schließt die Belagerung ab';
+    while (offenZiel > 0) {
+      let best = null;
+      for (const a of offen()) {
+        const b = bestesFeld(a, city);
+        if (b && (!best || b.c < best.c)) best = { a, t: b.t, c: b.c };
+      }
+      if (!best) break;
+      if (!botStep(S, pi, best.a, best.t, why)) break;
+      belege(best.a); offenZiel--;
+    }
+    return true;
+  };
+
+  const feindStaedte = () => S.cities.filter(c => c.owner !== pi);
+  // Prio 1: belagerte gegnerische HAUPTSTADT
+  for (const city of feindStaedte().filter(c => c.cap && siegeReady(S, pi, c)))
+    finishSiege(city, true);
+
+  /* Prio 2–5: eigene Städte schützen. Erst die Hauptstadt, dann die übrigen nach Größe.
+     Je Stadt zuerst flankieren (das entfernt den Angreifer ganz), dann verteidigen. */
+  const eigene = citiesOf(S, pi).slice().sort((a, b) =>
+    (b.cap ? 1 : 0) - (a.cap ? 1 : 0) || b.pop - a.pop);
+  for (const city of eigene) {
+    const feinde = threateningArmies(S, pi, city);
+    if (!feinde.length) continue;
+    const label = city.cap ? 'die Hauptstadt' : 'eine Stadt';
+    // (a) flankieren – schlägt die angreifende Armee ganz aus dem Spiel
+    for (const a of offen()) {
+      const { tiles, cost } = botReach(S, pi, a);
+      let bestT = null, bestC = Infinity;
+      for (const e of feinde)
+        for (const t of tiles)
+          if (botFlankOk(S, pi, a, e, t) && cost(t) < bestC) { bestT = t; bestC = cost(t); }
+      if (bestT && botStep(S, pi, a, bestT, `flankiert einen Angreifer auf ${label}`)) belege(a);
+    }
+    // (b) verteidigen: in Reichweite der Stadt, möglichst dicht am Angreifer
+    for (const a of offen()) {
+      const { tiles, cost } = botReach(S, pi, a);
+      const spots = tiles.filter(t => hexDistance(city.r, city.c, t[0], t[1]) <= projectRange(S, pi));
+      if (!spots.length) continue;
+      const naehe = t => Math.min(...feinde.map(e => hexDistance(e.r, e.c, t[0], t[1])));
+      const best = spots.reduce((x, y) =>
+        (naehe(y) * 100 + cost(y)) < (naehe(x) * 100 + cost(x)) ? y : x);
+      if (botStep(S, pi, a, best, `verteidigt ${label}`)) belege(a);
+    }
+  }
+
+  // Prio 6: übrige belagerte gegnerische Städte – nur so viele Armeen wie nötig,
+  // größte Stadt zuerst.
+  const reif = feindStaedte().filter(c => !c.cap && siegeReady(S, pi, c))
+    .sort((a, b) => b.pop - a.pop);
+  for (const city of reif) finishSiege(city, false);
+}
 function botMoveArmy(S, pi, army) {
   const p = S.players[pi];
   const reach = reachable(army.r, army.c, army.mp,
@@ -177,21 +322,10 @@ function botMoveArmy(S, pi, army) {
 
   let goal = null, why = '';
 
-  // Priorität 1: belagerte eigene Städte verteidigen – die mit dem stärksten Angreifer zuerst
-  const besieged = citiesOf(S, pi).filter(city =>
-    Object.keys(S.sieges).some(k => k.endsWith('|' + city.id) && S.sieges[k] > 0));
-  if (besieged.length) {
-    const spots = tiles.filter(t => besieged.some(c => hexDistance(c.r, c.c, t[0], t[1]) <= rng));
-    goal = chooseBy(spots, t => {
-      const c = besieged.find(c => hexDistance(c.r, c.c, t[0], t[1]) <= rng);
-      const threat = Math.max(...S.players.map((_, i) => i === pi ? 0 :
-        attackValue(S, i, attackersOn(S, i, c).length)));
-      return -threat * 100 + cost(t);       // größte Bedrohung zuerst, dann kürzester Weg
-    });
-    if (goal) why = 'verteidigt eine belagerte Stadt';
-  }
+  // Verteidigung und Belagerungsabschluss sind vorher in botPlanArmies abgehandelt.
+  // Hier bleiben die Prioritäten 7–9: angreifen, flankieren, an den Rand.
 
-  // Priorität 2: gegnerische Stadt angreifen – schwächster Gegner, Hauptstadt bevorzugt
+  // Priorität 7: gegnerische Stadt angreifen – schwächster Gegner, Hauptstadt bevorzugt
   if (!goal) {
     const enemyCities = S.cities.filter(x => x.owner !== pi);
     const spots = tiles.filter(t => enemyCities.some(c => hexDistance(c.r, c.c, t[0], t[1]) <= rng));
@@ -204,7 +338,7 @@ function botMoveArmy(S, pi, army) {
     if (goal) why = 'greift eine gegnerische Stadt an';
   }
 
-  // Priorität 3: gegnerische Armee flankieren – schwächste zuerst
+  // Priorität 8: gegnerische Armee flankieren – schwächste zuerst
   if (!goal) {
     const mine = armiesOf(S, pi).filter(a => a !== army);
     const castle = has(p, 'burgenbau') ? citiesOf(S, pi).map(c => [c.r, c.c]) : [];
@@ -228,7 +362,7 @@ function botMoveArmy(S, pi, army) {
     if (goal) why = 'flankiert eine gegnerische Armee';
   }
 
-  // Priorität 4: innerhalb des eigenen Reiches an den Rand ziehen, dem eine gegnerische
+  // Priorität 9: innerhalb des eigenen Reiches an den Rand ziehen, dem eine gegnerische
   // Stadt am nächsten liegt. Der Bot verlässt sein Territorium hier NICHT.
   // Tiebreaker: gleiche Distanz → geringster Verteidigungswert der Stadt → auswürfeln.
   if (!goal) {

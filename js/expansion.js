@@ -288,7 +288,10 @@ function buildWonder(S, pi, city, wk, opts) {
   if (err) return err;
   const p = S.players[pi], w = WONDER_BY_KEY[wk];
   let cost = 0;
-  if (!(opts && opts.free)) { cost = wonderCost(S, pi); pay(S, pi, 'coins', cost); }
+  if (!(opts && opts.free)) {
+    cost = wonderCost(S, pi);
+    if (!pay(S, pi, 'coins', cost)) return `Zu wenig Münzen (${cost} nötig).`;
+  }
   const rangeBefore = moveAllowance(S, pi);
   S.wonders.push({ k: wk, lvl: w.lvl, owner: pi, cityId: city.id, r: city.r, c: city.c });
   S.wpool[w.lvl] = poolOf(S, w.lvl).filter(k => k !== wk);

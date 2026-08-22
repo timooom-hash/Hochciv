@@ -177,8 +177,7 @@ function doResearch(S, pi, tk) {
   if (!tech) return 'Unbekannte Technologie.';
   if (!techActive(S, tech)) return 'Diese Technologie gehört zur Weltwunder-Erweiterung.';
   const cost = techCost(S, pi, tech);
-  if (available(S, pi, 'sci') < cost) return 'Nicht genug Wissenschaft.';
-  pay(S, pi, 'sci', cost);
+  if (!pay(S, pi, 'sci', cost)) return 'Nicht genug Wissenschaft.';
   applyTech(S, pi, tech, `${cost} Wissenschaft`);
   return null;
 }
@@ -491,6 +490,29 @@ function pay(S, pi, kind, amount, opts) {
   }
   else { take('sci', r.sciToCoins); take('food', r.foodToCoins); }
   return need <= 0;
+}
+/* Mehrere Kosten auf einmal – Nahrung UND Münzen zum Beispiel.
+   Getrennt geprüft ist falsch: available() rechnet jede Art gegen den VOLLEN Vorrat,
+   und weil sich die Arten ineinander umtauschen lassen, greifen beide Prüfungen auf
+   dieselben Münzen zu. Mit 2 Münzen galten so „1 Nahrung" (= 2 Münzen) und „1 Münze"
+   gleichzeitig als gedeckt, obwohl zusammen 3 Münzen nötig sind.
+   payAll zahlt deshalb der Reihe nach und macht bei einem Fehlschlag alles rückgängig;
+   affordAll ist dieselbe Rechnung, nur ohne bleibende Wirkung. Prüfung und Bezahlung
+   folgen damit demselben Weg – sonst gehen sie wieder auseinander. */
+const COST_ORDER = ['food', 'coins', 'sci'];
+function payAll(S, pi, cost, opts) {
+  const p = S.players[pi], backup = Object.assign({}, p.res);
+  for (const k of COST_ORDER) {
+    if (!cost[k]) continue;
+    if (!pay(S, pi, k, cost[k], opts)) { p.res = backup; return false; }
+  }
+  return true;
+}
+function affordAll(S, pi, cost, opts) {
+  const p = S.players[pi], backup = Object.assign({}, p.res);
+  const ok = payAll(S, pi, cost, opts);
+  p.res = backup;
+  return ok;
 }
 
 /* --------------------------------------------- Nahrungsgrenze und Städte füttern
@@ -841,8 +863,9 @@ function canGrow(S, pi, city) {
     return 'Diese Runde schon gewachsen.';
   const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
   const c = growCost(S, pi, city);
-  if (c.food && available(S, pi, 'food') < c.food) return 'Zu wenig Nahrung.';
-  if (c.coins && available(S, pi, 'coins') < c.coins) return 'Zu wenig Münzen.';
+  // Zusammen prüfen, nicht getrennt: sonst zählen dieselben Münzen doppelt.
+  if (!affordAll(S, pi, c)) return c.food && c.coins ? 'Zu wenig Nahrung und Münzen.'
+    : c.food ? 'Zu wenig Nahrung.' : 'Zu wenig Münzen.';
   return null;
 }
 // Kann die Stadt kostenpflichtig wachsen? (unabhängig vom Gratis-Kontingent)
@@ -855,8 +878,8 @@ function canGrowPaid(S, pi, city) {
       : 'Diese Runde schon gewachsen.';
   const blocked = growBlockReason(S, pi, city); if (blocked) return blocked;
   const cost = growPrice(S, pi, city);
-  if (cost.food && available(S, pi, 'food') < cost.food) return 'Zu wenig Nahrung.';
-  if (cost.coins && available(S, pi, 'coins') < cost.coins) return 'Zu wenig Münzen.';
+  if (!affordAll(S, pi, cost)) return cost.food && cost.coins ? 'Zu wenig Nahrung und Münzen.'
+    : cost.food ? 'Zu wenig Nahrung.' : 'Zu wenig Münzen.';
   return null;
 }
 /* mode: 'free' erzwingt kostenloses Wachstum (nur wenn Kontingent offen),
@@ -872,14 +895,14 @@ function growCity(S, pi, city, mode) {
   if (mode === 'paid') {
     const err = canGrowPaid(S, pi, city); if (err) return err;
     const cost = growPrice(S, pi, city);
-    if (cost.food) pay(S, pi, 'food', cost.food); if (cost.coins) pay(S, pi, 'coins', cost.coins);
+    if (!payAll(S, pi, cost)) return 'Zu wenig Mittel.';    // zahlt alles oder nichts
     city.pop++; city.grown = (city.grown || 0) + 1;   // freeUsed bleibt: bezahltes Wachstum verbraucht das Gratis-Kontingent nicht
     log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst auf ${city.pop} (${cost.food} Nahrung, ${cost.coins} Münzen).`);
     return null;
   }
   const err = canGrow(S, pi, city); if (err) return err;
   const c = growCost(S, pi, city);
-  if (c.food) pay(S, pi, 'food', c.food); if (c.coins) pay(S, pi, 'coins', c.coins);
+  if (!payAll(S, pi, c)) return 'Zu wenig Mittel.';
   city.pop++; city.grown = (city.grown || 0) + 1;
   if (c.free) city.freeUsed = (city.freeUsed || 0) + 1;
   log(S, 'act', `${civOf(S.players[pi]).n}: Stadt wächst auf ${city.pop}` +
@@ -957,7 +980,7 @@ function canFound(S, pi, r, c) {
 function foundCity(S, pi, r, c) {
   const err = canFound(S, pi, r, c); if (err) return err;
   const cost = foundCost(S, pi, r, c);
-  pay(S, pi, 'food', cost);
+  if (!pay(S, pi, 'food', cost)) return 'Zu wenig Nahrung.';
   const pop = isAbil(S.players[pi], 'siedler') ? 2 : 1;   // Russland: Städte mit 2 Bevölkerung
   const city = { id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round };
   S.cities.push(city);
@@ -1009,16 +1032,18 @@ function roadPrice(S, pi, r, c, target) {
    WICHTIG: Die Oberfläche muss diese Funktion benutzen, statt die Stufe selbst
    herzuleiten. Genau daran scheiterte der Bau mit Eisenbahn ohne Rad: das Blatt
    wählte auf leeren Feldern immer Stufe 1 und zeigte den Knopf nur mit Rad, obwohl
-   buildRoad Stufe 2 längst erlaubt hätte.
-   Wer das Rad hat, baut auf leerem Feld zuerst die Straße – der Zwischenschritt ist
-   nicht teurer (1 + 1 = 2 wie der Direktbau) und lässt sich früher bezahlen.
-   Wer nur die Eisenbahn hat, überspringt die Straßenstufe. */
+   buildRoad Stufe 2 längst erlaubt hätte. */
+function roadTargets(S, pi, r, c) {
+  const p = S.players[pi], lvl = roadLevel(S, r, c), out = [];
+  if (lvl >= 2) return out;                           // schon fertig ausgebaut
+  if (lvl < 1 && has(p, 'rad')) out.push(1);
+  if (has(p, 'eisenbahn')) out.push(2);
+  return out;
+}
+/* Die günstigste noch mögliche Stufe – für alles, was nur eine Antwort braucht. */
 function roadTarget(S, pi, r, c) {
-  const p = S.players[pi], lvl = roadLevel(S, r, c);
-  if (lvl >= 2) return null;                          // schon fertig ausgebaut
-  if (lvl >= 1) return has(p, 'eisenbahn') ? 2 : null;
-  if (has(p, 'rad')) return 1;
-  return has(p, 'eisenbahn') ? 2 : null;
+  const z = roadTargets(S, pi, r, c);
+  return z.length ? z[0] : null;
 }
 function canBuildRoads(p) { return has(p, 'rad') || has(p, 'eisenbahn'); }
 function buildRoad(S, pi, r, c, target) {
