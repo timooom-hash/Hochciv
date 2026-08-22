@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v40)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v43)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -35,13 +35,13 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/bots.js` | 450 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
 | `js/tutorial.js` | 1000 | Geführtes Übungsspiel: **29 Schritte**, feste Würfelfolge, Schienen |
-| `test.js` | 2810 | **769 Assertions**, `node test.js` |
+| `test.js` | 2900 | **787 Assertions**, `node test.js` |
 | `smoke.js` | 1060 | **62 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v40`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v43`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -73,7 +73,7 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 769 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 787 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (62 Schritte), inklusive
@@ -197,8 +197,15 @@ Aus dieser Sitzung (21.8.):
   von selbst — der Spieler lernt stattdessen den Gegenangriff. Siehe ANNAHMEN.md.
   Fragil: das Zielfeld neben Griechenlands Hauptstadt ist das einzige erreichbare
   (`tutStrikeSpot` hat eine Rückfallebene).
+- **Griechenlands Militärforschung ist im Tutorial vorgegeben** (`TUT_FOE_MILITARY`,
+  Hook `tutBotTech` in `botResearch`): Eisenverarbeitung und Stahl statt Stadtmauern und
+  Burgenbau, damit seine Hauptstadt angreifbar bleibt. Gewürfelt wird normal weiter, nur
+  das Ergebnis wird getauscht — die feste Würfelfolge bleibt dadurch unberührt.
 - **Bot-Armeeprioritäten neu** (neunstufig, siehe ANNAHMEN.md). 1–6 werden in
   `botPlanArmies` über alle Armeen abgestimmt, 7–9 bleiben je Armee einzeln.
+  Verteidigung löst **nur bei laufender Belagerung** aus (`S.sieges[Gegner|Stadt] >= 1`),
+  nicht bei jeder danebenstehenden Armee. Eine Eroberung braucht zwei erfolgreiche Züge,
+  also bleibt immer eine Runde Reaktionszeit.
 - **Wachstum für 2 statt 3 Münzen:** `canGrow` prüfte Nahrung und Münzen getrennt gegen
   denselben Vorrat, und `growCity` ignorierte den Rückgabewert des zweiten `pay`. Jetzt
   `payAll`/`affordAll` — alles oder nichts, mit Rückrollen.
@@ -219,9 +226,10 @@ Aus dieser Sitzung (21.8.):
 
 ## Offene Punkte / bewusst nicht umgesetzt
 
-0a. **Die neuen Armeeprioritäten verschieben die Balance deutlich.** Je 200 Bot-Partien:
-   Median 5 → 7 Runden, Militärsiege 187 → 130, Forschungssiege 13 → 70. Bots verteidigen
-   jetzt zuerst und erobern sich langsamer. Ob das so gewollt ist, muss der Autor sagen.
+0a. **Die neuen Armeeprioritäten verschieben die Balance.** Je 200 Bot-Partien:
+   Militärsiege 187 (alt) → 130 (v39) → 152 (v43, Trigger ist die laufende Belagerung),
+   Median 5 → 7 → 6 Runden. Der größte Teil der Verschiebung ist damit zurückgenommen.
+   Ob der Rest so gewollt ist, muss der Autor sagen.
 
 0b. **Bots bauen keine Straßen** — gemessen über 25 vollständige Bot-Partien: null
    Straßen, null Handelsrouten. Die Regel ist damit praktisch ein reiner Vorteil für den

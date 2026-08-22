@@ -1060,3 +1060,113 @@ Der Schritt „Jede Bevölkerung isst" zählte je Stadt einzeln, wie oft sie noc
 könnte, und summierte. Jede Stadt tat dabei so, als wüchsen die anderen nicht – bei 11
 Nahrung kam so „33×" heraus. Jetzt wird reihum probiert, bis keine Stadt mehr kann, und
 der Text nennt zusätzlich die tatsächliche Produktion.
+
+
+---
+
+## Tutorial: Gegenrechnung und Griechenlands Militärforschung (v41)
+
+### Der Machtvergleich war falsch herum
+
+Der Schritt „Rechne nach, bevor du kaufst" behauptete, Griechenlands Angriff übersteige
+die Verteidigung. Gemessen stimmte das nicht: Machtwert 5, zwei Armeen also **10 gegen
+14** – die Verteidigung hätte gehalten. Der Text rechnet jetzt weiter:
+
+| Posten | |
+|---|---|
+| Machtwert jetzt | 5 |
+| 3 Städte wachsen je 1 | +3 |
+| eine neue Stadt gegründet | +1 |
+| **Machtwert dann** | **9** |
+| × 2 Armeen | **18** |
+
+18 gegen 14 – der Kauf wäre eine Runde später trotzdem verloren. Alle Zahlen kommen aus
+dem laufenden Spielstand (Städtezahl, Bevölkerung), nicht aus dem Text.
+
+### Griechenland forscht im Militärfeld jetzt vorgegeben
+
+`TUT_FOE_MILITARY = ['eisenverarbeitung', 'stahl']` statt der ausgewürfelten Stadtmauern
+und Burgenbau. Grund: Mit diesen beiden kam Griechenlands Hauptstadt auf **13**
+Verteidigung, und die Drohung im Gegenangriffs-Schritt wäre bloß symbolisch gewesen –
+der Spieler hätte sie nie erobern können. Jetzt steht sie bei **3** (nur Bevölkerung plus
+Armeen daneben): Zieht der Bot seine Armeen nicht zurück, fällt sie tatsächlich, denn der
+Spieler greift mit Belagerungsmaschinen und 3 Macht mit 8 an.
+
+**Umgesetzt, ohne die Würfelfolge zu verschieben.** `botResearch` ignoriert `avail`
+komplett – Bots würfeln direkt aus dem Techpool. Die Vorgabe konnte also nicht über die
+Verfügbarkeit laufen. Stattdessen würfelt `botResearch` ganz normal weiter und tauscht am
+Ende nur das **Ergebnis** (`tutBotTech`). Gemessen: Der Würfelzähler steht an derselben
+Stelle wie vorher (195 beim Machtschritt), der übrige Ablauf ist unverändert.
+Außerhalb des Tutorials greift der Hook nicht (`ui.tut` wird geprüft).
+
+### Was das NICHT ändert
+
+Die Bot-Prioritäten prüfen weiterhin **nicht**, wie gefährlich eine Bedrohung ist: Prio 3
+greift, sobald eine feindliche Armee die eigene Hauptstadt in Reichweite hat – unabhängig
+davon, ob sie sie erobern könnte. Vor dieser Änderung zog Griechenland also auch dann
+zurück, wenn seine Hauptstadt mit 13 gegen 8 sicher gewesen wäre. Mit den neuen
+Forschungen deckt sich das Verhalten mit der Lage; das Verhalten selbst ist unverändert.
+
+
+---
+
+## Verteidigt wird erst bei laufender Belagerung (v43)
+
+Ursprünglich lösten die Verteidigungsprioritäten 2–5 aus, sobald **irgendeine** feindliche
+Armee eine eigene Stadt in Reichweite hatte – auch eine chancenlose. Ein Zwischenstand
+(v42) rechnete deshalb aus, ob der Angriff die Verteidigung ohne die eigenen beweglichen
+Armeen überstiege. Das war unnötig kompliziert. Jetzt gilt schlicht:
+
+```
+bedroht  ⟺  S.sieges[Gegner|Stadt] >= 1
+```
+
+Also: **Hat ein Gegner in einem der letzten Züge einen erfolgreichen Angriff auf diese
+Stadt geführt?** Nur dann ziehen alle erreichbaren Armeen zur Verteidigung zurück.
+
+**Warum das reicht:** Eine Eroberung braucht zwei erfolgreiche Züge in Folge. Zieht der
+Bot Verteidiger ab und beginnt dadurch überhaupt erst eine Belagerung, bleibt ihm eine
+volle Runde, sie zurückzuholen – dieselbe Vorwarnzeit, die auch der Mensch hat („Zug 1/2"
+ist die Warnung). Eine Kraftrechnung im Voraus ist damit überflüssig.
+
+Nebeneffekt im Protokoll: Die Ursache ist jetzt sichtbar. Im Tutorial steht
+`Kampf um Griechenlands Stadt: Angriff 8 > Verteidigung 3 (Zug 1/2)` und direkt darunter
+`Griechenland: Armee verteidigt die Hauptstadt`.
+
+### Gemessener Balance-Effekt
+
+Je 200 vollständige Bot-Partien, gleiche Seeds:
+
+| | Median Runden | Militärsiege | Forschungssiege |
+|---|---|---|---|
+| vor der neuen Prioritätenliste | 5 | 187 | 13 |
+| jede Armee löst aus (v39–v41) | 7 | 130 | 70 |
+| Kraftrechnung (v42, verworfen) | 6 | 146 | 54 |
+| **nur laufende Belagerung (v43)** | **6** | **152** | **48** |
+
+Der Belagerungs-Trigger liegt noch näher am alten Verhalten als die Kraftrechnung – Bots
+binden nur dann Armeen, wenn wirklich etwas passiert ist.
+
+### Wirkung im Tutorial
+
+Genau deshalb bekommt Griechenland dort Eisenverarbeitung und Stahl statt Stadtmauern und
+Burgenbau (v41): Mit Mauern und Burgenbau stünde seine Hauptstadt bei 13, der Angriff von
+8 käme nicht durch, **es entstünde kein Belagerungszähler** – und der Bot hätte keinen
+Grund zurückzuziehen. Mit den neuen Forschungen steht sie bei 3, der Angriff sitzt, der
+Zähler springt auf 1/2 und der Rückzug folgt. Die beiden Änderungen greifen ineinander.
+
+## Bot-Forschung: zufällig im Spiel, fest im Tutorial
+
+Bots forschen **absichtlich** ohne Rücksicht auf Verfügbarkeiten – sie würfeln Feld,
+Zeitalter und Technologie direkt aus dem Pool. Das bleibt so.
+
+Nur im Tutorial liegt das Ergebnis fest, und zwar auf zwei Wegen:
+- Die **feste Würfelfolge** (`TUT_DICE`) macht jeden Durchlauf identisch – auch für alle
+  anderen Reiche.
+- Der Hook **`tutBotTech`** tauscht zusätzlich das Ergebnis im Militärfeld für
+  Griechenland. Gewürfelt wird trotzdem ganz normal, nur das Resultat wird ersetzt –
+  sonst verschöbe sich die Folge.
+
+Abgesichert durch zwei komplette Tutorial-Durchläufe im Test: identische Technologien bei
+**allen** Reichen, identischer Würfelverbrauch, Eisenverarbeitung und Stahl dabei,
+Stadtmauern und Burgenbau nicht. Außerhalb des Tutorials gibt der Hook `null` zurück.

@@ -268,6 +268,11 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     const a = { id: S.nextId++, owner, r, c, mp: 0, born: -1 };
     S.armies.push(a); return a;
   };
+  // Spieler 1 ist im Aufbau ein Mensch – sein Machtwert kommt aus gekaufter Macht,
+  // nicht aus der Bevölkerung. Für Kampftests deshalb ausdrücklich setzen.
+  const macht = (S, pi, n) => { S.players[pi].power = n; };
+  // Verteidigt wird erst, wenn eine Belagerung läuft (Zähler 1/2).
+  const belagert = (S, angreifer, city) => { S.sieges[angreifer + '|' + city.id] = 1; };
   // nur die abgestimmten Prioritäten 1–6 ausführen; zurück kommen die freien Armeen
   const plan = (S, pi) => {
     for (const a of armiesOf(S, pi)) { a.mp = moveAllowance(S, pi); delete a.botDone; }
@@ -302,25 +307,33 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     eq(plan(S, 0).length, 1, 'ohne Belagerung bleibt die Armee für Prio 7–9 frei');
     eq([a.r, a.c], [5, 8], 'und sie steht noch da');
   }
-  // Prio 3: eigene Hauptstadt verteidigen, möglichst dicht am Angreifer
+  // Prio 3: eigene Hauptstadt verteidigen, möglichst dicht am Angreifer.
+  // Die Bedrohung muss echt sein: Angriff > Verteidigung ohne die eigenen Armeen.
   {
     const S = flach();
-    const hs = stadt(S, 0, 5, 5, 3, true);
-    stadt(S, 1, 5, 12, 3, true);
+    const hs = stadt(S, 0, 5, 5, 1, true);
+    stadt(S, 1, 5, 12, 6, true); macht(S, 1, 6);
     const feind = armee(S, 1, 5, 6);
     armee(S, 0, 5, 8); armee(S, 0, 7, 5);
+    eq(threateningArmies(S, 0, hs).length, 0, 'ohne laufende Belagerung noch keine Bedrohung');
+    belagert(S, 1, hs);
+    eq(threateningArmies(S, 0, hs).length, 1, 'mit Zähler 1/2 gilt die Armee als Bedrohung');
     eq(plan(S, 0).length, 0, 'beide Armeen werden für die Verteidigung gebunden');
     eq(armiesOf(S, 0).every(a => hexDistance(a.r, a.c, hs.r, hs.c) <= projectRange(S, 0)), true,
       'beide zählen zur Verteidigung der Hauptstadt');
     eq(armiesOf(S, 0).some(a => hexDistance(a.r, a.c, feind.r, feind.c) === 1), true,
       'mindestens eine steht direkt neben dem Angreifer');
   }
-  // Prio 2: flankieren geht vor verteidigen – und wirkt im Kampf
+  // Prio 2: flankieren geht vor verteidigen – und wirkt im Kampf.
+  // Zwei Bedingungen müssen zugleich gelten: die Bedrohung ist echt (Angriff 6 >
+  // bareDefense 1) UND der eigene Machtwert übersteigt den des Gegners (Bots rechnen
+  // mit der Gesamtbevölkerung, deshalb die zweite Stadt weit im Hinterland).
   {
     const S = flach();
-    stadt(S, 0, 5, 5, 3, true);
-    stadt(S, 1, 5, 16, 3, true);
-    armee(S, 1, 5, 6);
+    const hs2 = stadt(S, 0, 5, 5, 1, true);
+    stadt(S, 0, 1, 1, 8, false);             // Hinterland: hebt den Machtwert auf 9
+    stadt(S, 1, 5, 16, 6, true); macht(S, 1, 6);
+    armee(S, 1, 5, 6); belagert(S, 1, hs2);
     armee(S, 0, 5, 5);                       // Partner steht schon neben dem Feind
     armee(S, 0, 5, 8);                       // soll sich gegenüber stellen
     plan(S, 0);
@@ -335,8 +348,9 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     stadt(S, 0, 2, 2, 3, true);              // Hauptstadt unbedroht
     const klein = stadt(S, 0, 9, 5, 1, false);
     const gross = stadt(S, 0, 9, 12, 4, false);
-    stadt(S, 1, 5, 16, 3, true);
+    stadt(S, 1, 5, 16, 8, true); macht(S, 1, 8);
     armee(S, 1, 9, 6); armee(S, 1, 9, 13);
+    belagert(S, 1, klein); belagert(S, 1, gross);   // beide stehen bei 1/2
     const v = armee(S, 0, 9, 9);             // genau dazwischen
     plan(S, 0);
     eq(hexDistance(v.r, v.c, gross.r, gross.c) <= projectRange(S, 0), true,
@@ -362,11 +376,11 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   {
     const S = flach();
     stadt(S, 0, 2, 2, 3, true);
-    const meine = stadt(S, 0, 5, 8, 2, false);
+    const meine = stadt(S, 0, 5, 8, 1, false);
     const ziel = stadt(S, 1, 5, 12, 1, false);
-    stadt(S, 1, 5, 16, 3, true);
-    S.sieges['0|' + ziel.id] = 1;
-    armee(S, 1, 5, 9);
+    stadt(S, 1, 5, 16, 6, true); macht(S, 1, 6);
+    S.sieges['0|' + ziel.id] = 1;            // ich belagere
+    armee(S, 1, 5, 9); belagert(S, 1, meine); // und werde selbst belagert
     const a = armee(S, 0, 5, 10);
     plan(S, 0);
     eq(hexDistance(a.r, a.c, meine.r, meine.c) <= projectRange(S, 0), true,
@@ -375,9 +389,9 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   // Eine Armee, die schon richtig steht, bleibt stehen
   {
     const S = flach();
-    const hs = stadt(S, 0, 5, 5, 3, true);
-    stadt(S, 1, 5, 16, 3, true);
-    armee(S, 1, 5, 6);
+    const hs = stadt(S, 0, 5, 5, 1, true);
+    stadt(S, 1, 5, 16, 6, true); macht(S, 1, 6);
+    armee(S, 1, 5, 6); belagert(S, 1, hs);
     const a = armee(S, 0, 5, 4);             // in Reichweite der Hauptstadt
     const vorher = [a.r, a.c];
     plan(S, 0);
@@ -385,6 +399,31 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
       'sie bleibt in Reichweite der Hauptstadt');
     eq(hexDistance(a.r, a.c, 5, 6) <= hexDistance(vorher[0], vorher[1], 5, 6), true,
       'und rückt höchstens näher an den Angreifer heran');
+  }
+  // Verteidigt wird erst bei laufender Belagerung – eine bloß danebenstehende Armee
+  // bindet keine Verteidiger.
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 1, 5, 16, 9, true); macht(S, 1, 9);
+    armee(S, 1, 5, 6);                       // steht schon neben der Hauptstadt
+    armee(S, 0, 8, 5);
+    eq(threateningArmies(S, 0, hs).length, 0, 'ohne Zähler gilt das nicht als Bedrohung');
+    eq(plan(S, 0).length, 1, 'die eigene Armee bleibt für andere Aufgaben frei');
+    // Erst der erste gewonnene Kampf löst aus
+    belagert(S, 1, hs);
+    eq(threateningArmies(S, 0, hs).length, 1, 'mit Zähler 1/2 sehr wohl');
+    eq(plan(S, 0).length, 0, 'dann wird die Armee gebunden');
+  }
+  // Ein Zähler auf eine FREMDE Stadt löst nichts aus
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 3, true);
+    const fremd = stadt(S, 1, 5, 16, 9, true); macht(S, 1, 9);
+    armee(S, 1, 5, 6);
+    armee(S, 0, 8, 5);
+    S.sieges['0|' + fremd.id] = 1;           // ICH belagere, nicht umgekehrt
+    eq(threateningArmies(S, 0, hs).length, 0, 'die eigene Belagerung bedroht nichts');
   }
   // Der Merker botDone bleibt nicht im Spielstand zurück
   {
@@ -2635,6 +2674,56 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(look.every(st => !!st.goal), true, 'der Leseschritt hat ein Ziel');
   eq(TUT_STEPS[TUT_STEPS.length - 1].goal, undefined,
     'der letzte Schritt hat keine Aufgabe – sonst würde er sich selbst beenden');
+}
+
+/* Bots forschen zufällig – nur im Tutorial liegt das Ergebnis fest.
+   Der Hook tauscht ausschließlich das ERGEBNIS im Militärfeld; gewürfelt wird normal
+   weiter, damit sich die feste Würfelfolge nicht verschiebt. */
+{
+  // Außerhalb des Tutorials greift der Hook nicht.
+  // ACHTUNG: hier keine lokale Konstante `S` anlegen – tutorialSetup() schreibt in die
+  // globale, eine Schattenvariable würde stillschweigend auf ein anderes Spiel zeigen.
+  ui = { tut: null };
+  {
+    const frei = mk('russland');
+    eq(tutBotTech(frei, 0, 2), null, 'ohne laufendes Tutorial keine Vorgabe');
+  }
+  // Im Tutorial: nur Griechenland, nur das Militärfeld
+  tutorialSetup();
+  const gi = S.players.findIndex(p => p.civ === 'griechenland');
+  const ri = S.players.findIndex(p => p.civ === 'russland');
+  eq(tutBotTech(S, gi, 2).k, 'eisenverarbeitung', 'Griechenland bekommt zuerst Eisenverarbeitung');
+  eq(tutBotTech(S, gi, 0), null, 'in anderen Feldern gibt es keine Vorgabe');
+  eq(tutBotTech(S, ri, 2), null, 'andere Reiche sind nicht betroffen');
+  S.players[gi].techs.eisenverarbeitung = true;
+  eq(tutBotTech(S, gi, 2).k, 'stahl', 'danach Stahl');
+  S.players[gi].techs.stahl = true;
+  eq(tutBotTech(S, gi, 2), null, 'danach greift wieder der Würfel');
+
+  // Zwei komplette Durchläufe: Griechenland forscht jedes Mal dasselbe
+  const durchlauf = () => {
+    tutorialSetup();
+    for (let i = 0; i < TUT_STEPS.length; i++) {
+      ui.tut.i = i; tutEnter();
+      const st = TUT_STEPS[i];
+      if (st.goal && !st.goal()) st.auto();
+    }
+    const g = S.players.findIndex(p => p.civ === 'griechenland');
+    return {
+      techs: Object.keys(S.players[g].techs).filter(k => S.players[g].techs[k]).sort().join(','),
+      wuerfel: ui.tut.die,
+      alle: S.players.map(p => Object.keys(p.techs).filter(k => p.techs[k]).sort().join(',')).join('|'),
+    };
+  };
+  const a1 = durchlauf(), a2 = durchlauf();
+  eq(a1.techs, a2.techs, 'Griechenland forscht in beiden Durchläufen dasselbe');
+  eq(a1.alle, a2.alle, 'auch alle anderen Reiche forschen identisch');
+  eq(a1.wuerfel, a2.wuerfel, 'und es werden gleich viele Würfel verbraucht');
+  eq(a1.techs.includes('eisenverarbeitung') && a1.techs.includes('stahl'), true,
+    'Eisenverarbeitung und Stahl sind dabei: ' + a1.techs);
+  eq(a1.techs.includes('stadtmauern') || a1.techs.includes('burgenbau'), false,
+    'Stadtmauern und Burgenbau nicht: ' + a1.techs);
+  ui = { sel: null, army: null, mode: null, botTimer: null };
 }
 
 /* ==================================================== Tutorial
