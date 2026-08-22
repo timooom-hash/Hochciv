@@ -132,7 +132,6 @@ function tutGuardSpot(army, pref) {
 const TUT_STEPS = [
   /* ------------------------------------------------------------------ Runde 1 */
   {
-    sub: 'Willkommen',
     t: 'Das hier ist ein echtes Spiel',
     html: () => `
       <p>Du spielst <b>Russland</b>, die anderen drei Reiche übernehmen Bots auf dem
@@ -149,7 +148,6 @@ const TUT_STEPS = [
     hl: () => [[tutCap().r, tutCap().c]],
   },
   {
-    sub: 'Zugablauf 1 von 5 · Einkommen',
     t: 'Dein Umland',
     html: () => `
       <p>Alle sechs Felder rund um deine Hauptstadt sind unter deiner Kontrolle und bringen
@@ -163,40 +161,33 @@ const TUT_STEPS = [
     hl: () => [...controlledTiles(S, RU())].map(unkey),
   },
   {
-    sub: 'Zugablauf 1 von 5 · Einkommen',
     t: 'Woher deine Zahlen kommen',
-    html: () => {
-      const b = incomeBreakdown(S, RU());
-      const rows = b.rows.map(r => `<tr><td>${r.count} × ${r.name}</td>` +
-        r.y.map(v => `<td>${v || '·'}</td>`).join('') + '</tr>').join('');
-      return `
+    html: () => `
       <p>Oben rechts in der Kopfzeile stehen 🔬 Wissenschaft, 🌾 Nahrung, 🪙 Münzen und
       ⚔︎ Macht.
       So setzen sie sich in diesem Zug zusammen:</p>
       <table class="tut-tab">
         <tr><th align="left">Quelle</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>
-        ${rows}
-        <tr><td>${b.pop.count} Bevölkerung</td>${b.pop.y.map(v => `<td>${v}</td>`).join('')}</tr>
-        <tr class="sum"><td>Summe</td>${b.total.map(v => `<td>${v}</td>`).join('')}</tr>
+        <tr><td>4 × Grasland</td><td>·</td><td>4</td><td>·</td></tr><tr><td>1 × Wald</td><td>·</td><td>1</td><td>1</td></tr><tr><td>1 × Fluss</td><td>·</td><td>1</td><td>1</td></tr>
+        <tr><td>1 Bevölkerung</td><td>1</td><td>-1</td><td>1</td></tr>
+        <tr class="sum"><td>Summe</td><td>1</td><td>5</td><td>3</td></tr>
       </table>
       <p>Jeder Bevölkerungspunkt bringt <b>+1 Wissenschaft und +1 Münze</b> und <b>frisst
       1 Nahrung</b> – jede Runde. Russland bekommt zusätzlich +1 Nahrung in jedem Wald.</p>
       <div class="tut-key"><b>Merke</b> Ressourcen <b>verfallen am Zugende</b>. Nur Macht
       bleibt liegen – gib also alles aus. Münzen können <b>2:1</b> als Nahrung oder
-      Wissenschaft verwendet werden.</div>`;
-    },
+      Wissenschaft verwendet werden.</div>`,
     hl: () => [...controlledTiles(S, RU())].map(unkey),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die zweite Stadt',
     html: () => `
       <p>Das golden umrandete Feld kostet
-      <b>${foundCost(S, RU(), ...TUT_CITY_1)} Nahrung</b> – 1 Basiskosten für die erste
+      <b>4 Nahrung</b> – 1 Basiskosten für die erste
       zusätzliche Stadt plus 3 für den Weg dorthin (gerechnet wird der Weg über passierbare
       Felder, nicht die Luftlinie).</p>
-      <p><b>Warum dieses Feld?</b> Ringsum liegen ${tutNeighbourText(...TUT_CITY_1)}. Ab der
-      nächsten Runde bringt die Stadt dir <b>${tutGainText(...TUT_CITY_1)}</b> – die eine
+      <p><b>Warum dieses Feld?</b> Ringsum liegen 5 × Wald, 1 × Grasland. Ab der
+      nächsten Runde bringt die Stadt dir <b>+1 🔬, +5 🌾, +6 🪙</b> – die eine
       Bevölkerung isst dabei schon mit. Wälder sind für <i>dich</i> besonders viel wert: die
       russische Grundfähigkeit gibt +1 Nahrung in jedem Wald, dazu kommt 1 Münze. Außerdem liegt das Feld genau die nötigen 3 Felder
       von der Hauptstadt entfernt (näher ist verboten) und der Weg ist kurz, das drückt den
@@ -209,7 +200,6 @@ const TUT_STEPS = [
     auto: () => foundCity(S, RU(), ...TUT_CITY_1),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Forschen: Schrift',
     html: () => `
       <p>Jede Technologie ist nur mit <b>50 % Wahrscheinlichkeit</b> in einer Partie
@@ -218,7 +208,7 @@ const TUT_STEPS = [
       Zeitalters und Feldes erforschst, würfelst du sofort die Verfügbarkeiten des nächsten
       Zeitalters in diesem Feld aus. Es ist immer mindestens eine Technologie je Zeitalter
       verfügbar.</p>
-      <p><b>Warum Schrift?</b> Sie kostet ${techCost(S, RU(), TECH_BY_KEY.schrift)}
+      <p><b>Warum Schrift?</b> Sie kostet 1
       Wissenschaft und gibt <b>+1 Wissenschaft je Bevölkerung</b> – dauerhaft, in jeder
       Runde. Das ist die billigste Verdopplung im Spiel, und sie wirkt sofort.</p>
       <p><b>So forschst du:</b> unten auf <b>Forschen</b> → im Bogen die Kachel
@@ -232,19 +222,15 @@ const TUT_STEPS = [
     auto: () => doResearch(S, RU(), 'schrift'),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die Hauptstadt wachsen lassen',
-    html: () => {
-      const pr = growPrice(S, RU(), tutCap());
-      return `
+    html: () => `
       <p>Wachsen kostet je <b>1 Nahrung und 1 Münze pro vorhandener Bevölkerung</b>. Deine
-      Hauptstadt hat ${tutCap().pop}, es kostet also ${pr.food} Nahrung und ${pr.coins}
+      Hauptstadt hat 1, es kostet also 1 Nahrung und 1
       Münzen. Von 2 auf 3 wären es 2 und 2.</p>
-      <p><b>Warum jetzt?</b> Du hast noch ${tutRes().food} Nahrung und ${tutRes().coins}
+      <p><b>Warum jetzt?</b> Du hast noch 1 Nahrung und 3
       Münzen übrig, und beides verfällt am Zugende. Der Punkt bringt dir ab der nächsten
       Runde jede Runde +1 Wissenschaft (mit Schrift +2) und +1 Münze.</p>
-      <p><b>So wächst du:</b> Hauptstadt antippen → <b>Bevölkerung wachsen</b>.</p>`;
-    },
+      <p><b>So wächst du:</b> Hauptstadt antippen → <b>Bevölkerung wachsen</b>.</p>`,
     task: 'Tippe deine <b>Hauptstadt</b> an und wähle <b>Bevölkerung wachsen</b>.',
     hl: () => [[tutCap().r, tutCap().c]],
     allow: { bar: [], labels: [/Bevölkerung wachsen/], hex: () => [[tutCap().r, tutCap().c]] },
@@ -252,12 +238,11 @@ const TUT_STEPS = [
     auto: () => growCity(S, RU(), tutCap(), 'paid'),
   },
   {
-    sub: 'Zugablauf 3 bis 5',
     t: 'Zug beenden',
     html: () => `
-      <p>Übrig sind ${tutRes().sci} 🔬, ${tutRes().food} 🌾, ${tutRes().coins} 🪙. Für eine
-      Armee (${armyCost(S, RU())} Münzen) oder einen Punkt Macht
-      (${powerPrice(S, RU())} Münzen) reicht es noch nicht – der Rest verfällt. Das ist
+      <p>Übrig sind 0 🔬, 0 🌾, 2 🪙. Für eine
+      Armee (5 Münzen) oder einen Punkt Macht
+      (5 Münzen) reicht es noch nicht – der Rest verfällt. Das ist
       normal in Runde 1.</p>
       <p>Nach deinem Zug folgen <b>Kampf</b> und <b>Siegprüfung</b>; du hast keine Armeen,
       also passiert nichts. Danach ziehen die drei Bots, jeder in einem eigenen Fenster.</p>
@@ -275,7 +260,6 @@ const TUT_STEPS = [
     },
   },
   {
-    sub: 'Die Gegner',
     t: 'Was die Bots getan haben',
     html: () => `
       <p>Ein Bot würfelt für jede Aktion gegen seinen Schwierigkeitsgrad: Siedler braucht
@@ -287,7 +271,7 @@ const TUT_STEPS = [
       mit Grund. Mit ✕ schließen.</p>
       <div class="tut-key"><b>Merke</b> Der <b>Machtwert eines Bots ist immer seine
       Gesamtbevölkerung</b>. Griechenland hat gerade
-      ${popOf(S, S.players.findIndex(p => p.civ === 'griechenland'))}.</div>`,
+      3.</div>`,
     task: 'Öffne einmal das <b>Protokoll</b>.',
     allow: { bar: ['a-log'] },
     goal: () => !!ui.tutSawLog,
@@ -297,36 +281,28 @@ const TUT_STEPS = [
   },
   /* ------------------------------------------------------------------ Runde 2 */
   {
-    sub: 'Zugablauf 1 von 5 · Einkommen',
     t: 'Runde 2: exponentielles Wachstum',
-    html: () => {
-      const inc = income(S, RU());
-      return `
-      <p>Dein Einkommen liegt jetzt bei <b>${inc.sci} 🔬, ${inc.food} 🌾,
-      ${inc.coins} 🪙</b> – in Runde 1 waren es 1, 5 und 3.</p>
+    html: () => `
+      <p>Dein Einkommen liegt jetzt bei <b>6 🔬, 9 🌾,
+      10 🪙</b> – in Runde 1 waren es 1, 5 und 3.</p>
       <p>Drei Dinge greifen zusammen: die zweite Stadt brachte sechs neue Felder, die
       Hauptstadt hat 2 Bevölkerung, und <b>Schrift</b> verdoppelt deren Wissenschaft. Genau
       dieser Effekt entscheidet die Partie – nicht die Armeen.</p>
       <p>Faustregel: die wichtigsten <b>Multiplikatoren</b> und <b>viele Städte</b> in
       Kombination – eines ohne das andere bringt wenig. Papier auf drei Grasland ist wenig
-      wert, zehn Städte ohne Landwirtschaft verhungern.</p>`;
-    },
+      wert, zehn Städte ohne Landwirtschaft verhungern.</p>`,
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Forschen: Papier',
-    html: () => {
-      const g = [...controlledTiles(S, RU())].filter(k => terrainAt(S, ...unkey(k)) === 'G').length;
-      return `
+    html: () => `
       <p>Mit Schrift hat sich das Mittelalter der Forschung geöffnet – deshalb steht jetzt
       <b>Papier</b> im Bogen. Es kostet
-      ${techCost(S, RU(), TECH_BY_KEY.papier)} Wissenschaft.</p>
+      6 Wissenschaft.</p>
       <p><b>Warum Papier?</b> Es gibt <b>+1 Wissenschaft auf jedem Grasland</b>. Du
-      kontrollierst ${g} Grasland-Felder, das sind ${g} Wissenschaft mehr in <i>jeder</i>
-      Runde für einmalig ${techCost(S, RU(), TECH_BY_KEY.papier)}. Nach zwei Runden hat es
+      kontrollierst 5 Grasland-Felder, das sind 5 Wissenschaft mehr in <i>jeder</i>
+      Runde für einmalig 6. Nach zwei Runden hat es
       sich mehrfach bezahlt.</p>
-`;
-    },
+`,
     dice: [5],                                   // Wissenschaftliche Methode wird verfügbar
     task: 'Öffne <b>Forschen</b> und kaufe <b>Papier</b>.',
     allow: { bar: ['a-tech'], techs: ['papier'] },
@@ -334,22 +310,17 @@ const TUT_STEPS = [
     auto: () => doResearch(S, RU(), 'papier'),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die dritte Stadt',
-    html: () => {
-      const sp = ui.tutSpot2 || TUT_CITY_2;
-      return `
-      <p>Die dritte Stadt kostet mehr: <b>${foundCost(S, RU(), ...sp)} Nahrung</b>
+    html: () => `
+      <p>Die dritte Stadt kostet mehr: <b>6 Nahrung</b>
       (3 Basiskosten bei zwei bestehenden Städten plus Weg). Die Basiskosten steigen
       1 / 3 / 6 / 10 – Ausbreitung wird teurer, je weiter du kommst.</p>
-      <p><b>Warum dieses Feld?</b> Ringsum liegen ${tutNeighbourText(...sp)}, das
-      bringt <b>${tutGainText(...sp)}</b> je Runde. Das Feld liegt an deinem bestehenden
+      <p><b>Warum dieses Feld?</b> Ringsum liegen 3 × Grasland, 2 × Fluss, 1 × Wald, das
+      bringt <b>+5 🔬, +5 🌾, +4 🪙</b> je Runde. Das Feld liegt an deinem bestehenden
       Gebiet – es füllt die Lücke, statt eine dritte Front zu öffnen. Kompakte Reiche
       verteidigen sich leichter.
-      ${sp[0] === TUT_CITY_2[0] && sp[1] === TUT_CITY_2[1] ? '' :
-        '<br><i>Hinweis: Der eigentlich vorgesehene Platz ist inzwischen von einem Bot besiedelt – deshalb dieses Feld.</i>'}</p>
-`;
-    },
+      </p>
+`,
     enter: () => { ui.tutSpot2 = tutSpot(TUT_CITY_2); },
     task: 'Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.',
     hl: () => [ui.tutSpot2 || TUT_CITY_2],
@@ -362,21 +333,17 @@ const TUT_STEPS = [
     auto: () => foundCity(S, RU(), ...(ui.tutSpot2 || TUT_CITY_2)),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Zweimal wachsen',
-    html: () => {
-      const cap = tutCap(), t1 = cityOn(...TUT_CITY_1);
-      return `
+    html: () => `
       <p>Jede Stadt darf einmal pro Runde wachsen. Die Hauptstadt kostet
-      ${growPrice(S, RU(), cap).food} Nahrung und ${growPrice(S, RU(), cap).coins} Münzen,
+      2 Nahrung und 2 Münzen,
       die jüngere Stadt nur
-      ${t1 ? growPrice(S, RU(), t1).food + ' und ' + growPrice(S, RU(), t1).coins : '1 und 1'} –
+      1 und 1 –
       kleine Städte wachsen billiger.</p>
       <p><b>Warum beide?</b> Nahrung und Münzen verfallen sonst. Und weil die Kosten mit der
       Größe steigen, ist es effizienter, viele kleine Städte gleichmäßig zu vergrößern als
       eine große.</p>
-`;
-    },
+`,
     hl: () => [[tutCap().r, tutCap().c], TUT_CITY_1],
     task: 'Lass <b>beide</b> golden umrandeten Städte je einmal wachsen.',
     allow: {
@@ -391,10 +358,9 @@ const TUT_STEPS = [
     },
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die erste Armee',
     html: () => `
-      <p>Eine Armee kostet <b>${armyCost(S, RU())} Münzen</b> – 5 je eigener Armee, die
+      <p>Eine Armee kostet <b>5 Münzen</b> – 5 je eigener Armee, die
       zweite also 10. Sie erscheint <i>in</i> einer Stadt und <b>muss sie im selben Zug
       verlassen</b>; Armeen stehen nie auf Städten, auch nicht auf eigenen.</p>
       <p><b>Warum überhaupt eine Armee?</b> Ohne Armee kannst du nichts angreifen und keine
@@ -410,7 +376,6 @@ const TUT_STEPS = [
     auto: () => { const t = cityOn(...TUT_CITY_1); if (t) buildArmy(S, RU(), t); },
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die Armee bewegen',
     html: () => `
       <p>Armeen ziehen <b>3 Felder</b> weit, nicht über Wasser (bis eine Technologie das
@@ -444,10 +409,9 @@ const TUT_STEPS = [
     },
   },
   {
-    sub: 'Zugablauf 3 bis 5',
     t: 'Zug beenden',
     html: () => `
-      <p>Übrig: ${tutRes().sci} 🔬, ${tutRes().food} 🌾, ${tutRes().coins} 🪙 – das verfällt.
+      <p>Übrig: 0 🔬, 0 🌾, 2 🪙 – das verfällt.
       Danach kommen Kampf und Siegprüfung, dann die Bots.</p>
       <p>Achte im Protokoll auf die Zeilen der Bots: Griechenland zieht seine Armeen nach
       vier Prioritäten – belagerte eigene Städte verteidigen, gegnerische Städte angreifen,
@@ -466,11 +430,10 @@ const TUT_STEPS = [
   },
   /* ------------------------------------------------------------------ Runde 3 */
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Forschen: Wissenschaftliche Methode',
     html: () => `
-      <p>Du hast ${tutRes().sci} Wissenschaft. <b>Wissenschaftliche Methode</b> kostet
-      ${techCost(S, RU(), TECH_BY_KEY.wiss_methode)} – über die Hälfte davon.</p>
+      <p>Du hast 20 Wissenschaft. <b>Wissenschaftliche Methode</b> kostet
+      11 – über die Hälfte davon.</p>
       <p><b>Warum trotzdem zuerst?</b> Sie senkt jede weitere Technologie um <b>2 in der
       Antike, 4 im Mittelalter, 6 in der Industrialisierung, 8 in der Moderne</b> – nie unter
       0. Danach kosten <b>Fischerei</b> und <b>Eisenverarbeitung</b> jeweils <b>0</b>. Sie
@@ -482,7 +445,6 @@ const TUT_STEPS = [
     auto: () => doResearch(S, RU(), 'wiss_methode'),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Zwei Technologien für null',
     html: () => `
       <p><b>Fischerei</b> (Meer +1 Nahrung) und <b>Eisenverarbeitung</b> (Macht kostet 4
@@ -500,25 +462,16 @@ const TUT_STEPS = [
     auto: () => { doResearch(S, RU(), 'fischerei'); doResearch(S, RU(), 'eisenverarbeitung'); },
   },
   {
-    sub: 'Zugablauf 4 von 5 · Kampf',
     t: 'Eine gegnerische Armee vor der Stadt',
-    html: () => {
-      const t = tutSiegeCity(), foe = tutSiegeArmy();
-      if (!t || !foe) return `<p>Die Belagerung hat sich aufgelöst – die Regel gilt
-        trotzdem: Angriff gegen Verteidigung, zwei Züge in Folge.</p>`;
-      const atk = attackValue(S, foe.owner, 1), def = defenseValue(S, t);
-      return `
+    html: () => `
       <p>Griechenland hat im eigenen Zug eine Armee neben deine Stadt gezogen und schon
       einmal angegriffen – im Protokoll steht dazu „Zug 1/2". Stadt und Armee sind golden
       umrandet.</p>
       <p><b>Angriffswert</b> = Machtwert je angreifender Armee, mehrere addieren sich:
-      <b>${atk}</b> (bei Bots ist das ihre Gesamtbevölkerung).<br>
+      <b>5</b> (bei Bots ist das ihre Gesamtbevölkerung).<br>
       <b>Verteidigungswert</b> = 1 je Stadtbevölkerung plus den Machtwert benachbarter
-      eigener Armeen: <b>${def}</b>.</p>
-      <p>${atk > def
-        ? 'Der Angriff ist höher. Ist er <b>zwei Züge in Folge</b> höher, verlierst du die Stadt und 2 Bevölkerung. Im Protokoll steht dann „Zug 1/2" – das ist deine Vorwarnung, du hast genau eine Runde Zeit.'
-        : 'Deine Verteidigung hält – am Zugende bricht die Belagerung zusammen.'}</p>`;
-    },
+      eigener Armeen: <b>1</b>.</p>
+      <p>Der Angriff ist höher. Ist er <b>zwei Züge in Folge</b> höher, verlierst du die Stadt und 2 Bevölkerung. Im Protokoll steht dann „Zug 1/2" – das ist deine Vorwarnung, du hast genau eine Runde Zeit.</p>`,
     enter: () => {
       const ru = RU();
       // Der Bot hat im letzten Zug von sich aus angegriffen – wir nehmen genau diese Armee.
@@ -546,27 +499,20 @@ const TUT_STEPS = [
     },
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die Antwort: Mauern und Burgenbau',
-    html: () => {
-      const t = tutSiegeCity(), a = tutSiegeArmy();
-      const cw = techCost(S, RU(), TECH_BY_KEY.stadtmauern);
-      const cb = techCost(S, RU(), TECH_BY_KEY.burgenbau);
-      const atk = a ? attackValue(S, a.owner, 1) : 0;
-      return `
-      <p><b>Stadtmauern</b> (${cw} Wissenschaft) geben <b>jeder</b> deiner Städte +5
-      Verteidigung. <b>Burgenbau</b> (${cb}) stellt in jede Stadt eine unbewegliche,
+    html: () => `
+      <p><b>Stadtmauern</b> (3 Wissenschaft) geben <b>jeder</b> deiner Städte +5
+      Verteidigung. <b>Burgenbau</b> (3) stellt in jede Stadt eine unbewegliche,
       virtuelle Armee: sie <b>projiziert deinen Machtwert auf die Stadt</b> – erst dadurch
-      hilft gekaufte Macht auch der Verteidigung. Du hast ${tutRes().sci} Wissenschaft.</p>
-      ${t ? `<p>Verteidigung jetzt <b>${defenseValue(S, t)}</b>, Angriff <b>${atk}</b>.
-      Mauern allein bringen dich auf ${defenseValue(S, t) + (has(tutP(), 'stadtmauern') ? 0 : 5)} –
-      der Bot wächst aber weiter. Deshalb kommt im nächsten Schritt noch Macht dazu.</p>` : ''}
+      hilft gekaufte Macht auch der Verteidigung. Du hast 9 Wissenschaft.</p>
+      <p>Verteidigung jetzt <b>1</b>, Angriff <b>5</b>.
+      Mauern allein bringen dich auf 6 –
+      der Bot wächst aber weiter. Deshalb kommt im nächsten Schritt noch Macht dazu.</p>
       <p><b>Warum beides?</b> Mauern wirken in allen Städten gleichzeitig, kosten einmalig
       und schrumpfen nicht. Burgenbau macht deine Macht verteidigungswirksam, ohne dass eine
       echte Armee neben der Stadt stehen muss – und die virtuelle Armee zählt nicht für die
       Kosten weiterer Armeen.</p>
-`;
-    },
+`,
     task: 'Kaufe <b>Stadtmauern</b> und <b>Burgenbau</b>.',
     allow: { bar: ['a-tech'], techs: ['stadtmauern', 'burgenbau'] },
     hl: () => { const t = tutSiegeCity(); return t ? [[t.r, t.c]] : []; },
@@ -574,86 +520,67 @@ const TUT_STEPS = [
     auto: () => { doResearch(S, RU(), 'stadtmauern'); doResearch(S, RU(), 'burgenbau'); },
   },
   {
-    sub: 'Zugablauf 2 von 5 · Macht',
     t: 'Rechne nach, bevor du kaufst',
-    html: () => {
-      const t = tutSiegeCity(), a = tutSiegeArmy();
-      const pr = powerPrice(S, RU());
-      const def = t ? defenseValue(S, t) : 0;
-      const feind = a ? a.owner : S.players.findIndex(x => x.civ === 'griechenland');
-      const macht = powerOf(S, feind);
-      const armeen = armiesOf(S, feind).length;
-      const staedte = citiesOf(S, feind).length;
-      const dann = macht + staedte + 1;          // je Stadt ein Wachstum, dazu eine Gründung
-      const wehr = (t ? t.pop : 1) + 13;         // Bevölkerung + Mauern 5 + Burgenbau 4 + Armee 4
-      return `
+    html: () => `
       <p>Macht ist der Angriffswert <i>jeder</i> deiner Armeen und zählt zur Verteidigung
       benachbarter eigener Städte. Ein Punkt kostet dank Eisenverarbeitung
-      <b>${pr} statt 5 Münzen</b>; du hast ${tutRes().coins}. Der Haken: zu Beginn jedes
+      <b>4 statt 5 Münzen</b>; du hast 16. Der Haken: zu Beginn jedes
       Zuges <b>halbiert</b> sich deine Macht (aufgerundet).</p>
       <p><b>Die naheliegende Rechnung.</b> Kauf dir 4 Macht, dann steht deine belagerte
       Stadt bei:</p>
       <div class="tut-calc">
-        ${t ? `<div><span>Bevölkerung der Stadt</span><b>${t.pop}</b></div>` : ''}
+        <div><span>Bevölkerung der Stadt</span><b>1</b></div>
         <div><span>Stadtmauern</span><b>+5</b></div>
         <div><span>Burgenbau (virtuelle Armee = dein Machtwert)</span><b>+4</b></div>
         <div><span>deine Armee daneben</span><b>+4</b></div>
-        <div class="sum"><span>Verteidigung</span><b>${wehr}</b></div>
+        <div class="sum"><span>Verteidigung</span><b>14</b></div>
       </div>
-      <p>Das sieht solide aus – <b>${def}</b> stehen ohne den Kauf schon da.</p>
+      <p>Das sieht solide aus – <b>6</b> stehen ohne den Kauf schon da.</p>
       <p><b>Und jetzt die Gegenrechnung.</b> Griechenland hat gerade
-      <b>${macht}</b> Machtwert – bei Bots ist das ihre Gesamtbevölkerung. Mit
-      ${armeen === 1 ? 'einer zweiten Armee, für die es jede Runde würfelt,' :
-        'seinen ' + armeen + ' Armeen'} stünde der Angriff bei <b>${2 * macht}</b>. Das
-      reicht gegen ${wehr} noch nicht.</p>
+      <b>5</b> Machtwert – bei Bots ist das ihre Gesamtbevölkerung. Mit
+      einer zweiten Armee, für die es jede Runde würfelt, stünde der Angriff bei <b>10</b>. Das
+      reicht gegen 14 noch nicht.</p>
       <p><b>Aber der Bot steht nicht still.</b> Er würfelt jede Runde für <i>jede</i> seiner
-      ${staedte} Städte auf Wachstum und einmal aufs Siedeln. Läuft das gut, wächst seine
+      3 Städte auf Wachstum und einmal aufs Siedeln. Läuft das gut, wächst seine
       Bevölkerung – und damit sein Machtwert – schon im nächsten Zug so:</p>
       <div class="tut-calc">
-        <div><span>Machtwert jetzt</span><b>${macht}</b></div>
-        <div><span>${staedte} Städte wachsen je 1</span><b>+${staedte}</b></div>
+        <div><span>Machtwert jetzt</span><b>5</b></div>
+        <div><span>3 Städte wachsen je 1</span><b>+3</b></div>
         <div><span>eine neue Stadt gegründet</span><b>+1</b></div>
-        <div class="sum"><span>Machtwert dann</span><b>${dann}</b></div>
-        <div><span>× 2 Armeen</span><b>${2 * dann}</b></div>
+        <div class="sum"><span>Machtwert dann</span><b>9</b></div>
+        <div><span>× 2 Armeen</span><b>18</b></div>
       </div>
-      <div class="tut-key"><b>Merke</b> ${2 * dann} gegen ${wehr}: deine vier Münzen wären
+      <div class="tut-key"><b>Merke</b> 18 gegen 14: deine vier Münzen wären
       verbrannt und die Stadt eine Runde später trotzdem weg. Gegen einen Gegner, der jede
       Runde wächst, ist reine Verteidigung ein Wettrennen, das du verlierst – seine Zahlen
       steigen von allein, deine nur, wenn du zahlst. <b>Kauf hier nichts.</b> Der nächste
-      Schritt zeigt den billigeren Weg.</div>`;
-    },
+      Schritt zeigt den billigeren Weg.</div>`,
     hl: () => { const t = tutSiegeCity(); return t ? [[t.r, t.c]] : []; },
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Der Gegenangriff als Verteidigung',
-    html: () => {
-      const gr = S.players.findIndex(x => x.civ === 'griechenland');
-      const gcap = capitalOf(S, gr);
-      const cb = techCost(S, RU(), TECH_BY_KEY.belagerung);
-      const pr = powerPrice(S, RU());
-      const ziel = ui.tutStrike || TUT_STRIKE;
-      return `
+    html: () => `
       <p>Bots ziehen ihre Armeen nach festen Prioritäten – und <b>die eigene Hauptstadt
       steht ganz oben</b>, noch vor „eine begonnene Belagerung zu Ende bringen". Wer eine
       Armee neben ihre Hauptstadt stellt, zwingt sie zum Rückzug.</p>
-      <p>Griechenlands Hauptstadt ist golden umrandet und hat
-      <b>${defenseValue(S, gcap)} Verteidigung</b> – erobern wirst du sie nicht. Das musst du
-      auch nicht: es reicht, <b>dazustehen</b>.</p>
-      <p>Drei Schritte, und dein Vorrat geht dabei genau auf:</p>
+      <p>Um die griechische Hauptstadt zu bedrohen, musst du ihren <b>Verteidigungswert
+      von 3</b> überbieten. Dafür dienen die folgenden drei Schritte:</p>
       <div class="tut-calc">
-        <div><span><b>Belagerungsmaschinen</b> forschen (+5 Angriff gegen Städte)</span><b>${cb} 🔬</b></div>
-        <div><span><b>3 Macht</b> kaufen (statt 4)</span><b>${3 * pr} 🪙</b></div>
+        <div><span><b>Belagerungsmaschinen</b> forschen (+5 Angriff gegen Städte)</span><b>2 🔬</b></div>
+        <div><span><b>3 Macht</b> kaufen (statt 4)</span><b>12 🪙</b></div>
         <div><span>Armee auf das <b>goldene Feld</b> daneben ziehen</span><b>3 Bewegung</b></div>
       </div>
-      <p>Danach greift deine eine Armee mit <b>${3 + 5} statt 3</b> an – zu wenig für die
-      Eroberung, aber genug, dass der Bot es ernst nimmt. Übrig bleiben
-      <b>${Math.max(0, tutRes().sci - cb)} Wissenschaft</b> und
-      <b>${Math.max(0, tutRes().coins - 3 * pr)} Münzen</b>; beides brauchst du gleich noch.</p>
+      <p>Danach greift deine Armee mit <b>8 statt 3</b> an – mehr als die 3, die dort
+      stehen. Am Ende deines Zuges gewinnst du den Kampf, und Griechenlands Hauptstadt
+      steht bei <b>Zug 1 von 2</b>: noch ein Erfolg, und sie gehört dir. Genau das zwingt den Bot,
+      seine Armeen zurückzuholen, statt deine Stadt zu Ende zu belagern.</p>
+      <p>Dein Vorrat geht dabei genau auf – übrig bleiben <b>1 Wissenschaft</b> und
+      <b>4 Münzen</b>, beides brauchst du gleich noch.</p>
       <p><b>So kaufst du</b> Macht: unten auf <b>Macht</b> → die Menge antippen.</p>
       <div class="tut-key"><b>Merke</b> Angriff ist oft die billigere Verteidigung. Eine Armee
-      an der richtigen Stelle bindet zwei gegnerische – ohne einen einzigen Kampf.</div>`;
-    },
+      an der richtigen Stelle bindet zwei gegnerische – und kostet dich weniger, als deren
+      Angriff aufzuwiegen. Bots verteidigen ihre Hauptstadt, sobald dort ein erster Angriff durchkam;
+      eine Armee, die bloß danebensteht, beeindruckt sie nicht.</div>`,
     enter: () => { ui.tutStrike = tutStrikeSpot(); },
     task: 'Forsche <b>Belagerungsmaschinen</b>, kaufe <b>3 Macht</b> und zieh deine Armee auf das <b>goldene Feld</b>.',
     hl: () => {
@@ -684,11 +611,10 @@ const TUT_STEPS = [
     },
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Der Rest der Wissenschaft: Rad',
     html: () => `
-      <p>Übrig ist ${tutRes().sci} Wissenschaft – genau der Preis für <b>Rad</b>
-      (${techCost(S, RU(), TECH_BY_KEY.rad)}). Ungenutzte Wissenschaft verfällt zum
+      <p>Übrig ist 1 Wissenschaft – genau der Preis für <b>Rad</b>
+      (1). Ungenutzte Wissenschaft verfällt zum
       Zugende, also raus damit.</p>
       <p><b>Warum Rad?</b> Es erlaubt <b>Straßen</b>. Die halbieren nicht nur die
       Bewegungskosten – sie verbinden auch deine Städte zu <b>Handelsrouten</b>, und die
@@ -702,24 +628,19 @@ const TUT_STEPS = [
     auto: () => { doResearch(S, RU(), 'rad'); },
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Die vierte Stadt',
-    html: () => {
-      const sp = ui.tutSpot3 || TUT_CITY_3;
-      return `
-      <p>Auch die ${tutRes().food} Nahrung sollen nicht verfallen. Eine vierte Stadt kostet
-      <b>${foundCost(S, RU(), ...sp)} Nahrung</b> – 6 Basiskosten bei drei bestehenden
+    html: () => `
+      <p>Auch die 12 Nahrung sollen nicht verfallen. Eine vierte Stadt kostet
+      <b>9 Nahrung</b> – 6 Basiskosten bei drei bestehenden
       Städten plus Weg. Teuer, aber es ist die einzige Ausgabe, die dauerhaft etwas
       zurückgibt.</p>
-      <p><b>Warum dieses Feld?</b> Ringsum liegen ${tutNeighbourText(...sp)}, das bringt
-      <b>${tutGainText(...sp)}</b> je Runde. Es liegt südlich deiner Hauptstadt, also im
+      <p><b>Warum dieses Feld?</b> Ringsum liegen 4 × Grasland, 1 × Gebirge, 1 × Meer, das bringt
+      <b>+7 🔬, +4 🌾, +3 🪙</b> je Runde. Es liegt südlich deiner Hauptstadt, also im
       Rücken – weg von der griechischen Grenze, wo gerade gekämpft wird.
-      ${sp[0] === TUT_CITY_3[0] && sp[1] === TUT_CITY_3[1] ? '' :
-        '<br><i>Hinweis: Der vorgesehene Platz ist inzwischen belegt – deshalb dieses Feld.</i>'}</p>
+      </p>
       <div class="tut-key"><b>Merke</b> Vier Städte sind fast immer besser als zwei große:
       jede bringt eigene Felder, wächst billiger und verteilt das Risiko. Die Basiskosten
-      steigen zwar (1/3/6/10), aber sie sind einmalig – der Ertrag bleibt.</div>`;
-    },
+      steigen zwar (1/3/6/10), aber sie sind einmalig – der Ertrag bleibt.</div>`,
     enter: () => { ui.tutSpot3 = tutSpot(TUT_CITY_3); },
     task: 'Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.',
     hl: () => [ui.tutSpot3 || TUT_CITY_3],
@@ -731,20 +652,8 @@ const TUT_STEPS = [
     auto: () => foundCity(S, RU(), ...(ui.tutSpot3 || TUT_CITY_3)),
   },
   {
-    sub: 'Zugablauf 3 von 5 · Aktion',
     t: 'Straßen: die Städte verbinden',
-    html: () => {
-      const offen = TUT_ROADS.filter(([r, c]) => roadLevel(S, r, c) < 1);
-      const tr = tradeRoutes(S, RU());
-      // Was die vier Straßen zusammen bringen: einmal mit, einmal ohne durchrechnen
-      const merk = {};
-      for (const [r, c] of TUT_ROADS) { merk[key(r, c)] = S.roads[key(r, c)]; S.roads[key(r, c)] = 1; }
-      const dann = tradeRoutes(S, RU());
-      for (const [r, c] of TUT_ROADS) {
-        if (merk[key(r, c)] == null) delete S.roads[key(r, c)];
-        else S.roads[key(r, c)] = merk[key(r, c)];
-      }
-      return `
+    html: () => `
       <p>Mit dem <b>Rad</b> kannst du Felder pflastern. Eine Straße kostet <b>1 Münze</b>
       und halbiert dort die Bewegungskosten – aber der eigentliche Gewinn ist ein anderer:</p>
       <div class="tut-key"><b>Handelsrouten</b> Jede deiner Städte außer der Hauptstadt, die
@@ -752,13 +661,12 @@ const TUT_STEPS = [
       <b>+1 Wissenschaft, +1 Nahrung und +1 Münze</b>. Liegt auf der ganzen Strecke
       <b>Eisenbahn</b>, sind es <b>+2</b>. Gemischt zählt der kleinere Wert – ein einziges
       Straßenfeld drückt die Strecke von +2 auf +1.</div>
-      <p>Du hast <b>${tutRes().coins} Münzen</b> und brauchst genau
-      <b>${offen.length}</b> davon: die vier golden umrandeten Felder hängen alle drei
+      <p>Du hast <b>4 Münzen</b> und brauchst genau
+      <b>4</b> davon: die vier golden umrandeten Felder hängen alle drei
       Nebenstädte an die Hauptstadt.</p>
-      <p>Das bringt ${tr.bonus ? `statt ${tr.bonus}` : ''} <b>+${dann.bonus}</b> auf jeden
-      der drei Erträge – jede Runde, dauerhaft, für einmalig ${offen.length} Münzen. Im
-      Forschungsbogen taucht dafür die Zeile <b>Handelsrouten</b> auf.</p>`;
-    },
+      <p>Das bringt  <b>+3</b> auf jeden
+      der drei Erträge – jede Runde, dauerhaft, für einmalig 4 Münzen. Im
+      Forschungsbogen taucht dafür die Zeile <b>Handelsrouten</b> auf.</p>`,
     enter: () => { ui.tutRoads = true; },
     task: 'Pflastere die vier <b>goldenen Felder</b> – je Feld antippen und <b>Straße bauen</b>.',
     hl: () => TUT_ROADS.filter(([r, c]) => roadLevel(S, r, c) < 1),
@@ -770,17 +678,10 @@ const TUT_STEPS = [
     auto: () => { for (const [r, c] of TUT_ROADS) buildRoad(S, RU(), r, c, 1); },
   },
   {
-    sub: 'Zugablauf 4 von 5 · Kampf',
     t: 'Zug beenden – und der Rückzug',
-    html: () => {
-      const t = tutSiegeCity(), a = tutSiegeArmy();
-      const def = t ? defenseValue(S, t) : 0;
-      const gr = S.players.findIndex(x => x.civ === 'griechenland');
-      const gcap = capitalOf(S, gr);
-      const atk = a ? attackValue(S, a.owner, armiesOf(S, a.owner).length) : 0;
-      return `
-      <p>Deine belagerte Stadt steht bei <b>Verteidigung ${def}</b>. Griechenland könnte mit
-      seinen ${armiesOf(S, gr).length} Armeen <b>${atk}</b> aufbieten – das würde reichen.</p>
+    html: () => `
+      <p>Deine belagerte Stadt steht bei <b>Verteidigung 9</b>. Griechenland könnte mit
+      seinen 1 Armeen <b>5</b> aufbieten – das würde reichen.</p>
       <p>Beende den Zug und sieh im Protokoll nach, was stattdessen passiert:
       <b>„Armee verteidigt die Hauptstadt"</b>. Deine eine Armee neben der griechischen
       Hauptstadt zieht beide Angreifer ab, und die Belagerung läuft ins Leere.</p>
@@ -788,8 +689,7 @@ const TUT_STEPS = [
       Reaktionszeit. Mehr Verteidigung zu kaufen ist dabei selten die beste Antwort – der
       Gegner kann nachlegen. Ihm etwas Wertvolleres zu bedrohen, wirkt sofort und kostet
       weniger.</div>
-`;
-    },
+`,
     task: 'Beende den Zug und klick dich durch die Bot-Fenster.',
     allow: { bar: ['a-end', 'a-log'] },
     hl: () => { const t = tutSiegeCity(), a = tutSiegeArmy();
@@ -804,65 +704,39 @@ const TUT_STEPS = [
     },
   },
   {
-    sub: 'Grenzen',
     t: 'Jede Bevölkerung isst',
-    html: () => {
-      /* Wie oft können alle eigenen Städte ZUSAMMEN noch wachsen?
-         Früher wurde je Stadt einzeln gezählt und aufsummiert – jede tat dabei so, als
-         wüchsen die anderen nicht, und die Summe war ein Vielfaches des Möglichen
-         (33 „Schritte" bei 11 Nahrung). Alle Städte teilen sich dieselbe Produktion,
-         also muss reihum probiert werden, bis keine mehr kann. */
-      const cities = citiesOf(S, RU());
-      const merk = cities.map(c => c.pop);
-      let room = 0, weiter = true;
-      while (weiter && room < 200) {
-        weiter = false;
-        for (const c of cities) {
-          c.pop++;
-          if (baseIncome(S, RU()).food >= 0) { room++; weiter = true; }
-          else c.pop--;
-        }
-      }
-      cities.forEach((c, i) => c.pop = merk[i]);
-      const jetzt = baseIncome(S, RU()).food;
-      return `
+    html: () => `
       <p>Weil jeder Bevölkerungspunkt dauerhaft 1 Nahrung verbraucht, darf deine
       <b>Nahrungsproduktion nie negativ</b> werden. Ist die Grenze erreicht, wird Wachstum
       gesperrt – verhungern tut aber niemand.</p>
-      <p>Du produzierst gerade <b>${jetzt} Nahrung</b> über den Verbrauch hinaus. Deine
-      Städte können zusammen also noch <b>${room}×</b> wachsen, bevor die Grenze greift –
+      <p>Du produzierst gerade <b>19 Nahrung</b> über den Verbrauch hinaus. Deine
+      Städte können zusammen also noch <b>19×</b> wachsen, bevor die Grenze greift –
       egal, wie du die Schritte auf die Städte verteilst.</p>
       <p>Dagegen hilft mehr Ertrag: <b>Landwirtschaft</b> auf Grasland, <b>Kunstdünger</b> im
       Wald, <b>Bewässerung</b> im Gebirge, <b>Ökologie</b>. Oder <b>Gentechnik</b> und
       <b>Massenmedien</b>: mit ihnen lässt sich zu Zugbeginn ein Teil dessen, was die
       Bevölkerung isst, aus Wissenschaft bzw. Münzen bestreiten – dann wird der 🌾-Knopf
-      oben anklickbar.</p>`;
-    },
+      oben anklickbar.</p>`,
     hl: () => citiesOf(S, RU()).map(c => [c.r, c.c]),
   },
   {
-    sub: 'Zugablauf 5 von 5 · Sieg',
     t: 'Die drei Wege zu gewinnen',
-    html: () => {
-      const o = victoryOption(S, tutP());
-      return `
-      <p><b>Forschungssieg</b> – erforsche die <b>Singularität</b>: ${SINGULARITY.c}
+    html: () => `
+      <p><b>Forschungssieg</b> – erforsche die <b>Singularität</b>: 100
       Wissenschaft, mit Wissenschaftlicher Methode 90. Sie verlangt mindestens eine
       Technologie der <b>Moderne in jedem der vier Felder</b>. Für ein Reich, das früh auf
       Multiplikatoren gesetzt hat, ist das oft der kürzeste Weg.</p>
       <p><b>Wirtschaftssieg</b> – wenn du am Zugende über zwei Drittel der Weltbevölkerung
       hast, gewinnst du. Oben links neben dem Rundenzähler siehst du immer den aktuellen
-      Bevölkerungsstand: gerade ${popOf(S, RU())} von ${worldPop(S)}. Um hier eine
+      Bevölkerungsstand: gerade 7 von 33. Um hier eine
       realistische Chance zu haben, brauchst du meistens vier bis sechs Städte sowie einige
       der Technologien <b>Keramik</b>, <b>Verbundwerkstoffe</b>, <b>Theologie</b> oder
       <b>Vereinte Nationen</b>.</p>
       <p><b>Militärsieg</b> – erobere eine gegnerische Hauptstadt: zwei Züge in Folge
       stärker sein. Das ist der Weg, auf dem Bots für den menschlichen Spieler meist sehr
-      bedrohlich sind.</p>`;
-    },
+      bedrohlich sind.</p>`,
   },
   {
-    sub: 'Zum Mitnehmen',
     t: 'Die drei Anfängerfehler',
     html: () => `
       <p><b>Ressourcen liegen lassen.</b> Wissenschaft, Nahrung und Münzen verfallen am
@@ -880,13 +754,12 @@ const TUT_STEPS = [
       schon erforscht hast. Militär nur so viel, wie du zum Überleben brauchst.</div>`,
   },
   {
-    sub: 'Fertig',
     t: 'Ab hier spielst du allein',
     html: () => `
       <p>Das Tutorial ist durch – und dieses Spiel läuft einfach weiter, jetzt ohne
-      Einschränkungen. Du stehst in Runde ${S.round} mit
-      ${citiesOf(S, RU()).length} Städten, ${popOf(S, RU())} Bevölkerung und
-      ${Object.keys(tutP().techs).length} Technologien.</p>
+      Einschränkungen. Du stehst in Runde 4 mit
+      4 Städten, 7 Bevölkerung und
+      9 Technologien.</p>
       <p>Der nächste sinnvolle Schritt: weiter wachsen, Nahrungstechnologien nachziehen und
       in jedem Feld ein Zeitalter aufschließen – die Singularität braucht am Ende eine
       Moderne-Technologie in allen vier.</p>
@@ -1001,7 +874,6 @@ function tutEnter() {
 function renderTutPanel() {
   const st = tutStep();
   if (!st) return;
-  $('tut-sub').textContent = st.sub;
   $('tut-title').textContent = st.t;
   $('tut-body').innerHTML = typeof st.html === 'function' ? st.html() : st.html;
   const done = tutDone(), last = ui.tut.i === TUT_STEPS.length - 1;
@@ -1020,6 +892,7 @@ function tutMove(d) {
   if (d > 0 && ui.tut.i === TUT_STEPS.length - 1) return tutorialQuit();
   if (d > 0 && !tutDone()) return;
   ui.tut.i = Math.max(0, Math.min(TUT_STEPS.length - 1, ui.tut.i + d));
+  ui.tut.max = Math.max(ui.tut.max || 0, ui.tut.i);
   ui.army = null;
   tutEnter();
   redraw();
@@ -1043,6 +916,9 @@ function tutMaybeAdvance() {
   const st = tutStep();
   if (!st || !st.goal || !tutDone()) return;
   if (ui.tut.i >= TUT_STEPS.length - 1) return;
+  // Wer zurückblättert, will nachlesen – dort darf nicht sofort wieder vorgesprungen
+  // werden. Automatisch geht es nur auf dem weitesten je erreichten Schritt weiter.
+  if (ui.tut.i < (ui.tut.max || 0)) return;
   if (ui.botLock) return;
   const p = tutP();
   if ((p.freePicks || []).some(c => c.n > 0) || (p.backPicks || []).length) return;

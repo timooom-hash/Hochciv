@@ -164,6 +164,14 @@ function botSettle(S, pi, capital) {
    gemeinsam. 7–9 entscheidet jede übrige Armee für sich in botMoveArmy.
    Verteidigung geht vor Eroberung; innerhalb einer Stufe zählt die größere Stadt zuerst. */
 
+/* Eine Armee bleibt nicht in einer eigenen Stadt stehen: dort blockiert sie den Bauplatz
+   für die nächste und schützt schlechter als auf einem Feld daneben (in der Stadt zählt
+   sie zwar zur Verteidigung, kann aber nicht flankieren und nicht abfangen). Erlaubt ist
+   es nur, wenn es gar keinen anderen Halteplatz gibt – etwa auf einer vollen Insel. */
+function botOutOfCity(S, pi, tiles) {
+  const frei = tiles.filter(([r, c]) => { const ct = cityAt(S, r, c); return !ct || ct.owner !== pi; });
+  return frei.length ? frei : tiles;
+}
 /* Erreichbare Halteplätze einer Armee, mit Wegkosten.
    Das eigene Feld gehört dazu: reachable() liefert es nicht mit (es gilt als besetzt),
    aber „stehen bleiben" muss eine Option sein – sonst räumt eine Armee, die schon
@@ -172,10 +180,11 @@ function botReach(S, pi, army) {
   const reach = reachable(army.r, army.c, army.mp,
     (r, c) => botCanEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
-  const tiles = [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c));
+  const tiles = botOutOfCity(S, pi,
+    [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c)));
   const hier = key(army.r, army.c);
   if (!reach.has(hier)) { tiles.push([army.r, army.c]); reach.set(hier, 0); }
-  return { tiles, cost: t => reach.get(key(t[0], t[1])) };
+  return { tiles: botOutOfCity(S, pi, tiles), cost: t => reach.get(key(t[0], t[1])) };
 }
 function botStep(S, pi, army, goal, why) {
   if (goal[0] === army.r && goal[1] === army.c) return true;   // steht schon richtig
@@ -315,7 +324,8 @@ function botMoveArmy(S, pi, army) {
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   // Zielfelder: nur solche, auf denen die Armee auch anhalten darf (kein Wasser ohne
   // Panzerschiff/Luftwaffe). Wasser bleibt als Durchgangsfeld erlaubt.
-  const tiles = [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c));
+  const tiles = botOutOfCity(S, pi,
+    [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c)));
   if (!tiles.length) return;
   const cost = t => reach.get(key(t[0], t[1]));
   const rng = attackRange(S, pi);
