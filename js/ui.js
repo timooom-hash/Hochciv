@@ -482,17 +482,26 @@ function openTile(r, c) {
         toast(e || 'Atomschlag ausgeführt'); redraw(); openTile(r, c);
       }, p.nuked || banned);
   }
-  if (has(p, 'rad') && !city)
-    btn(roadLevel(S, r, c) >= 1 ? 'Eisenbahn bauen' : 'Straße bauen',
-      roadLevel(S, r, c) >= 1 ? 'Bewegung kostenlos' : 'Bewegung ½ Punkt',
-      (roadPrice(S, pi, r, c, roadLevel(S, r, c) >= 1 ? 2 : 1) ?? '–') + '🪙',
-      () => doRoad(r, c), roadLevel(S, r, c) >= 2 || (roadLevel(S, r, c) >= 1 && !has(p, 'eisenbahn')));
+  // Die Stufe kommt aus roadTarget, nicht aus einer eigenen Rechnung – sonst weicht das
+  // Blatt von dem ab, was buildRoad erlaubt (Eisenbahn ohne Rad war so unbaubar).
+  if (canBuildRoads(p) && !city) {
+    const lvl = roadLevel(S, r, c), ziel = roadTarget(S, pi, r, c);
+    const stufe = ziel || (lvl >= 1 ? 2 : 1);
+    btn(stufe === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
+      lvl >= 2 ? 'hier liegt schon eine Eisenbahn'
+        : !ziel ? 'Eisenbahn noch nicht erforscht'
+          : stufe === 2 ? 'Bewegung kostenlos · Handelsroute +2'
+            : 'Bewegung ½ Punkt · Handelsroute +1',
+      ((ziel ? roadPrice(S, pi, r, c, ziel) : null) ?? '–') + '🪙',
+      () => doRoad(r, c), !ziel);
+  }
   sheet(head + rows.join(''));
   if (ui.tut) tutGateSheet(r, c);
   handlers.forEach(([id, fn]) => { const el = $(id); if (el) el.onclick = fn; });
 }
 function doRoad(r, c) {
-  const target = roadLevel(S, r, c) >= 1 ? 2 : 1;
+  const target = roadTarget(S, S.cur, r, c);
+  if (!target) return toast('Hier lässt sich nichts weiter bauen.');
   const e = buildRoad(S, S.cur, r, c, target);
   e ? toast(e) : toast(target === 2 ? 'Eisenbahn gebaut' : 'Straße gebaut');
   redraw();

@@ -1005,6 +1005,22 @@ function roadPrice(S, pi, r, c, target) {
   if (target <= cur) return null;
   return (cur === 0 && target === 2) ? 2 : 1;
 }
+/* Welche Stufe würde hier als Nächstes gebaut – oder null, wenn nichts geht?
+   WICHTIG: Die Oberfläche muss diese Funktion benutzen, statt die Stufe selbst
+   herzuleiten. Genau daran scheiterte der Bau mit Eisenbahn ohne Rad: das Blatt
+   wählte auf leeren Feldern immer Stufe 1 und zeigte den Knopf nur mit Rad, obwohl
+   buildRoad Stufe 2 längst erlaubt hätte.
+   Wer das Rad hat, baut auf leerem Feld zuerst die Straße – der Zwischenschritt ist
+   nicht teurer (1 + 1 = 2 wie der Direktbau) und lässt sich früher bezahlen.
+   Wer nur die Eisenbahn hat, überspringt die Straßenstufe. */
+function roadTarget(S, pi, r, c) {
+  const p = S.players[pi], lvl = roadLevel(S, r, c);
+  if (lvl >= 2) return null;                          // schon fertig ausgebaut
+  if (lvl >= 1) return has(p, 'eisenbahn') ? 2 : null;
+  if (has(p, 'rad')) return 1;
+  return has(p, 'eisenbahn') ? 2 : null;
+}
+function canBuildRoads(p) { return has(p, 'rad') || has(p, 'eisenbahn'); }
 function buildRoad(S, pi, r, c, target) {
   const p = S.players[pi];
   if (target === 1 && !has(p, 'rad')) return 'Rad noch nicht erforscht.';
