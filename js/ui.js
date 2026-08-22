@@ -775,6 +775,32 @@ function gameOver() {
   modal('Spielende', `<p style="font-family:var(--serif);font-size:22px;margin:0 0 6px">
     ${civOf(S.players[w]).n} gewinnt.</p><p class="sub">${S.over.how}</p>
     <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">Zurück zum Menü</button>`);
+  confetti(civOf(S.players[w]).c);
+}
+/* Kleiner Sieggruß: ein paar Papierschnipsel, die einmal durchs Bild fallen.
+   Bewusst sparsam – 40 Stück, gut zwei Sekunden, danach räumt es sich selbst ab.
+   Reines CSS in Bewegung, kein Zeitgeber je Schnipsel; wer Bewegung reduziert haben
+   möchte (prefers-reduced-motion), bekommt gar keins. */
+function confetti(farbe) {
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  } catch (e) { }
+  const alt = $('confetti'); if (alt) alt.remove();
+  const box = document.createElement('div');
+  box.id = 'confetti';
+  const farben = [farbe || '#9a3b2f', '#c8a83c', '#4d7a4a', '#e8dfc4'];
+  let h = '';
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * 100, dauer = 1.6 + Math.random() * 1.1;
+    const spät = Math.random() * 0.5, dreh = Math.random() * 720 - 360;
+    const c = farben[i % farben.length], br = 5 + Math.random() * 5;
+    h += `<i style="left:${x}%;background:${c};width:${br.toFixed(1)}px;
+      height:${(br * 1.6).toFixed(1)}px;animation-duration:${dauer.toFixed(2)}s;
+      animation-delay:${spät.toFixed(2)}s;--dreh:${dreh.toFixed(0)}deg"></i>`;
+  }
+  box.innerHTML = h;
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 3400);
 }
 
 /* --------------------------------------------------------- Ereignis & Erweiterungen */
@@ -918,6 +944,10 @@ function foodSheet() {
 function feedSheet() { return foodSheet(); }
 /* Auswahl kostenloser Technologien (Bibliothek, Oxford, Griechenland) */
 function freePickModal() {
+  // Die Singularität ist über Oxford kostenlos wählbar und beendet das Spiel sofort.
+  // Ohne diese Prüfung liefe die Auswahl weiter, das Fenster schlösse sich stumm und
+  // der Siegbildschirm käme nie – das Spiel wirkte hängengeblieben.
+  if (S.over) { closeModal(); return gameOver(); }
   const pi = S.cur, p = P(S);
   const pick = freePick(p);
   const list = pick ? freePickOptions(S, pi) : backPickOptions(S, pi);
@@ -932,6 +962,7 @@ function freePickModal() {
     const e = pick ? useFreePick(S, S.cur, b.dataset.free) : useBackPick(S, S.cur, b.dataset.free);
     if (e) return toast(e);
     redraw();
+    if (S.over) { closeModal(); return gameOver(); }
     if (freePick(P(S)) || backPickOptions(S, S.cur).length) freePickModal();
     else closeModal();
   });
@@ -1200,9 +1231,13 @@ function rulesModal() {
     <p class="sub">Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
     2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.</p>
     <p class="sub">Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert,
-    sobald das Einkommen dadurch unter 0 fiele. Gentechnik (Wissenschaft) und Massenmedien
-    (Münzen) heben die Grenze auf – sie füttern zu Zugbeginn 1:1 und sind kein
-    allgemeiner Umtausch.</p>
+    sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein
+    Ereignis dieser Runde zählt dafür nicht. Gentechnik (Wissenschaft) und Massenmedien
+    (Münzen) heben die Grenze auf: zu Zugbeginn lässt sich damit bestreiten, was die
+    Bevölkerung isst – höchstens diese Kosten, also kein allgemeiner Umtausch.</p>
+    <p class="sub"><b>Handelsrouten:</b> jede eigene Stadt außer der Hauptstadt, die über
+    einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über
+    eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße.</p>
     <p class="sub">Geländeerträge je Feld</p>
     <table style="width:100%;font-size:13px;border-collapse:collapse">
       <tr style="color:var(--ink-soft);font-size:11px"><th align="left">Feld</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>

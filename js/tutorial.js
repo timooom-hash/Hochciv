@@ -710,12 +710,18 @@ const TUT_STEPS = [
       Moderne-Technologie in allen vier.</p>
       <p><b>Was das Tutorial nicht gezeigt hat</b>, aber im Spiel steckt: gegnerische Armeen
       <b>flankieren</b> und zerstören (zwei eigene Armeen gegenüberliegend, mit <b>Taktik</b>
-      von zwei beliebigen Seiten) · <b>Straßen und Eisenbahn</b> bauen, die Bewegung billiger
-      machen · Technologien mit eigenen Aktionen: <b>Sklaverei</b> (Bevölkerung gegen Münzen
-      opfern), <b>Spionage</b>, <b>Kundschafterei</b> und <b>Internet</b> (fremde
-      Technologien kopieren), <b>Kolonialismus</b> (Felder kaufen), <b>Atomwaffen</b>
-      (alle Armeen auf einem Feld und ringsum entfernen) · und Reichsfähigkeiten, die du im
-      Aufbau umstellen kannst.</p>
+      von zwei beliebigen Seiten) · <b>Straßen und Eisenbahn</b> bauen: sie machen nicht nur
+      die Bewegung billiger, sondern öffnen auch <b>Handelsrouten</b> · Technologien mit
+      eigenen Aktionen: <b>Sklaverei</b> (Bevölkerung gegen Münzen opfern), <b>Spionage</b>,
+      <b>Kundschafterei</b> und <b>Internet</b> (fremde Technologien kopieren),
+      <b>Kolonialismus</b> (Felder kaufen), <b>Atomwaffen</b> (alle Armeen auf einem Feld und
+      ringsum entfernen) · und Reichsfähigkeiten, die du im Aufbau umstellen kannst.</p>
+      <p><b>Handelsrouten</b> lohnen sich früh: Jede deiner Städte außer der Hauptstadt, die
+      über einen durchgehenden Weg mit ihr verbunden ist, bringt dir jede Runde zusätzlich
+      <b>+1</b> Wissenschaft, Nahrung und Münzen — über eine reine <b>Eisenbahn</b> sogar
+      <b>+2</b>. Gemischt zählt der kleinere Bonus: ein einziges Straßenfeld auf der Strecke
+      drückt sie von +2 auf +1. Im Ertragsbogen stehen sie als eigene Zeile
+      <b>Handelsrouten</b>.</p>
       <p>Zwei Dinge helfen immer: <b>Protokoll</b> zeigt jeden Würfelwurf, <b>Regeln &amp;
       Technologien</b> im Menü listet alle Technologien mit ihrer Wirkung.</p>`,
   },

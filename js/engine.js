@@ -395,6 +395,11 @@ function incomeBreakdown(S, pi) {
     pyy[2] += py[2] * city.pop * mult;
   }
   if (sea) extra.push({ name: 'Städte am Meer', glyph: '⚓', count: sea, y: [2 * sea, 2 * sea, 2 * sea] });
+  // Handelsrouten: Städte, die über Straßen (+1) oder durchgehend Eisenbahn (+2) an
+  // der Hauptstadt hängen. Grundregel, gilt also auch für Bots.
+  const tr = tradeRoutes(S, pi);
+  if (tr.bonus)
+    extra.push({ name: 'Handelsrouten', glyph: '🛤', count: tr.count, y: [tr.bonus, tr.bonus, tr.bonus] });
   // Wallfahrt (Erweiterung): je eigenem Weltwunder +3 auf alle drei Erträge
   if (has(p, 'wallfahrt') && p.kind !== 'bot') {
     const w = wondersOf(S, pi).length;
@@ -704,6 +709,55 @@ function effectiveRoad(S, r, c) {
 function moveCost(S, r1, c1, r2, c2) {
   const lvl = Math.min(effectiveRoad(S, r1, c1), effectiveRoad(S, r2, c2));
   return lvl >= 2 ? 0 : lvl >= 1 ? 0.5 : 1;
+}
+/* ------------------------------------------------------------ Handelsrouten
+   Jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg aus
+   Straßen mit ihr verbunden ist, bringt +1 auf alle drei Erträge; ist der Weg
+   durchgehend Eisenbahn, +2.
+
+   Umgesetzt als zwei getrennte Suchen von der Hauptstadt aus – einmal nur über
+   Felder mit Eisenbahn, einmal über Felder mit mindestens Straße. Damit ergibt sich
+   die Mischungsregel von selbst: eine Stadt, die nur über die zweite Suche erreichbar
+   ist, hängt an einer gemischten Strecke und bekommt den kleineren Bonus. Es genügt
+   also nicht, dass irgendwo auf dem Weg Eisenbahn liegt – sie muss durchgehend sein.
+
+   Getroffene Auslegungen (die Vorgabe lässt sie offen):
+   · Stadtfelder zählen über effectiveRoad mit, wie überall sonst auch – ein Weg endet
+     nicht am Stadtrand.
+   · Der Weg darf über neutrales Gebiet laufen; nur FREMDE Städte sperren ihn.
+   · Erobert jemand die Hauptstadt, brechen alle Routen weg. */
+function tradeRoutes(S, pi) {
+  const out = { count: 0, bonus: 0, rail: 0, road: 0 };
+  const cap = capitalOf(S, pi);
+  if (!cap) return out;
+  const others = citiesOf(S, pi).filter(c => !c.cap);
+  if (!others.length || !Object.keys(S.roads || {}).length) return out;
+
+  const erreichbar = min => {
+    const seen = new Set(), stack = [];
+    if (effectiveRoad(S, cap.r, cap.c) < min) return seen;
+    seen.add(key(cap.r, cap.c)); stack.push([cap.r, cap.c]);
+    while (stack.length) {
+      const [r, c] = stack.pop();
+      for (const [nr, nc] of neighbors(r, c)) {
+        const k = key(nr, nc);
+        if (seen.has(k) || !terrainAt(S, nr, nc)) continue;
+        if (effectiveRoad(S, nr, nc) < min) continue;
+        const ct = cityAt(S, nr, nc);
+        if (ct && ct.owner !== pi) continue;          // fremde Stadt sperrt den Weg
+        seen.add(k); stack.push([nr, nc]);
+      }
+    }
+    return seen;
+  };
+  const perBahn = erreichbar(2), perWeg = erreichbar(1);
+  for (const city of others) {
+    const k = key(city.r, city.c);
+    if (perBahn.has(k)) { out.rail++; out.bonus += 2; }
+    else if (perWeg.has(k)) { out.road++; out.bonus += 1; }
+  }
+  out.count = out.rail + out.road;
+  return out;
 }
 function armyReach(S, army) {
   const pi = army.owner;
