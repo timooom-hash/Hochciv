@@ -865,6 +865,66 @@ const setEvent = (S, k) => {
   eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
 }
 
+/* Wegebau: welche Stufe ist als Nächstes dran?
+   Die Oberfläche leitete das früher selbst her und lag daneben – mit Eisenbahn, aber
+   ohne Rad war gar nichts baubar, obwohl buildRoad Stufe 2 erlaubt. */
+{
+  const leer = mk('griechenland');
+  const feld = within(capitalOf(leer, 0).r, capitalOf(leer, 0).c, 3)
+    .find(([r, c]) => isLand(leer, r, c) && !cityAt(leer, r, c));
+  const [fr, fc] = feld;
+  const mitTechs = (...t) => { const S = mk('griechenland', t); return S; };
+
+  // Ohne alles: gar kein Wegebau
+  eq(canBuildRoads(mitTechs().players[0]), false, 'ohne Rad und Eisenbahn kein Wegebau');
+  eq(roadTarget(mitTechs(), 0, fr, fc), null, 'und keine Zielstufe');
+
+  // Nur Rad
+  const R = mitTechs('rad');
+  eq(roadTarget(R, 0, fr, fc), 1, 'nur Rad: auf leerem Feld die Straße');
+  R.roads[key(fr, fc)] = 1;
+  eq(roadTarget(R, 0, fr, fc), null, 'nur Rad: auf der Straße geht es nicht weiter');
+
+  // Nur Eisenbahn – der gemeldete Fall
+  const E = mitTechs('eisenbahn');
+  eq(canBuildRoads(E.players[0]), true, 'Eisenbahn allein erlaubt Wegebau');
+  eq(roadTarget(E, 0, fr, fc), 2, 'nur Eisenbahn: die Straßenstufe wird übersprungen');
+  eq(roadPrice(E, 0, fr, fc, 2), 2, 'der Direktbau kostet 2');
+  E.players[0].res.coins = 9;
+  eq(buildRoad(E, 0, fr, fc, roadTarget(E, 0, fr, fc)), null,
+    'und der Bau gelingt mit genau dieser Zielstufe');
+  eq(roadLevel(E, fr, fc), 2, 'das Feld hat danach eine Eisenbahn');
+  eq(roadTarget(E, 0, fr, fc), null, 'danach ist nichts mehr zu bauen');
+
+  // Beides: erst Straße, dann Eisenbahn – und in Summe nicht teurer als der Direktbau
+  const B = mitTechs('rad', 'eisenbahn');
+  B.players[0].res.coins = 9;
+  eq(roadTarget(B, 0, fr, fc), 1, 'mit beidem zuerst die günstige Straße');
+  const p1 = roadPrice(B, 0, fr, fc, 1);
+  eq(buildRoad(B, 0, fr, fc, 1), null, 'Straße gebaut');
+  eq(roadTarget(B, 0, fr, fc), 2, 'danach ist die Eisenbahn dran');
+  const p2 = roadPrice(B, 0, fr, fc, 2);
+  eq(p1 + p2, roadPrice(mitTechs('rad', 'eisenbahn'), 0, fr, fc, 2),
+    'zwei Schritte kosten zusammen so viel wie der Direktbau');
+
+  // Invariante: roadTarget schlägt nie etwas vor, das buildRoad ablehnt
+  let geprueft = 0;
+  for (const techs of [[], ['rad'], ['eisenbahn'], ['rad', 'eisenbahn']])
+    for (const lvl of [0, 1, 2]) {
+      const S = mk('griechenland', techs);
+      S.players[0].res.coins = 9;
+      if (lvl) S.roads[key(fr, fc)] = lvl;
+      const ziel = roadTarget(S, 0, fr, fc);
+      if (ziel != null) {
+        const err = buildRoad(S, 0, fr, fc, ziel);
+        if (err) throw new Error(`roadTarget schlägt ${ziel} vor, buildRoad sagt: ${err}` +
+          ` (Techs ${techs.join('+') || 'keine'}, Level ${lvl})`);
+      }
+      geprueft++;
+    }
+  eq(geprueft, 12, '12 Kombinationen aus Technologien und Ausbaustufe geprüft');
+}
+
 /* ==================================================== Handelsrouten
    Jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg an die
    Hauptstadt angebunden ist: +1 auf alle Erträge über Straße, +2 über reine Eisenbahn.

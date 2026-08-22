@@ -865,3 +865,42 @@ lässt sie gut zwei Sekunden fallen und räumt sich nach 3,4 s selbst ab. Bewuss
 `pointer-events:none`, damit „Zurück zum Menü" sofort erreichbar bleibt; ein zweiter Aufruf
 ersetzt den alten Kasten, statt zu stapeln. Bei `prefers-reduced-motion: reduce` entfällt es.
 Die Fallhöhe hängt an `--fall`, weil im gedrehten Hochformat „unten" die kurze Seite ist.
+
+
+---
+
+## Fehler: Eisenbahn ohne Rad war nicht baubar (v37)
+
+Gemeldet und reproduziert: Wer die Eisenbahn erforscht hatte, aber nicht das Rad, konnte
+überhaupt keine Wege bauen. **Zwei Fehler in einem**, beide in der Oberfläche:
+
+1. Der Knopf erschien nur unter `has(p, 'rad')` – ohne Rad gab es ihn gar nicht.
+2. Selbst mit Knopf hätte er auf leeren Feldern Stufe 1 gewählt (`roadLevel >= 1 ? 2 : 1`),
+   und `buildRoad` hätte mit „Rad noch nicht erforscht" abgelehnt.
+
+Die Regelmaschine konnte es die ganze Zeit: `buildRoad(S, pi, r, c, 2)` gelang auch ohne
+Rad. Es ist derselbe Fehlertyp wie beim Bürgerkrieg – die Oberfläche leitet eine
+Entscheidung selbst her, statt die der Regelmaschine zu übernehmen.
+
+**Behoben mit `roadTarget(S, pi, r, c)`** in `engine.js` als einziger Wahrheit; Blatt und
+`doRoad` benutzen sie. Dazu `canBuildRoads(p)` für die Frage, ob der Knopf überhaupt
+erscheint. Die Regel:
+
+| Stufe auf dem Feld | nur Rad | nur Eisenbahn | beides | keins |
+|---|---|---|---|---|
+| 0 (frei) | 1 | **2** (Straßenstufe übersprungen) | 1 | – |
+| 1 (Straße) | – | 2 | 2 | – |
+| 2 (Eisenbahn) | – | – | – | – |
+
+**Getroffene Auslegung:** Wer beides hat, baut auf leerem Feld zuerst die Straße. Der
+Zwischenschritt ist nicht teurer als der Direktbau (1 + 1 = 2) und lässt sich früher
+bezahlen – ein Test pinnt diese Gleichheit. Wer nur die Eisenbahn hat, überspringt die
+Straßenstufe und zahlt direkt 2.
+
+Abgesichert durch eine Invariante über **alle zwölf** Kombinationen aus Technologien und
+Ausbaustufe: was `roadTarget` vorschlägt, muss `buildRoad` auch annehmen. Dazu ein
+Smoke-Test, der den gemeldeten Fall über die echte Oberfläche nachspielt; mit künstlich
+zurückgebautem Fehler schlägt er an.
+
+Nebenbei: die Untertexte am Knopf nennen jetzt auch den Handelsrouten-Bonus
+(„Bewegung kostenlos · Handelsroute +2").

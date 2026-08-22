@@ -785,6 +785,55 @@ step('Konfetti beim Sieg – klein und selbsträumend', () => {
   window.document.getElementById('confetti').remove();
   console.log('       ' + n + ' Schnipsel, ohne Berührungsfang, kein Stapeln');
 });
+step('Eisenbahn ohne Rad lässt sich bauen (gemeldeter Fehler)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  p.techs.eisenbahn = true; delete p.techs.rad;      // genau die gemeldete Lage
+  p.res.coins = 50;
+  const cap = G('capitalOf')(S, pi);
+  const feld = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
+    G('isLand')(S, r, c) && !G('cityAt')(S, r, c));
+  if (!feld) throw new Error('kein freies Nachbarfeld');
+  G('tapHex')(feld[0], feld[1]);
+  const knopf = [...$('sheet-body').querySelectorAll('.opt')]
+    .find(b => /Eisenbahn bauen|Straße bauen/.test(b.textContent));
+  if (!knopf) throw new Error('kein Bau-Knopf im Blatt, obwohl Eisenbahn erforscht ist');
+  if (knopf.disabled) throw new Error('Bau-Knopf gesperrt');
+  if (!/Eisenbahn bauen/.test(knopf.textContent))
+    throw new Error('bietet die Straße an, die ohne Rad gar nicht baubar ist');
+  if (!/2🪙/.test(knopf.textContent))
+    throw new Error('falscher Preis: ' + knopf.textContent.replace(/\s+/g, ' '));
+  knopf.onclick();
+  if (G('roadLevel')(S, feld[0], feld[1]) !== 2)
+    throw new Error('keine Eisenbahn entstanden: Stufe ' + G('roadLevel')(S, feld[0], feld[1]));
+  // Umgekehrt: nur Rad bietet die Straße an und sperrt danach
+  const feld2 = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
+    G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && G('roadLevel')(S, r, c) === 0);
+  if (feld2) {
+    delete p.techs.eisenbahn; p.techs.rad = true;
+    G('tapHex')(feld2[0], feld2[1]);
+    const k2 = [...$('sheet-body').querySelectorAll('.opt')]
+      .find(b => /Eisenbahn bauen|Straße bauen/.test(b.textContent));
+    if (!/Straße bauen/.test(k2.textContent)) throw new Error('nur Rad bietet nicht die Straße an');
+    k2.onclick();
+    G('tapHex')(feld2[0], feld2[1]);
+    const k3 = [...$('sheet-body').querySelectorAll('.opt')]
+      .find(b => /Eisenbahn bauen|Straße bauen/.test(b.textContent));
+    if (!k3.disabled) throw new Error('ohne Eisenbahn ist der Ausbau trotzdem freigegeben');
+  }
+  // Ganz ohne die beiden Technologien gibt es keinen Knopf
+  delete p.techs.rad; delete p.techs.eisenbahn;
+  const feld3 = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
+    G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && G('roadLevel')(S, r, c) === 0);
+  if (feld3) {
+    G('tapHex')(feld3[0], feld3[1]);
+    if ([...$('sheet-body').querySelectorAll('.opt')]
+      .some(b => /Eisenbahn bauen|Straße bauen/.test(b.textContent)))
+      throw new Error('Bau-Knopf ohne jede Wegetechnologie');
+  }
+  G('closeSheet')();
+  console.log('       nur Eisenbahn → „Eisenbahn bauen" für 2🪙, Stufe 2 gesetzt');
+});
 step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   frischesSpiel();
   const S = G('S'), pi = S.cur, p = G('P')(S);

@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v36)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v37)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -35,13 +35,13 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/bots.js` | 320 | Bot-Züge, Siedlerbewegung nach Regelheft, Armeeprioritäten, Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
 | `js/tutorial.js` | 857 | Geführtes Übungsspiel: 27 Schritte, feste Würfelfolge, Schienen |
-| `test.js` | 2530 | **705 Assertions**, `node test.js` |
-| `smoke.js` | 950 | **60 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 2590 | **720 Assertions**, `node test.js` |
+| `smoke.js` | 995 | **61 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v36`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v37`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -73,10 +73,10 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 705 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 720 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (60 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (61 Schritte), inklusive
    Tutorial-Audit: in jedem der 27 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -137,6 +137,9 @@ Alles Weitere dazu steht ausführlich in `ANNAHMEN.md`, Abschnitt „Designände
 - **Tutorial-Schienen:** Ein fehlender Schlüssel in `allow` heißt „nichts erlaubt". Wer neue
   Schritte hinzufügt, muss `bar`, `labels`, `techs`, ggf. `hex`/`moveTo` setzen — sonst ist
   der Schritt eine Sackgasse (das Smoke-Audit meldet beides).
+- **Die Oberfläche darf Regelentscheidungen nicht selbst herleiten.** Zweimal derselbe
+  Fehler: `payOpts` (Bürgerkrieg) und `roadTarget` (Eisenbahn ohne Rad). Wer im Blatt eine
+  Bedingung schreibt, die die Regelmaschine auch kennt, muss deren Funktion benutzen.
 - **Jede neue Kaufprüfung in der Oberfläche muss `payOpts(S, pi)` mitgeben**, sonst
   weicht sie von dem ab, was `pay()` tatsächlich erlaubt (das war der Bürgerkriegs-Fehler).
 - **Smoke-Tests, die auf einem frischen Spiel aufsetzen, müssen ihre Ausgangslage selbst
@@ -187,6 +190,9 @@ Aus diesem Chat:
   freigeschaltet statt ausgewürfelt.
 
 Aus dieser Sitzung (21.8.):
+- **Eisenbahn ohne Rad war nicht baubar:** Das Blatt zeigte den Knopf nur mit Rad und
+  leitete die Zielstufe selbst her. Jetzt entscheidet `roadTarget(S, pi, r, c)` aus
+  `engine.js`, und Blatt wie `doRoad` benutzen sie.
 - **Oxford + Singularität:** `freePickModal` prüfte `S.over` nicht — das Spiel war vorbei,
   aber der Siegbildschirm kam nie.
 - **Nahrungsgrenze hing am Ereignis der Runde:** Dürre und Revolution verboten Wachstum
