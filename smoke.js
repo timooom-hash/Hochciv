@@ -977,6 +977,48 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   G('closeModal')();
   console.log('       Straße +1, Eisenbahn +2, Zeile im Forschungsbogen sichtbar');
 });
+step('Zurückblättern springt nicht sofort wieder vor', () => {
+  G('tutorialStart')();
+  const n = G('TUT_STEPS').length;
+  const idx = () => +$('tut-count').textContent.split('/')[0] - 1;
+  // Bis zum ersten erledigten Aufgabenschritt vorarbeiten
+  let guard = 0, erledigt = -1;
+  while (guard++ < n * 3) {
+    const i = idx();
+    if ($('tut-next').disabled) {
+      const st = G('TUT_STEPS')[i];
+      if (!st.auto) throw new Error('Schritt ' + (i + 1) + ' ohne auto');
+      st.auto(); G('redraw')();
+      if (idx() > i) { erledigt = i; break; }        // hat automatisch weitergeschaltet
+    }
+    if (i >= n - 1) break;
+    $('tut-next').onclick();
+  }
+  if (erledigt < 0) throw new Error('kein automatisch weitergeschalteter Schritt gefunden');
+  const danach = idx();
+  // Zurückblättern: der Schritt muss stehen bleiben
+  $('tut-prev').onclick();
+  if (idx() !== danach - 1) throw new Error('Zurückblättern hat nicht funktioniert');
+  G('redraw')();
+  if (idx() !== danach - 1)
+    throw new Error('nach dem Zurückblättern wurde sofort wieder vorgesprungen');
+  // Auch mehrfaches Neuzeichnen darf nichts ändern
+  G('redraw')(); G('redraw')();
+  if (idx() !== danach - 1) throw new Error('springt beim Neuzeichnen doch noch vor');
+  // Vorwärts geht weiterhin
+  $('tut-next').onclick();
+  if (idx() !== danach) throw new Error('vorwärts geht nicht mehr');
+  G('tutorialQuit')();
+  console.log('       Schritt ' + (erledigt + 1) + ' erledigt → ' + (danach + 1)
+    + ', zurück auf ' + danach + ' bleibt stehen');
+});
+step('Tutorial zeigt keine Zugablauf-Einordnung mehr', () => {
+  G('tutorialStart')();
+  if (G('TUT_STEPS').some(st => st.sub)) throw new Error('ein Schritt hat noch sub');
+  const el = $('tut-sub');
+  if (el && el.textContent.trim()) throw new Error('die Zeile wird noch gefüllt: ' + el.textContent);
+  G('tutorialQuit')();
+});
 step('Tutorialtext erklärt die Handelsrouten', () => {
   const schritt = G('TUT_STEPS').find(st => /Straßen/.test(st.t || ''));
   if (!schritt) throw new Error('kein Straßenschritt im Tutorial');

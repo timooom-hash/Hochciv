@@ -329,11 +329,15 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   // bareDefense 1) UND der eigene Machtwert übersteigt den des Gegners (Bots rechnen
   // mit der Gesamtbevölkerung, deshalb die zweite Stadt weit im Hinterland).
   {
+    // Die Punktspiegelung um den Gegner liegt in odd-r nur waagerecht: Partner und
+    // Flanker müssen auf 5/5 und 5/7 stehen. Die Stadt darf deshalb nicht dort liegen,
+    // muss den Gegner aber in Reichweite haben – 4/6 erfüllt beides.
     const S = flach();
-    const hs2 = stadt(S, 0, 5, 5, 1, true);
+    const hs2 = stadt(S, 0, 4, 6, 1, true);
     stadt(S, 0, 1, 1, 8, false);             // Hinterland: hebt den Machtwert auf 9
     stadt(S, 1, 5, 16, 6, true); macht(S, 1, 6);
     armee(S, 1, 5, 6); belagert(S, 1, hs2);
+    eq(threateningArmies(S, 0, hs2).length, 1, 'der Gegner bedroht die Hauptstadt');
     armee(S, 0, 5, 5);                       // Partner steht schon neben dem Feind
     armee(S, 0, 5, 8);                       // soll sich gegenüber stellen
     plan(S, 0);
@@ -424,6 +428,39 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     armee(S, 0, 8, 5);
     S.sieges['0|' + fremd.id] = 1;           // ICH belagere, nicht umgekehrt
     eq(threateningArmies(S, 0, hs).length, 0, 'die eigene Belagerung bedroht nichts');
+  }
+  // Armeen bleiben nicht in der eigenen Stadt stehen
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 1, 5, 16, 3, true);
+    const a = armee(S, 0, 5, 5);             // frisch gebaut, steht in der Stadt
+    plan(S, 0); botMoveArmy(S, 0, a);
+    eq(a.r === hs.r && a.c === hs.c, false, 'die Armee verlässt die eigene Stadt');
+    eq(cityAt(S, a.r, a.c), undefined, 'und steht auf keinem eigenen Stadtfeld');
+  }
+  // Auch bei laufender Belagerung wird die Stadt verlassen (daneben schützt besser)
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 1, true);
+    stadt(S, 1, 5, 16, 6, true); macht(S, 1, 6);
+    armee(S, 1, 5, 6); belagert(S, 1, hs);
+    const a = armee(S, 0, 5, 5);
+    plan(S, 0);
+    eq(a.r === hs.r && a.c === hs.c, false, 'auch als Verteidiger rückt sie heraus');
+    eq(hexDistance(a.r, a.c, hs.r, hs.c) <= projectRange(S, 0), true,
+      'bleibt aber in Reichweite der Stadt');
+  }
+  // Gibt es gar keinen anderen Halteplatz, darf sie bleiben
+  {
+    const S = flach();
+    const hs = stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 0, 8, 8, 2, false);
+    eq(botOutOfCity(S, 0, [[5, 5], [5, 6]]), [[5, 6]], 'das Stadtfeld fällt weg');
+    eq(botOutOfCity(S, 0, [[5, 5]]), [[5, 5]], 'als einzige Option bleibt es erhalten');
+    eq(botOutOfCity(S, 0, [[5, 5], [8, 8]]).length, 2,
+      'sind ALLE Felder eigene Städte, greift die Ausnahme und nichts fällt weg');
+    eq(botOutOfCity(S, 0, [[5, 6], [7, 7]]).length, 2, 'freie Felder bleiben unangetastet');
   }
   // Der Merker botDone bleibt nicht im Spielstand zurück
   {
@@ -2732,8 +2769,10 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
    aus dem Spielstand stammen. Den Durchlauf über die Oberfläche fährt smoke.js. */
 {
   eq(TUT_STEPS.length >= 20, true, `${TUT_STEPS.length} Tutorialschritte`);
-  eq(TUT_STEPS.every(st => st.t && st.sub && typeof st.html === 'function'), true,
-    'jeder Schritt hat Titel, Einordnung und Text');
+  eq(TUT_STEPS.every(st => st.t && typeof st.html === 'function'), true,
+    'jeder Schritt hat Titel und Text');
+  eq(TUT_STEPS.some(st => st.sub), false,
+    'die Zugablauf-Einordnung ist überall entfernt');
   eq(TUT_STEPS.every(st => !st.goal || st.auto), true, 'jede Aufgabe hat einen Ausweg');
   eq(TUT_STEPS.every(st => !st.task || st.goal), true, 'jede Aufgabenzeile hat ein Ziel');
   eq(TUT_STEPS.every(st => !st.task || st.allow), true, 'jede Aufgabe schaltet gezielt frei');

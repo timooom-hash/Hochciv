@@ -1170,3 +1170,45 @@ Nur im Tutorial liegt das Ergebnis fest, und zwar auf zwei Wegen:
 Abgesichert durch zwei komplette Tutorial-Durchläufe im Test: identische Technologien bei
 **allen** Reichen, identischer Würfelverbrauch, Eisenverarbeitung und Stahl dabei,
 Stadtmauern und Burgenbau nicht. Außerhalb des Tutorials gibt der Hook `null` zurück.
+
+
+---
+
+## Tutorial: feste Texte, Zurückblättern, Armeen aus der Stadt (v44)
+
+### Alle Schritttexte sind jetzt fest verdrahtet
+
+Die Texte rechneten ihre Zahlen aus dem laufenden Spielstand (81 eingebettete Ausdrücke).
+Das war beim Nachlesen verwirrend, weil dieselbe Stelle je nach Zeitpunkt andere Werte
+zeigte – besonders auffällig beim Gegenangriffs-Schritt, wo der Verteidigungswert der
+gegnerischen Hauptstadt beim Öffnen höher stand als in der Rechnung, weil die feindliche
+Armee noch daneben stand.
+
+Vorgehen: Alle 29 Schritte wurden im jeweils richtigen Zustand gerendert (jeder Schritt
+nach den `auto()`-Aufrufen der vorherigen) und die `html`-Funktionen durch den gerenderten
+Text ersetzt. `hl`, `goal`, `auto` und `allow` bleiben dynamisch – nur die Anzeige ist
+eingefroren. Wer Zahlen ändert (Kosten, Kartenfelder), muss die Texte jetzt von Hand
+nachziehen; dafür stimmen sie beim Zurückblättern immer.
+
+### Zurückblättern springt nicht mehr vor
+
+`tutMaybeAdvance` schaltete auch dann automatisch weiter, wenn man einen erledigten
+Schritt noch einmal aufschlug – die Seiten waren damit praktisch nicht mehr lesbar.
+`ui.tut.max` merkt jetzt den weitesten je erreichten Schritt; automatisch geht es nur
+dort weiter. Vorwärtsblättern und die Aufgaben selbst bleiben unverändert.
+
+### Die Zugablauf-Einordnung ist weg
+
+Alle 29 `sub`-Felder („Zugablauf 2 von 5 · Macht") sind entfernt, ebenso die Anzeige.
+Die Zeile bleibt im Aufbau erhalten (sie trägt „Tutorial beenden"), nur leer.
+
+### Bots lassen keine Armee in der eigenen Stadt stehen
+
+Gemeldet: Im Tutorial blieb die zweite griechische Armee in der Hauptstadt stehen.
+`botOutOfCity` streicht eigene Stadtfelder jetzt aus den Halteplätzen – in `botReach`
+(Prioritäten 1–6) und in `botMoveArmy` (7–9). **Ausnahme:** Gibt es gar keinen anderen
+Halteplatz, bleibt das Stadtfeld erlaubt, sonst könnte eine Armee auf einer vollen Insel
+gar nicht mehr ziehen.
+
+Begründung: In der Stadt blockiert eine Armee den Bauplatz für die nächste, kann nicht
+flankieren und niemanden abfangen; ein Feld daneben zählt genauso zur Verteidigung.
