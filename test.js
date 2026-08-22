@@ -2868,8 +2868,9 @@ function tutRun() {
   eq(tutAllow().bar, [], 'beim Gründen ist die Aktionsleiste gesperrt');
   eq(tutHexOk(...TUT_CITY_1), true, 'das Zielfeld ist freigegeben');
   eq(tutHexOk(0, 0), false, 'andere Felder nicht');
-  // Forschungsschritt
-  ui.tut.i = TUT_STEPS.findIndex(st => /Schrift/.test(st.t));
+  // Forschungsschritt – über die Freigabe gesucht, nicht über den Titel: die Texte
+  // werden umgeschrieben, die Schienen bleiben.
+  ui.tut.i = TUT_STEPS.findIndex(st => st.allow && (st.allow.techs || []).includes('schrift'));
   eq(tutAllow().techs, ['schrift'], 'im Forschungsschritt ist nur Schrift freigegeben');
   eq(tutAllow().bar, ['a-tech'], 'und nur der Forschen-Knopf');
   // Armeeschritt: Zugziel ist gebunden
