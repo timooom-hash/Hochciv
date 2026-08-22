@@ -27,7 +27,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--parchment);color
   html.turn body{position:fixed;top:0;left:0;width:100vh;height:100vw;
     transform-origin:top left;transform:rotate(90deg) translateY(-100vw)}
   /* Gedreht zeigen die Systemeinfassungen in die falsche Richtung – lieber keine. */
-  html.turn{--safe-t:0px;--safe-b:0px}
+  html.turn{--safe-t:0px;--safe-b:0px;--fall:105vw}   /* gedreht ist „unten" die kurze Seite */
 }
 button,select,input{font:inherit;color:inherit}
 .screen{position:fixed;inset:0;display:none;flex-direction:column;padding-top:var(--safe-t)}
@@ -282,6 +282,21 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 
 /* Hinweise erscheinen oben unter der Kopfzeile. Unten würden sie die Aktionsleiste
    überlagern – man trifft dann versehentlich „Zug beenden". */
+/* Sieggruß: Papierschnipsel fallen einmal durchs Bild. Liegt über allem, fängt aber
+   keine Berührungen ab, damit „Zurück zum Menü" sofort erreichbar bleibt.
+   Im gedrehten Hochformat fällt es mit der App, nicht mit dem Gerät – der Kasten hängt
+   im <body> und dreht deshalb mit. */
+#confetti{position:fixed;inset:0;z-index:70;pointer-events:none;overflow:hidden}
+#confetti i{position:absolute;top:-16px;border-radius:1px;opacity:0;
+  animation-name:schnipsel;animation-timing-function:cubic-bezier(.3,.5,.6,1);
+  animation-fill-mode:forwards}
+@keyframes schnipsel{
+  0%{transform:translateY(0) rotate(0);opacity:0}
+  8%{opacity:.95}
+  100%{transform:translateY(var(--fall,105vh)) rotate(var(--dreh,180deg));opacity:0}
+}
+@media (prefers-reduced-motion: reduce){ #confetti{display:none} }
+
 .toast{position:fixed;left:50%;top:calc(62px + var(--safe-t));transform:translateX(-50%) translateY(-18px);
   background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:20px;font-size:13px;
   opacity:0;transition:.2s;pointer-events:none;z-index:40;max-width:86%;text-align:center}
