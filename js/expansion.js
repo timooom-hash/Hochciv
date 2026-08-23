@@ -342,16 +342,11 @@ function applyWonderEffect(S, pi, city, w) {
       growFree(S, pi, city, 9, 'Angkor Wat');
       break;
     case 'koloss': {
-      let built = 0;
-      for (const [r, c] of neighbors(city.r, city.c)) {
-        if (built >= 2) break;
-        const t = terrainAt(S, r, c);
-        if (!t || !TERRAIN[t].land || TERRAIN[t].block) continue;
-        if (cityAt(S, r, c) || armyAt(S, r, c)) continue;
-        S.armies.push({ id: S.nextId++, owner: pi, r, c, mp: 0, born: S.round });
-        built++;
-      }
-      log(S, 'act', `${civOf(p).n}: Der Koloss stellt ${built} kostenlose Armee(n).`);
+      // Zwei kostenlose Armeen – sie erscheinen in der Hauptstadt und müssen sie
+      // verlassen, nacheinander: auf einem Feld steht nur eine Armee.
+      p.freeArmies = (p.freeArmies || 0) + 2;
+      log(S, 'act', `${civOf(p).n}: Der Koloss stellt zwei kostenlose Armeen.`);
+      spawnFreeArmies(S, pi);
       break;
     }
     case 'canal':

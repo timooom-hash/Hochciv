@@ -116,10 +116,10 @@ function newGame(cfg) {
     // Russland "Siedlertrecks": auch die Hauptstadt startet mit 2 Bevölkerung
     const startPop = isAbil(p, 'siedler') ? 2 : 1;
     S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: startPop, cap: true, grown: 0, born: 0 });
-    if (p.civ === 'wikinger' && isAbil(p, 'basis')) {   // Wikinger: kostenlose Armee am Start
-      const spot = neighbors(pos[0], pos[1]).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
-      if (spot) S.armies.push({ id: S.nextId++, owner: i, r: spot[0], c: spot[1], mp: 0, born: 0 });
-    }
+    // Wikinger: kostenlose Armee am Start. Sie erscheint IN der Hauptstadt, genau wie
+    // eine gebaute – und muss sie im ersten Zug verlassen (born = aktuelle Runde).
+    if (p.civ === 'wikinger' && isAbil(p, 'basis'))
+      S.armies.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], mp: 0, born: S.round });
   });
   if (S.wo) initWonderPools(S);
   S.startIdx = startIdx;      // Rundenwechsel und Ereignis hängen am Startspieler
@@ -679,6 +679,7 @@ function beginTurn(S) {
   // Zustände zurücksetzen
   S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
   S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
+  spawnFreeArmies(S, S.cur);           // was letzte Runde nicht gestellt werden konnte
   p.copies = 0; p.nuked = false; p.backPicks = [];
 }
 
@@ -802,6 +803,7 @@ function moveArmy(S, army, r, c) {
   army.mp -= reach.get(k);
   army.r = r; army.c = c;
   log(S, 'act', `${civOf(S.players[army.owner]).n}: Armee zieht nach ${r}/${c}.`);
+  spawnFreeArmies(S, army.owner);      // macht den Platz für die nächste Gratisarmee frei
   return null;
 }
 
@@ -1002,6 +1004,23 @@ function armyCost(S, pi) {
    Bezahlen – sonst sperrt der Knopf einen Kauf, den die Regel erlauben würde (genau
    dieser Fehler trat im Bürgerkrieg auf). */
 function payOpts(S, pi) { return { foodOk: evActive(S, pi, 'buergerkrieg') }; }
+/* Kostenlose Armeen (Der Koloss) erscheinen wie gebaute IN der Hauptstadt und müssen
+   sie verlassen. Weil dort nur eine Armee stehen kann, kommt die nächste erst, wenn die
+   vorige weggezogen ist – deshalb die Warteschlange p.freeArmies.
+   Aufgerufen beim Wunderbau, nach jeder Armeebewegung und zu Zugbeginn. */
+function spawnFreeArmies(S, pi) {
+  const p = S.players[pi];
+  let n = 0;
+  while ((p.freeArmies || 0) > 0) {
+    const cap = capitalOf(S, pi);
+    if (!cap || armyAt(S, cap.r, cap.c)) break;      // besetzt: die nächste wartet
+    S.armies.push({ id: S.nextId++, owner: pi, r: cap.r, c: cap.c,
+      mp: moveAllowance(S, pi), born: S.round });
+    p.freeArmies--; n++;
+    log(S, 'act', `${civOf(p).n}: kostenlose Armee in der Hauptstadt – muss sie noch verlassen.`);
+  }
+  return n;
+}
 function buildArmy(S, pi, city) {
   if (!city || city.owner !== pi) return 'Nur in eigener Stadt.';
   if (armyAt(S, city.r, city.c)) return 'Dort steht schon eine Armee.';
@@ -1308,6 +1327,8 @@ function pendingWarnings(S, pi) {
   const out = [];
   for (const a of armiesOf(S, pi))
     if (a.born === S.round && cityAt(S, a.r, a.c)) out.push('Eine neu gebaute Armee steht noch in der Stadt und müsste sich wegbewegen.');
+  if ((S.players[pi].freeArmies || 0) > 0)
+    out.push('Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Hauptstadt frei ist.');
   return out;
 }
 /* Schritt 4 + 5 des Zuges. Läuft für Menschen wie Bots an genau einer Stelle –
