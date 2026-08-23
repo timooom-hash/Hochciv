@@ -239,13 +239,10 @@ const TUT_STEPS = [
     t: 'Was die Bots getan haben',
     html: () => `
       <p>Ein Bot führt  immer dieselben Schritte aus: jede Stadt wachsen lassen, eine neue Stadt siedeln, eine Armee bauen, alle Armeen bewegen,
-      zweimal forschen. Allerdings führt er jede Aktion nur mit eine Wahrscheinlichkeit von 17% (leichtester Schwierigkeitsgrad) bis 83%(höchster Schwierigkeitsgrad) aus. Jeder Wurf steht im
+      zweimal forschen. Allerdings führt er jede Aktion nur mit einer Wahrscheinlichkeit von 17 % (leichtester Schwierigkeitsgrad) bis 83%(höchster Schwierigkeitsgrad) aus. Jeder Wurf steht im
       Protokoll.</p>
      <p><b>So liest du mit:</b> unten auf <b>Protokoll</b> – dort steht jeder Würfelwurf
-      mit Grund.</p>
-      <div class="tut-key"><b>Merke</b> Der <b>Machtwert eines Bots ist immer seine
-      Gesamtbevölkerung</b>. Griechenland hat gerade
-      3.</div>`,
+      mit Grund.</p>`,
     task: 'Öffne einmal das <b>Protokoll</b>.',
     allow: { bar: ['a-log'] },
     goal: () => !!ui.tutSawLog,
@@ -331,8 +328,8 @@ const TUT_STEPS = [
       <p>Eine Armee zu bauen kostet aktuell <b>5 Münzen</b>. Das steigt um weitere 5 je eigener Armee, die
       zweite kostet also 10. Sie erscheint <i>in</i> einer Stadt und <b>muss sie im selben Zug
       verlassen</b>; Armeen stehen nie auf Städten, auch nicht auf eigenen.</p>
-      <p><b>Warum überhaupt eine Armee?</b> Ohne Armee kannst du weder angreifen aktiv eine
-      Stadt verteidigen.</p>
+      <p><b>Warum überhaupt eine Armee?</b> Ohne Armee kannst du weder angreifen noch aktiv
+      eine Stadt verteidigen.</p>
       <p><b>So baust du:</b> die golden umrandete Stadt antippen → im Blatt auf
       <b>Armee bauen</b>. Die Armee steht dann in der Stadt und muss sie noch in diesem Zug
       verlassen.</p>`,
