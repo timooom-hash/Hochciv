@@ -134,6 +134,12 @@ const TUT_STEPS = [
   {
     t: 'Hochzeivilization',
     html: () => `
+      <p>Hochzeivilization ist ein Spiel, bei dem vier Zivilisationen ihr Reich von der
+      Antike in die Moderne führen. Alle Reiche beginnen mit nur einer einzigen Stadt,
+      werden aber schon bald expandieren, ihre Bevölkerung vergrößern, neue Technologien
+      erforschen und Armeen bauen. Eine Zivilisation gewinnt durch wirtschaftliche,
+      militärische oder Technologische Vorherrschaft. Wie genau das im Detail funktioniert,
+      wird später erklärt.</p>
       <p>Du spielst <b>Russland</b>, die anderen drei Reiche übernehmen Bots auf dem
       höchsten Schwierigkeitsgrad „David".</p>
       <p>Golden umrandet ist deine <b>Hauptstadt</b>: Der Kreis mit Symbol ist die Stadt, die Striche
@@ -377,9 +383,6 @@ const TUT_STEPS = [
     html: () => `
       <p>Übrig: 0 🔬, 0 🌾, 2 🪙 – das verfällt.
       Danach kommen Kampf und Siegprüfung, dann die Bots.</p>
-      <p>Achte im Protokoll auf die Zeilen der Bots: Ein Bot zieht seine Armeen nach
-      vier Prioritäten – belagerte eigene Städte verteidigen, gegnerische Städte angreifen,
-      Armeen flankieren, sonst an den Reichsrand.</p>
 `,
     task: 'Beende den Zug und klick dich durch die Bot-Fenster.',
     allow: { bar: ['a-end', 'a-log'] },
