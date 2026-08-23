@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.8., `sw.js` v44)
+# Hochzeivilization — Projekt-Übergabe (Stand 22.8., `sw.js` v48)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -35,13 +35,13 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/bots.js` | 450 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
 | `js/tutorial.js` | 1000 | Geführtes Übungsspiel: **29 Schritte**, feste Würfelfolge, Schienen |
-| `test.js` | 2960 | **797 Assertions**, `node test.js` |
+| `test.js` | 3000 | **812 Assertions**, `node test.js` |
 | `smoke.js` | 1060 | **62 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v44`), `manifest.webmanifest`, `icons/`, `README.md`.
+aktuell `hochciv-v48`), `manifest.webmanifest`, `icons/`, `README.md`.
 
 ## Regelheft
 
@@ -73,7 +73,7 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 797 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 812 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (64 Schritte), inklusive
@@ -192,7 +192,15 @@ Aus diesem Chat:
 - Tutorial: Schienen-Lücke bei Schritten mit unvollständigem `allow`; Papier wurde still
   freigeschaltet statt ausgewürfelt.
 
-Aus dieser Sitzung (21.8.):
+Aus dieser Sitzung (21.–22.8.):
+- **Kostenlose Armeen** (Wikinger-Start, Koloss) erscheinen jetzt in der Hauptstadt und
+  müssen sie verlassen; beim Koloss nacheinander über die Warteschlange `p.freeArmies`
+  (`spawnFreeArmies`, aufgerufen beim Wunderbau, nach `moveArmy` und in `beginTurn`).
+- **Tutorialtexte vom Autor überarbeitet** (v45–v47): Schritte 1–15 wurden wörtlich
+  übernommen. Tests, die Schritte am Titel suchten, hängen jetzt an den Schienen
+  (`allow.techs`), damit Textänderungen sie nicht brechen.
+- **Kostenlose Armeen** (Wikinger-Start, Koloss) erscheinen in der Hauptstadt und müssen
+  sie verlassen; beim Koloss nacheinander über die Warteschlange `p.freeArmies`.
 - **Tutorialtexte sind fest verdrahtet** (v44): keine berechneten Zahlen mehr in den
   Schritttexten. Wer Kosten oder Kartenfelder ändert, muss die Texte von Hand nachziehen.
 - **Bots lassen keine Armee in der eigenen Stadt stehen** (`botOutOfCity`), außer es gibt

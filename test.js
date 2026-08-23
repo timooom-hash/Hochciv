@@ -131,6 +131,17 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(armyCost(S, 0), 10, 'zweite Armee kostet 10');
   const W = mk('wikinger');
   eq(armiesOf(W, 0).length, 1, 'Wikinger starten mit einer kostenlosen Armee');
+  // Sie erscheint IN der Hauptstadt und muss sie im ersten Zug verlassen
+  {
+    const wcap = capitalOf(W, 0), wa = armiesOf(W, 0)[0];
+    eq([wa.r, wa.c], [wcap.r, wcap.c], 'die Startarmee steht in der Hauptstadt');
+    eq(wa.born, W.round, 'sie gilt als neu gebaut');
+    eq(pendingWarnings(W, 0).some(x => /noch in der Stadt/.test(x)), true,
+      'das Zugende erinnert ans Wegbewegen');
+    eq(wa.mp > 0, true, 'zu Zugbeginn hat sie Bewegungspunkte');
+    // Kein zweites Reich bekommt eine geschenkt
+    eq(armiesOf(W, 1).length, 0, 'die Gegenseite startet ohne Armee');
+  }
   eq(armyCost(W, 0), 5, 'Wikinger: nächste Armee kostet 5 statt 10');
   W.armies.push({ id: 98, owner: 0, r: 0, c: 0, mp: 0, born: 0 });
   eq(armyCost(W, 0), 10, 'Wikinger: dritte Armee kostet 10 statt 15');
@@ -2505,9 +2516,32 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   S.round++; p.doubleIncome = S.round;
   eq(income(S, 0).sci, plain * 2, 'Taj Mahal verdoppelt die Erträge');
   p.doubleIncome = null;
-  applyWonderEffect(S, 0, cap, WONDER_BY_KEY.koloss);
-  eq(armiesOf(S, 0).length, 2, 'Koloss stellt zwei Armeen neben die Stadt');
-  eq(armiesOf(S, 0).every(a => !cityAt(S, a.r, a.c)), true, 'die Armeen stehen nicht auf der Stadt');
+  // Koloss: zwei kostenlose Armeen, aber nacheinander – auf einem Feld steht nur eine
+  {
+    const vorher = armiesOf(S, 0).length;
+    applyWonderEffect(S, 0, cap, WONDER_BY_KEY.koloss);
+    eq(armiesOf(S, 0).length, vorher + 1, 'zuerst erscheint nur EINE Armee');
+    eq(p.freeArmies, 1, 'die zweite wartet in der Warteschlange');
+    const erste = armiesOf(S, 0).find(a => a.r === cap.r && a.c === cap.c);
+    eq(!!erste, true, 'sie steht in der Hauptstadt');
+    eq(erste.born, S.round, 'und gilt als neu gebaut – muss die Stadt verlassen');
+    eq(erste.mp > 0, true, 'sie hat dafür auch Bewegungspunkte');
+    eq(pendingWarnings(S, 0).some(w => /kostenlose Armee wartet/.test(w)), true,
+      'das Zugende warnt vor der wartenden Armee');
+    // Solange die Hauptstadt besetzt ist, kommt keine zweite
+    spawnFreeArmies(S, 0);
+    eq(armiesOf(S, 0).length, vorher + 1, 'die zweite kommt nicht, solange es eng ist');
+    // Erst das Wegziehen macht Platz
+    const ziel = neighbors(cap.r, cap.c).find(([r, c]) =>
+      isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+    eq(!!ziel, true, 'ein Nachbarfeld ist frei');
+    erste.mp = moveAllowance(S, 0);
+    eq(moveArmy(S, erste, ziel[0], ziel[1]), null, 'die erste zieht heraus');
+    eq(armiesOf(S, 0).length, vorher + 2, 'und die zweite rückt sofort nach');
+    eq(p.freeArmies, 0, 'die Warteschlange ist leer');
+    eq(armiesOf(S, 0).filter(a => cityAt(S, a.r, a.c)).length, 1,
+      'genau eine Armee steht jetzt noch in der Stadt');
+  }
   const before = cap.pop;
   applyWonderEffect(S, 0, cap, WONDER_BY_KEY.angkor);
   eq(cap.pop > before, true, 'Angkor Wat lässt die Stadt wachsen');

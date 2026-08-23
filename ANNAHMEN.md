@@ -1212,3 +1212,31 @@ gar nicht mehr ziehen.
 
 Begründung: In der Stadt blockiert eine Armee den Bauplatz für die nächste, kann nicht
 flankieren und niemanden abfangen; ein Feld daneben zählt genauso zur Verteidigung.
+
+
+---
+
+## Kostenlose Armeen erscheinen in der Hauptstadt (v48)
+
+**Wikinger „Beutezüge"** stellte seine Startarmee bisher auf ein freies Nachbarfeld der
+Hauptstadt. Jetzt erscheint sie **in** der Hauptstadt, mit `born = aktuelle Runde` – also
+genau wie eine gebaute Armee, samt der Erinnerung beim Zugende, dass sie die Stadt noch
+verlassen muss. Betrifft nur menschliche Wikinger: Bots bekommen keine Fähigkeiten und
+damit auch keine Startarmee (`isAbil` ist für Bots immer false).
+
+**Der Koloss** stellte zwei Armeen gleichzeitig auf Nachbarfelder. Jetzt kommen sie in die
+Hauptstadt – aber **nacheinander**, weil auf einem Feld nur eine Armee stehen kann:
+
+- `p.freeArmies` ist eine Warteschlange (der Koloss legt 2 hinein).
+- `spawnFreeArmies(S, pi)` stellt so viele, wie Platz haben – praktisch also eine, denn
+  danach ist die Hauptstadt besetzt.
+- Aufgerufen wird sie an drei Stellen: beim Wunderbau, **nach jeder Armeebewegung**
+  (`moveArmy`) und zu **Zugbeginn** (`beginTurn`), falls letzte Runde kein Platz war.
+- Die Armeen bekommen `mp = moveAllowance` und `born = aktuelle Runde`, gelten also als
+  frisch gebaut und dürfen sich sofort bewegen.
+- `pendingWarnings` weist auf eine noch wartende Armee hin.
+
+Damit gilt durchgängig dieselbe Regel wie beim normalen Armeebau: erscheinen in der Stadt,
+sofort herausbewegen, ein Feld je Armee. Vorher waren die Gratisarmeen die einzige
+Ausnahme – sie standen mit `mp: 0` neben der Stadt und konnten sich in der Runde ihres
+Erscheinens gar nicht bewegen.
