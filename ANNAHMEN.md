@@ -1240,3 +1240,43 @@ Damit gilt durchgängig dieselbe Regel wie beim normalen Armeebau: erscheinen in
 sofort herausbewegen, ein Feld je Armee. Vorher waren die Gratisarmeen die einzige
 Ausnahme – sie standen mit `mp: 0` neben der Stadt und konnten sich in der Runde ihres
 Erscheinens gar nicht bewegen.
+
+
+---
+
+## Drei Anpassungen (v49)
+
+### Techbogen zeigt, was andere Menschen erforschen könnten
+
+Neben den Marken „hat diese Technologie" gibt es jetzt eine zweite Art: „könnte sie
+erforschen". Sie erscheint **nur bei mehr als einem menschlichen Spieler** und **nur für
+andere** – die eigene Verfügbarkeit sieht man ohnehin am Zustand der Kachel.
+
+**Bots bekommen nie eine solche Marke.** Sie kennen keine Verfügbarkeiten, sondern würfeln
+Feld, Zeitalter und Technologie direkt aus dem Pool; eine Anzeige „könnte" wäre dort
+schlicht falsch.
+
+Optisch nach demselben Muster wie bezahlbar/zu teuer im selben Bogen: beide Marken sind
+umkringelt, „hat es" durchgezogen und satt, „könnte es" gestrichelt und blass. Eine
+Möglichkeit soll nicht aussehen wie eine Tatsache. Die Legende über dem Raster erklärt
+den Ring – aber nur, wenn es mehr als einen Menschen gibt.
+
+### Versionsnummer im Hauptmenü
+
+`APP_VERSION` in `js/data.js` ist die Quelle; das Menü zeigt sie unten als
+„Hochzeivilization v49". Sie muss zur `VERSION` in `sw.js` passen – **ein Test bindet
+beide aneinander**, sonst zeigt das Menü etwas anderes an, als der Offline-Cache
+ausliefert. Beim Hochzählen also beide Stellen ändern; der Test schlägt sonst an.
+
+### Zugende mit Armee in der Stadt ist gesperrt, nicht mehr nur bestätigungspflichtig
+
+Bisher warnte `pendingWarnings` einmal, der zweite Tipp auf „Zug beenden" ließ durch.
+Jetzt gibt es `blockingIssues(S, pi)`: Steht eine Armee auf einem Stadtfeld, ist das
+Zugende **gar nicht** möglich – Städte tragen keine Armeen, der Zustand ist ungültig.
+
+**Ausnahme gegen die Sackgasse:** Blockiert wird nur, wenn die Armee auch tatsächlich
+herauskann. Geprüft wird über `armyReach`, ob ein erreichbares Feld außerhalb einer Stadt
+existiert. Sonst wäre der Zug bei einer eingeschlossenen Insel, ringsum besetzten Feldern
+oder aufgebrauchter Bewegung nicht mehr beendbar.
+
+`pendingWarnings` behält nur noch die weichen Hinweise (wartende Gratisarmee).

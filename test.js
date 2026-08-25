@@ -136,8 +136,8 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     const wcap = capitalOf(W, 0), wa = armiesOf(W, 0)[0];
     eq([wa.r, wa.c], [wcap.r, wcap.c], 'die Startarmee steht in der Hauptstadt');
     eq(wa.born, W.round, 'sie gilt als neu gebaut');
-    eq(pendingWarnings(W, 0).some(x => /noch in der Stadt/.test(x)), true,
-      'das Zugende erinnert ans Wegbewegen');
+    eq(blockingIssues(W, 0).some(x => /noch in einer Stadt/.test(x)), true,
+      'das Zugende ist blockiert, bis sie herauszieht');
     eq(wa.mp > 0, true, 'zu Zugbeginn hat sie Bewegungspunkte');
     // Kein zweites Reich bekommt eine geschenkt
     eq(armiesOf(W, 1).length, 0, 'die Gegenseite startet ohne Armee');
@@ -2528,6 +2528,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     eq(erste.mp > 0, true, 'sie hat dafür auch Bewegungspunkte');
     eq(pendingWarnings(S, 0).some(w => /kostenlose Armee wartet/.test(w)), true,
       'das Zugende warnt vor der wartenden Armee');
+    eq(blockingIssues(S, 0).length > 0, true, 'und ist blockiert, solange sie in der Stadt steht');
     // Solange die Hauptstadt besetzt ist, kommt keine zweite
     spawnFreeArmies(S, 0);
     eq(armiesOf(S, 0).length, vorher + 1, 'die zweite kommt nicht, solange es eng ist');
@@ -2795,6 +2796,16 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(a1.techs.includes('stadtmauern') || a1.techs.includes('burgenbau'), false,
     'Stadtmauern und Burgenbau nicht: ' + a1.techs);
   ui = { sel: null, army: null, mode: null, botTimer: null };
+}
+
+/* Die Versionsnummer steht an zwei Stellen – sie müssen zusammenpassen, sonst zeigt das
+   Menü etwas anderes an, als der Offline-Cache ausliefert. */
+{
+  const sw = require('fs').readFileSync(__dirname + '/sw.js', 'utf8');
+  const m = /const VERSION = 'hochciv-(v\d+)'/.exec(sw);
+  eq(!!m, true, 'sw.js nennt eine Version');
+  eq(APP_VERSION, m[1], `APP_VERSION (${APP_VERSION}) passt zu sw.js (${m && m[1]})`);
+  eq(/^v\d+$/.test(APP_VERSION), true, 'die Version hat die Form vNN');
 }
 
 /* ==================================================== Tutorial

@@ -1041,6 +1041,99 @@ step('Tutorialtext erklärt die Handelsrouten', () => {
   G('closeModal')();
   console.log('       Abschlusstext und Kurzregeln nennen beide Stufen');
 });
+step('Techbogen zeigt, was andere Menschen erforschen könnten', () => {
+  // Zwei Menschen aufsetzen: der Aufbau macht nur den ersten zum Menschen
+  $('m-new').onclick();
+  $('setup-list').children[1].querySelector('[data-kind="human"]').onclick();
+  [2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  $('setup-go').onclick();
+  const S = G('S'), pi = S.cur;
+  if (G('humanCount')(S) < 2) throw new Error('Testaufbau hat keine zwei Menschen');
+  const andere = S.players.findIndex((p, i) => i !== pi && p.kind === 'human');
+  const bot = S.players.findIndex(p => p.kind === 'bot');
+  // Eine Tech, die der andere Mensch verfügbar hat, aber niemand erforscht
+  const k = Object.keys(S.players[andere].avail)
+    .find(x => S.players[andere].avail[x] && !S.players.some(p => p.techs[x]));
+  if (!k) throw new Error('keine passende Technologie gefunden');
+  const box = window.document.createElement('div');
+  box.innerHTML = G('ownerMarks')(S, k, pi);
+  if (!box.querySelector('.owner-mark.can'))
+    throw new Error('keine „könnte erforschen"-Marke für den anderen Menschen');
+  if (box.querySelectorAll('.owner-mark:not(.can)').length)
+    throw new Error('gefüllte Marke, obwohl niemand die Technologie hat');
+  // Hat er sie erforscht, wird daraus eine gefüllte Marke
+  S.players[andere].techs[k] = true;
+  box.innerHTML = G('ownerMarks')(S, k, pi);
+  if (box.querySelector('.owner-mark.can'))
+    throw new Error('noch als Möglichkeit markiert, obwohl er sie hat');
+  if (!box.querySelectorAll('.owner-mark').length) throw new Error('gar keine Marke mehr');
+  delete S.players[andere].techs[k];
+  // Bots bekommen nie eine Möglichkeits-Marke – sie kennen keine Verfügbarkeiten
+  if (bot >= 0) {
+    S.players[bot].avail = S.players[bot].avail || {};
+    S.players[bot].avail[k] = true;
+    box.innerHTML = G('ownerMarks')(S, k, pi);
+    const farben = [...box.querySelectorAll('.owner-mark.can')].length;
+    if (farben !== 1) throw new Error(farben + ' Möglichkeits-Marken – Bots dürfen keine haben');
+  }
+  // Die eigene Verfügbarkeit erzeugt keine Marke (sieht man an der Kachel)
+  S.players[pi].avail[k] = true;
+  box.innerHTML = G('ownerMarks')(S, k, pi);
+  if ([...box.querySelectorAll('.owner-mark.can')].length !== 1)
+    throw new Error('das eigene Reich wurde mitmarkiert');
+  console.log('       „' + k + '": eine Möglichkeits-Marke, keine für Bots oder einen selbst');
+});
+step('Solo gegen Bots zeigt keine Möglichkeits-Marken', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur;
+  if (G('humanCount')(S) !== 1) throw new Error('Testaufbau hat nicht genau einen Menschen');
+  const k = Object.keys(S.players[pi].avail).find(x => S.players[pi].avail[x]);
+  const box = window.document.createElement('div');
+  box.innerHTML = G('ownerMarks')(S, k, pi);
+  if (box.querySelector('.owner-mark.can'))
+    throw new Error('Möglichkeits-Marke im Solospiel');
+  $('a-tech').onclick();
+  if (/könnte/.test($('ov-body').textContent))
+    throw new Error('die Legende erklärt etwas, das es hier nicht gibt');
+  G('closeModal')();
+});
+step('Hauptmenü zeigt die Versionsnummer', () => {
+  const el = $('m-version');
+  if (!el) throw new Error('keine Versionszeile im Hauptmenü');
+  const txt = el.textContent.trim();
+  if (!/^Hochzeivilization v\d+$/.test(txt)) throw new Error('falsches Format: „' + txt + '"');
+  if (!txt.includes(G('APP_VERSION'))) throw new Error('zeigt nicht APP_VERSION');
+  // Sie darf die Menüknöpfe nicht verdrängen
+  if (!$('screen-menu').querySelector('#m-new')) throw new Error('Menüknöpfe fehlen');
+  console.log('       ' + txt);
+});
+step('Zugende ist mit Armee in der Stadt gesperrt (nicht nur bestätigungspflichtig)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S);
+  const cap = G('capitalOf')(S, pi);
+  p.res.coins = 50;
+  const e = G('buildArmy')(S, pi, cap);
+  if (e) throw new Error('Armee ließ sich nicht bauen: ' + e);
+  G('redraw')();
+  const runde = S.round, dran = S.cur;
+  if (!G('blockingIssues')(S, pi).length) throw new Error('keine Sperre gemeldet');
+  // Zweimal versuchen – früher ließ der zweite Versuch durch
+  $('a-end').onclick();
+  $('a-end').onclick();
+  if (G('S').round !== runde || G('S').cur !== dran)
+    throw new Error('der Zug wurde trotzdem beendet');
+  // Nach dem Herausziehen geht es
+  const arm = G('armiesOf')(S, pi).find(a => a.r === cap.r && a.c === cap.c);
+  const ziel = G('neighbors')(cap.r, cap.c).find(([r, c]) =>
+    G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && !G('armyAt')(S, r, c));
+  arm.mp = G('moveAllowance')(S, pi);
+  G('moveArmy')(S, arm, ziel[0], ziel[1]);
+  if (G('blockingIssues')(S, pi).length) throw new Error('Sperre bleibt trotz freiem Stadtfeld');
+  $('a-end').onclick();
+  if (G('S').round === runde && G('S').cur === dran)
+    throw new Error('der Zug ließ sich danach immer noch nicht beenden');
+  console.log('       zweimal blockiert, nach dem Herausziehen frei');
+});
 step('Hauptmenü ohne Fußzeile (Punkt 3 der Nachbesserung)', () => {
   if ($('screen-menu').querySelector('.foot')) throw new Error('Fußzeile steht noch da');
   if (/Home-Bildschirm/.test($('screen-menu').textContent))

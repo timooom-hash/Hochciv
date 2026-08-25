@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 22.8., `sw.js` v48)
+# Hochzeivilization — Projekt-Übergabe (Stand 22.8., `sw.js` v49)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -16,7 +16,7 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
   `mkdir -p /home/claude/hochciv && cd /home/claude && unzip -o -q /mnt/user-data/uploads/hochzeivilization.zip -d /home/claude/unz && cp -r /home/claude/unz/hochzeivilization/. /home/claude/hochciv/`
   (oder aus `/mnt/user-data/outputs/hochzeivilization/`, falls noch vorhanden).
   Danach `npm install jsdom --no-fund --no-audit` — für `smoke.js` und `check_single.js` nötig.
-- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (20 Dateien),
+- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (21 Dateien),
   `hochzeivilization.zip`, und `hochzeivilization-einzeldatei.html` — Letzteres ist, was der
   Autor tatsächlich aufs iPad lädt.
 - **Wichtig beim Paketieren:** `node_modules` und `package*.json` ausschließen
@@ -24,24 +24,25 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
   Einmal ist ein `node_modules` ins Zip gerutscht und ließ sich wegen eines I/O-Fehlers auf dem
   Mount nicht mehr löschen — nur durch Umbenennen aus dem Ordner heraus lösbar.
 
-## Dateistruktur (~7700 Zeilen)
+## Dateistruktur (~9500 Zeilen)
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/data.js` | 461 | TERRAIN (inkl. Vulkan), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, Karten, Zufalls- und Duellkartengenerator inkl. Startgüte, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 465 | `APP_VERSION`, TERRAIN (inkl. Vulkan), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, Karten, Zufalls- und Duellkartengenerator inkl. Startgüte, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
-| `js/engine.js` | 1133 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
-| `js/expansion.js` | 508 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 450 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1099 | SVG-Karte, Touch, Aktionsblätter, Technologiebogen, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln mit voller Techliste |
-| `js/tutorial.js` | 1000 | Geführtes Übungsspiel: **29 Schritte**, feste Würfelfolge, Schienen |
-| `test.js` | 3000 | **812 Assertions**, `node test.js` |
-| `smoke.js` | 1060 | **62 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `js/engine.js` | 1370 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/expansion.js` | 511 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
+| `js/bots.js` | 479 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/ui.js` | 1325 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln |
+| `js/tutorial.js` | 911 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
+| `test.js` | 3059 | **816 Assertions**, `node test.js` |
+| `smoke.js` | 1292 | **68 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
-Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION bei jeder Änderung hochzählen**,
-aktuell `hochciv-v48`), `manifest.webmanifest`, `icons/`, `README.md`.
+Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION hochzählen — zusammen mit
+`APP_VERSION` in `js/data.js`**, ein Test bindet beide aneinander), `manifest.webmanifest`,
+`icons/`, `README.md`.
 
 ## Regelheft
 
@@ -59,7 +60,13 @@ Gedächtnis rekonstruieren.
 - **Zivilisationsfähigkeiten:** je Reich drei zur Wahl (Grund + zwei Alternativen aus dem
   Civs-Bogen), im Aufbau umschaltbar. **Bots erhalten keinerlei Fähigkeit.**
 - **Nahrungsgrenze:** Die Nahrungsproduktion darf nicht negativ werden, Wachstum wird sonst
-  blockiert. Gentechnik und Massenmedien heben die Grenze auf und füttern 1:1 zu Zugbeginn.
+  blockiert — gerechnet auf dem **dauerhaften** Wert (`baseIncome`), ein Ereignis dieser
+  Runde zählt nicht. Gentechnik und Massenmedien heben die Grenze auf: zu Zugbeginn öffnet
+  sich ein Fenster, in dem sich die **Bevölkerungskosten** aus Wissenschaft oder Münzen
+  bestreiten lassen — höchstens bis zur Höhe dieser Kosten, also kein Umtausch.
+- **Handelsrouten:** Jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden
+  Weg mit ihr verbunden ist, bringt +1 auf alle Erträge; bei reiner Eisenbahn +2. Gemischte
+  Strecken zählen als Straße.
 - **Ereignisse** (Erweiterung, hart/leicht) mit Barbaren als neutraler Fraktion.
 - **Weltwunder** (Erweiterung) mit Pyramidenregel, Kultursieg und vier eigenen Technologien
   (Baukräne, Wallfahrt, Militärlogistik, Raumfahrt). Bots bauen sie kostenlos, **ohne Effekte**
@@ -73,24 +80,25 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 812 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 816 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (64 Schritte), inklusive
-   Tutorial-Audit: in jedem der 27 Schritte wird geprüft, dass **nur** das Vorgesehene
+2. **`node smoke.js`** fährt die echte UI durch jsdom (68 Schritte), inklusive
+   Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
 4. **Visuelle Kontrolle:** `playwright` (chromium) für die echte Oberfläche,
    `cairosvg` für SVG-Karten, dann mit dem `view`-Tool ansehen. Beides ist installiert;
    `playwright install` schlägt fehl, der mitgelieferte Chromium funktioniert trotzdem.
-5. **Immer reproduzieren, nicht raten.** In diesem Chat war die erste Vermutung mehrfach
-   falsch: der „leere Toast" war das geschlossene Aktionsblatt, die Wikinger-Fähigkeit war
-   nicht kaputt sondern kam eine Runde zu spät, mehr Forschungssiege mit Weltwundern waren
-   reines Rauschen (60 Partien zu wenig; über 300 identisch).
+5. **Immer reproduzieren, nicht raten.** Die erste Vermutung war wiederholt falsch: der
+   „leere Toast" war das geschlossene Aktionsblatt; die Wikinger-Fähigkeit war nicht kaputt,
+   sondern kam eine Runde zu spät; mehr Forschungssiege mit Weltwundern waren Rauschen
+   (60 Partien zu wenig, über 300 identisch). Zuletzt: „Eisenbahn ohne Rad" waren **zwei**
+   Fehler, und der naheliegende Ein-Zeilen-Fix hätte nur den ersten behoben.
 6. **Messen statt behaupten.** Bei Balance- und Häufigkeitsaussagen mit ausreichend großen
    Stichproben arbeiten und die Zahl nennen.
 
-## Oberfläche (Stand 21.8.)
+## Oberfläche und Regeln (Stand 22.8.)
 
 - **Die Karte ist fest** — kein Zoomen, kein Schieben, immer vollständig sichtbar. Getippt
   wird direkt auf dem Sechseck (`attachTaps`, `data-r`/`data-c`), nicht über eine
@@ -122,7 +130,8 @@ Gedächtnis rekonstruieren.
   bekommen** – sonst verblasst der rote Rand und die Kachel sieht aus wie eine nicht
   verfügbare (ein Smoke-Test prüft das).
 
-Alles Weitere dazu steht ausführlich in `ANNAHMEN.md`, Abschnitt „Designänderungen vom 21.8.".
+Alles Weitere steht ausführlich in `ANNAHMEN.md` — dort ist jede Änderung mit
+Begründung und Messung festgehalten, chronologisch nach Versionen.
 
 ## Bekannte Fragilitäten
 
@@ -192,49 +201,62 @@ Aus diesem Chat:
 - Tutorial: Schienen-Lücke bei Schritten mit unvollständigem `allow`; Papier wurde still
   freigeschaltet statt ausgewürfelt.
 
-Aus dieser Sitzung (21.–22.8.):
-- **Kostenlose Armeen** (Wikinger-Start, Koloss) erscheinen jetzt in der Hauptstadt und
-  müssen sie verlassen; beim Koloss nacheinander über die Warteschlange `p.freeArmies`
-  (`spawnFreeArmies`, aufgerufen beim Wunderbau, nach `moveArmy` und in `beginTurn`).
-- **Tutorialtexte vom Autor überarbeitet** (v45–v47): Schritte 1–15 wurden wörtlich
-  übernommen. Tests, die Schritte am Titel suchten, hängen jetzt an den Schienen
-  (`allow.techs`), damit Textänderungen sie nicht brechen.
-- **Kostenlose Armeen** (Wikinger-Start, Koloss) erscheinen in der Hauptstadt und müssen
-  sie verlassen; beim Koloss nacheinander über die Warteschlange `p.freeArmies`.
-- **Tutorialtexte sind fest verdrahtet** (v44): keine berechneten Zahlen mehr in den
-  Schritttexten. Wer Kosten oder Kartenfelder ändert, muss die Texte von Hand nachziehen.
-- **Bots lassen keine Armee in der eigenen Stadt stehen** (`botOutOfCity`), außer es gibt
-  gar keinen anderen Halteplatz.
-- **Tutorial auf den neuen Bot-Ausgang umgebaut** (v40): Die Belagerung bricht nicht mehr
-  von selbst — der Spieler lernt stattdessen den Gegenangriff. Siehe ANNAHMEN.md.
-  Fragil: das Zielfeld neben Griechenlands Hauptstadt ist das einzige erreichbare
-  (`tutStrikeSpot` hat eine Rückfallebene).
-- **Griechenlands Militärforschung ist im Tutorial vorgegeben** (`TUT_FOE_MILITARY`,
-  Hook `tutBotTech` in `botResearch`): Eisenverarbeitung und Stahl statt Stadtmauern und
-  Burgenbau, damit seine Hauptstadt angreifbar bleibt. Gewürfelt wird normal weiter, nur
-  das Ergebnis wird getauscht — die feste Würfelfolge bleibt dadurch unberührt.
-- **Bot-Armeeprioritäten neu** (neunstufig, siehe ANNAHMEN.md). 1–6 werden in
-  `botPlanArmies` über alle Armeen abgestimmt, 7–9 bleiben je Armee einzeln.
-  Verteidigung löst **nur bei laufender Belagerung** aus (`S.sieges[Gegner|Stadt] >= 1`),
-  nicht bei jeder danebenstehenden Armee. Eine Eroberung braucht zwei erfolgreiche Züge,
-  also bleibt immer eine Runde Reaktionszeit.
-- **Wachstum für 2 statt 3 Münzen:** `canGrow` prüfte Nahrung und Münzen getrennt gegen
-  denselben Vorrat, und `growCity` ignorierte den Rückgabewert des zweiten `pay`. Jetzt
-  `payAll`/`affordAll` — alles oder nichts, mit Rückrollen.
-- **Eisenbahn ohne Rad war nicht baubar:** Das Blatt zeigte den Knopf nur mit Rad und
-  leitete die Zielstufe selbst her. Jetzt entscheidet `roadTarget(S, pi, r, c)` aus
-  `engine.js`, und Blatt wie `doRoad` benutzen sie.
-- **Oxford + Singularität:** `freePickModal` prüfte `S.over` nicht — das Spiel war vorbei,
-  aber der Siegbildschirm kam nie.
-- **Nahrungsgrenze hing am Ereignis der Runde:** Dürre und Revolution verboten Wachstum
-  und Siedeln, obwohl die Stadt dauerhaft gedeckt war. `growthBlocked` rechnet jetzt über
-  `baseIncome()` auf dem dauerhaften Wert (`S.evMuted`).
+Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
+
+**Regeln und Rechnungen**
 - **Bürgerkrieg:** Armee/Macht ließen sich nicht mit einer Mischung aus Nahrung und Münzen
   kaufen. Die Regelmaschine konnte es, die Oberfläche prüfte ohne die Bürgerkriegs-Option.
   Es gibt jetzt `payOpts(S, pi)` als einzige Wahrheit — beide Seiten benutzen sie.
+- **Wachstum für 2 statt 3 Münzen:** `canGrow` prüfte Nahrung und Münzen getrennt gegen
+  denselben Vorrat, und `growCity` ignorierte den Rückgabewert des zweiten `pay`. Jetzt
+  `payAll`/`affordAll` — alles oder nichts, mit Rückrollen.
 - **Gentechnik/Massenmedien:** `feed()` schrieb alles über dem Defizit in den
-  Nahrungsvorrat und war damit doch ein 1:1-Umtausch. Füttern deckt jetzt nur noch das
-  offene Defizit.
+  Nahrungsvorrat und war damit doch ein 1:1-Umtausch. Ersetzt durch `coverPop`: die
+  Bevölkerungskosten lassen sich aus Wissenschaft oder Münzen bestreiten, höchstens bis zu
+  ihrer Höhe.
+- **Nahrungsgrenze hing am Ereignis der Runde:** Dürre und Revolution verboten Wachstum und
+  Siedeln, obwohl die Stadt dauerhaft gedeckt war. `growthBlocked` rechnet jetzt über
+  `baseIncome()` auf dem dauerhaften Wert (`S.evMuted`).
+- **Eisenbahn ohne Rad war nicht baubar:** Das Blatt zeigte den Knopf nur mit Rad und
+  leitete die Zielstufe selbst her. Jetzt entscheidet `roadTargets(S, pi, r, c)` aus
+  `engine.js`, und Blatt wie `doRoad` benutzen sie. Auf leerem Feld stehen mit beiden
+  Technologien **beide** Knöpfe; der Preis kommt immer frisch aus `buildRoad`.
+- **Oxford + Singularität:** `freePickModal` prüfte `S.over` nicht — das Spiel war vorbei,
+  aber der Siegbildschirm kam nie.
+- **Kostenlose Armeen** (Wikinger-Start, Koloss) erscheinen jetzt in der Hauptstadt und
+  müssen sie verlassen; beim Koloss nacheinander über die Warteschlange `p.freeArmies`
+  (`spawnFreeArmies`, aufgerufen beim Wunderbau, nach `moveArmy` und in `beginTurn`).
+- **Zugende ist mit Armee in einer Stadt gesperrt** (`blockingIssues`), nicht mehr nur
+  bestätigungspflichtig. Ausnahme, wenn die Armee gar nicht herauskann.
+
+**Neue Regel**
+- **Handelsrouten** (`tradeRoutes`): +1 bzw. +2 auf alle Erträge je angebundener Stadt.
+
+**Bots**
+- **Armeeprioritäten neu** (neunstufig, siehe ANNAHMEN.md). 1–6 werden in `botPlanArmies`
+  über alle Armeen abgestimmt, 7–9 bleiben je Armee einzeln. Verteidigung löst **nur bei
+  laufender Belagerung** aus (`S.sieges[Gegner|Stadt] >= 1`), nicht bei jeder
+  danebenstehenden Armee.
+- **Bots lassen keine Armee in der eigenen Stadt stehen** (`botOutOfCity`), außer es gibt
+  gar keinen anderen Halteplatz.
+
+**Tutorial**
+- **Auf den neuen Bot-Ausgang umgebaut** (v40): Die Belagerung bricht nicht mehr von selbst
+  — der Spieler lernt stattdessen den Gegenangriff. Fragil: das Zielfeld neben Griechenlands
+  Hauptstadt ist das einzige erreichbare (`tutStrikeSpot` hat eine Rückfallebene).
+- **Griechenlands Militärforschung ist vorgegeben** (`TUT_FOE_MILITARY`, Hook `tutBotTech`
+  in `botResearch`): Eisenverarbeitung und Stahl statt Stadtmauern und Burgenbau, damit
+  seine Hauptstadt angreifbar bleibt und der Gegenangriff überhaupt einen Zähler auslöst.
+  Gewürfelt wird normal weiter, nur das Ergebnis wird getauscht.
+- **Texte sind fest verdrahtet** (v44): keine berechneten Zahlen mehr in den Schritttexten.
+- **Texte vom Autor überarbeitet** (v45–v49): Schritte 1–15 wörtlich übernommen, Einleitung
+  ergänzt, Zugablauf-Einordnung (`sub`) überall entfernt.
+- **Zurückblättern springt nicht mehr vor** (`ui.tut.max`).
+
+**Oberfläche**
+- **Techbogen** markiert, welche Technologien andere MENSCHEN erforschen könnten (blass und
+  gestrichelt umkringelt, gegen satt und durchgezogen für „hat sie").
+- **Versionsnummer im Hauptmenü** aus `APP_VERSION` (js/data.js).
 
 ## Offene Punkte / bewusst nicht umgesetzt
 
@@ -252,19 +274,16 @@ Aus dieser Sitzung (21.–22.8.):
    Vorfahren und bei `env(safe-area-inset-*)` sind ein Restrisiko. Auf dem iPad
    gegenprüfen.
 
-1. **Ein ungedecktes Nahrungsdefizit kostet nichts.** Seit v35 ist das weniger schlimm,
-   weil Decken echten Nutzen hat (es macht Nahrung frei, statt nur ein folgenloses Defizit
-   zu tilgen). Ein Rest bleibt: wer gar nichts deckt, verliert nichts außer der Nahrung.
-   Frühere Messung dazu: Gemessen: zwei identische Spielstände, eines füttert 3 Wissenschaft, das
-   andere nicht; nach der Runde unterscheiden sie sich **nur** in den 3 Wissenschaft,
-   Bevölkerung und Nahrung sind gleich. Vor v33 verdeckte der (fehlerhafte) Umtausch das,
-   weil Füttern echten Nahrungsvorrat brachte. Die Funktion braucht also eine Folge, sonst
-   ist sie Zierde. Alternativen, je etwa eine Zeile:
-   - „ungedecktes Defizit kostet Bevölkerung" (dann lohnt Füttern),
-   - „Wachstum nur so weit, wie diese Runde gefüttert werden kann",
-   - oder Füttern darf über das Defizit hinaus bis zur Nahrungsaufnahme der Bevölkerung
-     gehen und schafft echten Vorrat (dann ist es wieder ein begrenzter Umtausch).
+1. **Ein ungedecktes Nahrungsdefizit kostet nichts.** Seit dem Umbau auf `coverPop` ist
+   das weniger schlimm: Decken macht Nahrung frei, statt nur ein folgenloses Defizit zu
+   tilgen. Ein Rest bleibt aber — wer gar nichts deckt, verliert nichts außer der Nahrung.
+   Gemessen (vor dem Umbau): zwei identische Spielstände, einer füttert 3 Wissenschaft, der
+   andere nicht; nach der Runde unterscheiden sie sich **nur** in diesen 3 Wissenschaft,
+   Bevölkerung und Nahrung sind gleich. Alternativen, je etwa eine Zeile:
+   - „ungedecktes Defizit kostet Bevölkerung",
+   - „Wachstum nur so weit, wie diese Runde gedeckt werden kann".
    **Entscheidung des Autors steht aus.**
+
 2. **Wikinger „Beutezüge"** funktioniert, zahlt aber selten: der Ertrag ist Angriffswert minus
    Verteidigungswert, und ein Mensch überbietet Bots (Machtwert = Gesamtbevölkerung) selten.
    Gemessen: mit Macht 30 über 20 Partien 1809 Beute, mit normal gekaufter Macht 0.
@@ -286,7 +305,8 @@ nicht die erstbeste Vermutung umsetzen. Jede Regeländerung mit Test absichern.
 ## Typischer Abschluss-Ablauf nach Änderungen
 
 1. `node test.js` und `node smoke.js` grün.
-2. `sw.js`-Version hochzählen.
+2. Version hochzählen — **beide Stellen**: `APP_VERSION` in `js/data.js` und `VERSION`
+   in `sw.js`. Ein Test schlägt an, wenn sie auseinanderlaufen.
 3. `python3 build_single.py && node check_single.js`.
 4. Nach `/mnt/user-data/outputs/` paketieren (Ordner + Zip + Einzeldatei, ohne
    `node_modules`), aus dem ausgelieferten Zip **noch einmal** `test.js`/`smoke.js` laufen
