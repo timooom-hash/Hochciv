@@ -542,13 +542,27 @@ function armySheet() {
 
 /* Kleine Symbolmarker: welche Reiche diese Technologie schon haben.
    Eigenes Reich mit Ring hervorgehoben, damit man sich sofort verortet. */
+/* Wie viele Menschen spielen mit? Nur dann lohnt die Anzeige, wer eine Technologie
+   erforschen KÖNNTE – Bots kennen keine Verfügbarkeiten, sie würfeln frei aus dem Pool. */
+function humanCount(S) { return S.players.filter(p => p.kind === 'human' && !p.dead).length; }
+/* Marken an einer Technologiekachel.
+   Gefüllt = hat sie bereits. Blass und umkringelt = kann sie erforschen (nur andere
+   MENSCHEN, nur im Mehrpersonenspiel). Beides klar zu unterscheiden, weil es zwei sehr
+   verschiedene Dinge sind: erledigte Tatsache gegen bloße Möglichkeit. */
 function ownerMarks(S, techKey, pi) {
+  const mehrere = humanCount(S) > 1;
   const marks = S.players.map((pl, i) => {
-    if (!pl.techs[techKey] || pl.dead) return '';
+    if (pl.dead) return '';
     const civ = civOf(pl);
     const self = i === pi;
-    return `<span class="owner-mark${self ? ' self' : ''}" style="color:${civ.color}"
-      title="${civ.n}${self ? ' (du)' : ''}">${SYM[civ.sym]}</span>`;
+    if (pl.techs[techKey])
+      return `<span class="owner-mark${self ? ' self' : ''}" style="color:${civ.color}"
+        title="${civ.n}${self ? ' (du)' : ''} hat sie">${SYM[civ.sym]}</span>`;
+    // Verfügbar bei einem anderen Menschen – die eigene Verfügbarkeit sieht man an der Kachel
+    if (mehrere && !self && pl.kind === 'human' && pl.avail && pl.avail[techKey])
+      return `<span class="owner-mark can" style="color:${civ.color}"
+        title="${civ.n} könnte sie erforschen">${SYM[civ.sym]}</span>`;
+    return '';
   }).join('');
   return marks ? `<span class="owner-marks">${marks}</span>` : '';
 }
@@ -587,7 +601,10 @@ function techModal() {
   const others = S.players.filter((pl, i) => i !== pi && !pl.dead)
     .map(pl => `<span style="color:${civOf(pl).color}">${SYM[civOf(pl).sym]}</span> ${civOf(pl).n}`).join(' · ');
   let grid = others
-    ? `<p class="sub" style="margin:-2px 0 10px">Symbole an einer Technologie zeigen, wer sie schon hat: ${others} · dein Reich ist umrandet.</p>`
+    ? `<p class="sub" style="margin:-2px 0 10px">Symbole an einer Technologie zeigen, wer sie schon hat:
+       ${others} · dein Reich ist umrandet.${humanCount(S) > 1
+        ? ' Ein <span class="owner-mark can" style="color:var(--ink-soft)">◇</span>-Ring darum heißt: dieses Reich <b>könnte</b> sie erforschen.'
+        : ''}</p>`
     : '';
   grid += '<div class="techgrid">';
   for (let a = 0; a < 4; a++) {
@@ -744,6 +761,10 @@ function logModal() {
 
 /* ------------------------------------------------------------------ Zugende & Bots */
 function endHumanTurn() {
+  // Harte Sperre: eine Armee, die noch in einer Stadt steht, verhindert das Zugende
+  // ganz – da hilft kein Bestätigen, der Zustand ist schlicht ungültig.
+  const stop = blockingIssues(S, S.cur);
+  if (stop.length) { toast(stop[0]); return; }
   const warn = pendingWarnings(S, S.cur);
   if (warn.length && !ui.confirmedEnd) {
     ui.confirmedEnd = true;
@@ -1223,6 +1244,8 @@ function boot() {
 
   attachTaps($('map'), tapHex);
   attachTaps($('ed-map'), edTap);
+  const ver = $('m-version');
+  if (ver) ver.textContent = 'Hochzeivilization ' + APP_VERSION;
   initOrientation();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }

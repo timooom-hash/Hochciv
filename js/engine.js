@@ -1323,10 +1323,23 @@ function checkVictory(S, pi) {
   }
   return S.over;
 }
+/* Was das Zugende hart verhindert – im Gegensatz zu pendingWarnings, das nur erinnert.
+   Eine Armee auf einem Stadtfeld ist kein gültiger Zustand: Städte tragen keine Armeen.
+   Blockiert wird aber nur, wenn sie auch wirklich herauskann – sonst wäre der Zug nicht
+   mehr beendbar (eingeschlossene Insel, alles ringsum besetzt, keine Bewegung mehr übrig). */
+function blockingIssues(S, pi) {
+  const out = [];
+  for (const a of armiesOf(S, pi)) {
+    if (!cityAt(S, a.r, a.c)) continue;
+    const raus = [...armyReach(S, a).keys()].map(unkey)
+      .some(([r, c]) => !(r === a.r && c === a.c) && !cityAt(S, r, c));
+    if (raus) out.push('Eine Armee steht noch in einer Stadt – sie muss erst herausziehen.');
+  }
+  return out;
+}
 function pendingWarnings(S, pi) {
   const out = [];
-  for (const a of armiesOf(S, pi))
-    if (a.born === S.round && cityAt(S, a.r, a.c)) out.push('Eine neu gebaute Armee steht noch in der Stadt und müsste sich wegbewegen.');
+  // Armeen in Städten stehen in blockingIssues – hier bleiben nur die weichen Hinweise.
   if ((S.players[pi].freeArmies || 0) > 0)
     out.push('Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Hauptstadt frei ist.');
   return out;
