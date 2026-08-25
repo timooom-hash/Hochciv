@@ -34,6 +34,10 @@ button,select,input{font:inherit;color:inherit}
 .screen.show{display:flex}
 
 /* ------------------------------------------------------------------ Menü */
+/* Versionsnummer am Fuß des Hauptmenüs – hilft beim Melden von Fehlern und zeigt,
+   ob das iPad den neuen Stand geladen hat. */
+.menu-version{margin:26px 0 0;font-size:11px;color:var(--ink-soft);opacity:.7;
+  font-family:var(--mono);letter-spacing:.05em}
 .menu-wrap{margin:auto;padding:24px;max-width:520px;text-align:center}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
   color:var(--ink-soft);margin:0 0 10px}
@@ -230,6 +234,12 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 .owner-mark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
   font-size:11px;line-height:1;border-radius:50%;background:rgba(255,255,255,.55)}
 .owner-mark.self{outline:2px solid var(--ink);outline-offset:1px;font-weight:700;background:#fff}
+/* „Hat es" gegen „könnte es erforschen": beide umkringelt, aber durchgezogen und satt
+   gegen gestrichelt und blass – dasselbe Muster wie bezahlbar/zu teuer im Techbogen.
+   Eine Möglichkeit soll nicht aussehen wie eine Tatsache. */
+.owner-mark{border:1px solid currentColor;border-radius:50%;background:var(--paper);
+  font-weight:700}
+.owner-mark.can{opacity:.45;border-style:dashed;background:none;font-weight:400}
 .age-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--ink-soft);margin:10px 0 4px;grid-column:1/-1;border-top:1px solid var(--rule);padding-top:6px}
 
