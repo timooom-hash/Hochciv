@@ -277,10 +277,13 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 }
 
 /* Editor */
-#ed-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:manipulation;
+#ed-host,#pl-host{flex:1;position:relative;overflow:hidden;background:#e4dbbe;touch-action:manipulation;
   min-height:0}
-#ed-map{position:absolute;inset:0;width:100%;height:100%}
-#ed-map [data-r]{cursor:pointer}
+#ed-map,#pl-map{position:absolute;inset:0;width:100%;height:100%}
+#ed-map [data-r],#pl-map [data-r]{cursor:pointer}
+/* Legephase: Hinweis links, Knöpfe rechts */
+.place-tools{align-items:center}
+.place-tools .hint{flex:1;margin:0;font-size:12px}
 .palette{display:flex;gap:6px;padding:8px;background:var(--paper);border-top:1px solid var(--rule);
   overflow-x:auto}
 .swatch{flex:0 0 auto;padding:8px 10px;border-radius:8px;border:2px solid transparent;font-size:12px;
