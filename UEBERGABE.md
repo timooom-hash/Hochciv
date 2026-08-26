@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 26.8., `sw.js` v50)
+# Hochzeivilization — Projekt-Übergabe (Stand 26.8., `sw.js` v51)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -24,21 +24,22 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
   Einmal ist ein `node_modules` ins Zip gerutscht und ließ sich wegen eines I/O-Fehlers auf dem
   Mount nicht mehr löschen — nur durch Umbenennen aus dem Ordner heraus lösbar.
 
-## Dateistruktur (~10 000 Zeilen)
+## Dateistruktur (~10 400 Zeilen)
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
 | `js/data.js` | 471 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, Karten, Zufalls- und Duellkartengenerator inkl. Startgüte, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
-| `js/tiles.js` | 255 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1370 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
-| `js/expansion.js` | 511 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 479 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1496 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/tiles.js` | 256 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
+| `js/engine.js` | 1471 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/expansion.js` | 515 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
+| `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/ui.js` | 1516 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 911 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 3266 | **953 Assertions**, `node test.js` |
-| `smoke.js` | 1449 | **77 Schritte** durch die echte UI via jsdom, `node smoke.js` |
-| `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
+| `test.js` | 3542 | **1064 Assertions**, `node test.js` |
+| `smoke.js` | 1506 | **78 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `build_single.py` / `check_single.js` | 20 / 34 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
+| `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 30 / 210 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` erzeugen (reportlab) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION hochzählen — zusammen mit
@@ -86,6 +87,12 @@ Gedächtnis rekonstruieren.
   des Duells); freie Zivilisationswahl bei 2 und 3.
 - **1 gegen 1:** zwei frei gewählte Reiche, nur Zufallskarten (Plättchen- oder Rasterkarte
   12 × 8), Wirtschaftssieg erst über 3/4 (Theologie 7/10, UN 2/3).
+- **Spielende (v51):** Nur der **Militärsieg** endet sofort. Wirtschafts-, Forschungs- und
+  Kultursieg werden **angemeldet** (`claimVictory`, `S.claims`, `S.endRound`); gespielt wird
+  bis zum **Rundenende**, dort entscheidet `resolveClaims`. Mehrere Ansprüche in derselben
+  Runde ⇒ **Punkte = Bevölkerung + Wunder + Technologien**. Ein Anspruch bleibt gültig, auch
+  wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
+  gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
@@ -180,6 +187,21 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Stelle, die Würfe verbraucht, verschiebt sich der ganze Ablauf — dann die Textstellen
   prüfen, die Bot-Verhalten beschreiben, und ggf. eine neue Würfelfolge suchen (in `test.js`
   ist der Ablauf zweimal auf Gleichheit gepinnt).
+
+### Siegansprüche (neu in v51)
+
+- `S.over` wird an **zwei** Stellen gesetzt: sofort in `captureCity` (Militärsieg,
+  `military: true`) und am Rundenende in `resolveClaims`. Alles andere geht über
+  `claimVictory` – wer eine neue Siegbedingung einbaut, muss `claimVictory` benutzen,
+  sonst endet das Spiel wieder mitten in der Runde.
+- `resolveClaims` hängt in `advanceTurn` **genau an der Stelle, an der die Runde
+  umschlägt** (`S.cur === first`, vor `S.round++`). Wer dort etwas umbaut, verschiebt das
+  Spielende.
+- Die Balance hat sich dadurch messbar verschoben (Militärsiege 49 % → 60 % über 200
+  Bot-Partien, siehe `ANNAHMEN.md`). Beim nächsten Balance-Vergleich daran denken: Zahlen
+  vor v51 sind nicht mehr vergleichbar.
+- Alte Spielstände haben `claims`/`endRound` nicht; alle Zugriffe sind deshalb
+  `(S.claims || [])`-fest.
 
 ### Plättchengeometrie (neu in v50)
 

@@ -801,15 +801,38 @@ step('Oxford + Singularität zeigt den Siegbildschirm (gemeldeter Fehler)', () =
     .find(b => b.dataset.free === 'singularitaet');
   if (!btn) throw new Error('Singularität steht bei Oxford nicht zur Wahl');
   btn.onclick();
-  if (!G('S').over) throw new Error('Spiel ist nicht beendet');
-  if (!$('overlay').classList.contains('show'))
-    throw new Error('kein Fenster offen – das Spiel wirkt hängengeblieben');
+  // Seit v51 endet ein Forschungssieg am Rundenende, nicht sofort: angemeldet ja,
+  // beendet nein – und die Oberfläche darf trotzdem nicht hängen.
+  const S2 = G('S');
+  if (S2.over) throw new Error('Forschungssieg beendet das Spiel sofort');
+  if (!(S2.claims || []).some(c => c.how.startsWith('Forschungssieg')))
+    throw new Error('kein Sieganspruch angemeldet');
+  if (S2.endRound !== S2.round) throw new Error('Rundenende nicht vorgemerkt');
+  if (!/letzte Runde/.test($('hud-round').textContent))
+    throw new Error('die Kopfzeile sagt nicht, dass die Runde die letzte ist');
+  // Weiterspielbar: die Aktionsleiste muss bedienbar bleiben, kein Spielende-Fenster
+  if ($('a-end').disabled) throw new Error('Aktionsleiste gesperrt – hängengeblieben');
+  if ($('overlay').classList.contains('show') && $('ov-title').textContent === 'Spielende')
+    throw new Error('Spielende-Fenster obwohl die Runde noch läuft');
+  if ($('overlay').classList.contains('show')) G('closeModal')();
+  // Runde über die Oberfläche zu Ende spielen: Zug beenden, Bot-Blätter wegklicken
+  let guard = 0;
+  while (!G('S').over && guard++ < 60) {
+    if ($('bot-next')) { $('bot-next').onclick(); continue; }
+    if ($('overlay').classList.contains('show')) { G('closeModal')(); continue; }
+    if ($('a-end').disabled) throw new Error('Zugende gesperrt, Runde nicht spielbar');
+    $('a-end').onclick();
+    if ($('ov-title') && $('ov-title').textContent === 'Zug beenden')
+      $('overlay').querySelector('.btn.primary, .btn.wide').onclick();
+  }
+  const S3 = G('S');
+  if (!S3.over) throw new Error('das Spiel endet nicht am Rundenende');
+  if (S3.over.round !== S2.round) throw new Error('es endet in der falschen Runde');
   if ($('ov-title').textContent !== 'Spielende')
     throw new Error('falsches Fenster: ' + $('ov-title').textContent);
   if (!/gewinnt/.test($('ov-body').textContent)) throw new Error('kein Siegtext');
-  // Oxford hatte zwei Ansprüche – der zweite darf das Fenster nicht überschreiben
   if (!/Forschungssieg/.test($('ov-body').textContent)) throw new Error('Siegart fehlt');
-  console.log('       Siegbildschirm erscheint trotz offenem zweiten Oxford-Anspruch');
+  console.log('       angemeldet in Runde ' + S2.round + ', entschieden am Rundenende');
 });
 step('Konfetti beim Sieg – klein und selbsträumend', () => {
   const box = window.document.getElementById('confetti');
@@ -1320,7 +1343,9 @@ step('Verdeckt: sichtbar sind nur die offenen Plättchen und das eigene', () => 
   // Sechseck: 90 Felder (Mitte bleibt leer), davon 15 für das verdeckte Plättchen
   if (felder !== 75) throw new Error('sichtbar sind ' + felder + ' Felder statt 75');
   const hl = $('pl-map').querySelectorAll('[stroke-dasharray="5 4"]').length;
-  if (hl < 10) throw new Error('zu wenige erlaubte Felder markiert: ' + hl);
+  const erlaubt = legeHelfer.frei().filter(Boolean).length;
+  if (hl !== erlaubt) throw new Error(`${hl} Markierungen, aber ${erlaubt} erlaubte Felder`);
+  if (erlaubt < 5) throw new Error('kaum ein Feld erlaubt: ' + erlaubt);
   console.log('       ' + felder + ' Felder sichtbar, ' + hl + ' erlaubte Hauptstadtfelder');
 });
 step('Drehen zeigt dasselbe Plättchen in einer anderen Lage', () => {
@@ -1387,6 +1412,37 @@ step('Aufdecken zeigt alle Plättchen, dann startet das Spiel', () => {
   if (mitte < 0) throw new Error('kein Loch in der Mitte des Sechsecks');
   console.log('       ' + S.map.name + ', Hauptstadtabstand ' +
     G('hexDistance')(a.r, a.c, b.r, b.c));
+});
+step('Spielende: Punktetafel und Mensch vor Bot', () => {
+  // Vier Reiche, Originalkarte: Platz 1 Mensch, Plätze 2–4 Bots. Die Schritte davor
+  // haben Modus und Kartenwahl verstellt, beides wird hier bewusst zurückgesetzt.
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  $('setup-go').onclick();
+  const S = G('S');
+  if (!S || S.over) throw new Error('kein frisches Spiel');
+  S.cities.forEach(c => { c.pop = 2; });
+  S.players.forEach(p => { p.techs = { rad: true, schrift: true }; });
+  const mensch = S.players.findIndex(p => p.kind !== 'bot');
+  const bot = S.players.findIndex(p => p.kind === 'bot');
+  G('claimVictory')(S, bot, 'Forschungssieg (Singularität)');
+  G('claimVictory')(S, mensch, 'Wirtschaftssieg (Test)');
+  if (!/letzte Runde/.test(($('hud-round').textContent, G('redraw')(), $('hud-round').textContent)))
+    throw new Error('die Kopfzeile nennt die letzte Runde nicht');
+  let guard = 0;
+  while (!G('S').over && guard++ < 8) G('endTurn')(S);
+  if (!S.over) throw new Error('das Spiel endet nicht am Rundenende');
+  if (S.over.winner !== mensch) throw new Error('bei Gleichstand gewinnt nicht der Mensch');
+  G('gameOver')();
+  const txt = $('ov-body').textContent;
+  if (!/Punkte/.test(txt)) throw new Error('keine Punktetafel im Spielende');
+  if (!/Gleichstand/.test(txt)) throw new Error('die Gleichstandsregel wird nicht erklärt');
+  const zeilen = $('ov-body').querySelectorAll('table tr').length;
+  if (zeilen !== 3) throw new Error('Punktetafel hat ' + zeilen + ' Zeilen statt 3 (Kopf + 2)');
+  console.log('       Punktetafel mit 2 Ansprüchen, Sieg an den Menschen');
+  G('closeModal')();
 });
 step('Drei Reiche im Aufbau', () => {
   $('m-new').onclick();

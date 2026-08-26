@@ -1395,3 +1395,94 @@ Duell. Die alten Rastergeneratoren bleiben als **„Rasterkarte\"** erhalten (12
 Duell, 12 × 18 sonst) – wer die Legephase nicht will, hat damit weiter eine Zufallskarte
 in einem Zug. Die zuletzt bewusst gewählte Karte wird gemerkt (`setupMapWanted`), damit
 ein Ausflug in den Duellmodus die Wahl nicht still umstellt.
+
+## Spielende: Ansprüche und Punktvergleich (v51)
+
+Bis v50 endete das Spiel in der Sekunde, in der eine Siegbedingung erfüllt war. Auf
+Wunsch des Autors gilt jetzt:
+
+* **Militärsieg** (fremde Hauptstadt erobert) endet **sofort** und gewinnt für den
+  Angreifer. Kein Vergleich, keine Wartezeit.
+* **Wirtschafts-, Forschungs- und Kultursieg** enden das Spiel **nicht** sofort. Wer die
+  Bedingung erfüllt, **meldet einen Sieg an**; die laufende Runde wird zu Ende gespielt.
+  Das Spiel endet am **Rundenende** – dort, wo die Reihe wieder zum Startspieler kommt.
+* Erfüllen in derselben Runde **mehrere** Reiche eine nichtmilitärische Bedingung,
+  entscheiden **Punkte**:
+
+      Punkte = Bevölkerung + Anzahl Weltwunder + Anzahl Technologien
+
+* Ein Anspruch **bleibt gültig**, auch wenn die Bedingung später wieder wegfällt: sinkt
+  die Bevölkerung unter die Schwelle oder wird das Stufe-3-Wunder erobert, zählt der
+  Anspruch trotzdem – für das Rundenende genauso wie für den Punktvergleich. Gewertet
+  werden die Punkte **am Rundenende**, nicht die zum Zeitpunkt des Anspruchs.
+
+Im Code: `claimVictory(S, pi, how)` legt den Anspruch ab (`S.claims`, `S.endRound`),
+`victoryScore(S, pi)` rechnet die Punkte, `resolveClaims(S)` läuft in `advanceTurn` genau
+an der Stelle, an der die Runde umschlägt. `S.over` bekommt dann zusätzlich `winners`,
+`score` (die volle Punktetafel) und `shared`. Der Militärsieg setzt `S.over` weiter direkt
+und trägt `military: true`.
+
+### Gleichstand: Mensch vor Bot
+
+Steht es nach Punkten gleich, **gewinnen die Menschen allein** – ein Bot nimmt einem
+Menschen den Sieg nicht weg, wenn beide gleich weit gekommen sind (Vorgabe des Autors).
+Die Regel greift ausdrücklich **nur** beim Gleichstand: hat der Bot einen Punkt mehr,
+gewinnt der Bot. Sind mehrere Menschen gleichauf, teilen sie den Sieg; sind nur Bots im
+Vergleich, teilen die Bots. `S.over.tiebreak === 'mensch'` merkt sich, dass die Regel
+gegriffen hat, das Spielende schreibt es dazu.
+
+Gemessen: 400 Mischpartien (zwei Menschen, zwei Bots, alle von der Bot-Logik gespielt)
+ergaben 21-mal mehrere Ansprüche in derselben Runde und **einen** echten Gleichstand –
+die Regel entscheidet also selten, aber sie entscheidet dann eindeutig.
+
+**Barbaren** melden nie einen Sieg an und stehen in keinem Vergleich (`canWin`). Sie sind
+eine neutrale Fraktion und ohnehin als „dead" geführt; die Prüfung ist der Gürtel zum
+Hosenträger, damit ein Barbarenreich mit erobertem Volk nicht über die Bevölkerung
+gewinnen kann.
+
+### Zwei Punkte, die die Vorgabe offenlässt
+
+1. **Gleichstand unter Gleichen.** Mensch gegen Mensch (oder Bot gegen Bot) mit gleicher
+   Punktzahl ⇒ **gemeinsamer Sieg** (`shared: true`), das Spielende nennt beide Reiche.
+   Ein Stichentscheid (etwa „der frühere Anspruch gewinnt") wäre genauso vertretbar –
+   eine Zeile in `resolveClaims`.
+2. **Ausgeschiedene Reiche.** Wer keine Stadt mehr hat, gewinnt nicht, auch mit Anspruch.
+   Die Vorgabe schützt vor dem Wegfallen der *Siegbedingung*, nicht vor dem Untergang;
+   ein totes Reich mit vielen Technologien hätte sonst über die Punkte gewonnen. Verfällt
+   dadurch der letzte Anspruch, **läuft das Spiel weiter** (`endRound` wird zurückgesetzt).
+3. **Nachprüfung am Rundenende.** Wessen Zug schon vorbei war, als der erste Anspruch kam,
+   würde sonst leer ausgehen – nur wegen der Sitzreihenfolge. `resolveClaims` prüft
+   deshalb am Rundenende noch einmal **alle** Reiche auf den Wirtschaftssieg. Für Kultur-
+   und Forschungssieg ist das nicht nötig: die hängen an Ereignissen im eigenen Zug.
+
+Der Kultursieg behält seine eigene Verzögerung (Stufe-3-Wunder muss zu Beginn des
+nächsten eigenen Zuges noch da sein, Abschnitt 13). Erst danach wird angemeldet.
+
+### Was das mit der Balance macht (gemessen, nicht geschätzt)
+
+200 Bot-Partien, identische Startwerte vor und nach der Änderung:
+
+| | Militärsieg | Forschungssieg | Kultursieg | Median |
+|---|---|---|---|---|
+| v50 (sofortiges Ende) | 98 | 97 | 5 | Runde 5 |
+| v51 (Rundenende) | 121 | 76 | 3 | Runde 5 |
+
+**Militärsiege nehmen deutlich zu (49 % → 60 %).** Der Grund liegt in der Regel selbst:
+ein angemeldeter Sieg gibt den anderen Reichen noch je einen Zug – und ein Militärsieg in
+diesem Fenster schlägt den Anspruch. Gemessen: von den 121 Militärsiegen fielen 23 bei
+schon offenem Anspruch, 10 davon haben einen fremden Anspruch überfahren. Das ist die
+gewollte Folge („A military victory by anyone is still instant"), aber es verschiebt die
+Balance – wer das nicht will, müsste den Militärsieg ebenfalls bis zum Rundenende
+verschieben (dann wäre er einer von mehreren Ansprüchen und käme in den Punktvergleich).
+
+Der Punktvergleich greift selten, aber er greift: in 14 von 200 Partien meldeten mehrere
+Reiche in derselben Runde an, 13-mal entschieden die Punkte, einmal gab es einen
+Gleichstand und damit einen gemeinsamen Sieg.
+
+### Oberfläche
+
+Sobald ein Anspruch steht, zeigt die Kopfzeile `… · letzte Runde (Reich)` – ohne diesen
+Hinweis wirkte das Spielende eine Runde später willkürlich. Im Protokoll steht der
+Anspruch als Überschrift samt Erklärung, dass die Runde noch zu Ende gespielt wird. Das
+Spielende-Fenster zeigt bei mehreren Ansprüchen die **Punktetafel** (Bevölkerung, Wunder,
+Technologien, Summe) und markiert den Sieger fett.

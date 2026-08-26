@@ -1479,7 +1479,10 @@ const setEvent = (S, k) => {
   eq(freePickOptions(S, 0).some(t => t.k === 'singularitaet'), true, 'die Singularität steht zur Wahl');
   eq(useFreePick(S, 0, 'singularitaet'), null, 'sie ist kostenlos erforschbar');
   eq(has(p, 'singularitaet'), true, 'sie ist erforscht');
-  eq(S.over && S.over.how.startsWith('Forschungssieg'), true, 'und gewinnt das Spiel');
+  // Seit v51 endet ein Forschungssieg nicht sofort, sondern am Ende der Runde
+  eq((S.claims || []).some(c => c.pi === 0 && c.how.startsWith('Forschungssieg')), true,
+    'und meldet damit den Sieg an');
+  eq([S.over, S.endRound], [null, S.round], 'das Spiel läuft bis zum Rundenende weiter');
 }
 /* Bibliothek und Raumfahrt bieten die Singularität nicht an */
 {
@@ -1963,13 +1966,16 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   });
   const a = capitalOf(S, 0), b = capitalOf(S, 1);
   a.pop = 3; b.pop = 1;                     // genau 3/4
-  eq(checkVictory(S, 0), null, 'genau 3/4 reicht nicht (strikt größer)');
+  checkVictory(S, 0);
+  eq(S.claims.length, 0, 'genau 3/4 reicht nicht (strikt größer)');
   a.pop = 4;                                 // 4/5 > 3/4
-  eq(!!checkVictory(S, 0), true, 'über 3/4 gewinnt');
+  checkVictory(S, 0);
+  eq(S.claims.map(c => c.pi), [0], 'über 3/4 wird der Sieg angemeldet');
   // im Vier-Reiche-Spiel hätte 3/4 schon gereicht
   const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
   N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = 2/3
-  eq(!!checkVictory(N, 0), true, 'ohne Duell genügen 2/3');
+  checkVictory(N, 0);
+  eq(N.claims.map(c => c.pi), [0], 'ohne Duell genügen 2/3');
 }
 /* Eine vollständige 1-gegen-1-Partie Mensch gegen Bot läuft durch */
 {
@@ -2633,8 +2639,12 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(buildWonder(S, 0, city, 'pentagon'), null, 'Stufe-3-Wunder gebaut');
   eq(S.players[0].cultureWin, S.round, 'Kultursieg ist vorgemerkt');
   eq(checkCultureVictory(S, 0), null, 'im selben Zug gewinnt niemand');
+  eq(S.claims.length, 0, 'und es ist auch nichts angemeldet');
   S.round++;
-  eq(checkCultureVictory(S, 0).how.startsWith('Kultursieg'), true, 'zu Beginn des nächsten Zuges Kultursieg');
+  checkCultureVictory(S, 0);
+  eq(S.claims.map(c => c.how.startsWith('Kultursieg')), [true],
+    'zu Beginn des nächsten Zuges wird der Kultursieg angemeldet');
+  eq(S.over, null, 'entschieden wird er erst am Rundenende');
 }
 {
   // verlorenes Stufe-3-Wunder verhindert den Kultursieg
@@ -2645,6 +2655,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   S.round++;
   removeWonder(S, S.wonders[0]);
   eq(checkCultureVictory(S, 0), null, 'ohne Stufe-3-Wunder kein Kultursieg');
+  eq(S.claims.length, 0, 'und kein Anspruch');
 }
 /* Bots bauen Wunder ohne Kosten und ohne Effekte */
 {
@@ -3297,6 +3308,233 @@ function tutRun() {
   eq(canFound(S, 0, nr, nc), 'Kein Feld.', 'dort lässt sich keine Stadt gründen');
   eq(isOff('X') && !isOff('M') && !isOff('V'), true, 'nur X gilt als außerhalb');
   eq(TERRAIN.X.land, false, 'außerhalb ist kein Land');
+}
+
+/* ============================================== Spielende: Ansprüche und Punkte
+   Alles außer dem Militärsieg endet erst am Rundenende; erfüllen mehrere in derselben
+   Runde eine Bedingung, entscheiden Punkte = Bevölkerung + Wunder + Technologien.   */
+{
+  // Hilfsspiel: vier Menschen in Zugreihenfolge, Startspieler Russland (Index 0),
+  // damit die Runde nachvollziehbar bei Russland beginnt und endet.
+  const ZUGFOLGE = ['russland', 'griechenland', 'england', 'wikinger'];
+  const mkEnd = () => newGame({
+    seed: 77, wonders: true, startPlayer: 0,
+    players: ZUGFOLGE.map(k => ({ civ: k, kind: 'human' })),
+  });
+  eq([mkEnd().startIdx, mkEnd().cur], [0, 0], 'Russland ist Startspieler');
+  // --- Punkteformel
+  {
+    const S = mkEnd();
+    const cap = capitalOf(S, 0);
+    cap.pop = 7;
+    S.wonders.push({ k: 'gaerten', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+    S.wonders.push({ k: 'koloss', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+    S.players[0].techs = { rad: true, schrift: true, bronze: true, aus: false };
+    const sc = victoryScore(S, 0);
+    eq([sc.pop, sc.wonders, sc.techs, sc.total], [7, 2, 3, 12],
+      'Punkte = Bevölkerung + Wunder + Technologien');
+  }
+  // --- Ein Anspruch: die Runde läuft weiter, das Spiel endet am Rundenende
+  {
+    const S = mkEnd();
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 ≥ 2/3
+    eq(finishTurn(S), null, 'der Wirtschaftssieg beendet den Zug nicht');
+    eq(S.claims.map(c => c.pi), [0], 'er ist aber angemeldet');
+    eq([S.over, S.endRound], [null, 1], 'Ende ist für Runde 1 vorgemerkt');
+    advanceTurn(S);
+    eq([S.over, S.cur, S.round], [null, 1, 1], 'Griechenland ist regulär am Zug');
+    endTurn(S); endTurn(S);                       // Griechenland, England
+    eq([!!S.over, S.cur], [false, 3], 'auch die Wikinger kommen noch dran');
+    endTurn(S);                                    // Wikinger beenden die Runde
+    eq(!!S.over, true, 'am Rundenende ist das Spiel zu Ende');
+    eq([S.over.winner, S.round, S.over.shared], [0, 1, false], 'Russland gewinnt in Runde 1');
+    eq(S.over.how.startsWith('Wirtschaftssieg'), true, 'und zwar mit dem Wirtschaftssieg');
+  }
+  // --- Verlorene Bedingung schadet dem Anspruch nicht
+  {
+    const S = mkEnd();
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    finishTurn(S);
+    eq(S.claims.length, 1, 'Anspruch steht');
+    capitalOf(S, 0).pop = 1;                       // Bedingung fällt weg
+    checkVictory(S, 0);
+    eq(S.claims.length, 1, 'der Anspruch bleibt trotzdem stehen');
+    advanceTurn(S); endTurn(S); endTurn(S); endTurn(S);
+    eq([!!S.over, S.over && S.over.winner], [true, 0],
+      'und gewinnt am Rundenende, obwohl die Bevölkerung längst gesunken ist');
+  }
+  // --- Zwei Ansprüche in derselben Runde: Punkte entscheiden
+  {
+    const S = mkEnd();
+    // Russland: Wirtschaftssieg, wenig Technologien
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    S.players[0].techs = { rad: true };
+    finishTurn(S);                                  // Anspruch Russland
+    // Griechenland: Forschungssieg, dafür viele Technologien
+    const g = S.players[1];
+    techPool(S).forEach(t => { if (t.k !== 'singularitaet') g.techs[t.k] = true; });
+    advanceTurn(S);
+    applyTech(S, 1, SINGULARITY, 'Test');
+    eq(S.claims.map(c => c.pi), [0, 1], 'beide Ansprüche sind vermerkt');
+    eq(S.over, null, 'entschieden ist noch nichts');
+    const pR = victoryScore(S, 0).total, pG = victoryScore(S, 1).total;
+    eq(pG > pR, true, `Griechenland hat mehr Punkte (${pG} zu ${pR})`);
+    endTurn(S); endTurn(S); endTurn(S);
+    eq(!!S.over, true, 'Rundenende');
+    eq(S.over.winner, 1, 'der Punktsieger gewinnt, nicht der erste Anspruch');
+    eq(S.over.score.length, 2, 'die Punktetafel nennt beide');
+    eq(S.over.score[0].total >= S.over.score[1].total, true, 'sie ist absteigend sortiert');
+    eq(/Punktvergleich/.test(S.over.how), true, 'und der Vergleich steht im Ergebnistext');
+  }
+  // --- Gleichstand: gemeinsamer Sieg
+  {
+    const S = mkEnd();
+    S.cities.forEach(c => { c.pop = 1; });
+    // beide melden an, beide haben genau dieselben Punkte
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    claimVictory(S, 1, 'Kultursieg (Weltwunder der Stufe 3)');
+    S.players[0].techs = { rad: true, schrift: true };
+    S.players[1].techs = { bronze: true, mathematik: true };
+    eq(victoryScore(S, 0).total, victoryScore(S, 1).total, 'gleich viele Punkte');
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq(!!S.over, true, 'die Runde endet');
+    eq(S.over.shared, true, 'bei Gleichstand gewinnen beide');
+    eq(S.over.winners.slice().sort(), [0, 1], 'und zwar genau diese beiden');
+  }
+  // --- Gleichstand zwischen Mensch und Bot: der Mensch gewinnt
+  {
+    const S = newGame({
+      seed: 77, wonders: true, startPlayer: 0,
+      players: [
+        { civ: 'russland', kind: 'bot', diff: 'david' },
+        { civ: 'griechenland', kind: 'human' },
+        { civ: 'england', kind: 'bot', diff: 'david' },
+        { civ: 'wikinger', kind: 'human' },
+      ],
+    });
+    S.cities.forEach(c => { c.pop = 2; });
+    [0, 1, 2].forEach(i => claimVictory(S, i, 'Forschungssieg (Singularität)'));
+    S.players.forEach(p => { p.techs = { rad: true, schrift: true }; });   // überall gleich
+    eq([0, 1, 2].map(i => victoryScore(S, i).total), [4, 4, 4], 'drei Reiche gleichauf');
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq(!!S.over, true, 'die Runde endet');
+    eq(S.over.winners, [1], 'bei Gleichstand gewinnt der Mensch allein');
+    eq(S.over.tiebreak, 'mensch', 'und das steht auch im Ergebnis');
+    eq(S.players[S.over.winner].kind, 'human', 'der Sieger ist kein Bot');
+    eq(/Mensch vor Bot/.test(S.over.how), true, 'der Ergebnistext nennt die Regel');
+  }
+  // --- Der Bot gewinnt trotzdem, wenn er mehr Punkte hat
+  {
+    const S = newGame({
+      seed: 77, wonders: true, startPlayer: 0,
+      players: [
+        { civ: 'russland', kind: 'bot', diff: 'david' },
+        { civ: 'griechenland', kind: 'human' },
+        { civ: 'england', kind: 'bot', diff: 'david' },
+        { civ: 'wikinger', kind: 'human' },
+      ],
+    });
+    S.cities.forEach(c => { c.pop = 2; });
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    claimVictory(S, 1, 'Wirtschaftssieg (Test)');
+    S.players[0].techs = { rad: true, schrift: true, bronze: true };       // ein Punkt mehr
+    S.players[1].techs = { rad: true, schrift: true };
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq([S.over.winner, S.over.tiebreak], [0, null],
+      'die Menschenregel greift nur bei Gleichstand, nicht gegen mehr Punkte');
+  }
+  // --- Zwei Menschen gleichauf: gemeinsamer Sieg, Bots bleiben draußen
+  {
+    const S = newGame({
+      seed: 77, wonders: true, startPlayer: 0,
+      players: [
+        { civ: 'russland', kind: 'bot', diff: 'david' },
+        { civ: 'griechenland', kind: 'human' },
+        { civ: 'england', kind: 'bot', diff: 'david' },
+        { civ: 'wikinger', kind: 'human' },
+      ],
+    });
+    S.cities.forEach(c => { c.pop = 2; });
+    [0, 1, 3].forEach(i => claimVictory(S, i, 'Kultursieg (Weltwunder der Stufe 3)'));
+    S.players.forEach(p => { p.techs = { rad: true }; });
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq(S.over.winners.slice().sort(), [1, 3], 'die beiden Menschen teilen den Sieg');
+    eq(S.over.shared, true, 'und zwar als gemeinsamer Sieg');
+  }
+  // --- Barbaren gewinnen nie
+  {
+    const S = mkEnd();
+    const bi = barbIndex(S);
+    eq(claimVictory(S, bi, 'Wirtschaftssieg (Test)'), null, 'Barbaren melden nichts an');
+    eq(S.claims.length, 0, 'ihr Anspruch wird nicht vermerkt');
+  }
+  // --- Militärsieg schlägt jeden angemeldeten Anspruch, sofort
+  {
+    const S = mkEnd();
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    finishTurn(S);
+    eq(S.claims.map(c => c.pi), [0], 'Russland hat angemeldet');
+    // Griechenland erobert die russische Hauptstadt
+    const cap = capitalOf(S, 0), att = S.players[1];
+    att.power = 99;
+    S.armies.push({ id: S.nextId++, owner: 1, r: cap.r, c: cap.c === 0 ? 1 : cap.c - 1, mp: 0 });
+    S.sieges['1|' + cap.id] = { rounds: 2, last: 99 };
+    captureCity(S, 1, cap);
+    eq(!!S.over, true, 'der Militärsieg endet sofort');
+    eq([S.over.winner, S.over.military], [1, true], 'und gewinnt für den Angreifer');
+    eq(S.over.score, undefined, 'ohne Punktvergleich');
+  }
+  // --- Am Rundenende wird noch einmal für alle geprüft
+  {
+    const S = mkEnd();
+    // Wikinger (letzter im Zug) melden an; Russland erfüllt die Schwelle erst danach
+    claimVictory(S, 3, 'Kultursieg (Weltwunder der Stufe 3)');
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq(S.claims.map(c => c.pi).sort(), [0, 3],
+      'Russland kommt am Rundenende noch in den Vergleich');
+    eq(!!S.over, true, 'und das Spiel ist zu Ende');
+  }
+  // --- Ausgeschiedene Reiche gewinnen nicht; verfällt der letzte Anspruch, geht es weiter
+  {
+    const S = mkEnd();
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    S.cities = S.cities.filter(c => c.owner !== 0);       // Russland verliert alles
+    S.players[0].dead = true;
+    for (let i = 0; i < 5; i++) if (!S.over) endTurn(S);
+    eq(S.over, null, 'ein ausgeschiedenes Reich gewinnt nicht');
+    eq([S.endRound, S.claims.length], [null, 0], 'der Anspruch verfällt, das Spiel läuft');
+    eq(S.round >= 2, true, 'und die nächste Runde beginnt');
+  }
+  // --- Nur ein Anspruch je Reich, auch bei mehreren Gründen
+  {
+    const S = mkEnd();
+    claimVictory(S, 0, 'Wirtschaftssieg (Test)');
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    eq(S.claims.length, 1, 'der zweite Grund desselben Reichs macht keinen zweiten Anspruch');
+    eq(S.claims[0].how.startsWith('Wirtschaftssieg'), true, 'der erste Grund bleibt vermerkt');
+  }
+  // --- Bot-Partien enden weiterhin regulär
+  {
+    let rounds = [], arten = {};
+    for (let g = 0; g < 25; g++) {
+      const S = newGame({
+        seed: 900 + g, wonders: g % 2 === 0, events: g % 3 === 0, eventMode: 'hard',
+        players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })),
+      });
+      let guard = 0;
+      while (!S.over && guard++ < 400) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+      eq(!!S.over, true, `Bot-Partie ${g} endet`);
+      rounds.push(S.round);
+      const art = S.over.how.split(' (')[0];
+      arten[art] = (arten[art] || 0) + 1;
+      // Wer gewinnt, muss auch am Ende noch leben
+      eq(!S.players[S.over.winner].dead, true, `Sieger von Partie ${g} lebt noch`);
+    }
+    rounds.sort((a, b) => a - b);
+    console.log('       25 Bot-Partien: Median Runde ' + rounds[12] + ', Siegarten ' +
+      Object.entries(arten).map(([k, v]) => `${k} ${v}`).join(', '));
+  }
 }
 
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');

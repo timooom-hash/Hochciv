@@ -40,6 +40,19 @@ sonst behalten installierte Geräte die alte Fassung.
 | Sklaverei / Kolonialismus | im Aktionsblatt der Stadt bzw. eines herrenlosen Feldes |
 | **Protokoll** | jede Aktion; die Würfe dahinter hängen eingeklappt an der Zeile und lassen sich antippen |
 
+## Spielende
+
+Ein **Militärsieg** (fremde Hauptstadt erobert) endet das Spiel auf der Stelle.
+**Wirtschafts-, Forschungs- und Kultursieg** werden angemeldet: die Runde wird noch zu
+Ende gespielt, die Kopfzeile zeigt dann „letzte Runde". Erfüllen mehrere Reiche in
+derselben Runde eine Bedingung, entscheiden am Rundenende Punkte:
+
+> Punkte = Bevölkerung + Anzahl Weltwunder + Anzahl Technologien
+
+Ein Anspruch bleibt gültig, auch wenn die Bedingung später wieder wegfällt. Bei
+**Gleichstand gewinnt der Mensch** vor dem Bot; mehrere Menschen gleichauf teilen den
+Sieg. Das Spielende zeigt dann die Punktetafel.
+
 Straßen laufen durch Städte hindurch: ein Stadtfeld zählt selbst als Straße oder
 Eisenbahn, sobald ein solches Feld daran grenzt.
 
@@ -102,6 +115,19 @@ ersten Zug mindestens 4 Nahrung bringt.
   `X` kein Feld (liegt außerhalb der Karte – so entstehen nicht rechteckige Umrisse;
   im Editor blass gestrichelt, sonst unsichtbar).
 
+### Druckbogen der Plättchen
+
+`Startplaettchen.pdf` (6 Seiten A4) zeigt alle 20 Plättchen zum Nachschlagen oder
+Ausschneiden: Seite 1 die Legende, die Legeregeln und die drei Formen, danach vier
+Plättchen je Seite mit Umrisslinie. Neu erzeugen nach Änderungen an `TILE_POOL`:
+
+```bash
+node tools_startplaettchen_dump.js    # liest js/tiles.js → tiles.json
+python3 tools_startplaettchen_pdf.py  # tiles.json → Startplaettchen.pdf (braucht reportlab)
+```
+
+Der Bogen kann so nicht vom Spiel abweichen – er wird aus derselben Quelle gebaut.
+
 ## Prüfprogramme (nur für die Entwicklung)
 
 ```bash
@@ -126,4 +152,5 @@ js/bots.js            Bot-Züge nach den Bot-Regeln
 js/ui.js              Karte, Gesten, Aktionsblätter, Editor
 sw.js                 Offline-Cache
 ANNAHMEN.md           wo die Regeln offen sind und wie hier entschieden wurde
+Startplaettchen.pdf   Druckbogen der 20 Plättchen (aus js/tiles.js erzeugt)
 ```
