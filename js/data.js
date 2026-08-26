@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v49';
+const APP_VERSION = 'v50';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -22,7 +22,13 @@ const TERRAIN = {
   I: { key: 'I', name: 'Insel', yield: [1, 1, 1], land: true, color: '#d0c48a' },
   // Vulkan: entsteht nur durch das Ereignis "Vulkanausbruch" – unpassierbar, kein Ertrag.
   V: { key: 'V', name: 'Vulkan', yield: [0, 0, 0], land: true, color: '#6b5a4c', block: true },
+  /* Kein Feld: liegt außerhalb der Karte. Plättchenkarten sind nicht rechteckig – was
+     nicht zur Form gehört, ist X. Wird nicht gezeichnet, ist unpassierbar, bringt nichts
+     und taucht in keiner Ertragsübersicht auf. `off` unterscheidet es vom Vulkan, der
+     ein echtes (nur wertloses) Feld ist. */
+  X: { key: 'X', name: 'Kein Feld', yield: [0, 0, 0], land: false, color: '#cdc4a4', block: true, off: true },
 };
+const isOff = t => !!(t && TERRAIN[t] && TERRAIN[t].off);
 // Stadt: pro Bevölkerungspunkt +1 Wissenschaft, -1 Nahrung, +1 Münze
 const CITY_YIELD = [1, -1, 1];
 

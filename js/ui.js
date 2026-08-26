@@ -65,7 +65,7 @@ function setBarHeight() {
    Gedreht wird NUR der Spielbildschirm. Menü, Aufbau, Editor und die Regelseite haben
    keine feste Karte, die Platz in der Breite bräuchte – dort wäre der Zwang lästig.
    Deshalb hängt html.turn am aktiven Bildschirm und wird aus show() nachgeführt. */
-const TURN_SCREENS = ['screen-game'];
+const TURN_SCREENS = ['screen-game', 'screen-place'];
 function turnWanted() { return !load('hochciv.noturn'); }
 function onTurnScreen() {
   return TURN_SCREENS.some(id => { const el = $(id); return el && el.classList.contains('show'); });
@@ -192,15 +192,21 @@ function drawMap(svg, map, opts) {
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   const pts = hexPath(HEX);
 
-  // 1 Gelände
+  // 1 Gelände. „Kein Feld" (X) gehört nicht zur Karte: es wird nicht gezeichnet und
+  // ist nicht antippbar – so entsteht die Form einer Plättchenkarte. Nur der Editor
+  // zeigt es blass, sonst ließe sich ein versehentlich gesetztes X nicht zurücknehmen.
   for (let r = 0; r < R; r++) for (let c = 0; c < rows[r].length; c++) {
     const t = rows[r][c], [x, y] = hexCenter(r, c, HEX);
-    const poly = svgEl('polygon', {
+    if (!TERRAIN[t]) continue;
+    const off = isOff(t);
+    if (off && !opts.showVoid) continue;
+    const attrs = {
       points: pts, transform: `translate(${x},${y})`, fill: TERRAIN[t].color,
       stroke: '#8a8258', 'stroke-width': 1, 'data-r': r, 'data-c': c
-    });
-    world.appendChild(poly);
-    terrainGlyph(world, t, x, y);
+    };
+    if (off) { attrs.opacity = 0.4; attrs['stroke-dasharray'] = '3 3'; }
+    world.appendChild(svgEl('polygon', attrs));
+    if (!off) terrainGlyph(world, t, x, y);
   }
   // 2 Straßen / Eisenbahn
   if (opts.state) {
@@ -290,6 +296,22 @@ function drawMap(svg, map, opts) {
       wonderMarks(world, S2, ct, x, y);
     });
   } else if (map.capitals) {
+    // Ohne Spielstand: Legephase. Erlaubte Felder werden genauso markiert wie im Spiel
+    // die erreichbaren, nur eben vor den Hauptstädten gezeichnet.
+    (opts.highlight || []).forEach(([r, c]) => {
+      const [x, y] = hexCenter(r, c, HEX);
+      world.appendChild(svgEl('polygon', {
+        points: pts, transform: `translate(${x},${y})`, fill: 'rgba(255,255,255,.42)',
+        stroke: '#2a2721', 'stroke-width': 2, 'stroke-dasharray': '5 4', 'pointer-events': 'none'
+      }));
+    });
+    (opts.frame || []).forEach(([r, c]) => {
+      const [x, y] = hexCenter(r, c, HEX);
+      world.appendChild(svgEl('polygon', {
+        points: pts, transform: `translate(${x},${y})`, fill: 'none',
+        stroke: '#b8860b', 'stroke-width': 3, 'stroke-linejoin': 'round', 'pointer-events': 'none'
+      }));
+    });
     for (const k in map.capitals) {
       const [r, c] = map.capitals[k], civ = CIVS.find(x => x.k === k);
       if (!civ || r >= R) continue;
@@ -1020,15 +1042,36 @@ function humanTurnStart() {
 }
 
 /* ------------------------------------------------------------------ Aufbau */
-let setupMode = 'vier';        // 'vier' = alle vier Reiche, 'duell' = 1 gegen 1
+// 'vier' = alle vier Reiche, 'drei' = drei Reiche, 'duell' = 1 gegen 1
+let setupMode = 'vier';
+const setupCount = () => setupMode === 'duell' ? 2 : setupMode === 'drei' ? 3 : 4;
 
+/* Kartenliste. Sie hängt an der Spielerzahl: die Plättchenkarte hat für zwei, drei und
+   vier Reiche eine eigene Form, die festen Karten haben vier Startsterne (bei drei
+   Reichen bleibt einer ungenutzt), und im Duell passen sie gar nicht. */
+function mapOptions() {
+  const n = setupCount();
+  const out = [];
+  if (n > 2) MAPS.forEach((m, i) => out.push([String(i), m.name]));
+  out.push(['plaettchen', TILE_SHAPES[n].name]);
+  out.push(['zufall', n === 2 ? 'Rasterkarte (12 × 8)' : 'Rasterkarte (12 × 18)']);
+  if (customMap && n > 2) out.push(['eigene', 'Eigene Karte']);
+  return out;
+}
+/* Die zuletzt bewusst gewählte Karte. Sie wird gemerkt, damit ein Ausflug in den
+   Duellmodus (dort gibt es die festen Karten nicht) die Wahl nicht still umstellt. */
+let setupMapWanted = '0';
+function fillMapSelect() {
+  const sel = $('setup-map'), opts = mapOptions();
+  sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+  sel.value = opts.some(o => o[0] === setupMapWanted) ? setupMapWanted : opts[0][0];
+  sel.onchange = () => {
+    setupMapWanted = sel.value;
+    $('setup-tile-hint').hidden = sel.value !== 'plaettchen';
+  };
+  $('setup-tile-hint').hidden = sel.value !== 'plaettchen';
+}
 function setupScreen() {
-  const sel = $('setup-map');
-  // MAPS[0] ist die Originalkarte – damit ist sie im Menü vorausgewählt.
-  sel.innerHTML = MAPS.map((m, i) => `<option value="${i}">${m.name}</option>`).join('') +
-    '<option value="zufall">Zufallskarte (12 × 18)</option>' +
-    (customMap ? '<option value="eigene">Eigene Karte</option>' : '');
-  sel.value = '0';
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
     `<option value="${x.k}"${x.k === 'prinz' ? ' selected' : ''}>${x.n}</option>`).join('');
@@ -1038,6 +1081,7 @@ function setupScreen() {
   // Der gewählte Modus bleibt erhalten, wenn man den Aufbau erneut öffnet
   $('setup-mode').querySelectorAll('[data-mode]').forEach(b =>
     b.classList.toggle('on', b.dataset.mode === setupMode));
+  fillMapSelect();
   $('setup-mode').querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
     $('setup-mode').querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
     setupMode = b.dataset.mode;
@@ -1046,22 +1090,21 @@ function setupScreen() {
   renderSlots();
 }
 /* Zeichnet die Reichs-Karteikarten. Bei vier Reichen liegt die Zivilisation fest,
-   im Duell wählt jeder Platz seine eigene aus – beide Plätze nie dieselbe. */
+   sonst wählt jeder Platz seine eigene aus – nie zweimal dieselbe. */
 function renderSlots() {
-  const duel = setupMode === 'duell';
-  // Im Duell gibt es keine Kartenwahl: Zeile ausblenden und Auswahl abschalten,
-  // damit sie auch per Tastatur nicht erreichbar ist.
-  $('setup-map-row').hidden = duel;
-  $('setup-map').disabled = duel;
+  const n = setupCount(), duel = setupMode === 'duell';
+  $('setup-map-row').hidden = false;
+  $('setup-map').disabled = false;
   $('setup-duel-hint').hidden = !duel;
+  fillMapSelect();
   const list = $('setup-list');
-  const chosen = duel ? duelChoice() : CIVS.map(c => c.k);
+  const chosen = n < 4 ? pickChoice(n) : CIVS.map(c => c.k);
   list.innerHTML = '';
   chosen.forEach((civKey, i) => {
     const civ = CIV_BY_KEY[civKey];
     const d = document.createElement('div');
     d.className = 'slot'; d.dataset.civ = civKey;
-    d.innerHTML = (duel
+    d.innerHTML = (n < 4
       ? `<h3>${SYM[civ.sym]} Platz ${i + 1}</h3>
          <label class="row"><span>Zivilisation</span>
            <select data-civpick>${CIVS.map(c =>
@@ -1095,10 +1138,12 @@ function renderSlots() {
     if (pick) pick.onchange = () => {
       // Kinds und Fähigkeiten bleiben erhalten, die Zivilisation wechselt
       const kinds = [...list.children].map(x => x.querySelector('[data-kind].on').dataset.kind);
-      duelCivs[i] = pick.value;
-      const other = 1 - i;
-      if (duelCivs[other] === pick.value)                    // Kollision: anderen Platz umsetzen
-        duelCivs[other] = CIVS.map(c => c.k).find(k => k !== pick.value);
+      pickCivs[i] = pick.value;
+      // Kollision: jeder andere Platz mit derselben Zivilisation zieht auf eine freie um
+      for (let j = 0; j < n; j++) {
+        if (j === i || pickCivs[j] !== pick.value) continue;
+        pickCivs[j] = CIVS.map(c => c.k).find(k => !pickCivs.slice(0, n).includes(k));
+      }
       renderSlots();
       [...list.children].forEach((x, j) => x.querySelectorAll('[data-kind]')
         .forEach(b => b.classList.toggle('on', b.dataset.kind === kinds[j])));
@@ -1109,8 +1154,9 @@ function renderSlots() {
   });
   refreshStart();
 }
-let duelCivs = ['griechenland', 'wikinger'];
-function duelChoice() { return duelCivs.slice(0, 2); }
+// Vorauswahl der frei wählbaren Plätze (Duell und drei Reiche)
+let pickCivs = ['griechenland', 'wikinger', 'russland'];
+function pickChoice(n) { return pickCivs.slice(0, n); }
 function setupConfig() {
   const diff = $('setup-diff').value;    // ein Schwierigkeitsgrad für alle Bots
   return [...$('setup-list').children].map(slot => ({
@@ -1128,6 +1174,126 @@ function refreshStart() {
   sel.value = Math.max(0, firstHuman);
 }
 
+/* ------------------------------------------------- Startplättchen legen
+   Eine Plättchenkarte entsteht nicht im Aufbau, sondern in einer eigenen Phase:
+   die offenen Dreiecke liegen schon, jedes Reich legt sein eigenes selbst – Lage
+   (eine von drei) und Hauptstadt (irgendein Landfeld darauf, das keiner fremden
+   Startecke zu nah kommt). Gelegt wird verdeckt: sichtbar sind nur die offenen
+   Plättchen und das eigene. Bots legen sofort, zufällig, Hauptstadt auf einem der
+   drei mittigen Felder. Erst wenn alle fertig sind, wird aufgedeckt.               */
+let placeState = null;
+
+function startPlacement(cfg) {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  const plan = tilePlan(cfg.players.map(p => p.civ), seed);
+  if (!plan) return toast('Für diese Spielerzahl gibt es keine Plättchenkarte.');
+  const rnd = mapRng(seed + 12345);
+  placeState = { cfg, plan, rnd, queue: [], at: 0, o: 0, cell: null, done: false };
+  plan.seats.forEach(seat => {
+    const pl = cfg.players.find(p => p.civ === seat.civ);
+    if (pl && pl.kind === 'bot') botPlaceSeat(plan, seat, rnd);
+    else placeState.queue.push(seat);
+  });
+  show('screen-place');
+  placeStep();
+}
+function placeSeatNow() {
+  const st = placeState;
+  return (st && !st.done && st.at < st.queue.length) ? st.queue[st.at] : null;
+}
+function placeStep() {
+  const st = placeState;
+  if (st.at >= st.queue.length) return placeReveal();
+  st.o = 0; st.cell = null;
+  drawPlace();
+  // Hotseat: zwischen zwei Menschen wird das Gerät übergeben, vorher nichts gezeigt.
+  if (st.queue.length > 1) {
+    const civ = CIV_BY_KEY[placeSeatNow().civ];
+    modal('Verdeckt legen', `<p class="sub">${SYM[civ.sym]} <b>${civ.n}</b> ist dran.
+      Das eigene Startplättchen sehen die anderen erst nach dem Aufdecken – jetzt also
+      Gerät übergeben.</p>
+      <button class="btn primary wide" id="pl-gate">Plättchen ansehen</button>`);
+    $('pl-gate').onclick = closeModal;
+  }
+}
+function drawPlace() {
+  const st = placeState, plan = st.plan;
+  const seat = placeSeatNow();
+  const shape = TILE_SHAPES[plan.n];
+  const shown = shape.slots.map((_, i) => i)
+    .filter(i => st.done || !isSeatSlot(plan, i) || (seat && seat.slot === i));
+  const map = tileMap(plan, {
+    show: shown, seat, o: seat ? st.o : null, cell: st.cell,
+    caps: st.done ? null : (seat ? [seat.civ] : []),
+  });
+  const opts = {};
+  if (seat) {
+    const rcs = slotRC(plan, seat.slot), ok = placeOptions(plan, seat, st.o);
+    opts.frame = rcs;
+    opts.highlight = rcs.filter((_, i) => ok[i]);
+    if (st.cell != null) opts.sel = rcs[st.cell];
+  }
+  drawMap($('pl-map'), map, opts);
+  const note = $('pl-note');
+  if (st.done) {
+    note.innerHTML = `Alle Plättchen liegen offen. ${plan.n} Reiche, ` +
+      `${shape.slots.length} Dreiecke.`;
+    $('pl-rot').hidden = true;
+    $('pl-ok').textContent = 'Spiel beginnen';
+  } else {
+    const civ = CIV_BY_KEY[seat.civ], tile = TILE_POOL[plan.tiles[seat.slot]];
+    note.innerHTML = `<b>${SYM[civ.sym]} ${civ.n}</b> · „${tile.n}" · Lage ${st.o + 1} von 3 · ` +
+      (st.cell == null ? 'Hauptstadt auf ein markiertes Feld tippen'
+        : 'Hauptstadt gesetzt – „Fertig", wenn es passt');
+    $('pl-rot').hidden = false;
+    $('pl-ok').textContent = 'Fertig';
+  }
+}
+function plTap(r, c) {
+  const st = placeState, seat = placeSeatNow();
+  if (!seat) return;
+  const rcs = slotRC(st.plan, seat.slot);
+  const i = rcs.findIndex(x => x[0] === r && x[1] === c);
+  if (i < 0) return toast('Nur auf dem eigenen Plättchen.');
+  if (!placeOptions(st.plan, seat, st.o)[i])
+    return toast('Nur auf Land – und nicht so nah an einem fremden Startplättchen.');
+  st.cell = i;
+  drawPlace();
+}
+function placeRotate() {
+  const st = placeState, seat = placeSeatNow();
+  if (!seat) return;
+  st.o = (st.o + 1) % 3;
+  // Die Hauptstadt bleibt liegen, solange das Feld auch in der neuen Lage passt.
+  if (st.cell != null && !placeOptions(st.plan, seat, st.o)[st.cell]) st.cell = null;
+  drawPlace();
+}
+function placeConfirm() {
+  const st = placeState;
+  if (!st) return;
+  if (st.done) return placeGo();
+  const seat = placeSeatNow();
+  if (st.cell == null) return toast('Erst die Hauptstadt setzen.');
+  const err = placeSeat(st.plan, seat, st.o, st.cell);
+  if (err) return toast(err);
+  st.at++;
+  placeStep();
+}
+function placeReveal() {
+  const st = placeState;
+  // Sicherheitsnetz: wer (aus welchem Grund auch immer) nichts gelegt hat, wird gelegt.
+  st.plan.seats.forEach(seat => { if (seat.cell == null) botPlaceSeat(st.plan, seat, st.rnd); });
+  st.done = true; st.plan.revealed = true;
+  drawPlace();
+}
+function placeGo() {
+  const st = placeState;
+  const cfg = Object.assign({}, st.cfg, { map: tileMap(st.plan) });
+  placeState = null;
+  S = newGame(cfg);
+  startGameScreen();
+}
+
 /* ------------------------------------------------------------------ Karteneditor */
 function editorScreen() {
   editMap = JSON.parse(JSON.stringify(currentMap()));
@@ -1143,7 +1309,7 @@ function editorScreen() {
   CIVS.forEach(c => add('cap:' + c.k, SYM[c.sym] + ' ' + c.n, c.color));
   drawEditor();
 }
-function drawEditor() { drawMap($('ed-map'), editMap, {}); }
+function drawEditor() { drawMap($('ed-map'), editMap, { showVoid: true }); }
 function edTap(r, c) {
   if (r < 0 || r >= editMap.rows.length) return;
   if (c < 0 || c >= editMap.rows[r].length) return;
@@ -1190,17 +1356,19 @@ function boot() {
     if (!players.some(p => p.kind === 'human')) return toast('Mindestens eine menschliche Zivilisation.');
     const duel = setupMode === 'duell';
     const pick = $('setup-map').value;
-    // Duell: immer eine frische 10 × 15-Zufallskarte mit festen Startpunkten
-    const map = duel ? duelMap(players[0].civ, players[1].civ)
-      : pick === 'eigene' ? customMap
-        : pick === 'zufall' ? randomMap()
-          : MAPS[+pick];
-    endTutorialPanel();
-    S = newGame({
-      players, map, duel, startPlayer: +$('setup-start').value,
+    const cfg = {
+      players, duel, startPlayer: +$('setup-start').value,
       events: $('setup-events').checked, eventMode: $('setup-evmode').value,
       wonders: $('setup-wonders').checked,
-    });
+    };
+    endTutorialPanel();
+    // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.
+    if (pick === 'plaettchen') return startPlacement(cfg);
+    // Rasterkarte: im Duell 12 × 8 mit festen Startpunkten, sonst 12 × 18
+    cfg.map = pick === 'eigene' ? customMap
+      : pick === 'zufall' ? (duel ? duelMap(players[0].civ, players[1].civ) : randomMap())
+        : MAPS[+pick];
+    S = newGame(cfg);
     startGameScreen();
   };
   $('a-tech').onclick = techModal;
@@ -1244,6 +1412,9 @@ function boot() {
 
   attachTaps($('map'), tapHex);
   attachTaps($('ed-map'), edTap);
+  attachTaps($('pl-map'), plTap);
+  $('pl-rot').onclick = placeRotate;
+  $('pl-ok').onclick = placeConfirm;
   const ver = $('m-version');
   if (ver) ver.textContent = 'Hochzeivilization ' + APP_VERSION;
   initOrientation();
@@ -1282,7 +1453,7 @@ function rulesModal() {
     <p class="sub">Geländeerträge je Feld</p>
     <table style="width:100%;font-size:13px;border-collapse:collapse">
       <tr style="color:var(--ink-soft);font-size:11px"><th align="left">Feld</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>
-      ${Object.values(TERRAIN).map(t => `<tr style="border-top:1px solid var(--rule)">
+      ${Object.values(TERRAIN).filter(t => !t.off).map(t => `<tr style="border-top:1px solid var(--rule)">
         <td>${t.name}</td>${t.yield.map(n => `<td align="center">${n || '·'}</td>`).join('')}</tr>`).join('')}
       <tr style="border-top:1px solid var(--rule)"><td>Stadt (je Bevölkerung)</td>
         <td align="center">1</td><td align="center">−1</td><td align="center">1</td></tr>

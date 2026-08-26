@@ -377,7 +377,7 @@ function incomeBreakdown(S, pi) {
   }
   for (const t of Object.keys(TERRAIN)) {
     const e = byTerrain[t];
-    if (e) rows.push({ key: t, name: TERRAIN[t].name, count: e.count, y: e.y });
+    if (e && !isOff(t)) rows.push({ key: t, name: TERRAIN[t].name, count: e.count, y: e.y });
   }
   // Bevölkerung als eigene Zeile
   const py = cityPopYield(S, pi);
@@ -965,7 +965,7 @@ function enemyArmyAdjacent(S, pi, r, c) {
 }
 function canFound(S, pi, r, c) {
   const t = terrainAt(S, r, c);
-  if (!t) return 'Kein Feld.';
+  if (!t || isOff(t)) return 'Kein Feld.';
   if (!TERRAIN[t].land) return 'Nicht auf Meer.';
   if (TERRAIN[t].block) return 'Nicht auf einem Vulkan.';
   if (armyAt(S, r, c)) return 'Feld besetzt.';
@@ -1070,7 +1070,8 @@ function buildRoad(S, pi, r, c, target) {
   if (target === 1 && !has(p, 'rad')) return 'Rad noch nicht erforscht.';
   if (target === 2 && !has(p, 'eisenbahn')) return 'Eisenbahn noch nicht erforscht.';
   const t = terrainAt(S, r, c);
-  if (!t || !TERRAIN[t].land) return 'Nicht auf Meer.';
+  if (!t || isOff(t)) return 'Kein Feld.';
+  if (!TERRAIN[t].land) return 'Nicht auf Meer.';
   // nur eigenes oder neutrales Gebiet
   const k = key(r, c);
   const mine = controlledTiles(S, pi).has(k) || S.cities.some(x => x.owner === pi && x.r === r && x.c === c);
