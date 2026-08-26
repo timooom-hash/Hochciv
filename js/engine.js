@@ -83,6 +83,8 @@ function newGame(cfg) {
   const S = {
     v: 2, seed: (cfg.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
     round: 1, cur: 0, over: null, log: [],
+    // Angemeldete Siege (alles außer Militärsieg) und die Runde, in der sie fallen
+    claims: [], endRound: null,
     map: JSON.parse(JSON.stringify(cfg.map || DEFAULT_MAP)),
     roads: {}, sieges: {}, bought: {},
     cities: [], armies: [], nextId: 1,
@@ -190,8 +192,9 @@ function applyTech(S, pi, tech, note, opts) {
   p.techs[tech.k] = true;
   log(S, 'act', `${civOf(p).n} erforscht ${tech.n} (${note}).`);
   // Die Singularität gewinnt das Spiel, egal ob bezahlt oder kostenlos (z. B. Oxford).
+  // Gewonnen wird aber erst am Rundenende – siehe claimVictory.
   if (tech.k === 'singularitaet') {
-    S.over = { winner: pi, how: 'Forschungssieg (Singularität)' };
+    claimVictory(S, pi, 'Forschungssieg (Singularität)');
     return;
   }
   // Griechenland "Rückschau": jede erforschte Technologie – auch eine kostenlose aus
@@ -1294,8 +1297,13 @@ function captureCity(S, pi, city) {
     takeCityWonders(S, city, old, pi);  // Wunder samt dauerhafter Effekte wechseln den Besitzer
     log(S, 'fight', `${civOf(p).n} erobert eine Stadt von ${civOf(loser).n} (Bevölkerung ${city.pop}).`);
   }
+  // Militärsieg: der einzige Sieg, der sofort und ohne Punktvergleich endet. Er schlägt
+  // auch schon angemeldete Siege – wer die Hauptstadt nimmt, gewinnt auf der Stelle.
   if (wasCapital && p.kind !== 'barbar')
-    S.over = { winner: pi, how: `Militärsieg (Hauptstadt von ${civOf(loser).n} erobert)` };
+    S.over = {
+      winner: pi, winners: [pi], military: true,
+      how: `Militärsieg (Hauptstadt von ${civOf(loser).n} erobert)`,
+    };
   if (!citiesOf(S, S.players.indexOf(loser)).length) loser.dead = true;
 }
 
@@ -1319,10 +1327,97 @@ function checkVictory(S, pi) {
   const p = S.players[pi], w = worldPop(S), mine = popOf(S, pi);
   const o = victoryOption(S, p);
   const enough = o.strict ? mine > w * o.frac : mine >= w * o.frac;
-  if (w > 0 && enough && S.cities.length > 1) {
-    S.over = { winner: pi, how: `Wirtschaftssieg (${mine} von ${w} Weltbevölkerung, Schwelle ${o.label})` };
-  }
+  if (w > 0 && enough && S.cities.length > 1)
+    claimVictory(S, pi, `Wirtschaftssieg (${mine} von ${w} Weltbevölkerung, Schwelle ${o.label})`);
   return S.over;
+}
+
+/* --------------------------------------------------- Siegansprüche und Punkte
+   Wirtschafts-, Forschungs- und Kultursieg beenden das Spiel nicht auf der Stelle,
+   sondern **am Ende der laufenden Runde**. Wer die Bedingung erfüllt, meldet einen
+   Anspruch an; die Runde wird noch zu Ende gespielt. Erfüllen mehrere Reiche in
+   derselben Runde eine Siegbedingung, entscheiden Punkte:
+
+       Punkte = Bevölkerung + Anzahl Weltwunder + Anzahl Technologien
+
+   Ein Anspruch bleibt gültig, auch wenn die Bedingung später wieder wegfällt (die
+   Bevölkerung sinkt, ein Stufe-3-Wunder wird erobert). Er zählt für den Punktvergleich
+   genauso mit – gewertet werden die Punkte am Rundenende, nicht zur Zeit des Anspruchs.
+   Nur der Militärsieg endet sofort und ohne Vergleich.                              */
+function claimVictory(S, pi, how) {
+  if (S.over) return S.over;                       // Militärsieg ist schon gefallen
+  if (!canWin(S.players[pi])) return null;         // Barbaren gewinnen nie
+  if (!S.claims) S.claims = [];
+  const civ = civOf(S.players[pi]).n;
+  if (S.claims.some(c => c.pi === pi)) {           // zweiter Grund desselben Reichs
+    log(S, 'info', `${civ} erfüllt eine weitere Siegbedingung: ${how}.`);
+    return null;
+  }
+  S.claims.push({ pi, how, round: S.round });
+  if (S.endRound == null) S.endRound = S.round;
+  log(S, 'head', `${civ}: ${how}`);
+  log(S, 'info', S.claims.length > 1
+    ? `${civ} meldet ebenfalls einen Sieg an – am Rundenende entscheiden Punkte.`
+    : `Das Spiel endet am Ende dieser Runde (Runde ${S.endRound}). ` +
+      `Wer bis dahin ebenfalls eine Siegbedingung erfüllt, kommt in den Punktvergleich.`);
+  return null;
+}
+/* Punkte eines Reichs. Technologien zählen als Stückzahl, nicht nach Kosten. */
+function victoryScore(S, pi) {
+  const p = S.players[pi];
+  const pop = popOf(S, pi);
+  const wonders = typeof wondersOf === 'function' ? wondersOf(S, pi).length : 0;
+  const techs = Object.keys(p.techs || {}).filter(k => p.techs[k]).length;
+  return { pop, wonders, techs, total: pop + wonders + techs };
+}
+/* Kann dieses Reich überhaupt gewinnen? Barbaren sind eine neutrale Fraktion. */
+const canWin = p => p && p.kind !== 'barbar';
+const isHumanPlayer = p => !!p && p.kind !== 'bot' && p.kind !== 'barbar';
+/* Läuft am Rundenende. Rückgabe: true, wenn das Spiel damit zu Ende ist. */
+function resolveClaims(S) {
+  if (S.over) return true;
+  if (S.endRound == null || S.round < S.endRound) return false;
+  // Letzte Gelegenheit: wessen Zug in dieser Runde schon vorbei war, als der erste
+  // Anspruch kam, wird hier noch einmal geprüft – sonst hinge der Vergleich an der
+  // Sitzreihenfolge.
+  S.players.forEach((p, i) => { if (!p.dead && canWin(p)) checkVictory(S, i); });
+  // Ausgeschiedene Reiche (keine Stadt mehr) können nicht gewinnen. Die Vorgabe
+  // schützt nur vor dem Wegfallen der *Siegbedingung*, nicht vor dem Untergang.
+  const live = (S.claims || []).filter(c =>
+    canWin(S.players[c.pi]) && !S.players[c.pi].dead && citiesOf(S, c.pi).length);
+  if (!live.length) {                    // niemand mehr übrig: Anspruch verfällt
+    if ((S.claims || []).length)
+      log(S, 'info', 'Kein Reich mit Sieganspruch ist noch im Spiel – es geht weiter.');
+    S.claims = []; S.endRound = null;
+    return false;
+  }
+  // Punkte absteigend; bei gleicher Punktzahl stehen Menschen vor Bots.
+  const rang = c => isHumanPlayer(S.players[c.pi]) ? 0 : 1;
+  const scored = live.map(c => ({ ...c, ...victoryScore(S, c.pi) }))
+    .sort((a, b) => b.total - a.total || rang(a) - rang(b));
+  const best = scored[0].total;
+  const gleich = scored.filter(x => x.total === best);
+  // Gleichstand: gewinnt ein Mensch mit, gewinnen nur die Menschen. Ein Bot soll einem
+  // Menschen den Sieg nicht wegnehmen, wenn beide gleich weit gekommen sind.
+  const mitMensch = gleich.some(x => isHumanPlayer(S.players[x.pi]));
+  const winners = gleich.filter(x => !mitMensch || isHumanPlayer(S.players[x.pi]));
+  const menschRegel = mitMensch && winners.length < gleich.length;
+  const namen = winners.map(x => civOf(S.players[x.pi]).n).join(' und ');
+  const punkte = scored.map(x => `${civOf(S.players[x.pi]).n} ${x.total}`).join(', ');
+  S.over = {
+    winner: winners[0].pi, winners: winners.map(x => x.pi),
+    how: scored.length > 1
+      ? `${winners[0].how} · Punktvergleich am Rundenende: ${punkte}` +
+        (menschRegel ? ' · Gleichstand, Mensch vor Bot' : '')
+      : winners[0].how,
+    score: scored, shared: winners.length > 1, tiebreak: menschRegel ? 'mensch' : null,
+    round: S.round,
+  };
+  log(S, 'head', scored.length > 1
+    ? `Rundenende: ${namen} gewinnt nach Punkten (${punkte})` +
+      (menschRegel ? ' – bei Gleichstand geht der Sieg an den Menschen.' : '.')
+    : `Rundenende: ${namen} gewinnt. ${winners[0].how}`);
+  return true;
 }
 /* Was das Zugende hart verhindert – im Gegensatz zu pendingWarnings, das nur erinnert.
    Eine Armee auf einem Stadtfeld ist kein gültiger Zustand: Städte tragen keine Armeen.
@@ -1356,11 +1451,15 @@ function finishTurn(S) {
 function advanceTurn(S) {
   // Eine Runde ist eine volle Umdrehung ab dem Startspieler: dort wird hochgezählt und
   // dort wird das Ereignis der neuen Runde ausgewürfelt – nicht bei Russland (Index 0).
+  // Genau dort ist auch das Rundenende: angemeldete Siege werden hier ausgewertet.
   const first = S.startIdx || 0;
   let guard = 0;
   do {
     S.cur = (S.cur + 1) % S.players.length;
-    if (S.cur === first) { S.round++; startRound(S); }
+    if (S.cur === first) {
+      if (resolveClaims(S)) return S.over;
+      S.round++; startRound(S);
+    }
     guard++;
   } while (S.players[S.cur].dead && guard < 20);
   beginTurn(S);

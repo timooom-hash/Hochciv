@@ -453,8 +453,8 @@ function botResearch(S, pi, avoidFields = []) {
   // Singularität, sobald ein Feld der Moderne schon beforscht ist
   if (techPool(S).some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
     p.techs.singularitaet = true;
-    S.over = { winner: pi, how: 'Forschungssieg (Singularität)' };
     log(S, 'act', `${civOf(p).n} erforscht die Singularität!`);
+    claimVictory(S, pi, 'Forschungssieg (Singularität)');   // fällt am Rundenende
     return field;
   }
   // höchstes erforschbares Zeitalter in diesem Feld

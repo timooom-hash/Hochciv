@@ -471,13 +471,16 @@ function claimOrphanWonders(S, pi, city) {
   if (list.some(w => w.lvl === 3)) S.players[pi].cultureWin = S.round;
 }
 /* Kultursieg: zu Beginn des nächsten eigenen Zuges nach dem Bau – sofern das
-   Stufe-3-Wunder da noch im eigenen Besitz ist. */
+   Stufe-3-Wunder da noch im eigenen Besitz ist. Diese Prüfung bleibt, sie gehört zum
+   Kultursieg selbst; erst danach wird der Sieg angemeldet und fällt am Rundenende.
+   Geht das Wunder später verloren, ändert das am angemeldeten Anspruch nichts mehr. */
 function checkCultureVictory(S, pi) {
   const p = S.players[pi];
   if (S.over) return S.over;
   if (p.cultureWin == null || S.round <= p.cultureWin) return null;
+  if (S.claims && S.claims.some(c => c.pi === pi && c.how.startsWith('Kultursieg'))) return null;
   if (!wondersOf(S, pi).some(w => w.lvl === 3)) { p.cultureWin = null; return null; }
-  S.over = { winner: pi, how: 'Kultursieg (Weltwunder der Stufe 3)' };
+  claimVictory(S, pi, 'Kultursieg (Weltwunder der Stufe 3)');
   return S.over;
 }
 

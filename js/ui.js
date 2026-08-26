@@ -365,8 +365,12 @@ function redraw() {
   // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet.
   const mine = popOf(S, S.cur), all = worldPop(S);
   const pct = all > 0 ? Math.round((mine / all) * 100) : 0;
+  // Ist ein Sieg angemeldet, läuft die Runde noch zu Ende – das muss in der Kopfzeile
+  // stehen, sonst wirkt das plötzliche Spielende willkürlich.
+  const letzte = S.endRound != null && !S.over
+    ? ` · letzte Runde (${(S.claims || []).map(c => civOf(S.players[c.pi]).n).join(', ')})` : '';
   $('hud-round').textContent = `Runde ${S.round} · Bevölkerung ${mine}/${all} (${pct} %)` +
-    (ev ? ` · ${ev.n}` : '');
+    (ev ? ` · ${ev.n}` : '') + letzte;
   $('hud-sci').textContent = p.res.sci;
   $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
   $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
@@ -832,9 +836,24 @@ function runBots() {
   };
 }
 function gameOver() {
-  const w = S.over.winner;
+  const o = S.over, w = o.winner;
+  const namen = (o.winners || [w]).map(i => civOf(S.players[i]).n).join(' und ');
+  const titel = o.shared ? `${namen} gewinnen gemeinsam.` : `${namen} gewinnt.`;
+  // Bei mehreren Siegansprüchen die Punkte offenlegen: Bevölkerung + Wunder + Techs.
+  let tafel = '';
+  if (o.score && o.score.length > 1) {
+    tafel = `<table class="tbl" style="margin:10px 0"><tr><th>Reich</th><th>Bev.</th>
+      <th>Wunder</th><th>Techs</th><th>Punkte</th></tr>` +
+      o.score.map(x => `<tr${(o.winners || []).includes(x.pi) ? ' style="font-weight:700"' : ''}>
+        <td>${civOf(S.players[x.pi]).n}</td><td>${x.pop}</td><td>${x.wonders}</td>
+        <td>${x.techs}</td><td>${x.total}</td></tr>`).join('') + '</table>' +
+      `<p class="sub">${o.score.map(x => `${civOf(S.players[x.pi]).n}: ${x.how}`).join(' · ')}</p>` +
+      (o.tiebreak === 'mensch'
+        ? '<p class="sub">Gleichstand nach Punkten – bei Gleichstand geht der Sieg an den Menschen.</p>'
+        : '');
+  }
   modal('Spielende', `<p style="font-family:var(--serif);font-size:22px;margin:0 0 6px">
-    ${civOf(S.players[w]).n} gewinnt.</p><p class="sub">${S.over.how}</p>
+    ${titel}</p><p class="sub">${o.how}</p>${tafel}
     <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">Zurück zum Menü</button>`);
   confetti(civOf(S.players[w]).c);
 }
