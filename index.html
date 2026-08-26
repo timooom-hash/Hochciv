@@ -43,14 +43,17 @@
       menschliche Zivilisation in der Liste.</p>
     <div class="seg wide" id="setup-mode">
       <button data-mode="vier" class="on">Vier Reiche</button>
+      <button data-mode="drei">Drei Reiche</button>
       <button data-mode="duell">1 gegen 1</button>
     </div>
     <div id="setup-list"></div>
     <label class="row" id="setup-map-row"><span>Karte</span>
       <select id="setup-map"></select></label>
-    <p class="hint" id="setup-duel-hint" hidden>1 gegen 1: zufällige Karte 12 × 8 mit festen
-      Startpunkten – die Karte lässt sich hier nicht wählen. Wirtschaftssieg erst über 3/4
-      der Weltbevölkerung (mit Theologie 7/10, mit Vereinten Nationen 2/3).</p>
+    <p class="hint" id="setup-duel-hint" hidden>1 gegen 1: nur Zufallskarten, dafür
+      Wirtschaftssieg erst über 3/4 der Weltbevölkerung (mit Theologie 7/10, mit
+      Vereinten Nationen 2/3).</p>
+    <p class="hint" id="setup-tile-hint" hidden>Plättchenkarte: die offenen Dreiecke liegen
+      gleich, das eigene legt jede*r selbst – Lage wählen, Hauptstadt setzen, verdeckt.</p>
     <label class="row"><span>Mit Ereignissen</span>
       <input type="checkbox" id="setup-events"></label>
     <label class="row" id="setup-evmode-row" hidden><span>Ereignisstärke</span>
@@ -117,6 +120,20 @@
   </nav>
 </section>
 
+<!-- ------------------------------------------------- Startplättchen legen -->
+<section id="screen-place" class="screen">
+  <header class="bar">
+    <button class="icon-btn" data-back>‹</button>
+    <h2 id="pl-title">Startplättchen</h2>
+  </header>
+  <div id="pl-host"><svg id="pl-map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="ed-tools place-tools">
+    <p class="hint" id="pl-note"></p>
+    <button class="btn small" id="pl-rot">Drehen</button>
+    <button class="btn small primary" id="pl-ok">Fertig</button>
+  </div>
+</section>
+
 <!-- ------------------------------------------------------------------ Karteneditor -->
 <section id="screen-editor" class="screen">
   <header class="bar">
@@ -141,6 +158,7 @@
 
 <script src="js/data.js"></script>
 <script src="js/hex.js"></script>
+<script src="js/tiles.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/expansion.js"></script>
 <script src="js/bots.js"></script>

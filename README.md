@@ -24,8 +24,9 @@ sonst behalten installierte Geräte die alte Fassung.
 | Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
 | Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
-| Spielart | „Vier Reiche“ oder „1 gegen 1“ (zwei frei gewählte Zivilisationen, Karte 12 × 8, Wirtschaftssieg erst über 3/4) |
-| Karte | Originalkarte, Große Karte, Zufallskarte oder eigene aus dem Editor |
+| Spielart | „Vier Reiche“, „Drei Reiche“ oder „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) |
+| Karte | Originalkarte, Große Karte, **Plättchenkarte**, Rasterkarte oder eigene aus dem Editor |
+| Plättchenkarte | Zufallskarte aus Dreiecken zu 15 Feldern. Vor dem Spiel legt jedes Reich verdeckt sein eigenes Startdreieck: Lage wählen (drei), Hauptstadt setzen. Dann wird aufgedeckt |
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
 | 🌾 in der Kopfzeile | Städte füttern (nur mit Gentechnik oder Massenmedien) |
 | Weltwunder bauen | im Stadtblatt, wenn die Erweiterung an ist |
@@ -61,18 +62,45 @@ gespeichert.
 
 ## Karten
 
-Im Aufbaubildschirm stehen zwei Karten zur Wahl: die **Originalkarte** (12 × 18, aus dem
-Foto des gedruckten Bogens ausgemessen) und eine **große Karte** (15 × 24) im selben Stil,
-mit weiter auseinanderliegenden Hauptstädten und dadurch längeren Partien. Welche Zivilisation an welchem Stern startet, steht auf dem Bogen nicht –
+Im Aufbaubildschirm stehen zwei feste Karten zur Wahl: die **Originalkarte** (12 × 18, aus
+dem Foto des gedruckten Bogens ausgemessen) und eine **große Karte** (15 × 24) im selben
+Stil, mit weiter auseinanderliegenden Hauptstädten und dadurch längeren Partien. Welche Zivilisation an welchem Stern startet, steht auf dem Bogen nicht –
 zugeordnet ist nach Himmelsrichtung: Wikinger Norden, Russland Osten, England Westen,
 Griechenland Süden.
+
+### Plättchenkarte (Zufallskarte)
+
+Aus einem Vorrat von 20 handentworfenen Dreiecken zu je 15 Feldern werden Plättchen
+gezogen und zu einer Form zusammengelegt:
+
+| Reiche | Form | Größe |
+|---|---|---|
+| 2 | Sechseck aus 6 Dreiecken, 4 offen, 2 verdeckt | 11 × 11, 90 Felder |
+| 3 | großes Dreieck aus 9 Dreiecken, 6 offen | 16 × 16, 135 Felder |
+| 4 | gestrecktes Sechseck aus 10 Dreiecken, 6 offen | 10 × 18, 150 Felder |
+
+Bei zwei und drei Reichen bleibt **genau in der Mitte ein Feld frei** – dort ist kein
+Feld, da führt kein Weg durch. Das ist rechnerisch unvermeidlich (6 · 15 = 91 − 1) und
+bleibt bewusst offen.
+
+Jedes Reich legt sein eigenes Dreieck selbst und verdeckt: **Drehen** wählt eine der drei
+Lagen, ein Tipp auf ein markiertes Feld setzt die Hauptstadt. Gesperrt sind nur Felder,
+die einer fremden Hauptstadt näher als 3 Felder kommen könnten (Städte brauchen 3 Felder
+Abstand, und gelegt wird blind). Bots drehen zufällig und setzen auf eines der drei
+mittigen Felder. Erst wenn alle fertig sind, wird aufgedeckt.
+
+Neue Plättchen kommen in `js/tiles.js`, `TILE_POOL` – fünf Zeilen zu 5/4/3/2/1 Feldern.
+`node test.js` prüft dabei, dass die drei mittigen Felder Land sind und jedes davon im
+ersten Zug mindestens 4 Nahrung bringt.
 
 * **Im Spiel:** *Karte bearbeiten* → Gelände antippen; Hauptstädte über die
   Zivilisationsfelder der Palette setzen, oben rechts mit ✓ speichern.
   Über *Exportieren* / *Importieren* lässt sich die Karte als Datei sichern.
 * **Im Code:** `js/data.js`, `DEFAULT_MAP`. Eine Zeile = eine Hexreihe,
   ungerade Zeilen sind nach rechts versetzt.
-  `G` Grasland · `W` Wald · `B` Gebirge · `F` Fluss · `M` Meer · `I` Insel.
+  `G` Grasland · `W` Wald · `B` Gebirge · `F` Fluss · `M` Meer · `I` Insel ·
+  `X` kein Feld (liegt außerhalb der Karte – so entstehen nicht rechteckige Umrisse;
+  im Editor blass gestrichelt, sonst unsichtbar).
 
 ## Prüfprogramme (nur für die Entwicklung)
 
@@ -92,6 +120,7 @@ index.html            Aufbau der Bildschirme
 css/style.css         Optik des gedruckten Spielbogens
 js/data.js            Technologien, Zivilisationen, Erträge, Karte
 js/hex.js             Hexraster, Distanzen, Wegsuche
+js/tiles.js           Dreiecksplättchen: Vorrat, Formen, Legephase, Kartenbau
 js/engine.js          Regeln: Einkommen, Aktionen, Kampf, Sieg
 js/bots.js            Bot-Züge nach den Bot-Regeln
 js/ui.js              Karte, Gesten, Aktionsblätter, Editor

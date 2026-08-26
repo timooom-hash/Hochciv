@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
+for (const f of ['js/data.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -3053,6 +3053,250 @@ function tutRun() {
   }
   eq(!!S.over, true, 'Partie mit menschlichem Spieler endet (' + (S.over ? S.over.how : 'offen') + ')');
   console.log('       Runde ' + S.round + ', Bevölkerung ' + S.players.map((p, i) => popOf(S, i)).join('/'));
+}
+
+/* ==================================================== Plättchenkarten
+   Zufallskarten aus Dreiecken zu 15 Feldern: Vorrat, Formen, Legeregeln, Karte. */
+{
+  // --- Vorrat
+  eq(TILE_POOL.length, 20, 'der Vorrat hat 20 Plättchen');
+  eq(TILE_POOL.every(t => tileTerrain(t).length === TILE_CELLS), true, 'jedes Plättchen hat 15 Felder');
+  eq(TILE_POOL.every(t => t.a.map(r => r.length).join() === '5,4,3,2,1'), true,
+    'die Zeilen sind 5/4/3/2/1 Felder lang');
+  eq(TILE_POOL.every(t => tileTerrain(t).every(c => TERRAIN[c] && !TERRAIN[c].off && !TERRAIN[c].block)), true,
+    'nur bespielbares Gelände auf den Plättchen');
+  eq(new Set(TILE_POOL.map(t => t.n)).size, 20, 'die Namen sind verschieden');
+  // Die drei mittigen Felder tragen Bot-Hauptstädte: Land, und ihre sechs Nachbarn
+  // liegen sämtlich auf demselben Plättchen – die Startgüte steht also hier schon fest.
+  const nbIJK = ([i, j, k]) => [[i + 1, j - 1, k], [i - 1, j + 1, k], [i + 1, j, k - 1],
+    [i - 1, j, k + 1], [i, j + 1, k - 1], [i, j - 1, k + 1]];
+  const midStart = (tile, n) => {
+    const face = tileTerrain(tile);
+    let food = -1, coins = 1, miss = 0;                       // Stadt mit 1 Bevölkerung
+    for (const t of nbIJK(TRI_IJK[n])) {
+      const idx = TRI_INDEX[t.join(',')];
+      if (idx == null) { miss++; continue; }
+      food += TERRAIN[face[idx]].yield[1]; coins += TERRAIN[face[idx]].yield[2];
+    }
+    return { food: food + Math.floor(coins / 2), miss };
+  };
+  eq(TILE_POOL.every(t => TRI_MIDDLE.every(n => TERRAIN[tileTerrain(t)[n]].land)), true,
+    'die drei mittigen Felder sind überall Land');
+  eq(TILE_POOL.every(t => TRI_MIDDLE.every(n => midStart(t, n).miss === 0)), true,
+    'die Nachbarn der mittigen Felder liegen auf demselben Plättchen');
+  const schlecht = TILE_POOL.filter(t => TRI_MIDDLE.some(n => midStart(t, n).food < START_MIN_FOOD));
+  eq(schlecht.map(t => t.n), [], 'jedes mittige Feld bringt mindestens 4 Nahrung (Münzen 2:1)');
+  {
+    const alle = TILE_POOL.flatMap(t => TRI_MIDDLE.map(n => midStart(t, n).food));
+    console.log('       Startnahrung der mittigen Felder: min ' + Math.min(...alle) +
+      ', max ' + Math.max(...alle));
+  }
+
+  // --- Drehung
+  eq(TRI_ROT.length, 3, 'drei Lagen je Plättchen');
+  eq(TRI_ROT.every(r => new Set(r).size === TILE_CELLS), true, 'jede Lage ist eine Umordnung');
+  eq(TRI_ROT[0].map((_, n) => TRI_ROT[1][TRI_ROT[1][TRI_ROT[1][n]]]).join(), TRI_ROT[0].join(),
+    'dreimal gedreht ist wieder die Ausgangslage');
+  eq(TRI_MIDDLE.every(m => TRI_ROT.every(r => TRI_MIDDLE.includes(r[m]))), true,
+    'die Mitte bleibt beim Drehen die Mitte');
+
+  // --- Formen
+  const nbCube = c => [[1, -1, 0], [1, 0, -1], [0, 1, -1], [-1, 1, 0], [-1, 0, 1], [0, -1, 1]]
+    .map(d => [c[0] + d[0], c[1] + d[1], c[2] + d[2]]);
+  for (const n of [2, 3, 4]) {
+    const sh = TILE_SHAPES[n], K = c => c[0] + ',' + c[1];
+    const belegt = new Map();
+    let doppelt = 0;
+    sh.slots.forEach((sl, i) => slotCells(sl).forEach(c => {
+      if (belegt.has(K(c))) doppelt++;
+      belegt.set(K(c), i);
+    }));
+    sh.holes.forEach(h => { if (belegt.has(K(h))) doppelt++; belegt.set(K(h), 'loch'); });
+    eq(doppelt, 0, `${n}P: kein Plättchen überlappt ein anderes`);
+    eq(belegt.size, sh.slots.length * TILE_CELLS + sh.holes.length,
+      `${n}P: ${sh.slots.length} × 15 Felder plus ${sh.holes.length} Loch/Löcher`);
+    // keine ungenutzte Zelle mitten in der Form
+    let luecken = 0;
+    for (const k of belegt.keys()) {
+      const [x, y] = k.split(',').map(Number);
+      for (const nb of nbCube([x, y, -x - y]))
+        if (!belegt.has(K(nb)) && nbCube(nb).every(z => belegt.has(K(z)))) luecken++;
+    }
+    eq(luecken, 0, `${n}P: keine Lücke im Inneren der Form`);
+    // Zeilenversatz: die Verschiebung nach oben muss gerade sein, sonst kippt der
+    // Versatz der Zeilen und die Form verzerrt sich.
+    const zeilen = [...belegt.keys()].map(k => { const [x, y] = k.split(',').map(Number); return -x - y; });
+    eq(Math.min(...zeilen) % 2, 0, `${n}P: die Form beginnt in einer geraden Zeile`);
+    // Sitzplätze
+    sh.seatSets.forEach(set => {
+      eq(set.length, n, `${n}P: ${set.length} Sitzplätze`);
+      eq(new Set(set).size, n, `${n}P: keine zwei Reiche auf demselben Plättchen`);
+      const frei = set.map((_, i) => seatFreeCells(sh, set, i));
+      eq(frei.every(f => TRI_MIDDLE.every(m => f[m])), true,
+        `${n}P: die mittigen Felder sind immer erlaubt (dort setzen Bots)`);
+      // Kein Paar erlaubter Felder kommt sich näher als die Regel zulässt
+      let naeher = 99;
+      for (let a = 0; a < set.length; a++) for (let b = a + 1; b < set.length; b++)
+        slotCells(sh.slots[set[a]]).forEach((x, xi) => slotCells(sh.slots[set[b]]).forEach((y, yi) => {
+          if (frei[a][xi] && frei[b][yi]) naeher = Math.min(naeher, cubeDist(x, y));
+        }));
+      eq(naeher >= 3, true, `${n}P: zwei Hauptstädte können nie näher als 3 Felder liegen (${naeher})`);
+    });
+  }
+  // Vier Reiche: die Sitze lassen im Ring der acht äußeren Plättchen je einen frei
+  {
+    const sh = TILE_SHAPES[4];
+    const mitte = [2, 7];                       // die beiden mittigen Plättchen
+    const ring = [9, 8, 6, 5, 0, 1, 3, 4];      // Reihenfolge rundherum
+    const set = sh.seatSets[0];
+    eq(set.some(i => mitte.includes(i)), false, 'kein Reich sitzt auf einem mittigen Plättchen');
+    const pos = set.map(i => ring.indexOf(i)).sort((a, b) => a - b);
+    eq(pos.map(p => p % 2).every(x => x === pos[0] % 2), true,
+      'die Reiche sitzen auf jedem zweiten Plättchen des Rings');
+  }
+
+  // --- Plan, Legen, Karte
+  const civs4 = CIVS.map(c => c.k);
+  for (const n of [2, 3, 4]) {
+    const civs = civs4.slice(0, n);
+    const plan = tilePlan(civs, 1000 + n);
+    eq(plan.tiles.length, TILE_SHAPES[n].slots.length, `${n}P: für jeden Platz ein Plättchen`);
+    eq(new Set(plan.tiles).size, plan.tiles.length, `${n}P: kein Plättchen doppelt gezogen`);
+    eq(plan.seats.map(s => s.civ), civs, `${n}P: jedes Reich hat einen Sitzplatz`);
+    eq(plan.seats.every(s => s.cell == null), true, `${n}P: vor dem Legen ist nichts gesetzt`);
+    // verdeckt: die Karte zeigt nur die offenen Plättchen
+    const offen = TILE_SHAPES[n].slots.map((_, i) => i).filter(i => !isSeatSlot(plan, i));
+    const vorher = tileMap(plan);
+    const sichtbar = vorher.rows.join('').split('').filter(c => c !== 'X').length;
+    eq(sichtbar, offen.length * TILE_CELLS,
+      `${n}P: vor dem Aufdecken sind nur die offenen Plättchen zu sehen`);
+    // Bots legen
+    const rnd = mapRng(77);
+    plan.seats.forEach(s => eq(botPlaceSeat(plan, s, rnd), null, `${n}P: Bot legt ${s.civ}`));
+    eq(plan.seats.every(s => TRI_MIDDLE.includes(s.cell)), true,
+      `${n}P: Bots setzen auf eines der drei mittigen Felder`);
+    const m = tileMap(plan);
+    eq(m.rows.every(r => r.length === m.rows[0].length), true, `${n}P: alle Zeilen gleich lang`);
+    eq(m.rows.every(r => [...r].every(t => TERRAIN[t])), true, `${n}P: nur bekanntes Gelände`);
+    eq(m.rows.join('').split('').filter(c => c !== 'X').length,
+      TILE_SHAPES[n].slots.length * TILE_CELLS,
+      `${n}P: die fertige Karte hat 15 Felder je Plättchen`);
+    // Das Loch in der Mitte bleibt ein Loch – ringsum aber echte Felder.
+    {
+      const alle = TILE_SHAPES[n].slots.flatMap(slotCells)
+        .concat(TILE_SHAPES[n].holes).map(cubeToRC);
+      const r0 = Math.min(...alle.map(x => x[0])), c0 = Math.min(...alle.map(x => x[1]));
+      TILE_SHAPES[n].holes.forEach(h => {
+        const [hr, hc] = cubeToRC(h), r = hr - r0, c = hc - c0;
+        eq(m.rows[r][c], 'X', `${n}P: das Mittelfeld bleibt leer`);
+        eq(neighbors(r, c).every(([nr, nc]) => m.rows[nr] && m.rows[nr][nc] !== 'X'), true,
+          `${n}P: rings um das Loch liegen echte Felder`);
+        eq(canPass(newGame({
+          seed: 1, map: m, duel: n === 2,
+          players: civs.map(cv => ({ civ: cv, kind: 'bot' })),
+        }), 0, r, c), false, `${n}P: durch das Loch führt kein Weg`);
+      });
+    }
+    eq(Object.keys(m.capitals).sort(), civs.slice().sort(), `${n}P: für jedes Reich eine Hauptstadt`);
+    for (const [civ, [r, c]] of Object.entries(m.capitals)) {
+      eq(TERRAIN[m.rows[r][c]].land, true, `${n}P: Hauptstadt ${civ} liegt auf Land`);
+      eq(TERRAIN[m.rows[r][c]].off, undefined, `${n}P: Hauptstadt ${civ} liegt auf der Karte`);
+    }
+    const ks = Object.keys(m.capitals);
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++)
+      eq(hexDistance(...m.capitals[ks[i]], ...m.capitals[ks[j]]) >= 3, true,
+        `${n}P: ${ks[i]} und ${ks[j]} liegen mindestens 3 Felder auseinander`);
+    console.log(`       ${n}P: ${m.rows.length} × ${m.rows[0].length}, ` +
+      `${m.rows.join('').split('').filter(c => c !== 'X').length} Felder`);
+    // gleicher Startwert = gleiche Ziehung
+    const gleich = tilePlan(civs, 1000 + n);
+    eq(gleich.tiles.join(), plan.tiles.join(), `${n}P: gleicher Startwert zieht dieselben Plättchen`);
+    eq(tilePlan(civs, 999).tiles.join() !== plan.tiles.join(), true,
+      `${n}P: ein anderer Startwert zieht andere`);
+    // eine ganze Partie darauf
+    const S = newGame({
+      seed: 30 + n, map: m, duel: n === 2,
+      players: civs.map(c => ({ civ: c, kind: 'bot', diff: 'david' })),
+    });
+    eq(S.cities.length, n, `${n}P: alle Hauptstädte stehen`);
+    let guard = 0;
+    while (!S.over && guard++ < 400) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+    eq(!!S.over, true, `${n}P: die Partie auf der Plättchenkarte endet regulär`);
+  }
+  // --- Dauerlauf: viele Ziehungen, alle Invarianten
+  {
+    let fehler = [], minAbstand = 99, minStart = 99, benutzt = new Set();
+    for (const n of [2, 3, 4]) for (let seed = 0; seed < 60; seed++) {
+      const civs = CIVS.map(c => c.k).slice(0, n);
+      const plan = tilePlan(civs, seed);
+      const rnd = mapRng(seed * 7 + 1);
+      plan.seats.forEach(st => { const e = botPlaceSeat(plan, st, rnd); if (e) fehler.push(e); });
+      plan.tiles.forEach(t => benutzt.add(t));
+      const m = tileMap(plan);
+      if (m.rows.some(r => r.length !== m.rows[0].length)) fehler.push(`${n}/${seed}: Zeilenlänge`);
+      if (m.rows.join('').split('').filter(c => c !== 'X').length !== TILE_SHAPES[n].slots.length * TILE_CELLS)
+        fehler.push(`${n}/${seed}: Feldzahl`);
+      const ks = Object.keys(m.capitals);
+      if (ks.length !== n) fehler.push(`${n}/${seed}: ${ks.length} Hauptstädte`);
+      ks.forEach(k => {
+        const [r, c] = m.capitals[k];
+        if (!TERRAIN[m.rows[r][c]].land) fehler.push(`${n}/${seed}: Hauptstadt auf ${m.rows[r][c]}`);
+      });
+      for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++)
+        minAbstand = Math.min(minAbstand, hexDistance(...m.capitals[ks[i]], ...m.capitals[ks[j]]));
+      // Startgüte auf der FERTIGEN Karte messen, nicht nur auf dem Plättchen
+      const S = newGame({ seed, map: m, duel: n === 2, players: civs.map(cv => ({ civ: cv, kind: 'bot' })) });
+      S.players.forEach((_, pi) => {
+        const inc = baseIncome(S, pi);
+        minStart = Math.min(minStart, inc.food + Math.floor(inc.coins / 2));
+      });
+    }
+    eq(fehler.slice(0, 5), [], '180 Ziehungen über alle Spielerzahlen ohne Beanstandung');
+    eq(minAbstand >= 3, true, `Hauptstädte immer mindestens 3 Felder auseinander (${minAbstand})`);
+    eq(minStart >= START_MIN_FOOD, true,
+      `jede Bot-Hauptstadt startet mit mindestens 4 Nahrung (${minStart})`);
+    eq(benutzt.size, TILE_POOL.length, 'über die Ziehungen kommt jedes Plättchen einmal vor');
+    console.log(`       Dauerlauf: kleinster Hauptstadtabstand ${minAbstand}, ` +
+      `schlechtester Start ${minStart} Nahrung`);
+  }
+
+  // Ein Mensch kann nicht auf ein gesperrtes oder nasses Feld setzen
+  {
+    const plan = tilePlan(['russland', 'england'], 4711);
+    const seat = plan.seats[0];
+    const ok = placeOptions(plan, seat, 0);
+    const nass = ok.findIndex((v, i) => !v);
+    eq(placeSeat(plan, seat, 0, nass) !== null, true, 'gesperrtes Feld wird abgelehnt');
+    eq(placeSeat(plan, seat, 3, ok.indexOf(true)) !== null, true, 'es gibt nur drei Lagen');
+    eq(placeSeat(plan, seat, 2, ok.indexOf(true)), null, 'erlaubtes Feld wird angenommen');
+    eq([seat.o, seat.cell], [2, ok.indexOf(true)], 'Lage und Feld sind gespeichert');
+  }
+  // Drehen zeigt dasselbe Plättchen, nur anders herum
+  {
+    const face0 = tileFaceTerrain(0, 0).slice().sort().join('');
+    eq([1, 2].every(o => tileFaceTerrain(0, o).slice().sort().join('') === face0), true,
+      'jede Lage zeigt dieselben 15 Gelände');
+    eq(tileFaceTerrain(2, 0).join() !== tileFaceTerrain(2, 1).join(), true,
+      'aber an anderer Stelle');
+  }
+}
+
+/* ==================================================== Felder außerhalb der Karte */
+{
+  const S = newGame({
+    seed: 5, players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'bot' }],
+  });
+  // ein Feld neben der Hauptstadt zu „kein Feld" machen
+  const cap = capitalOf(S, 0);
+  const [nr, nc] = neighbors(cap.r, cap.c).find(([r, c]) => terrainAt(S, r, c));
+  S.map.rows[nr] = S.map.rows[nr].slice(0, nc) + 'X' + S.map.rows[nr].slice(nc + 1);
+  eq(tileYield(S, 0, 'X'), [0, 0, 0], 'ein Feld außerhalb der Karte bringt nichts');
+  eq(incomeBreakdown(S, 0).rows.some(r => r.key === 'X'), false,
+    'es taucht in der Ertragsübersicht nicht auf');
+  eq(canPass(S, 0, nr, nc), false, 'keine Armee kann es betreten');
+  eq(canFound(S, 0, nr, nc), 'Kein Feld.', 'dort lässt sich keine Stadt gründen');
+  eq(isOff('X') && !isOff('M') && !isOff('V'), true, 'nur X gilt als außerhalb');
+  eq(TERRAIN.X.land, false, 'außerhalb ist kein Land');
 }
 
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');

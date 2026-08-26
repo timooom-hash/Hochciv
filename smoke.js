@@ -22,7 +22,7 @@ const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 // Im Browser teilen sich <script>-Tags den globalen Gültigkeitsbereich; eval nicht.
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
-const src = ['js/data.js', 'js/hex.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
+const src = ['js/data.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
   + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
@@ -283,7 +283,11 @@ step('1-gegen-1-Modus im Aufbau', () => {
   $('setup-mode').querySelector('[data-mode=duell]').onclick();
   const slots = [...$('setup-list').children];
   if (slots.length !== 2) throw new Error('nicht zwei Plätze, sondern ' + slots.length);
-  if (!$('setup-map-row').hidden) throw new Error('Kartenauswahl im Duell nicht versteckt');
+  // Im Duell stehen nur Zufallskarten zur Wahl – die festen haben vier Startsterne.
+  const karten = [...$('setup-map').options].map(o => o.value);
+  if (karten.includes('0')) throw new Error('feste Karten im Duell angeboten');
+  if (!karten.includes('plaettchen') || !karten.includes('zufall'))
+    throw new Error('Duell ohne beide Zufallskarten: ' + karten.join(','));
   if ($('setup-duel-hint').hidden) throw new Error('kein Hinweis auf die Duellregeln');
   const picks = slots.map(x => x.querySelector('[data-civpick]'));
   if (picks.some(p => !p) || picks[0].options.length !== 4)
@@ -1286,6 +1290,159 @@ step('Blatt endet über der Aktionsleiste (Punkt 3, gemessen)', () => {
   if (!v) throw new Error('--bar-h wurde nicht gesetzt');
   if (!/^\d+px$/.test(v)) throw new Error('--bar-h ist kein Pixelmaß: ' + v);
   console.log('       --bar-h = ' + v);
+});
+
+/* ============================================ Plättchenkarte: Startdreiecke legen */
+const legeHelfer = {
+  rcs: () => G('slotRC')(G('placeState').plan, G('placeSeatNow')().slot),
+  frei: () => G('placeOptions')(G('placeState').plan, G('placeSeatNow')(), G('placeState').o),
+};
+// Duell mit zwei Menschen auf der Plättchenkarte
+step('Plättchenkarte: Legephase startet statt des Spiels', () => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=duell]').onclick();
+  // beide Plätze auf Mensch
+  [...$('setup-list').children].forEach(x => x.querySelector('[data-kind="human"]').onclick());
+  $('setup-map').value = 'plaettchen'; $('setup-map').onchange();
+  if ($('setup-tile-hint').hidden) throw new Error('kein Hinweis zur Plättchenkarte');
+  const vorher = G('S');
+  $('setup-go').onclick();
+  if (!$('screen-place').classList.contains('show')) throw new Error('Legebildschirm kommt nicht');
+  if (G('S') !== vorher) throw new Error('das Spiel startet schon vor dem Legen');
+  const st = G('placeState');
+  if (st.queue.length !== 2) throw new Error('nicht beide Menschen in der Warteschlange');
+  console.log('       ' + st.plan.name + ', Warteschlange ' + st.queue.length);
+});
+step('Verdeckt: sichtbar sind nur die offenen Plättchen und das eigene', () => {
+  if (!$('overlay').classList.contains('show')) throw new Error('keine Übergabe-Aufforderung');
+  $('pl-gate').onclick();
+  const felder = $('pl-map').querySelectorAll('[data-r]').length;
+  // Sechseck: 90 Felder (Mitte bleibt leer), davon 15 für das verdeckte Plättchen
+  if (felder !== 75) throw new Error('sichtbar sind ' + felder + ' Felder statt 75');
+  const hl = $('pl-map').querySelectorAll('[stroke-dasharray="5 4"]').length;
+  if (hl < 10) throw new Error('zu wenige erlaubte Felder markiert: ' + hl);
+  console.log('       ' + felder + ' Felder sichtbar, ' + hl + ' erlaubte Hauptstadtfelder');
+});
+step('Drehen zeigt dasselbe Plättchen in einer anderen Lage', () => {
+  const karte = () => G('tileMap')(G('placeState').plan, {
+    show: [G('placeSeatNow')().slot], seat: G('placeSeatNow')(), o: G('placeState').o,
+  }).rows.join('');
+  const a = karte();
+  G('placeRotate')();
+  if (G('placeState').o !== 1) throw new Error('Lage nicht weitergeschaltet');
+  const b = karte();
+  if (a === b) throw new Error('Drehen ändert die Karte nicht');
+  G('placeRotate')(); G('placeRotate')();
+  if (G('placeState').o !== 0) throw new Error('nach drei Mal nicht wieder Lage 1');
+  if (karte() !== a) throw new Error('drei Drehungen ergeben nicht die Ausgangslage');
+  console.log('       drei Lagen, danach wieder die erste');
+});
+step('Hauptstadt nur auf erlaubten Feldern des eigenen Plättchens', () => {
+  const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
+  // fremdes Feld: der Zustand darf sich nicht ändern
+  G('plTap')(0, 0);
+  if (G('placeState').cell != null) throw new Error('Feld außerhalb des Plättchens angenommen');
+  const gesperrt = frei.indexOf(false);
+  if (gesperrt >= 0) {
+    G('plTap')(rcs[gesperrt][0], rcs[gesperrt][1]);
+    if (G('placeState').cell != null) throw new Error('gesperrtes Feld angenommen');
+  }
+  const gut = frei.indexOf(true);
+  G('plTap')(rcs[gut][0], rcs[gut][1]);
+  if (G('placeState').cell !== gut) throw new Error('erlaubtes Feld nicht übernommen');
+  console.log('       gesperrte Felder: ' + frei.filter(x => !x).length + ' von 15');
+});
+step('Bestätigen gibt an die zweite Person weiter', () => {
+  G('placeConfirm')();
+  const st = G('placeState');
+  if (st.at !== 1) throw new Error('nicht weitergerückt');
+  if (st.done) throw new Error('zu früh aufgedeckt');
+  if (!$('overlay').classList.contains('show')) throw new Error('keine zweite Übergabe');
+  $('pl-gate').onclick();
+  if (st.plan.seats[0].cell == null) throw new Error('erste Wahl nicht gespeichert');
+  const felder = $('pl-map').querySelectorAll('[data-r]').length;
+  if (felder !== 75) throw new Error('das fremde Plättchen ist zu sehen (' + felder + ')');
+});
+step('Aufdecken zeigt alle Plättchen, dann startet das Spiel', () => {
+  const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
+  const gut = frei.indexOf(true);
+  G('plTap')(rcs[gut][0], rcs[gut][1]);
+  G('placeConfirm')();
+  const st = G('placeState');
+  if (!st.done) throw new Error('nicht aufgedeckt');
+  const felder = $('pl-map').querySelectorAll('[data-r]').length;
+  if (felder !== 90) throw new Error('nach dem Aufdecken nur ' + felder + ' Felder');
+  if (!$('pl-rot').hidden) throw new Error('Drehen ist nach dem Aufdecken noch möglich');
+  G('placeConfirm')();
+  const S = G('S');
+  if (!$('screen-game').classList.contains('show')) throw new Error('Spiel startet nicht');
+  if (!S.duel) throw new Error('Duellregeln nicht übernommen');
+  if (S.cities.length !== 2) throw new Error('nicht zwei Hauptstädte');
+  const [a, b] = S.cities;
+  if (G('hexDistance')(a.r, a.c, b.r, b.c) < 3) throw new Error('Hauptstädte zu nah beieinander');
+  if ($('map').querySelectorAll('[data-r]').length !== 90)
+    throw new Error('die Spielkarte zeigt nicht 90 Felder');
+  // Das Loch in der Mitte ist wirklich keines: unpassierbar, nicht antippbar
+  const mitte = S.map.rows.findIndex(r => r.includes('X') && /[^X]X[^X]/.test(r));
+  if (mitte < 0) throw new Error('kein Loch in der Mitte des Sechsecks');
+  console.log('       ' + S.map.name + ', Hauptstadtabstand ' +
+    G('hexDistance')(a.r, a.c, b.r, b.c));
+});
+step('Drei Reiche im Aufbau', () => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=drei]').onclick();
+  const slots = [...$('setup-list').children];
+  if (slots.length !== 3) throw new Error('nicht drei Plätze, sondern ' + slots.length);
+  const civs = slots.map(x => x.dataset.civ);
+  if (new Set(civs).size !== 3) throw new Error('zweimal dieselbe Zivilisation: ' + civs.join(','));
+  // Kollision auflösen: Platz 1 auf die Zivilisation von Platz 2 setzen
+  const picks = slots.map(x => x.querySelector('[data-civpick]'));
+  picks[0].value = civs[1]; picks[0].onchange();
+  const jetzt = [...$('setup-list').children].map(x => x.dataset.civ);
+  if (new Set(jetzt).size !== 3) throw new Error('Kollision nicht aufgelöst: ' + jetzt.join(','));
+  const karten = [...$('setup-map').options].map(o => o.text);
+  if (!karten.some(k => /9 Dreiecke/.test(k))) throw new Error('keine 9er-Plättchenkarte: ' + karten);
+  console.log('       ' + jetzt.join(' · ') + ' | ' + karten.join(' · '));
+});
+step('Drei Reiche spielen auf der Plättchenkarte', () => {
+  [...$('setup-list').children].slice(1).forEach(x => x.querySelector('[data-kind="bot"]').onclick());
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+  $('setup-map').value = 'plaettchen'; $('setup-map').onchange();
+  $('setup-go').onclick();
+  const st = G('placeState');
+  if (st.queue.length !== 1) throw new Error('nicht genau ein Mensch in der Warteschlange');
+  if (st.plan.seats.filter(x => x.cell != null).length !== 2)
+    throw new Error('die Bots haben nicht schon gelegt');
+  const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
+  const gut = frei.indexOf(true);
+  G('plTap')(rcs[gut][0], rcs[gut][1]);
+  G('placeConfirm')();          // legt und deckt auf
+  G('placeConfirm')();          // Spiel beginnen
+  const S = G('S');
+  if (S.players.length !== 3) throw new Error('nicht drei Reiche im Spiel');
+  if (S.cities.length !== 3) throw new Error('nicht drei Hauptstädte');
+  if (S.duel) throw new Error('Duellregeln bei drei Reichen');
+  if ($('map').querySelectorAll('[data-r]').length !== 135)
+    throw new Error('das große Dreieck hat nicht 135 Felder');
+  console.log('       ' + S.map.name + ' · ' + S.map.rows.length + ' × ' + S.map.rows[0].length);
+});
+step('Karteneditor zeigt Felder außerhalb der Karte', () => {
+  G('__set')('customMap', null);
+  $('m-editor').onclick();
+  const felder = $('ed-map').querySelectorAll('[data-r]').length;
+  const zeilen = G('__get')('editMap').rows;
+  if (felder !== zeilen.length * zeilen[0].length)
+    throw new Error('im Editor fehlen Felder: ' + felder);
+  // ein Feld auf X setzen und wieder zurücknehmen
+  G('__set')('edTool', 'X');
+  G('edTap')(0, 0);
+  if (G('__get')('editMap').rows[0][0] !== 'X') throw new Error('X lässt sich nicht setzen');
+  if (!$('ed-map').querySelector('[data-r="0"][data-c="0"]'))
+    throw new Error('ein X-Feld ist im Editor nicht mehr antippbar');
+  G('__set')('edTool', 'G');
+  G('edTap')(0, 0);
+  if (G('__get')('editMap').rows[0][0] !== 'G') throw new Error('X lässt sich nicht zurücknehmen');
+  G('show')('screen-menu');
 });
 
 console.log(errors.length ? '\n' + errors.length + ' Fehler' : '\nOberfläche läuft fehlerfrei durch');

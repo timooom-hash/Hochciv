@@ -19,5 +19,19 @@ const fields=$('map').querySelectorAll('[data-r]').length;
 console.log('Karte:', S.map.rows.length+'x'+S.map.rows[0].length, '|', fields, 'Felder');
 console.log('Erweiterungen:', 'Ereignisse='+(S.ev?S.ev.mode:'aus'), 'Wunder='+S.wo);
 console.log('Techs im Bogen:', (w.eval("$('a-tech').onclick(); $('ov-body').querySelectorAll('.tech').length")));
+// Plättchenkarte samt Legephase: einmal komplett durchspielen
+w.eval("closeModal(); show('screen-setup'); setupScreen();");
+w.eval("$('setup-mode').querySelector('[data-mode=duell]').onclick()");
+w.eval("$('setup-map').value='plaettchen'; $('setup-map').onchange(); $('setup-go').onclick()");
+w.eval("closeModal()");
+w.eval(`(() => {
+  const rcs = slotRC(placeState.plan, placeSeatNow().slot);
+  const ok = placeOptions(placeState.plan, placeSeatNow(), placeState.o);
+  const i = ok.indexOf(true);
+  plTap(rcs[i][0], rcs[i][1]); placeConfirm(); placeConfirm();
+})()`);
+const T = w.eval('S');
+console.log('Plättchenkarte:', T.map.name, T.map.rows.length + 'x' + T.map.rows[0].length,
+  '|', $('map').querySelectorAll('[data-r]').length, 'Felder |', T.cities.length, 'Hauptstädte');
 console.log('Fehler:', errs.length ? errs : 'keine');
 process.exit(errs.length?1:0);

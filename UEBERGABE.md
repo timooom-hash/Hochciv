@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 22.8., `sw.js` v49)
+# Hochzeivilization — Projekt-Übergabe (Stand 26.8., `sw.js` v50)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -24,19 +24,20 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
   Einmal ist ein `node_modules` ins Zip gerutscht und ließ sich wegen eines I/O-Fehlers auf dem
   Mount nicht mehr löschen — nur durch Umbenennen aus dem Ordner heraus lösbar.
 
-## Dateistruktur (~9500 Zeilen)
+## Dateistruktur (~10 000 Zeilen)
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/data.js` | 465 | `APP_VERSION`, TERRAIN (inkl. Vulkan), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, Karten, Zufalls- und Duellkartengenerator inkl. Startgüte, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 471 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, Karten, Zufalls- und Duellkartengenerator inkl. Startgüte, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
+| `js/tiles.js` | 255 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
 | `js/engine.js` | 1370 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 511 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 479 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1325 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln |
+| `js/ui.js` | 1496 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 911 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 3059 | **816 Assertions**, `node test.js` |
-| `smoke.js` | 1292 | **68 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 3266 | **953 Assertions**, `node test.js` |
+| `smoke.js` | 1449 | **77 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 23 | Einzeldatei bauen und in jsdom prüfen |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -71,11 +72,20 @@ Gedächtnis rekonstruieren.
 - **Weltwunder** (Erweiterung) mit Pyramidenregel, Kultursieg und vier eigenen Technologien
   (Baukräne, Wallfahrt, Militärlogistik, Raumfahrt). Bots bauen sie kostenlos, **ohne Effekte**
   — einzige Ausnahme: Militärlogistik wirkt auch für Bots.
-- **Karten:** Originalkarte (Standard), Große Karte, Zufallskarte 12 × 18, eigene aus dem
-  Editor. Zufallskarten garantieren je Startplatz **4 Nahrung** (Münzen 2:1) und ein
-  siedelbares Feld in Distanz 3.
-- **1 gegen 1:** zwei frei gewählte Reiche, Zufallskarte **12 × 8**, keine Kartenwahl,
-  Wirtschaftssieg erst über 3/4 (Theologie 7/10, UN 2/3).
+- **Karten:** Originalkarte (Standard), Große Karte, **Plättchenkarte** (Zufallskarte aus
+  Dreiecken, eigene Form je Spielerzahl), Rasterkarte (der alte Generator: 12 × 18, im
+  Duell 12 × 8, garantiert je Startplatz 4 Nahrung und ein siedelbares Feld in Distanz 3),
+  eigene aus dem Editor.
+- **Plättchenkarte + Legephase:** 20 handentworfene Dreiecke zu 15 Feldern (`js/tiles.js`).
+  2 Reiche → Sechseck aus 6 (Mitte bleibt **als Loch offen**), 3 → großes Dreieck aus 9
+  (Loch), 4 → gestrecktes Sechseck aus 10 (lückenlos). Jedes Reich legt sein Startdreieck
+  **verdeckt**: eine von drei Lagen, Hauptstadt frei auf Land (gesperrt nur, was einer
+  fremden Hauptstadt näher als 3 kommen könnte). Bots legen zufällig auf eines der drei
+  mittigen Felder. Danach Aufdecken, dann startet das Spiel.
+- **Spielerzahlen 2, 3 und 4.** „Drei Reiche" ist neu (Standard-Siegschwellen, nicht die
+  des Duells); freie Zivilisationswahl bei 2 und 3.
+- **1 gegen 1:** zwei frei gewählte Reiche, nur Zufallskarten (Plättchen- oder Rasterkarte
+  12 × 8), Wirtschaftssieg erst über 3/4 (Theologie 7/10, UN 2/3).
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
@@ -170,6 +180,21 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Stelle, die Würfe verbraucht, verschiebt sich der ganze Ablauf — dann die Textstellen
   prüfen, die Bot-Verhalten beschreiben, und ggf. eine neue Würfelfolge suchen (in `test.js`
   ist der Ablauf zweimal auf Gleichheit gepinnt).
+
+### Plättchengeometrie (neu in v50)
+
+- **Zeilenversatz:** Jede Form muss in einer **geraden** Zeile beginnen. Bei odd-r-Versatz
+  kippt eine Verschiebung um eine ungerade Zeilenzahl den Versatz und verzerrt die Form.
+  Die Anker in `TILE_SHAPES` sind entsprechend gelegt, ein Test prüft es.
+- **Dreiecke aus 15 Feldern können die Ebene nicht periodisch parkettieren**
+  (15 und 30 sind keine Normen der Form a² + ab + b²). Neue Formen deshalb **nicht**
+  durch Fortsetzen eines Musters erfinden, sondern rechnen lassen: Überlappungen und
+  Innenlücken prüft der Formteil in `test.js` für jede Form automatisch.
+- **Zwei Windräder können sich keine zwei Plättchen teilen** — die Mitte des zweiten läge
+  im Radius des ersten Sechsecks. Deshalb ist die Vierer-Karte ein Streifenverbund und
+  keine „zwei Sechsecke".
+- Wer Plättchen ergänzt: die drei mittigen Felder müssen Land sein **und** je mindestens
+  4 Nahrung bringen (Bots setzen dort). Der Test rechnet es nach und nennt die Spanne.
 
 ## Vollständige Bug-Historie (alle behoben — nicht versehentlich rückgängig machen)
 
@@ -292,6 +317,13 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Entscheidung des Autors steht aus.
 4. **Bot-Siedler** scheitert in späten Runden weiter gelegentlich, obwohl Platz da ist
    (Zufallslauf auf gefüllter Karte).
+5. **Plättchenkarten sind enger als die festen Karten:** 45 Felder je Reich (2 Spieler),
+   45 (3), 37,5 (4) gegen 54 auf der Originalkarte. Die Formen kommen so aus der Vorgabe;
+   ob die Partien dadurch zu gedrängt sind, muss der Autor am Tisch entscheiden. Mehr Luft
+   gäbe es nur über größere Formen (mehr Plättchen) oder Dreiecke mit Seite 6 (21 Felder).
+6. **Bots legen ihr Startdreieck ohne Plan:** Lage zufällig, Hauptstadt zufällig auf einem
+   der drei mittigen Felder. Sie bewerten das Gelände nicht, ein Mensch wählt hier also
+   besser. Absicht (die Vorgabe verlangt genau das), aber ein Balancepunkt.
 
 ## Arbeitsweise, die der Autor schätzt
 

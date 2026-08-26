@@ -1280,3 +1280,118 @@ existiert. Sonst wäre der Zug bei einer eingeschlossenen Insel, ringsum besetzt
 oder aufgebrauchter Bewegung nicht mehr beendbar.
 
 `pendingWarnings` behält nur noch die weichen Hinweise (wartende Gratisarmee).
+
+## Zufallskarten aus Dreiecksplättchen (v50)
+
+Zufallskarten entstehen nicht mehr Feld für Feld, sondern werden aus **Dreiecken zu je 15
+Feldern** zusammengelegt. Der Vorrat in `js/tiles.js` (`TILE_POOL`) hat **20 von Hand
+entworfene Plättchen**; gezogen wird ohne Zurücklegen. Ein Plättchen wird als fünf
+Feldzeilen 5/4/3/2/1 notiert – so sieht es in einem A-Platz in Lage 1 auch auf der Karte aus.
+
+### Geometrie: warum die Formen genau so aussehen
+
+Gerechnet wird in Würfelkoordinaten (`x + y + z = 0`, `z` ist die Zeile). Ein Dreieck ist
+
+* **Typ A**: Feld = `a + (i, j, k)` mit `i+j+k = 4` und `Summe(a) = −4` (Spitze unten),
+* **Typ B**: Feld = `a − (i, j, k)` (Spitze oben).
+
+Beide werden über dasselbe Tripel angesprochen; eine Drehung um 120° ist genau
+`(i,j,k) → (j,k,i)`. Deshalb passt jedes Plättchen in **genau drei Lagen** in denselben
+Platz und wird dabei **nie gespiegelt** – ein Fluss, der entlang einer Kante läuft, bleibt
+ein Fluss entlang einer Kante.
+
+Zwei Rechnungen haben die Formen bestimmt (beide von `test.js` nachgerechnet, nicht
+geschätzt):
+
+* **6 Dreiecke = Sechseck mit Radius 5 ohne das Mittelfeld** (90 = 91 − 1). Die sechs
+  liegen als Windrad um genau ein freies Feld. Das ist kein Schönheitsfehler, sondern
+  zwingend: 6 · 15 ist immer um eins kleiner als das nächste Sechseck.
+  **Das Loch bleibt ein Loch** – dort ist kein Feld, es wird nicht aufgefüllt. Mitten in
+  der Welt liegt also ein unpassierbarer Punkt, um den herum gezogen werden muss und der
+  einer Stadt daneben ein Ertragsfeld nimmt. Das ist so gewollt (Entscheidung des Autors).
+* **9 Dreiecke = großes Dreieck mit Seite 16 ohne das Mittelfeld** (135 = 136 − 1) –
+  das Sechseck plus je ein Dreieck an drei abwechselnden Kanten. Exakt, keine weitere
+  Lücke; das eine Loch sitzt genau dort, wo die drei Reiche aufeinandertreffen.
+
+Für **vier Reiche** war die naheliegende Lesart (zwei Reihen à fünf, also zwei Windräder,
+die sich zwei Plättchen teilen) **geometrisch unmöglich**: die Mitte des zweiten Windrads
+läge im Radius des ersten Sechsecks und wäre dort schon überdeckt, könnte also nicht frei
+bleiben. Gebaut ist deshalb ein **Streifenverbund**: zwei Reihen zu fünf Dreiecken,
+abwechselnd A und B. Der deckt **150 Felder exakt ab – ohne Loch und ohne Überlappung**
+(die Vierer-Karte ist also die einzige ohne Loch),
+Form 10 × 18, und hat trotzdem die verlangte Struktur: zwei mittige Plättchen, acht
+darum herum, die Reiche auf jedem zweiten davon.
+
+Alle drei Formen beginnen in einer **geraden Zeile**. Das ist Pflicht, nicht Zufall: bei
+odd-r-Versatz kippt eine Verschiebung um eine ungerade Zeilenzahl den Zeilenversatz und
+verzerrt die Form. Ein Test prüft es.
+
+### Was offen liegt und was verdeckt ist
+
+* Die Plättchen, die **niemandem gehören**, liegen von Anfang an offen – mit gelosten
+  Lagen, damit die Startaufstellung auch bei denselben Plättchen anders aussieht.
+* Das **eigene Startplättchen** kennt nur, wer es legt. Sichtbar sind während des Legens
+  die offenen Plättchen und das eigene, sonst nichts. Erst wenn alle fertig sind, wird
+  aufgedeckt.
+* **Auslegung:** Das Regelheft dieser Erweiterung gibt es nicht; verlangt war das
+  verdeckte Legen ausdrücklich nur für zwei Reiche. Umgesetzt ist es für **alle**
+  Spielerzahlen – bei drei und vier wäre offenes Legen sonst ein Vorteil für den, der
+  zuletzt legt.
+
+### Hauptstadt „frei\" – mit einer Einschränkung
+
+Gesetzt werden darf auf **jedes Landfeld des eigenen Plättchens**, mit einer Ausnahme:
+Felder, die einem **fremden Startplättchen näher als 3 Felder** kommen könnten, sind
+gesperrt (`PLACE_MIN_GAP = 3` in `js/tiles.js`). Grund: Städte brauchen 3 Felder Abstand,
+beide Seiten legen aber **verdeckt** – ein Verstoß wäre hinterher nicht mehr zu heilen.
+Gesperrt ist damit nur, was auch im schlimmsten Fall zu nah käme, nicht mehr.
+
+Das kostet wenig: bei zwei Reichen 1 Feld von 15 (die innere Spitze), bei vier Reichen 1
+bis 2, bei drei Reichen keines. Die **drei mittigen Felder sind nie gesperrt** – dort
+setzen Bots. Wer den Abstand größer haben will, erhöht `PLACE_MIN_GAP`; mit 4 sind
+Hauptstädte garantiert 6 (2 Reiche) bzw. 4 (4 Reiche) Felder auseinander, es fallen dann
+aber 3 bzw. 5 Felder weg.
+
+### Startgüte statt Startgarantie
+
+Der alte Rasterkartengenerator hat den Startplatz **garantiert** (4 Nahrung, Siedelplatz
+in Reichweite). Auf Plättchenkarten wählt man selbst, also braucht es keine Garantie mehr
+– außer für Bots, die zufällig legen. Deshalb gilt für jedes Plättchen im Vorrat:
+
+* die drei mittigen Felder sind Land,
+* jedes davon bringt im ersten Zug **mindestens 4 Nahrung** (Münzen 2:1).
+
+Das lässt sich beim Entwerfen entscheiden, weil die **sechs Nachbarn eines mittigen Feldes
+sämtlich auf demselben Plättchen liegen** – ein mittiges Feld hat in `(i,j,k)` überall
+Werte ≥ 1. Ein Test rechnet alle 60 Fälle nach; die Spanne liegt bei 4 bis 7 Nahrung
+(Rasterkarte: 4 bis 7, also derselbe Bereich).
+
+### Felder außerhalb der Karte
+
+Plättchenkarten sind nicht rechteckig, die Datenstruktur aber schon. Alles, was nicht zur
+Form gehört, ist das neue Gelände **`X` „Kein Feld\"**: wird nicht gezeichnet, ist nicht
+antippbar, unpassierbar, bringt nichts und taucht in keiner Ertragsübersicht auf.
+`isOff(t)` unterscheidet es vom Vulkan, der ein echtes (nur wertloses) Feld ist.
+
+Im **Karteneditor** wird `X` blass und gestrichelt gezeichnet und bleibt antippbar –
+sonst ließe sich ein versehentlich gesetztes „Kein Feld\" nicht zurücknehmen. Damit lassen
+sich auch eigene Karten mit beliebigem Umriss bauen.
+
+### Drei Reiche
+
+Bisher gab es „Vier Reiche\" und „1 gegen 1\". Für die Dreiecksform mit neun Plättchen
+brauchte es einen **Drei-Reiche-Modus**: drei Plätze mit freier Zivilisationswahl wie im
+Duell. Siegschwellen sind die **Standardschwellen** (2/3), nicht die des Duells – die
+höhere Duellschwelle hängt daran, dass es dort nur einen Gegner gibt.
+
+Die festen Karten (Original, Große Karte) stehen für drei Reiche weiter zur Wahl; der
+vierte Startstern bleibt dann einfach unbenutzt.
+
+### Kartenmenü nach Spielerzahl
+
+Das Kartenmenü hängt jetzt an der Spielerzahl: die Plättchenkarte hat für 2, 3 und 4
+Reiche eine eigene Form, die festen Karten haben vier Startsterne und passen nicht ins
+Duell. Die alten Rastergeneratoren bleiben als **„Rasterkarte\"** erhalten (12 × 8 im
+Duell, 12 × 18 sonst) – wer die Legephase nicht will, hat damit weiter eine Zufallskarte
+in einem Zug. Die zuletzt bewusst gewählte Karte wird gemerkt (`setupMapWanted`), damit
+ein Ausflug in den Duellmodus die Wahl nicht still umstellt.
