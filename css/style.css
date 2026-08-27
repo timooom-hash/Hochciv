@@ -230,16 +230,22 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 .tech.avail.costly .eff{opacity:.75}
 .tech.avail.costly .c{color:var(--red);font-weight:700}
 .tech.locked{opacity:.32;cursor:default}
-.owner-marks{display:flex;gap:3px;margin-top:5px;flex-wrap:wrap;align-items:center}
-.owner-mark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
-  font-size:11px;line-height:1;border-radius:50%;background:rgba(255,255,255,.55)}
-.owner-mark.self{outline:2px solid var(--ink);outline-offset:1px;font-weight:700;background:#fff}
-/* „Hat es" gegen „könnte es erforschen": beide umkringelt, aber durchgezogen und satt
-   gegen gestrichelt und blass – dasselbe Muster wie bezahlbar/zu teuer im Techbogen.
-   Eine Möglichkeit soll nicht aussehen wie eine Tatsache. */
-.owner-mark{border:1px solid currentColor;border-radius:50%;background:var(--paper);
-  font-weight:700}
-.owner-mark.can{opacity:.45;border-style:dashed;background:none;font-weight:400}
+.owner-marks{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;align-items:center}
+/* „Hat sie erforscht" gegen „könnte sie erforschen": voll gegen leer. Farbe und Symbol
+   sind bei gleicher Zivilisation identisch, also muss der Unterschied in der Füllung
+   liegen – die trägt auch bei 17 px und in Graustufen. Eine Möglichkeit soll nicht
+   aussehen wie eine Tatsache. */
+.owner-mark{display:inline-flex;align-items:center;justify-content:center;position:relative;
+  width:17px;height:17px;font-size:11px;line-height:1;border-radius:50%;
+  border:1.5px solid currentColor;font-weight:700}
+.owner-mark.has{box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.owner-mark.can{background:var(--paper);border-style:dashed;font-weight:400;opacity:.85}
+/* kleines Fragezeichen an der Möglichkeit – zweiter Unterschied neben der Füllung */
+.owner-mark.can i{position:absolute;right:-3px;bottom:-4px;font-style:normal;font-size:8px;
+  font-weight:700;line-height:1;background:var(--paper);border-radius:50%;padding:0 1px}
+.owner-mark.self{outline:2px solid var(--ink);outline-offset:1.5px}
+.owner-legend{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.owner-legend span{margin-right:8px}
 .age-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--ink-soft);margin:10px 0 4px;grid-column:1/-1;border-top:1px solid var(--rule);padding-top:6px}
 
