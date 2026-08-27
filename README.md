@@ -75,6 +75,19 @@ Im Aufbaubildschirm unter **Regeln** wählbar:
 Der gewählte Modus steht während des Spiels im Rundentitel und wird im Spielstand
 gespeichert.
 
+## Sprache
+
+Im Hauptmenü schalten zwei Flaggen zwischen **Deutsch** (Vorgabe) und **Englisch** um; die
+Wahl bleibt gespeichert. Englisch ist vollständig für Menü, Aufbau, Kopfzeile,
+Aktionsleiste, Legephase und alle Spielinhalte (Technologien, Ereignisse, Weltwunder,
+Fähigkeiten, Gelände, Plättchen). Noch deutsch sind Protokollmeldungen, der Regelbogen,
+die Blätter und das Tutorial – `node smoke.js` zählt die Reste und lässt die Zahl nicht
+steigen.
+
+Neue Texte übersetzen: Spielinhalte in `DATA_EN` (`js/i18n.js`), Oberflächensätze mit
+`T('deutscher Satz')` und einem Eintrag in `UI_EN`. Fehlt einer, erscheint der deutsche
+Satz und `missingStrings()` nennt ihn.
+
 ## Karten
 
 Im Aufbaubildschirm stehen zwei feste Karten zur Wahl: die **Originalkarte** (12 × 18, aus
@@ -92,7 +105,7 @@ gezogen und zu einer Form zusammengelegt:
 |---|---|---|
 | 2 | Sechseck aus 6 Dreiecken, 4 offen, 2 verdeckt | 11 × 11, 90 Felder |
 | 3 | großes Dreieck aus 9 Dreiecken, 6 offen | 16 × 16, 135 Felder |
-| 4 | gestrecktes Sechseck aus 10 Dreiecken, 6 offen | 10 × 18, 150 Felder |
+| 4 | gestrecktes Sechseck aus 10 Dreiecken, 6 offen (Startplätze: die zwei oberen und die zwei unteren) | 10 × 18, 150 Felder |
 
 Bei zwei und drei Reichen bleibt **genau in der Mitte ein Feld frei** – dort ist kein
 Feld, da führt kein Weg durch. Das ist rechnerisch unvermeidlich (6 · 15 = 91 − 1) und

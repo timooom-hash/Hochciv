@@ -1717,3 +1717,74 @@ farbigem Symbol, gestricheltem Rand und einem kleinen Fragezeichen. Voll gegen l
 auch bei 17 px und in Graustufen; das Fragezeichen ist der zweite, von der Farbe
 unabhängige Unterschied. Dazu zeigt die Legende beide Marken jetzt **als Beispiel**
 nebeneinander, statt sie zu beschreiben.
+
+## Startplätze der Viererkarte verlegt (v51)
+
+Bisher saßen die vier Reiche auf **jedem zweiten** der acht äußeren Plättchen des
+Streifenverbunds. Auf Wunsch des Autors sind es jetzt die **beiden oberen und die beiden
+unteren** Dreiecke – also die vier, deren Fünferzeile auf der Ober- bzw. Unterkante der
+Form liegt (Plätze 1, 3, 6, 8). Genau diese vier liegen so; die übrigen sechs stoßen mit
+ihrer breiten Seite an die Mittellinie und ragen nur mit einer Spitze an den Rand.
+
+Zwei Folgen, gemessen an 300 Karten mit Bot-Platzierung:
+
+| | alte Plätze (Ring) | neue Plätze (oben/unten) |
+|---|---|---|
+| Hauptstadtabstand Median | 9 | **7** |
+| kleinster gemessener Abstand | 5 | 5 |
+| garantierter Mindestabstand | 3 | 3 |
+| erlaubte Hauptstadtfelder je Plättchen | 13–14 von 15 | **11 von 15** |
+
+Die Startplätze liegen also **enger zusammen**: die Spitzen von 1 und 6 (links) sowie von
+3 und 8 (rechts) berühren sich, dadurch sperrt die Abstandsregel je vier Felder statt
+einem oder zwei. Der garantierte Mindestabstand von 3 Feldern bleibt, die drei mittigen
+Felder bleiben überall erlaubt (dort setzen Bots). Wer wieder mehr Luft will, ändert
+`seatSets` in `TILE_SHAPES[4]` – der Test prüft die Regel, nicht die Zahlen.
+
+## Zwei Sprachen: Deutsch und Englisch (v52)
+
+Im Hauptmenü stehen zwei Flaggen; die Wahl wird gespeichert (`hochciv.lang`), **Deutsch
+bleibt die Vorgabe**. Deutsch ist auch die Quelle: englische Texte kommen auf zwei Wegen
+dazu, beide in `js/i18n.js`.
+
+**1. Datentexte** (`DATA_EN`) – Gelände, alle 66 Technologien samt Singularität, alle 18
+Weltwunder, alle 18 Ereignisse, die vier Zivilisationen mit je drei Fähigkeiten,
+Zeitalter, Technologiefelder, Schwierigkeitsgrade, Ereignisstärken, Kartennamen, die 20
+Plättchennamen und die drei Kartenformen. Beim Wechsel werden die Felder `n` und `e` der
+Spielobjekte ausgetauscht – **kein Aufrufer muss davon wissen**, und `node test.js` prüft,
+dass für jeden Schlüssel eine englische Fassung existiert (134 Einträge, keine Lücke).
+
+**2. Oberflächentexte** (`UI_EN`) laufen durch `T()`. **Schlüssel ist der deutsche Satz**,
+Platzhalter sind `%s`. Das hat zwei Vorteile: der Code bleibt lesbar (kein
+`t('setup.map.label')`), und eine fehlende Übersetzung fällt nicht aus, sondern zeigt den
+deutschen Satz und landet in `missingStrings()`.
+
+Der **feste Text aus `index.html`** wird beim Start einmal als Textknoten eingesammelt und
+beim Wechsel neu gesetzt (`collectStatic`/`applyStaticLang`). Damit ist das ganze Markup
+mit einer Handvoll Zeilen erfasst, statt 50 Elemente einzeln mit Schlüsseln zu versehen.
+
+### Was fertig ist und was nicht
+
+**Vollständig englisch:** Menü, Aufbau (inklusive der dynamisch gezeichneten Reichs-Karten),
+Kopfzeile, Aktionsleiste, Legephase, Editor-Werkzeugleiste, sämtliche Datentexte – also
+Technologienamen und -wirkungen, Ereignisse, Weltwunder, Fähigkeiten, Gelände.
+
+**Noch deutsch:** die Sätze, die im Code zusammengebaut werden – **Protokoll** (~76
+Meldungen), **Regelbogen** (18), **Editor-Hinweise** (18), **Blätter** für Stadt, Armee und
+Welt (20) sowie das **Tutorial** (29 Schritte, rund 23 000 Zeichen). Gemessen: 122
+Textstellen im englischen Modus.
+
+Das ist ausdrücklich ein Zwischenstand, kein verstecktes Loch: `node smoke.js` läuft die
+Bildschirme im englischen Modus ab, zählt die deutschen Reste und **schlägt Alarm, wenn
+die Zahl über 150 steigt** – neue Texte brauchen also eine Übersetzung, und die
+verbleibenden 122 sind eine Liste, die man abarbeiten kann. Die Maschinerie dafür steht;
+was fehlt, ist Fleißarbeit an rund 160 Sätzen, vor allem im Tutorial.
+
+### Warum nicht alles auf einmal
+
+Die Datentexte waren billig: eine Tabelle, kein Eingriff im Code. Die Codesätze sind teuer,
+weil jeder einzeln umgebaut werden muss (`\`${civ.n} erforscht ${t.n}\`` →
+`T('%s erforscht %s', civ.n, t.n)`). Bei rund 160 solchen Stellen, davon viele im
+Tutorial-Prosatext, wäre das Ergebnis in einem Durchgang schlechter als in zwei: entweder
+hastige Übersetzungen oder ein halb umgebauter Code, in dem man nicht mehr sieht, was schon
+läuft. Deshalb erst die Maschinerie samt Messung, dann die Fleißarbeit.

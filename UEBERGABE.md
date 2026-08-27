@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 26.8., `sw.js` v51)
+# Hochzeivilization — Projekt-Übergabe (Stand 27.8., `sw.js` v52)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -28,16 +28,17 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
+| `js/i18n.js` | 353 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `js/data.js` | 349 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
-| `js/tiles.js` | 265 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
+| `js/tiles.js` | 267 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
 | `js/engine.js` | 1512 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 515 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1631 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 1688 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 911 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 3646 | **1067 Assertions**, `node test.js` |
-| `smoke.js` | 1675 | **85 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 3714 | **1090 Assertions**, `node test.js` |
+| `smoke.js` | 1759 | **88 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 34 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 30 / 210 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` erzeugen (reportlab) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
@@ -78,12 +79,20 @@ Gedächtnis rekonstruieren.
   Rastergenerator (12 × 18 bzw. 12 × 8) ist in v51 **ersatzlos entfallen**, samt
   `randomMap`, `duelMap`, `makeRandomMap`, `MAP_MIX`, `RANDOM_CAPITALS`, `startFood`,
   `startSpots`, `carveSpot`, `boostFood`. Geblieben ist aus dem Block nur `mapRng`.
+- **Startplätze der Viererkarte (v51):** die **beiden oberen und die beiden unteren**
+  Dreiecke (Plätze 1, 3, 6, 8 – die einzigen, deren Fünferzeile auf der Ober- oder
+  Unterkante liegt), nicht mehr jedes zweite des äußeren Rings. Dadurch liegen die Starts
+  enger: Hauptstadtabstand im Median 7 statt 9, erlaubte Felder 11 statt 13–14 von 15.
 - **Plättchenkarte + Legephase:** 20 handentworfene Dreiecke zu 15 Feldern (`js/tiles.js`).
   2 Reiche → Sechseck aus 6 (Mitte bleibt **als Loch offen**), 3 → großes Dreieck aus 9
   (Loch), 4 → gestrecktes Sechseck aus 10 (lückenlos). Jedes Reich legt sein Startdreieck
   **verdeckt**: eine von drei Lagen, Hauptstadt frei auf Land (gesperrt nur, was einer
   fremden Hauptstadt näher als 3 kommen könnte). Bots legen zufällig auf eines der drei
   mittigen Felder. Danach Aufdecken, dann startet das Spiel.
+- **Sprachen (v52):** zwei Flaggen im Menü, Deutsch ist Vorgabe und Quelle. Datentexte über
+  `DATA_EN` (Tabelle, kein Eingriff im Code), Oberflächensätze über `T('deutscher Satz')`
+  mit `UI_EN`. **Noch deutsch:** Protokoll, Regelbogen, Blätter, Editor-Hinweise, Tutorial –
+  122 Textstellen, von `smoke.js` gezählt und nach oben begrenzt. Details in `ANNAHMEN.md`.
 - **Aufbau (v51):** Zivilisation, Fähigkeit und Startspieler lassen sich **auslosen**
   („Zufall", aufgelöst erst beim Start in `resolveRandom`); bei mehr als einem Menschen ist
   der zufällige Startspieler die Vorgabe. Doppelgänger bekommen **je eine der vier

@@ -22,7 +22,7 @@ const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 // Im Browser teilen sich <script>-Tags den globalen Gültigkeitsbereich; eval nicht.
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
-const src = ['js/data.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
+const src = ['js/data.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
   + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
@@ -609,11 +609,19 @@ step('Karteneditor', () => {
 
 /* ================================================ Die sieben Designänderungen
    Frisches Spiel: die Läufe davor enden im Siegbildschirm oder bei einem Bot. */
+/* Ein frisches Spiel für die folgenden Prüfungen: vier Reiche, Originalkarte, Platz 1
+   Mensch. Modus und Karte werden ausdrücklich gesetzt – vorherige Schritte hinterlassen
+   ihre Wahl, und mit der Plättchenkarte käme statt eines Spiels die Legephase. */
 const frischesSpiel = () => {
   $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
   [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  $('setup-start').value = '0'; $('setup-start').onchange();
   $('setup-go').onclick();
   const S = G('S');
+  if (!$('screen-game').classList.contains('show')) throw new Error('kein Spielbildschirm');
   if (S.over) throw new Error('frisches Spiel ist schon entschieden');
   if (G('P')(S).kind === 'bot') throw new Error('frisches Spiel beginnt mit einem Bot');
 };
@@ -1531,6 +1539,7 @@ step('Zwei gleiche Reiche spielen auf der Plättchenkarte', () => {
   console.log('       ' + S.players.map(p => G('civOf')(p).n).join(' · '));
 });
 step('Zufall als Zivilisation, Fähigkeit und Startspieler', () => {
+  G('__set')('startWanted', null);      // ohne bewusste Wahl gilt die Vorgabe
   $('m-new').onclick();
   $('setup-mode').querySelector('[data-mode=vier]').onclick();
   $('setup-map').value = 'plaettchen'; $('setup-map').onchange();
@@ -1592,10 +1601,14 @@ step('Doppelte Zivilisation bekommt eine andere Zivilisationsfarbe, keine Schatt
 step('Technologiebogen: „hat sie" und „könnte sie" sind zu unterscheiden', () => {
   frischesSpiel();
   const S = G('S');
-  // zwei Menschen, damit die Möglichkeit-Marken überhaupt gezeigt werden
-  S.players[1].kind = 'human';
-  S.players[1].techs.rad = true;
-  S.players[1].avail.schrift = true;
+  // Ein zweiter Mensch, damit die Möglichkeit-Marken überhaupt gezeigt werden – und zwar
+  // einer, der noch Bot ist (die Reihenfolge im Spiel folgt der Zugfolge, nicht dem Aufbau)
+  const zweiter = S.players.findIndex(p => p.kind === 'bot');
+  if (zweiter < 0) throw new Error('kein Bot zum Umstellen');
+  S.players[zweiter].kind = 'human';
+  S.players[zweiter].techs.rad = true;
+  S.players[zweiter].avail.schrift = true;
+  if (G('humanCount')(S) !== 2) throw new Error('nicht zwei Menschen im Spiel');
   G('techModal')();
   const hat = $('ov-body').querySelectorAll('.owner-mark.has');
   const kann = $('ov-body').querySelectorAll('.owner-mark.can');
@@ -1610,6 +1623,77 @@ step('Technologiebogen: „hat sie" und „könnte sie" sind zu unterscheiden', 
   if (!$('ov-body').querySelector('.owner-legend')) throw new Error('keine Legende mit Beispielmarken');
   console.log(`       ${hat.length} × hat, ${kann.length} × könnte, Legende vorhanden`);
   G('closeModal')();
+});
+step('Sprachwechsel im Menü: zwei Flaggen, Deutsch als Vorgabe', () => {
+  G('show')('screen-menu');
+  const flaggen = [...$('m-lang').querySelectorAll('[data-lang]')];
+  if (flaggen.length !== 2) throw new Error(flaggen.length + ' Flaggen statt zwei');
+  if (flaggen[0].dataset.lang !== 'de' || !flaggen[0].classList.contains('on'))
+    throw new Error('Deutsch ist nicht die Vorgabe');
+  const deutsch = $('m-new').textContent;
+  flaggen[1].onclick();                       // auf Englisch
+  if (G('LANG') !== 'en') throw new Error('Sprache nicht gewechselt');
+  if ($('m-new').textContent === deutsch) throw new Error('Menütext unverändert');
+  if ($('m-new').textContent !== 'New game') throw new Error('Menü: ' + $('m-new').textContent);
+  if (window.document.documentElement.lang !== 'en') throw new Error('lang-Attribut nicht gesetzt');
+  if (!$('m-lang').querySelector('[data-lang=en]').classList.contains('on'))
+    throw new Error('die englische Flagge ist nicht hervorgehoben');
+  // Spielobjekte tragen jetzt englische Namen
+  if (G('TECH_BY_KEY').schrift.n !== 'Writing') throw new Error('Technologien nicht übersetzt');
+  if (G('TERRAIN').G.name !== 'Grassland') throw new Error('Gelände nicht übersetzt');
+  console.log('       ' + [...$('#screen-menu') ? [] : []].concat(
+    [...window.document.querySelectorAll('#screen-menu .menu-actions button')]
+      .map(b => b.textContent.trim())).join(' · '));
+});
+step('Englischer Aufbau und englische Partie', () => {
+  $('m-new').onclick();
+  const texte = [...window.document.querySelectorAll('#screen-setup label span')].map(e => e.textContent.trim());
+  if (!texte.includes('Map')) throw new Error('Aufbau nicht übersetzt: ' + texte.join(','));
+  if (![...$('setup-list').children[0].querySelectorAll('[data-kind]')].some(b => b.textContent === 'Human'))
+    throw new Error('Mensch/Bot nicht übersetzt');
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  $('setup-go').onclick();
+  const S = G('S');
+  if (!S || S.over) throw new Error('kein englisches Spiel gestartet');
+  if (!/^Round 1/.test($('hud-round').textContent))
+    throw new Error('Kopfzeile: ' + $('hud-round').textContent);
+  G('techModal')();
+  const kacheln = [...$('ov-body').querySelectorAll('.tech b')].map(b => b.textContent);
+  if (!kacheln.includes('Writing')) throw new Error('Technologiebogen nicht übersetzt');
+  const theo = [...$('ov-body').querySelectorAll('.tech')].find(b => /Theology/.test(b.textContent));
+  if (theo && !/of the population/.test(theo.textContent))
+    throw new Error('Wirkungstext nicht übersetzt: ' + theo.textContent);
+  G('closeModal')();
+  console.log('       ' + kacheln.slice(0, 6).join(' · '));
+});
+step('Deutsche Reste im englischen Modus zählen (Ratsche)', () => {
+  // Was noch nicht übersetzt ist, soll sichtbar bleiben statt sich zu verstecken.
+  // Die Zahl darf sinken, aber nicht steigen.
+  const DE = /[äöüßÄÖÜ]|\b(der|die|das|und|nicht|kein|keine|eine|einen|mit|für|von|zum|zur|auf|Stadt|Armee|Runde|Zug|Feld|Karte|Reich|Bevölkerung|Nahrung|Münzen|Wissenschaft|Macht|wird|werden|schon|noch|dein|deine)\b/;
+  const rest = new Set();
+  const sammle = () => {
+    const w = window.document.createTreeWalker(window.document.body, 4);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const t = (n.nodeValue || '').trim().replace(/\s+/g, ' ');
+      if (t.length >= 3 && DE.test(t)) rest.add(t.slice(0, 60));
+    }
+  };
+  sammle();
+  G('techModal')(); sammle(); G('closeModal')();
+  $('a-army').onclick(); sammle(); G('closeSheet')();
+  $('a-info').onclick(); sammle(); G('closeModal')();
+  $('a-log').onclick(); sammle(); G('closeSheet')();
+  G('rulesModal')(); sammle(); G('closeModal')();
+  const OBERGRENZE = 150;
+  if (rest.size > OBERGRENZE)
+    throw new Error(`${rest.size} deutsche Textstellen (Grenze ${OBERGRENZE}) – neue Texte brauchen eine Übersetzung`);
+  console.log(`       noch deutsch: ${rest.size} Textstellen (Grenze ${OBERGRENZE}) – ` +
+    'Protokoll, Regelbogen, Blätter und Tutorial fehlen noch');
+  // zurück auf Deutsch für die folgenden Schritte
+  G('switchLang')('de');
+  if (G('LANG') !== 'de') throw new Error('Rückschalten fehlgeschlagen');
+  if ($('m-new').textContent !== 'Neues Spiel') throw new Error('Menü nicht wieder deutsch');
 });
 step('Drei Reiche im Aufbau', () => {
   $('m-new').onclick();

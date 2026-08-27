@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
+for (const f of ['js/data.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -3149,16 +3149,23 @@ function tutRun() {
       eq(naeher >= 3, true, `${n}P: zwei Hauptstädte können nie näher als 3 Felder liegen (${naeher})`);
     });
   }
-  // Vier Reiche: die Sitze lassen im Ring der acht äußeren Plättchen je einen frei
+  // Vier Reiche: die Sitze sind die beiden oberen und die beiden unteren Dreiecke,
+  // also die, deren Fünferzeile auf der Ober- bzw. Unterkante der Form liegt.
   {
     const sh = TILE_SHAPES[4];
-    const mitte = [2, 7];                       // die beiden mittigen Plättchen
-    const ring = [9, 8, 6, 5, 0, 1, 3, 4];      // Reihenfolge rundherum
     const set = sh.seatSets[0];
-    eq(set.some(i => mitte.includes(i)), false, 'kein Reich sitzt auf einem mittigen Plättchen');
-    const pos = set.map(i => ring.indexOf(i)).sort((a, b) => a - b);
-    eq(pos.map(p => p % 2).every(x => x === pos[0] % 2), true,
-      'die Reiche sitzen auf jedem zweiten Plättchen des Rings');
+    const zeilen = sh.slots.map(sl => slotCells(sl).map(c => cubeToRC(c)[0]));
+    const oben = Math.min(...zeilen.flat()), unten = Math.max(...zeilen.flat());
+    const kante = i => {
+      const z = zeilen[i];
+      const anOben = z.filter(r => r === oben).length, anUnten = z.filter(r => r === unten).length;
+      return anOben === TILE_SIDE ? 'oben' : anUnten === TILE_SIDE ? 'unten' : null;
+    };
+    eq(set.map(kante).sort(), ['oben', 'oben', 'unten', 'unten'],
+      'je zwei Startplättchen liegen mit ihrer breiten Seite oben und unten');
+    eq(sh.slots.map((_, i) => i).filter(i => kante(i)).sort(), set.slice().sort(),
+      'und es sind genau diese vier – keine anderen liegen so');
+    eq(set.includes(2) || set.includes(7), false, 'die beiden mittigen Plättchen bleiben offen');
   }
 
   // --- Plan, Legen, Karte
@@ -3639,6 +3646,67 @@ function tutRun() {
   const pT = { civ: 'england', techs: { theologie: true }, kind: 'human', ability: 'basis' };
   eq(victoryOption(D, pT).label, '7/10', 'Rechnung und Anzeige nennen dieselbe Schwelle');
   eq(victoryOption(N, pT).label, '3/5', 'auch im normalen Spiel');
+}
+
+/* ============================================================ Sprachen (i18n)
+   Deutsch ist die Quelle, Englisch kommt aus DATA_EN (Spielobjekte) und UI_EN
+   (Oberflächensätze, Schlüssel ist der deutsche Satz).                             */
+{
+  eq(LANG, 'de', 'Deutsch ist die Vorgabe');
+  eq(LANGS.map(l => l.k), ['de', 'en'], 'zwei Sprachen');
+  // Datentabellen vollständig? Sonst stünde im englischen Spiel deutscher Text.
+  const luecken = [];
+  TECHS.forEach(t => { if (!DATA_EN.tech[t.k]) luecken.push('tech ' + t.k); });
+  if (!DATA_EN.tech.singularitaet) luecken.push('tech singularitaet');
+  WONDERS.forEach(w => { if (!DATA_EN.wonder[w.k]) luecken.push('wonder ' + w.k); });
+  Object.values(EVENT_BY_KEY).forEach(e => { if (!DATA_EN.event[e.k]) luecken.push('event ' + e.k); });
+  Object.values(TERRAIN).forEach(t => { if (!DATA_EN.terrain[t.key]) luecken.push('terrain ' + t.key); });
+  DIFFICULTIES.forEach(d => { if (!DATA_EN.diff[d.k]) luecken.push('diff ' + d.k); });
+  EVENT_MODES.forEach(m => { if (!DATA_EN.evmode[m.k]) luecken.push('evmode ' + m.k); });
+  CIVS.forEach(c => {
+    if (!DATA_EN.civ[c.k]) luecken.push('civ ' + c.k);
+    c.abilities.forEach(a => { if (!(DATA_EN.abil[c.k] || {})[a.k]) luecken.push('abil ' + c.k + '/' + a.k); });
+  });
+  TILE_POOL.forEach(t => { if (!DATA_EN.tile[t.de || t.n]) luecken.push('tile ' + t.n); });
+  eq(luecken, [], `alle ${TECHS.length + WONDERS.length + 18 + 12 + TILE_POOL.length} Datentexte haben eine englische Fassung`);
+  eq(DATA_EN.ages.length, AGES.length, 'Zeitalter übersetzt');
+  eq(DATA_EN.fields.length, FIELDS.length, 'Technologiefelder übersetzt');
+  eq(DATA_EN.maps.length, MAPS.length, 'Kartennamen übersetzt');
+
+  // Umschalten und zurück
+  setLang('en', { quiet: true });
+  eq([TECH_BY_KEY.schrift.n, TECH_BY_KEY.schrift.e], ['Writing', 'City: +1 science'],
+    'Technologien wechseln Name und Wirkung');
+  eq(TERRAIN.G.name, 'Grassland', 'Gelände wechselt');
+  eq([CIVS[0].n, CIVS[0].abilities[0].n], ['Greece', 'Cheap research'], 'Zivilisation und Fähigkeit wechseln');
+  eq(WONDER_BY_KEY.mauer.n, 'The Great Wall', 'Weltwunder wechseln');
+  eq(EVENT_BY_KEY.pest.n, 'The Plague', 'Ereignisse wechseln');
+  eq(AGES[0], 'Antiquity', 'Zeitalter wechseln');
+  eq(TILE_POOL[0].n, 'Open Plain', 'Plättchennamen wechseln');
+  eq(TILE_SHAPES[2].name, 'Tile map (6 triangles)', 'Kartenformen wechseln');
+  // techEffect rechnet weiter mit den Duellschwellen, jetzt auf Englisch
+  eq(techEffect(TECH_BY_KEY.theologie, { duel: true }), '>7/10 of the population to win',
+    'Duellschwellen auch auf Englisch');
+  // T(): Übersetzung, Platzhalter, Rückfall auf Deutsch
+  eq(T('Neues Spiel'), 'New game', 'Oberflächensatz wird übersetzt');
+  eq(T('Runde %s · Bevölkerung %s/%s (%s %)', 3, 4, 12, 33),
+    'Round 3 · Population 4/12 (33 %)', 'Platzhalter werden der Reihe nach ersetzt');
+  clearMissing();
+  eq(T('Ein Satz, den es nicht gibt'), 'Ein Satz, den es nicht gibt',
+    'ohne Übersetzung bleibt der deutsche Satz stehen');
+  eq(missingStrings(), ['Ein Satz, den es nicht gibt'], 'und die Lücke wird gemeldet');
+  clearMissing();
+  // Regeln bleiben von der Sprache unberührt
+  {
+    const S = newGame({ seed: 4, players: CIVS.map(c => ({ civ: c.k, kind: 'bot' })) });
+    eq(S.cities.length, 4, 'ein englisches Spiel startet genauso');
+    let guard = 0;
+    while (!S.over && guard++ < 400) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+    eq(!!S.over, true, 'und läuft genauso durch');
+  }
+  setLang('de', { quiet: true });
+  eq([TECH_BY_KEY.schrift.n, TERRAIN.G.name, AGES[0], TILE_POOL[0].n],
+    ['Schrift', 'Grasland', 'Antike', 'Weite Ebene'], 'zurück auf Deutsch stimmt alles wieder');
 }
 
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
