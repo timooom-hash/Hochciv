@@ -1812,3 +1812,28 @@ einem Durchgang übersetzen, statt ihn zwischen Umbauarbeiten zu zerhacken. Die 
 ist bewusst frei, wo eine wörtliche schief klänge („Merke" → „Remember", „Und die
 Faustregel" → „And the rule of thumb"); Zahlen, Auszeichnungen und die HTML-Struktur sind
 identisch geblieben, damit die Rechenbeispiele weiter zum Spielstand passen.
+
+## Fehler: Tutorial hing auf Englisch bei Schritt 4 (v52)
+
+**Gemeldet:** „Im Tutorial bleibt das Spiel auf 4/29 stecken, man kann nicht auf dem
+goldenen Feld siedeln."
+
+**Ursache:** Das Tutorial hält jeden Schritt auf Schienen, indem es die Knöpfe im
+Aktionsblatt nach ihrer **Beschriftung** filtert – notiert als deutsche Ausdrücke
+(`labels: [/Stadt gründen/]`). Seit der Übersetzung trägt der Knopf aber den Text der
+gewählten Sprache. Auf Englisch heißt er „Found city", der Ausdruck passt nicht, und
+`tutGateSheet` schaltet ihn ab. Das Blatt ging auf, der Knopf war grau, das Tutorial kam
+nicht weiter – und weil die ersten drei Schritte reine Lesetexte sind, war Schritt 4 genau
+die erste Stelle, an der es auffiel.
+
+**Behoben:** Jeder Knopf im Aktionsblatt trägt jetzt seinen **deutschen Schlüssel** als
+`data-label`; `btn()` übersetzt die Anzeige selbst. Das Tutorial prüft `data-label` statt
+der sichtbaren Beschriftung – die Schienen sind damit sprachunabhängig, und die Texte in
+`TUT_STEPS` bleiben so notiert, wie sie geschrieben wurden. Dasselbe gilt für die Knöpfe
+im Machtblatt und die Zeilen im Armeeblatt.
+
+**Warum es niemand gemerkt hat:** Der bestehende Smoke-Schritt „in jedem Schritt ist nur
+das Vorgesehene anklickbar" lief nur auf Deutsch, und dort stimmten Beschriftung und
+Schlüssel überein. Jetzt gibt es einen Schritt, der **Schritt 4 in beiden Sprachen löst**
+(Feld antippen, gründen, weiterschalten) – und einen Durchlauf über alle 29 Schritte in
+beiden Sprachen habe ich beim Beheben gefahren.

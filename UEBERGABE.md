@@ -94,7 +94,9 @@ Gedächtnis rekonstruieren.
   mit `UI_EN` (470 Einträge). Übersetzt sind Menü, Aufbau, alle Blätter, Technologiebogen,
   Protokoll, Spielende, Regelbogen, Editor und das **komplette Tutorial** (470 Einträge).
   `smoke.js` läuft die Oberfläche auf Englisch ab, Grenze für deutsche Reste: 2.
-  **Achtung:** `TUT_STEPS` wird beim Laden gebaut – Titel und Aufgaben dort erst beim
+  **Achtung:** Das Tutorial filtert Knöpfe nach `data-label` (deutscher Schlüssel), nicht
+  nach der sichtbaren Beschriftung – wer `btn()` umbaut, muss das mitnehmen, sonst hängt
+  das Tutorial in der Fremdsprache. `TUT_STEPS` wird beim Laden gebaut – Titel und Aufgaben dort erst beim
   Anzeigen übersetzen (`T(st.t)`), sonst frieren sie auf Deutsch ein. Alte Protokollzeilen
   behalten ihre Sprache (das Protokoll speichert Sätze, keine Schlüssel).
 - **Aufbau (v51):** Zivilisation, Fähigkeit und Startspieler lassen sich **auslosen**

@@ -1697,7 +1697,7 @@ step('Deutsche Reste im englischen Modus zählen (Ratsche)', () => {
         // Protokollzeilen, die vor dem Sprachwechsel geschrieben wurden, bleiben in der
         // Sprache von damals – das Protokoll ist ein Mitschrieb, kein Anzeigetext.
         // Neue Zeilen kommen in der neuen Sprache; geprüft wird das im Schritt davor.
-        if (n.parentElement && n.parentElement.closest('.logline, #logbox')) continue;
+        if (n.parentElement && n.parentElement.closest('.logline, .lsum, .rolls, #logbox')) continue;
         rest.add(t.slice(0, 60));
       }
     });
@@ -1720,6 +1720,42 @@ step('Deutsche Reste im englischen Modus zählen (Ratsche)', () => {
   G('switchLang')('de');
   if (G('LANG') !== 'de') throw new Error('Rückschalten fehlgeschlagen');
   if ($('m-new').textContent !== 'Neues Spiel') throw new Error('Menü nicht wieder deutsch');
+});
+step('Tutorial: die ersten Aufgaben lassen sich auch auf Englisch lösen', () => {
+  // Gemeldeter Fehler: auf Englisch war „Stadt gründen" gesperrt und das Tutorial hing
+  // bei 4/29. Ursache: das Tutorial prüft Beschriftungen mit deutschen Ausdrücken, die
+  // Knöpfe trugen aber den übersetzten Text. Jetzt zählt data-label (deutscher Schlüssel).
+  const teste = sprache => {
+    G('switchLang')(sprache);
+    G('tutorialStart')();
+    for (let i = 0; i < 3; i++) G('tutMove')(1);          // drei Lesetexte
+    if (G('ui').tut.i !== 3) throw new Error(sprache + ': nicht bei Schritt 4');
+    const ziel = G('tutStep')().allow.hex()[0];
+    G('closeSheet')();                       // ein Blatt aus einem früheren Schritt weg
+    if ($('sheet').classList.contains('open'))
+      throw new Error(sprache + ': altes Blatt lässt sich nicht schließen (botLock?)');
+    G('tapHex')(ziel[0], ziel[1]);
+    if (!$('sheet').classList.contains('open'))
+      throw new Error(sprache + ': Blatt öffnet nicht · Spieler ' +
+        G('P')(G('S')).kind + ' · over ' + !!G('S').over);
+    const knopf = [...$('sheet-body').querySelectorAll('.opt')]
+      .find(b => b.dataset.label === 'Stadt gründen');
+    if (!knopf) throw new Error(sprache + ': kein Gründen-Knopf mit deutschem Schlüssel');
+    if (knopf.disabled) throw new Error(sprache + ': Gründen ist gesperrt');
+    const vorher = G('S').cities.length;
+    knopf.onclick();
+    if (G('S').cities.length !== vorher + 1) throw new Error(sprache + ': keine Stadt gegründet');
+    const neu = G('cityAt')(G('S'), ziel[0], ziel[1]);
+    if (!neu || neu.owner !== G('RU')()) throw new Error(sprache + ': Stadt nicht auf dem goldenen Feld');
+    // erledigte Aufgaben schalten selbst weiter
+    if (G('ui').tut.i !== 4) throw new Error(sprache + ': bleibt bei Schritt ' + (G('ui').tut.i + 1));
+    G('tutorialQuit')();
+    return (knopf.querySelector('span') || knopf).firstChild.textContent.trim();
+  };
+  const de = teste('de'), en = teste('en');
+  G('switchLang')('de');
+  if (de === en) throw new Error('die Beschriftung wechselt nicht: ' + de);
+  console.log(`       Schritt 4 gelöst · Knopf deutsch „${de}", englisch „${en}"`);
 });
 step('Drei Reiche im Aufbau', () => {
   $('m-new').onclick();
