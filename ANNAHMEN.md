@@ -1763,28 +1763,52 @@ Der **feste Text aus `index.html`** wird beim Start einmal als Textknoten einges
 beim Wechsel neu gesetzt (`collectStatic`/`applyStaticLang`). Damit ist das ganze Markup
 mit einer Handvoll Zeilen erfasst, statt 50 Elemente einzeln mit Schlüsseln zu versehen.
 
-### Was fertig ist und was nicht
+### Was fertig ist und was nicht (Stand nach dem zweiten Durchgang)
 
-**Vollständig englisch:** Menü, Aufbau (inklusive der dynamisch gezeichneten Reichs-Karten),
-Kopfzeile, Aktionsleiste, Legephase, Editor-Werkzeugleiste, sämtliche Datentexte – also
-Technologienamen und -wirkungen, Ereignisse, Weltwunder, Fähigkeiten, Gelände.
+**Vollständig englisch:** Menü, Aufbau, Kopfzeile, Aktionsleiste, Legephase, Editor,
+sämtliche Datentexte (Technologien, Ereignisse, Weltwunder, Fähigkeiten, Gelände,
+Plättchen), alle **Blätter** (Feld, Stadt, Armee, Welt, Macht, Nahrung, Weltwunder), der
+**Technologiebogen**, das **Protokoll** samt Würfelmeldungen, alle Fehlermeldungen der
+Regelmaschine, der **Bot-Bericht**, das **Spielende** mit Punktetafel und der
+**Regelbogen**. Zusammen 470 Wörterbucheinträge über den 134 Datentexten.
 
-**Noch deutsch:** die Sätze, die im Code zusammengebaut werden – **Protokoll** (~76
-Meldungen), **Regelbogen** (18), **Editor-Hinweise** (18), **Blätter** für Stadt, Armee und
-Welt (20) sowie das **Tutorial** (29 Schritte, rund 23 000 Zeichen). Gemessen: 122
-Textstellen im englischen Modus.
+Dazu das **Tutorial**: alle 29 Schritte mit Überschrift, Aufgabe und Erklärtext, also
+auch die 28 langen Prosablöcke (rund 19 000 Zeichen). Zusammen **470 Wörterbucheinträge**.
 
-Das ist ausdrücklich ein Zwischenstand, kein verstecktes Loch: `node smoke.js` läuft die
-Bildschirme im englischen Modus ab, zählt die deutschen Reste und **schlägt Alarm, wenn
-die Zahl über 150 steigt** – neue Texte brauchen also eine Übersetzung, und die
-verbleibenden 122 sind eine Liste, die man abarbeiten kann. Die Maschinerie dafür steht;
-was fehlt, ist Fleißarbeit an rund 160 Sätzen, vor allem im Tutorial.
+`node smoke.js` läuft die Bildschirme im englischen Modus ab und zählt die deutschen
+Reste; die Grenze steht bei 2, gefunden wird 1 (die Zeile „Runde 1" eines vor dem Wechsel
+geschriebenen Protokolleintrags). Ein neuer deutscher Text fällt damit sofort auf.
 
-### Warum nicht alles auf einmal
+**Eine bewusste Ausnahme:** Protokollzeilen, die **vor** dem Sprachwechsel geschrieben
+wurden, bleiben in der Sprache von damals. Das Protokoll ist ein Mitschrieb, kein
+Anzeigetext – es speichert fertige Sätze, keine Schlüssel. Neue Zeilen kommen in der neuen
+Sprache (ein Smoke-Schritt prüft genau das). Anders wäre das nur mit Schlüssel und
+Argumenten im Spielstand zu haben, was alte Spielstände unlesbar machen würde.
 
-Die Datentexte waren billig: eine Tabelle, kein Eingriff im Code. Die Codesätze sind teuer,
-weil jeder einzeln umgebaut werden muss (`\`${civ.n} erforscht ${t.n}\`` →
-`T('%s erforscht %s', civ.n, t.n)`). Bei rund 160 solchen Stellen, davon viele im
-Tutorial-Prosatext, wäre das Ergebnis in einem Durchgang schlechter als in zwei: entweder
-hastige Übersetzungen oder ein halb umgebauter Code, in dem man nicht mehr sieht, was schon
-läuft. Deshalb erst die Maschinerie samt Messung, dann die Fleißarbeit.
+**Zwei Fallen beim Umstellen**, beide gefunden und behoben:
+
+* `TUT_STEPS` wird beim **Laden der Datei** gebaut. Titel und Aufgaben standen dort als
+  fertige Zeichenketten – zu diesem Zeitpunkt ist die Sprache immer Deutsch, also blieben
+  sie deutsch. Übersetzt wird jetzt beim **Anzeigen** (`T(st.t)` in `renderTutPanel`); die
+  langen Texte sind Funktionen und liefen ohnehin bei jedem Zeichnen durch `T()`.
+* Das **Tutorialpanel** behielt beim Sprachwechsel seinen alten Text, weil nur die Karte
+  neu gezeichnet wurde. `switchLang` zeichnet es jetzt mit.
+
+### Wie die Codesätze umgestellt wurden
+
+Rund 230 Sätze waren im Code zusammengebaut (`` `${civ.n} erforscht ${t.n}` ``). Sie
+wurden **maschinell** umgeschrieben: ein kleines Skript hat Template-Literale mit
+deutschem Text erkannt, die `${…}`-Ausdrücke der Reihe nach durch `%s` ersetzt und den
+Aufruf zu `T('%s erforscht %s', civ.n, t.n)` gemacht. Verschachtelte Template-Literale hat
+es übersprungen (die wenigen von Hand). Das war deutlich verlässlicher als 230 Handgriffe
+und hat die Schlüssel gleich als Liste geliefert – daraus wurde das Wörterbuch.
+
+### Warum das Tutorial zuletzt kam
+
+Die 28 Tutorial-Blöcke sind kein Beiwerk, sondern ein **Lehrtext**: Rechenbeispiele,
+Begründungen, Merksätze, jeweils mit Auszeichnungen mitten im Satz. Deshalb kamen sie
+zuletzt und nicht zwischendurch – mit stehender Maschinerie ließ sich der ganze Block in
+einem Durchgang übersetzen, statt ihn zwischen Umbauarbeiten zu zerhacken. Die Übersetzung
+ist bewusst frei, wo eine wörtliche schief klänge („Merke" → „Remember", „Und die
+Faustregel" → „And the rule of thumb"); Zahlen, Auszeichnungen und die HTML-Struktur sind
+identisch geblieben, damit die Rechenbeispiele weiter zum Spielstand passen.

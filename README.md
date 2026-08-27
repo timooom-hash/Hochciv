@@ -78,11 +78,14 @@ gespeichert.
 ## Sprache
 
 Im Hauptmenü schalten zwei Flaggen zwischen **Deutsch** (Vorgabe) und **Englisch** um; die
-Wahl bleibt gespeichert. Englisch ist vollständig für Menü, Aufbau, Kopfzeile,
-Aktionsleiste, Legephase und alle Spielinhalte (Technologien, Ereignisse, Weltwunder,
-Fähigkeiten, Gelände, Plättchen). Noch deutsch sind Protokollmeldungen, der Regelbogen,
-die Blätter und das Tutorial – `node smoke.js` zählt die Reste und lässt die Zahl nicht
-steigen.
+Wahl bleibt gespeichert. Englisch ist **vollständig**: Menü, Aufbau, Spielbildschirm, alle
+Blätter, Technologiebogen, Protokoll, Spielende, Regelbogen, Editor, das komplette Tutorial
+und alle Spielinhalte. `node smoke.js` läuft die Oberfläche auf Englisch ab und lässt keinen
+neuen deutschen Text durch.
+
+Eine Ausnahme: Protokollzeilen, die vor dem Sprachwechsel geschrieben wurden, bleiben in der
+Sprache von damals – das Protokoll speichert fertige Sätze. Neue Zeilen kommen in der neuen
+Sprache.
 
 Neue Texte übersetzen: Spielinhalte in `DATA_EN` (`js/i18n.js`), Oberflächensätze mit
 `T('deutscher Satz')` und einem Eintrag in `UI_EN`. Fehlt einer, erscheint der deutsche

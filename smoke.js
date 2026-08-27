@@ -1667,17 +1667,40 @@ step('Englischer Aufbau und englische Partie', () => {
   G('closeModal')();
   console.log('       ' + kacheln.slice(0, 6).join(' · '));
 });
+step('Protokoll schreibt neue Zeilen auf Englisch', () => {
+  const S = G('S');
+  const vorher = S.log.length;
+  G('log')(S, 'act', G('T')('%s: Stadt wächst auf %s.', 'Test', 3));
+  const zeile = S.log[S.log.length - 1].m;
+  if (!/city grows to/.test(zeile)) throw new Error('Protokollzeile nicht englisch: ' + zeile);
+  S.log.length = vorher;
+  console.log('       ' + zeile);
+});
 step('Deutsche Reste im englischen Modus zählen (Ratsche)', () => {
   // Was noch nicht übersetzt ist, soll sichtbar bleiben statt sich zu verstecken.
   // Die Zahl darf sinken, aber nicht steigen.
   const DE = /[äöüßÄÖÜ]|\b(der|die|das|und|nicht|kein|keine|eine|einen|mit|für|von|zum|zur|auf|Stadt|Armee|Runde|Zug|Feld|Karte|Reich|Bevölkerung|Nahrung|Münzen|Wissenschaft|Macht|wird|werden|schon|noch|dein|deine)\b/;
   const rest = new Set();
+  // Nur der sichtbare Bildschirm und das offene Fenster/Blatt zählen: versteckte
+  // Bildschirme tragen noch den Text, mit dem sie zuletzt gezeichnet wurden – der wird
+  // beim nächsten Öffnen ohnehin neu erzeugt.
   const sammle = () => {
-    const w = window.document.createTreeWalker(window.document.body, 4);
-    for (let n = w.nextNode(); n; n = w.nextNode()) {
-      const t = (n.nodeValue || '').trim().replace(/\s+/g, ' ');
-      if (t.length >= 3 && DE.test(t)) rest.add(t.slice(0, 60));
-    }
+    const orte = [...window.document.querySelectorAll('.screen.show, #overlay.show, #sheet.show')];
+    orte.forEach(ort => {
+      const w = window.document.createTreeWalker(ort, 4);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const t = (n.nodeValue || '').trim().replace(/\s+/g, ' ');
+        if (t.length < 3 || !DE.test(t)) continue;
+        // Versteckte Teile zählen nicht: ihr Text ist der vom letzten Zeichnen und
+        // wird beim nächsten Öffnen neu erzeugt.
+        if (n.parentElement && n.parentElement.closest('[hidden]')) continue;
+        // Protokollzeilen, die vor dem Sprachwechsel geschrieben wurden, bleiben in der
+        // Sprache von damals – das Protokoll ist ein Mitschrieb, kein Anzeigetext.
+        // Neue Zeilen kommen in der neuen Sprache; geprüft wird das im Schritt davor.
+        if (n.parentElement && n.parentElement.closest('.logline, #logbox')) continue;
+        rest.add(t.slice(0, 60));
+      }
+    });
   };
   sammle();
   G('techModal')(); sammle(); G('closeModal')();
@@ -1685,11 +1708,14 @@ step('Deutsche Reste im englischen Modus zählen (Ratsche)', () => {
   $('a-info').onclick(); sammle(); G('closeModal')();
   $('a-log').onclick(); sammle(); G('closeSheet')();
   G('rulesModal')(); sammle(); G('closeModal')();
-  const OBERGRENZE = 150;
+  // Menü, Aufbau, Blätter, Protokoll, Regelbogen, Editor und Tutorial sind übersetzt.
+  // Die Grenze steht knapp über 0, damit ein neuer deutscher Text sofort auffällt.
+  const OBERGRENZE = 2;
   if (rest.size > OBERGRENZE)
-    throw new Error(`${rest.size} deutsche Textstellen (Grenze ${OBERGRENZE}) – neue Texte brauchen eine Übersetzung`);
+    throw new Error(`${rest.size} deutsche Textstellen (Grenze ${OBERGRENZE}): ` +
+      [...rest].slice(0, 6).join(' | '));
   console.log(`       noch deutsch: ${rest.size} Textstellen (Grenze ${OBERGRENZE}) – ` +
-    'Protokoll, Regelbogen, Blätter und Tutorial fehlen noch');
+    'die Oberfläche ist vollständig übersetzt');
   // zurück auf Deutsch für die folgenden Schritte
   G('switchLang')('de');
   if (G('LANG') !== 'de') throw new Error('Rückschalten fehlgeschlagen');
@@ -1710,7 +1736,8 @@ step('Drei Reiche im Aufbau', () => {
   const jetzt = [...$('setup-list').children].map(x => x.dataset.civ);
   if (new Set(jetzt).size !== 3) throw new Error('Kollision nicht aufgelöst: ' + jetzt.join(','));
   const karten = [...$('setup-map').options].map(o => o.text);
-  if (!karten.some(k => /9 Dreiecke/.test(k))) throw new Error('keine 9er-Plättchenkarte: ' + karten);
+  if (!karten.some(k => /9 (Dreiecke|triangles)/.test(k)))
+    throw new Error('keine 9er-Plättchenkarte: ' + karten);
   console.log('       ' + jetzt.join(' · ') + ' | ' + karten.join(' · '));
 });
 step('Drei Reiche spielen auf der Plättchenkarte', () => {
