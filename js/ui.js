@@ -312,8 +312,11 @@ function drawMap(svg, map, opts) {
         stroke: '#b8860b', 'stroke-width': 3, 'stroke-linejoin': 'round', 'pointer-events': 'none'
       }));
     });
-    for (const k in map.capitals) {
-      const [r, c] = map.capitals[k], civ = CIVS.find(x => x.k === k);
+    const capList = Array.isArray(map.capitals)
+      ? map.capitals.filter(Boolean).map(e => [e.civ, [e.r, e.c]])
+      : Object.keys(map.capitals).map(k => [k, map.capitals[k]]);
+    for (const [k, pos] of capList) {
+      const [r, c] = pos, civ = CIVS.find(x => x.k === k);
       if (!civ || r >= R) continue;
       const [x, y] = hexCenter(r, c, HEX);
       world.appendChild(svgEl('circle', { cx: x, cy: y, r: 15, fill: '#f7f1e0', stroke: '#2a2721', 'stroke-width': 3, 'pointer-events': 'none' }));
@@ -575,19 +578,31 @@ function humanCount(S) { return S.players.filter(p => p.kind === 'human' && !p.d
    Gefüllt = hat sie bereits. Blass und umkringelt = kann sie erforschen (nur andere
    MENSCHEN, nur im Mehrpersonenspiel). Beides klar zu unterscheiden, weil es zwei sehr
    verschiedene Dinge sind: erledigte Tatsache gegen bloße Möglichkeit. */
+/* Marken an einer Technologiekachel: wer sie hat, wer sie erforschen könnte.
+   Die beiden Zustände waren kaum zu unterscheiden (gleiches Symbol, gleiche Farbe, nur
+   Ring gestrichelt statt durchgezogen). Jetzt ist „hat sie" eine **ausgefüllte** Marke in
+   der Reichsfarbe mit hellem Symbol, „könnte sie" eine **leere** Marke mit farbigem
+   Symbol auf Papier und einem kleinen Fragezeichen. Voll gegen leer trägt auch bei 16 px
+   und in Graustufen. */
+function ownerMark(civ, art, self) {
+  const hat = art === 'hat';
+  const stil = hat
+    ? `background:${civ.color};border-color:${civ.color};color:#fff`
+    : `color:${civ.color};border-color:${civ.color}`;
+  const titel = hat ? `${civ.n}${self ? ' (du)' : ''} hat sie erforscht`
+    : `${civ.n} könnte sie erforschen`;
+  return `<span class="owner-mark ${hat ? 'has' : 'can'}${self ? ' self' : ''}"
+    style="${stil}" title="${titel}">${SYM[civ.sym]}${hat ? '' : '<i>?</i>'}</span>`;
+}
 function ownerMarks(S, techKey, pi) {
   const mehrere = humanCount(S) > 1;
   const marks = S.players.map((pl, i) => {
     if (pl.dead) return '';
-    const civ = civOf(pl);
-    const self = i === pi;
-    if (pl.techs[techKey])
-      return `<span class="owner-mark${self ? ' self' : ''}" style="color:${civ.color}"
-        title="${civ.n}${self ? ' (du)' : ''} hat sie">${SYM[civ.sym]}</span>`;
+    const civ = civOf(pl), self = i === pi;
+    if (pl.techs[techKey]) return ownerMark(civ, 'hat', self);
     // Verfügbar bei einem anderen Menschen – die eigene Verfügbarkeit sieht man an der Kachel
     if (mehrere && !self && pl.kind === 'human' && pl.avail && pl.avail[techKey])
-      return `<span class="owner-mark can" style="color:${civ.color}"
-        title="${civ.n} könnte sie erforschen">${SYM[civ.sym]}</span>`;
+      return ownerMark(civ, 'kann', false);
     return '';
   }).join('');
   return marks ? `<span class="owner-marks">${marks}</span>` : '';
@@ -626,11 +641,17 @@ function techModal() {
   const pi = S.cur, p = P(S);
   const others = S.players.filter((pl, i) => i !== pi && !pl.dead)
     .map(pl => `<span style="color:${civOf(pl).color}">${SYM[civOf(pl).sym]}</span> ${civOf(pl).n}`).join(' · ');
+  // Legende mit echten Marken: zwei Beispiele in der Farbe eines Mitspielers, damit
+  // „hat sie" und „könnte sie" direkt nebeneinander vergleichbar sind.
+  const bsp = S.players.find((pl, i) => i !== pi && !pl.dead);
   let grid = others
-    ? `<p class="sub" style="margin:-2px 0 10px">Symbole an einer Technologie zeigen, wer sie schon hat:
-       ${others} · dein Reich ist umrandet.${humanCount(S) > 1
-        ? ' Ein <span class="owner-mark can" style="color:var(--ink-soft)">◇</span>-Ring darum heißt: dieses Reich <b>könnte</b> sie erforschen.'
-        : ''}</p>`
+    ? `<p class="sub" style="margin:-2px 0 10px">Marken an einer Technologie zeigen die
+       anderen Reiche: ${others} · dein Reich ist zusätzlich umrandet.</p>
+       <p class="sub owner-legend" style="margin:-4px 0 10px">
+         ${ownerMark(civOf(bsp), 'hat', false)} <span>hat sie erforscht</span>
+         ${humanCount(S) > 1
+        ? `${ownerMark(civOf(bsp), 'kann', false)} <span>könnte sie erforschen</span>` : ''}
+       </p>`
     : '';
   grid += '<div class="techgrid">';
   for (let a = 0; a < 4; a++) {
@@ -643,7 +664,7 @@ function techModal() {
         const can = avail && available(S, pi, 'sci') >= cost;
         // Sklaverei wird mit der ersten Technologie der Moderne obsolet – im Bogen sichtbar.
         const dead = t.k === 'sklaverei' && owned && !slaveryUsable(p);
-        const eff = dead ? 'obsolet – seit der Moderne nicht mehr nutzbar' : t.e;
+        const eff = dead ? 'obsolet – seit der Moderne nicht mehr nutzbar' : techEffect(t, S);
         // Verfügbar zerfällt in zwei Zustände: bezahlbar (afford) und zu teuer (costly).
         // Rein grafisch – der Kostenwert steht ohnehin schon in der Kachel.
         const state = owned ? 'owned' : avail ? (can ? 'avail afford' : 'avail costly') : 'locked';
@@ -667,13 +688,13 @@ function techModal() {
   if (ft.length) {
     grid += '<p class="sub" style="margin-top:14px">Freie Forschung (1× pro Runde, kostenlos)</p>';
     grid += ft.map(t => `<button class="tech avail afford" data-freetech="${t.k}">
-      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
+      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
   }
   const bp = backPickOptions(S, pi);
   if (bp.length) {
     grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[backPick(p).f]}, früheres Zeitalter, kostenlos</p>`;
     grid += bp.map(t => `<button class="tech avail afford" data-backtech="${t.k}">
-      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
+      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
   }
   const cop = copyableTechs(S, pi);
   if (cop.length) {
@@ -687,7 +708,7 @@ function techModal() {
         buttons.push(`<button class="tech avail ${available(S, pi, 'coins') >= o.paidCoins
           ? 'afford' : 'costly'}" data-copy="${o.tech.k}" data-mode="paid">
           <span class="c">${o.paidCoins}🪙</span><b>${o.tech.n}</b>
-          <span class="eff">${o.tech.e}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
+          <span class="eff">${techEffect(o.tech, S)}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
       if (o.freeOk)
         buttons.push(`<button class="tech avail afford" data-copy="${o.tech.k}" data-mode="free">
           <span class="c">gratis</span><b>${o.tech.n}</b>
@@ -855,7 +876,7 @@ function gameOver() {
   modal('Spielende', `<p style="font-family:var(--serif);font-size:22px;margin:0 0 6px">
     ${titel}</p><p class="sub">${o.how}</p>${tafel}
     <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">Zurück zum Menü</button>`);
-  confetti(civOf(S.players[w]).c);
+  confetti(civOf(S.players[w]).color);
 }
 /* Kleiner Sieggruß: ein paar Papierschnipsel, die einmal durchs Bild fallen.
    Bewusst sparsam – 40 Stück, gut zwei Sekunden, danach räumt es sich selbst ab.
@@ -1036,7 +1057,7 @@ function freePickModal() {
   const h = `<p class="sub">${pick ? `Noch ${pick.n} kostenlose Technologie(n).` :
     'Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.'}</p>` +
     list.map(t => `<button class="tech avail" data-free="${t.k}">
-      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${t.e}</span></button>`).join('');
+      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
   modal(title, h);
   $('ov-body').querySelectorAll('[data-free]').forEach(b => b.onclick = () => {
     const e = pick ? useFreePick(S, S.cur, b.dataset.free) : useBackPick(S, S.cur, b.dataset.free);
@@ -1073,7 +1094,6 @@ function mapOptions() {
   const out = [];
   if (n > 2) MAPS.forEach((m, i) => out.push([String(i), m.name]));
   out.push(['plaettchen', TILE_SHAPES[n].name]);
-  out.push(['zufall', n === 2 ? 'Rasterkarte (12 × 8)' : 'Rasterkarte (12 × 18)']);
   if (customMap && n > 2) out.push(['eigene', 'Eigene Karte']);
   return out;
 }
@@ -1084,12 +1104,21 @@ function fillMapSelect() {
   const sel = $('setup-map'), opts = mapOptions();
   sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
   sel.value = opts.some(o => o[0] === setupMapWanted) ? setupMapWanted : opts[0][0];
+  // Im Duell gibt es nur die Plättchenkarte – dann bleibt die Zeile weg statt einer
+  // Auswahl mit einem einzigen Eintrag.
+  $('setup-map-row').hidden = opts.length < 2;
+  sel.disabled = opts.length < 2;
   sel.onchange = () => {
     setupMapWanted = sel.value;
-    $('setup-tile-hint').hidden = sel.value !== 'plaettchen';
+    renderSlots();          // die Plättchenkarte lässt jede Zivilisation mehrfach zu
   };
   $('setup-tile-hint').hidden = sel.value !== 'plaettchen';
+  $('setup-double-hint').hidden = sel.value !== 'plaettchen';
 }
+// Auf der Plättchenkarte darf jeder Platz frei wählen, auch dieselbe Zivilisation
+// mehrfach – auf den festen Karten sitzt jede Zivilisation genau einmal (feste
+// Startsterne, ein Stern je Reich).
+const freieCivWahl = () => setupMapWanted === 'plaettchen';
 function setupScreen() {
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
@@ -1108,45 +1137,65 @@ function setupScreen() {
   });
   renderSlots();
 }
-/* Zeichnet die Reichs-Karteikarten. Bei vier Reichen liegt die Zivilisation fest,
-   sonst wählt jeder Platz seine eigene aus – nie zweimal dieselbe. */
+/* Zeichnet die Reichs-Karteikarten. Auf den festen Karten sitzt jede Zivilisation genau
+   einmal (bei vier Reichen liegt sie damit fest); auf der Plättchenkarte wählt jeder Platz
+   frei, auch zweimal dieselbe. */
 function renderSlots() {
   const n = setupCount(), duel = setupMode === 'duell';
-  $('setup-map-row').hidden = false;
-  $('setup-map').disabled = false;
   $('setup-duel-hint').hidden = !duel;
   fillMapSelect();
   const list = $('setup-list');
-  const chosen = n < 4 ? pickChoice(n) : CIVS.map(c => c.k);
+  const frei = freieCivWahl();
+  // Mensch/Bot und Fähigkeit überleben ein Neuzeichnen (Kartenwechsel, Zivilisationswahl)
+  const alt = [...list.children].map(x => ({
+    kind: x.querySelector('[data-kind].on').dataset.kind,
+    abil: x.querySelector('[data-abil]').value,
+  }));
+  const chosen = (frei || n < 4) ? pickChoice(n) : CIVS.map(c => c.k);
+  // Feste Karte: Doppelungen auflösen, sonst säßen zwei Reiche auf einem Startstern
+  if (!frei) for (let i = 0; i < n; i++)
+    if (chosen.indexOf(chosen[i]) !== i)
+      chosen[i] = pickCivs[i] = CIVS.map(c => c.k).find(k => !chosen.slice(0, n).includes(k));
   list.innerHTML = '';
   chosen.forEach((civKey, i) => {
-    const civ = CIV_BY_KEY[civKey];
+    const zufall = civKey === 'zufall';
+    const civ = zufall ? null : CIV_BY_KEY[civKey];
+    // Bei Zufall stehen die Fähigkeiten der Zivilisation noch nicht fest: dann gibt es
+    // nur Zufall oder die Grundfähigkeit.
+    const abils = zufall
+      ? [{ k: 'zufall', n: 'Zufall' }, { k: 'basis', n: 'Grundfähigkeit' }]
+      : civ.abilities.map((a, j) => ({ k: a.k, n: j === 0 ? a.n : `Alternative ${j + 1}: ${a.n}`, e: a.e }))
+        .concat([{ k: 'zufall', n: 'Zufall', e: 'Wird beim Spielstart ausgelost.' }]);
     const d = document.createElement('div');
     d.className = 'slot'; d.dataset.civ = civKey;
-    d.innerHTML = (n < 4
-      ? `<h3>${SYM[civ.sym]} Platz ${i + 1}</h3>
+    d.innerHTML = ((frei || n < 4)
+      ? `<h3>${zufall ? '🎲' : SYM[civ.sym]} Platz ${i + 1}</h3>
          <label class="row"><span>Zivilisation</span>
            <select data-civpick>${CIVS.map(c =>
              `<option value="${c.k}"${c.k === civKey ? ' selected' : ''}>${c.n}</option>`).join('')}
+             <option value="zufall"${zufall ? ' selected' : ''}>Zufall</option>
            </select></label>`
       : `<h3>${SYM[civ.sym]} ${civ.n}</h3>`) +
       `<div class="seg">
-        <button data-kind="human" class="${i === 0 ? 'on' : ''}">Mensch</button>
-        <button data-kind="bot" class="${i === 0 ? '' : 'on'}">Bot</button>
+        <button data-kind="human" class="${(alt[i] ? alt[i].kind === 'human' : i === 0) ? 'on' : ''}">Mensch</button>
+        <button data-kind="bot" class="${(alt[i] ? alt[i].kind === 'bot' : i !== 0) ? 'on' : ''}">Bot</button>
       </div>
       <label class="row"><span>Fähigkeit</span>
-        <select data-abil="${civ.k}">${civ.abilities.map((a, j) =>
-          `<option value="${a.k}">${j === 0 ? a.n : `Alternative ${j + 1}: ${a.n}`}</option>`).join('')}
+        <select data-abil="${zufall ? 'zufall' : civ.k}">${abils.map(a =>
+          `<option value="${a.k}">${a.n}</option>`).join('')}
         </select></label>
       <p class="abil"></p>`;
     list.appendChild(d);
     const sela = d.querySelector('[data-abil]');
+    if (alt[i] && abils.some(a => a.k === alt[i].abil)) sela.value = alt[i].abil;
     const note = d.querySelector('.abil');
     const paint = () => {
       const kind = d.querySelector('[data-kind].on').dataset.kind;
       sela.disabled = kind === 'bot';
-      const a = civ.abilities.find(x => x.k === sela.value) || civ.abilities[0];
-      note.textContent = kind === 'bot' ? 'Bots erhalten keine Zivilisationsfähigkeit.' : a.e;
+      const a = abils.find(x => x.k === sela.value) || abils[0];
+      note.textContent = kind === 'bot' ? 'Bots erhalten keine Zivilisationsfähigkeit.'
+        : zufall ? 'Zivilisation und Fähigkeit werden beim Spielstart ausgelost.'
+          : (a.e || 'Wird beim Spielstart ausgelost.');
     };
     sela.onchange = paint;
     d.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
@@ -1155,29 +1204,25 @@ function renderSlots() {
     });
     const pick = d.querySelector('[data-civpick]');
     if (pick) pick.onchange = () => {
-      // Kinds und Fähigkeiten bleiben erhalten, die Zivilisation wechselt
-      const kinds = [...list.children].map(x => x.querySelector('[data-kind].on').dataset.kind);
       pickCivs[i] = pick.value;
-      // Kollision: jeder andere Platz mit derselben Zivilisation zieht auf eine freie um
-      for (let j = 0; j < n; j++) {
+      // Nur auf den festen Karten: jeder andere Platz mit derselben Zivilisation zieht
+      // auf eine freie um. Auf der Plättchenkarte darf sie doppelt vorkommen.
+      if (!freieCivWahl()) for (let j = 0; j < n; j++) {
         if (j === i || pickCivs[j] !== pick.value) continue;
         pickCivs[j] = CIVS.map(c => c.k).find(k => !pickCivs.slice(0, n).includes(k));
       }
-      renderSlots();
-      [...list.children].forEach((x, j) => x.querySelectorAll('[data-kind]')
-        .forEach(b => b.classList.toggle('on', b.dataset.kind === kinds[j])));
-      [...list.children].forEach(x => x.querySelector('[data-abil]').onchange());
-      refreshStart();
+      renderSlots();          // Mensch/Bot und Fähigkeit bleiben dabei erhalten
     };
     paint();
   });
   refreshStart();
 }
-// Vorauswahl der frei wählbaren Plätze (Duell und drei Reiche)
-let pickCivs = ['griechenland', 'wikinger', 'russland'];
+// Vorauswahl der frei wählbaren Plätze (Duell, drei Reiche, Plättchenkarte)
+let pickCivs = ['griechenland', 'wikinger', 'russland', 'england'];
 function pickChoice(n) { return pickCivs.slice(0, n); }
 function setupConfig() {
   const diff = $('setup-diff').value;    // ein Schwierigkeitsgrad für alle Bots
+  // Rohwahl: 'zufall' bleibt stehen, aufgelöst wird erst in startPlayers()
   return [...$('setup-list').children].map(slot => ({
     civ: slot.dataset.civ,
     kind: slot.querySelector('[data-kind].on').dataset.kind,
@@ -1185,12 +1230,75 @@ function setupConfig() {
     ability: slot.querySelector('[data-abil]').value,
   }));
 }
+/* Sitzt eine Zivilisation mehrfach am Tisch, bekommen ihre Reiche römische Ziffern und
+   je eine der vier Zivilisationsfarben – keine Schattierungen. Die erste behält ihre
+   eigene Farbe, die Doppelgänger nehmen eine noch freie (zwei Griechenland: eines blau,
+   das andere zum Beispiel Englands Rot). Ohne Farbunterschied wären sie auf der Karte
+   nicht auseinanderzuhalten: Städte, Armeen und Grenzen werden nur über sie unterschieden. */
+const ROMAN = ['I', 'II', 'III', 'IV'];
+function nameDoubles(players) {
+  const zaehler = {};
+  players.forEach(p => { zaehler[p.civ] = (zaehler[p.civ] || 0) + 1; });
+  const belegt = new Set();
+  // erster Durchgang: wer seine eigene Farbe noch bekommen kann, behält sie
+  players.forEach(p => {
+    if (belegt.has(p.civ)) return;
+    belegt.add(p.civ); p.colorOf = p.civ;
+  });
+  // zweiter Durchgang: die Doppelgänger nehmen eine freie Zivilisationsfarbe
+  players.forEach(p => {
+    if (p.colorOf) return;
+    const frei = CIVS.map(c => c.k).find(k => !belegt.has(k));
+    belegt.add(frei); p.colorOf = frei;
+  });
+  const lauf = {};
+  players.forEach(p => {
+    const civ = CIV_BY_KEY[p.civ];
+    p.color = p.colorOf === p.civ ? null : CIV_BY_KEY[p.colorOf].color;
+    delete p.colorOf;
+    if (zaehler[p.civ] < 2) return;
+    const k = lauf[p.civ] = (lauf[p.civ] || 0) + 1;
+    p.name = `${civ.n} ${ROMAN[k - 1] || k}`;
+  });
+  return players;
+}
+/* „Zufall" in der Auswahl wird erst beim Spielstart aufgelöst – bis dahin steht im
+   Aufbau wirklich Zufall, damit niemand aus der Anzeige schon die Wahl abliest.
+   `frei` = Doppelungen erlaubt (Plättchenkarte); sonst bleibt jede Zivilisation einmalig. */
+function resolveRandom(players, frei) {
+  const pick = list => list[Math.floor(Math.random() * list.length)];
+  players.forEach((p, i) => {
+    if (p.civ !== 'zufall') return;
+    const pool = CIVS.map(c => c.k).filter(k => frei ||
+      !players.some((q, j) => j !== i && q.civ === k));
+    p.civ = pick(pool.length ? pool : CIVS.map(c => c.k));
+    p.randomCiv = true;
+  });
+  players.forEach(p => {
+    if (p.ability !== 'zufall') return;
+    p.ability = pick(CIV_BY_KEY[p.civ].abilities).k;
+    p.randomAbility = true;
+  });
+  return players;
+}
+/* Fertige Spielerliste für den Start: Zufall auflösen, dann Ziffern und Farben. */
+function startPlayers() {
+  return nameDoubles(resolveRandom(setupConfig(), freieCivWahl()));
+}
+// Nur eine bewusste Wahl bleibt stehen; ohne sie richtet sich der Startspieler nach der
+// Besetzung (bei mehreren Menschen Zufall, sonst der einzige Mensch).
+let startWanted = null;
 function refreshStart() {
   const cfg = setupConfig(), sel = $('setup-start');
-  sel.innerHTML = cfg.map((p, i) =>
-    `<option value="${i}">${CIV_BY_KEY[p.civ].n}${p.kind === 'bot' ? ' (Bot)' : ''}</option>`).join('');
-  const firstHuman = cfg.findIndex(p => p.kind === 'human');
-  sel.value = Math.max(0, firstHuman);
+  const label = p => p.civ === 'zufall' ? 'Zufällige Zivilisation'
+    : (CIV_BY_KEY[p.civ] ? CIV_BY_KEY[p.civ].n : p.civ);
+  sel.innerHTML = '<option value="zufall">Zufällig</option>' + cfg.map((p, i) =>
+    `<option value="${i}">${label(p)}${p.kind === 'bot' ? ' (Bot)' : ''}</option>`).join('');
+  const menschen = cfg.filter(p => p.kind === 'human').length;
+  sel.value = (startWanted != null && [...sel.options].some(o => o.value === startWanted))
+    ? startWanted
+    : menschen > 1 ? 'zufall' : String(Math.max(0, cfg.findIndex(p => p.kind === 'human')));
+  sel.onchange = () => { startWanted = sel.value; };
 }
 
 /* ------------------------------------------------- Startplättchen legen
@@ -1209,12 +1317,17 @@ function startPlacement(cfg) {
   const rnd = mapRng(seed + 12345);
   placeState = { cfg, plan, rnd, queue: [], at: 0, o: 0, cell: null, done: false };
   plan.seats.forEach(seat => {
-    const pl = cfg.players.find(p => p.civ === seat.civ);
+    const pl = cfg.players[seat.idx];        // nach Platz, nicht nach Zivilisation
     if (pl && pl.kind === 'bot') botPlaceSeat(plan, seat, rnd);
     else placeState.queue.push(seat);
   });
   show('screen-place');
   placeStep();
+}
+/* Anzeige eines Sitzes: bei doppelten Zivilisationen der Platzname („Russland II") */
+function seatCiv(seat) {
+  const pl = placeState.cfg.players[seat.idx] || {};
+  return civOf({ civ: seat.civ, name: pl.name, color: pl.color });
 }
 function placeSeatNow() {
   const st = placeState;
@@ -1227,7 +1340,7 @@ function placeStep() {
   drawPlace();
   // Hotseat: zwischen zwei Menschen wird das Gerät übergeben, vorher nichts gezeigt.
   if (st.queue.length > 1) {
-    const civ = CIV_BY_KEY[placeSeatNow().civ];
+    const civ = seatCiv(placeSeatNow());
     modal('Verdeckt legen', `<p class="sub">${SYM[civ.sym]} <b>${civ.n}</b> ist dran.
       Das eigene Startplättchen sehen die anderen erst nach dem Aufdecken – jetzt also
       Gerät übergeben.</p>
@@ -1243,7 +1356,7 @@ function drawPlace() {
     .filter(i => st.done || !isSeatSlot(plan, i) || (seat && seat.slot === i));
   const map = tileMap(plan, {
     show: shown, seat, o: seat ? st.o : null, cell: st.cell,
-    caps: st.done ? null : (seat ? [seat.civ] : []),
+    caps: st.done ? null : (seat ? [seat.idx] : []),
   });
   const opts = {};
   if (seat) {
@@ -1260,7 +1373,7 @@ function drawPlace() {
     $('pl-rot').hidden = true;
     $('pl-ok').textContent = 'Spiel beginnen';
   } else {
-    const civ = CIV_BY_KEY[seat.civ], tile = TILE_POOL[plan.tiles[seat.slot]];
+    const civ = seatCiv(seat), tile = TILE_POOL[plan.tiles[seat.slot]];
     note.innerHTML = `<b>${SYM[civ.sym]} ${civ.n}</b> · „${tile.n}" · Lage ${st.o + 1} von 3 · ` +
       (st.cell == null ? 'Hauptstadt auf ein markiertes Feld tippen'
         : 'Hauptstadt gesetzt – „Fertig", wenn es passt');
@@ -1371,22 +1484,22 @@ function boot() {
   $('sheet-close').onclick = closeSheet;
 
   $('setup-go').onclick = () => {
-    const players = setupConfig();
+    const players = startPlayers();      // Zufall auflösen, dann Ziffern und Farben
     if (!players.some(p => p.kind === 'human')) return toast('Mindestens eine menschliche Zivilisation.');
     const duel = setupMode === 'duell';
     const pick = $('setup-map').value;
+    const startWahl = $('setup-start').value;
     const cfg = {
-      players, duel, startPlayer: +$('setup-start').value,
+      players, duel,
+      startPlayer: startWahl === 'zufall'
+        ? Math.floor(Math.random() * players.length) : +startWahl,
       events: $('setup-events').checked, eventMode: $('setup-evmode').value,
       wonders: $('setup-wonders').checked,
     };
     endTutorialPanel();
     // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.
     if (pick === 'plaettchen') return startPlacement(cfg);
-    // Rasterkarte: im Duell 12 × 8 mit festen Startpunkten, sonst 12 × 18
-    cfg.map = pick === 'eigene' ? customMap
-      : pick === 'zufall' ? (duel ? duelMap(players[0].civ, players[1].civ) : randomMap())
-        : MAPS[+pick];
+    cfg.map = pick === 'eigene' ? customMap : MAPS[+pick];
     S = newGame(cfg);
     startGameScreen();
   };
@@ -1455,9 +1568,11 @@ function rulesModal() {
       <li>Aktionen in beliebiger Reihenfolge, beliebig oft.</li>
       <li>Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen.
         Zwei Züge in Folge stärker → Stadt erobert.</li>
-      <li>Sieg: Singularität · ${S && S.duel ? 'über 3/4' : '2/3'} der Weltbevölkerung
-        (${S && S.duel ? 'UN 2/3, Theologie 7/10' : 'UN 1/2, Theologie 3/5'}) ·
-        gegnerische Hauptstadt · Weltwunder der Stufe 3.</li>
+      <li>Sieg: Singularität · ${victoryLabels(!!(S && S.duel)).base} der Weltbevölkerung
+        (UN ${victoryLabels(!!(S && S.duel)).un}, Theologie ${victoryLabels(!!(S && S.duel)).theologie}) ·
+        gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das
+        Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte
+        (Bevölkerung + Wunder + Technologien).</li>
     </ol>
     <p class="sub">Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
     2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.</p>
@@ -1496,7 +1611,7 @@ function rulesModal() {
         const list = techsIn(f, a, S);
         if (!list.length) return '';
         return `<p class="rule-age">${an}</p>` + list.map(t =>
-          `<div class="rule-tech"><span class="c">${t.c}</span><b>${t.n}</b><i>${t.e}</i></div>`).join('');
+          `<div class="rule-tech"><span class="c">${t.c}</span><b>${t.n}</b><i>${techEffect(t, S)}</i></div>`).join('');
       }).join('')).join('')}
     <p class="rule-field">Sieg</p>
     <div class="rule-tech"><span class="c">${SINGULARITY.c}</span><b>${SINGULARITY.n}</b>

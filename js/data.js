@@ -95,7 +95,7 @@ const TECHS = [
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
   { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (3× Kosten in Münzen)' },
   { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 8, e: 'Hauptstadt produziert doppelt' },
-  { k: 'kartografie', n: 'Kartografie', f: 3, c: 9, e: 'Keine Distanzkosten' },
+  { k: 'kartografie', n: 'Kartografie', f: 3, c: 9, e: 'Keine Distanzkosten beim Gründen' },
   { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>3/5 der Bevölkerung zum Sieg' },
   { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten = 2 × Anzahl' },
   { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
@@ -157,7 +157,7 @@ const CIVS = [
     ability: 'Münzen = Nahrung für alle Belange',
     abilities: [
       { k: 'basis', n: 'Handelsreich', e: 'Münzen = Nahrung für alle Belange (1:1 in beide Richtungen)' },
-      { k: 'gruenden', n: 'Kolonisten', e: 'Städte gründen kostet keine Basiskosten (nur Distanzkosten)' },
+      { k: 'gruenden', n: 'Kolonisten', e: 'Städte gründen kostet keine Basiskosten (nur Distanzkosten; mit Kartografie die günstigere der beiden)' },
       { k: 'kuestenstaedte', n: 'Seemacht', e: 'Jede Stadt, die an Meer angrenzt, bringt +2 Wissenschaft, Nahrung und Münzen' },
     ],
   },
@@ -328,144 +328,21 @@ const WONDER_POOL_SIZE = 3;      // je Stufe 1 und 2 sind drei Wunder verfügbar
 const WONDER_STEP = 10;          // Kosten je weiteres Wunder
 
 /* ------------------------------------------------------- Zufallskarten
-   Die Geländemischung folgt der Originalkarte (36 % Grasland, 30 % Meer, 15 % Wald,
-   9 % Gebirge, 8 % Fluss, 3 % Insel). Größe und Startpunkte sind fest, nur das Gelände
-   wird gewürfelt – unter einer Hauptstadt liegt nie Meer. */
-const MAP_MIX = [['G', 36], ['M', 30], ['W', 15], ['B', 9], ['F', 8], ['I', 3]];
-// Startpunkte der Zufallskarte im Format der Originalkarte (12 × 18)
-const RANDOM_CAPITALS = { wikinger: [1, 8], russland: [4, 15], england: [5, 3], griechenland: [9, 10] };
-// Duellkarte 12 × 8 (Spalten × Zeilen): zwei feste, weit auseinanderliegende Startpunkte.
-// Beide liegen ein Feld vom Rand entfernt, damit sie sechs Nachbarfelder haben.
-const DUEL_SIZE = { rows: 8, cols: 12 };
-const DUEL_STARTS = [[1, 10], [6, 1]];
-
-// Kleiner eigener Zufallsgenerator, damit eine Karte aus einem Startwert reproduzierbar ist
+   Zufallskarten entstehen ausschließlich aus Dreiecksplättchen (js/tiles.js). Der frühere
+   Rastergenerator (12 × 18 bzw. 12 × 8, gewürfeltes Gelände, feste Startpunkte) ist in v51
+   ersatzlos entfallen; geblieben ist nur der Zufallsgenerator, mit dem sich eine Karte aus
+   einem Startwert reproduzieren lässt. */
 function mapRng(seed) {
   let s = (seed | 0) || Math.floor(Math.random() * 2 ** 31);
   return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
 }
-function pickTerrain(rnd) {
-  const total = MAP_MIX.reduce((a, x) => a + x[1], 0);
-  let n = rnd() * total;
-  for (const [k, w] of MAP_MIX) { n -= w; if (n <= 0) return k; }
-  return 'G';
-}
-/* --------------------------------------------------- Mindestgüte eines Startplatzes
-   Jede Hauptstadt muss im ersten Zug mindestens 4 Nahrung aufbringen können (Münzen
-   zählen 2:1) und mindestens ein siedelbares Feld in Distanz 3 haben. Gerechnet wird mit
-   den Grunderträgen: keine Technologien, keine Zivilisationsfähigkeit, Stadt mit
-   1 Bevölkerung (verbraucht 1 Nahrung, bringt 1 Münze).
-   Erfüllt eine Hauptstadt das nicht, wird ihr Umland gezielt nachgebessert – die Karte
-   wird nicht neu gewürfelt, weil vier Startplätze gleichzeitig sonst kaum je passen. */
-const START_MIN_FOOD = 4;
-const LAND_KEYS = ['G', 'W', 'B', 'F'];
-const at = (grid, r, c) => (grid[r] && grid[r][c]) || null;
-const isLandKey = t => !!t && TERRAIN[t].land && !TERRAIN[t].block;
 
-// Wie viel Nahrung stehen im ersten Zug zur Verfügung (Münzen 2:1 eingerechnet)?
-function startFood(grid, r, c) {
-  let food = -1, coins = 1;                        // Stadt mit 1 Bevölkerung
-  for (const [nr, nc] of neighbors(r, c)) {
-    const t = at(grid, nr, nc);
-    if (!t) continue;
-    food += TERRAIN[t].yield[1];
-    coins += TERRAIN[t].yield[2];
-  }
-  return food + Math.floor(coins / 2);
-}
-/* Felder, die von dieser Hauptstadt aus über Land in genau drei Schritten erreichbar sind
-   und mindestens 3 Felder von jeder Hauptstadt entfernt liegen – also gründbar. */
-function startSpots(grid, r, c, capitals) {
-  const seen = new Set([r + ',' + c]);
-  let front = [[r, c]];
-  for (let step = 1; step <= 3; step++) {
-    const next = [];
-    for (const [cr, cc] of front) {
-      for (const [nr, nc] of neighbors(cr, cc)) {
-        const k = nr + ',' + nc;
-        if (seen.has(k) || !isLandKey(at(grid, nr, nc))) continue;
-        seen.add(k); next.push([nr, nc]);
-      }
-    }
-    front = next;
-    if (!front.length) break;
-  }
-  return front.filter(([sr, sc]) =>
-    Object.values(capitals).every(([kr, kc]) => hexDistance(kr, kc, sr, sc) >= 3));
-}
-/* Legt einen Landweg von der Hauptstadt zu einem Feld in Distanz 3 an. */
-function carveSpot(grid, r, c, capitals, rnd) {
-  const rows = grid.length, cols = grid[0].length;
-  const cands = [];
-  for (let tr = 0; tr < rows; tr++) for (let tc = 0; tc < cols; tc++) {
-    if (hexDistance(r, c, tr, tc) !== 3) continue;
-    if (!Object.values(capitals).every(([kr, kc]) => hexDistance(kr, kc, tr, tc) >= 3)) continue;
-    cands.push([tr, tc]);
-  }
-  if (!cands.length) return false;
-  // bevorzugt ein Ziel, das schon Land ist – dann muss weniger umgebaut werden
-  cands.sort((a, b) => (isLandKey(at(grid, ...b)) ? 1 : 0) - (isLandKey(at(grid, ...a)) ? 1 : 0));
-  const [tr, tc] = cands[Math.floor(rnd() * Math.min(cands.length, 3))] || cands[0];
-  let [cr, cc] = [r, c];
-  for (let step = 0; step < 6 && !(cr === tr && cc === tc); step++) {
-    const opts = neighbors(cr, cc).filter(([nr, nc]) => at(grid, nr, nc));
-    if (!opts.length) return false;
-    opts.sort((a, b) => hexDistance(a[0], a[1], tr, tc) - hexDistance(b[0], b[1], tr, tc));
-    [cr, cc] = opts[0];
-    if (!isLandKey(grid[cr][cc])) grid[cr][cc] = 'G';
-  }
-  return true;
-}
-/* Bessert das Umland nach, bis die Schwelle erreicht ist: das nahrungsärmste Nachbarfeld
-   wird Grasland, Meeresfelder erst zuletzt, damit Küsten möglichst erhalten bleiben. */
-function boostFood(grid, r, c) {
-  for (let guard = 0; guard < 8 && startFood(grid, r, c) < START_MIN_FOOD; guard++) {
-    const ns = neighbors(r, c).filter(([nr, nc]) => at(grid, nr, nc) && grid[nr][nc] !== 'G');
-    if (!ns.length) break;
-    ns.sort((a, b) => {
-      const ta = grid[a[0]][a[1]], tb = grid[b[0]][b[1]];
-      const sea = t => (t === 'M' || t === 'I') ? 1 : 0;      // Meer und Inseln zuletzt
-      return (sea(ta) - sea(tb)) || (TERRAIN[ta].yield[1] - TERRAIN[tb].yield[1]);
-    });
-    const [nr, nc] = ns[0];
-    grid[nr][nc] = 'G';
-  }
-}
-/* Baut eine Karte mit gegebener Größe und Hauptstädten. Unter Hauptstädten liegt
-   garantiert Land (kein Meer, keine Insel – Inseln wären ohne Navigation abgeschnitten),
-   und jeder Startplatz erfüllt die Mindestgüte. */
-function makeRandomMap(name, rows, cols, capitals, seed) {
-  const rnd = mapRng(seed);
-  const grid = [];
-  for (let r = 0; r < rows; r++) {
-    let line = '';
-    for (let c = 0; c < cols; c++) line += pickTerrain(rnd);
-    grid.push(line.split(''));
-  }
-  for (const pos of Object.values(capitals)) {
-    const [r, c] = pos;
-    if (!LAND_KEYS.includes(grid[r][c])) grid[r][c] = LAND_KEYS[Math.floor(rnd() * LAND_KEYS.length)];
-  }
-  // Mindestgüte je Startplatz: erst ein erreichbares Gründungsfeld, dann die Nahrung
-  for (const pos of Object.values(capitals)) {
-    const [r, c] = pos;
-    if (!startSpots(grid, r, c, capitals).length) carveSpot(grid, r, c, capitals, rnd);
-    boostFood(grid, r, c);
-  }
-  return { name, rows: grid.map(g => g.join('')), capitals: JSON.parse(JSON.stringify(capitals)), random: true };
-}
-function randomMap(seed) {
-  return makeRandomMap('Zufallskarte (12 × 18)', 12, 18, RANDOM_CAPITALS, seed);
-}
-/* Duellkarte: die beiden gewählten Zivilisationen bekommen die festen Startpunkte
-   in der Reihenfolge, in der sie im Aufbau stehen. */
-function duelMap(civA, civB, seed) {
-  const capitals = {};
-  capitals[civA] = DUEL_STARTS[0].slice();
-  capitals[civB] = DUEL_STARTS[1].slice();
-  return makeRandomMap('Duellkarte (12 × 8)', DUEL_SIZE.rows, DUEL_SIZE.cols, capitals, seed);
-}
 /* Siegschwellen im Duell: 3/4 statt 2/3, mit Theologie 7/10, mit Vereinten Nationen 2/3 */
 const DUEL_VICTORY_FRAC = 3 / 4;
 const DUEL_THEOLOGY_FRAC = 7 / 10;
 const DUEL_UN_FRAC = 2 / 3;
+/* Beschriftungen der Siegschwellen – eine Quelle für Regelrechnung und Anzeige, damit
+   der Technologiebogen im Duell nicht die Werte des normalen Spiels zeigt. */
+const VICTORY_LABEL = { base: '2/3', theologie: '3/5', un: '1/2' };
+const DUEL_VICTORY_LABEL = { base: '3/4', theologie: '7/10', un: '2/3' };
+const victoryLabels = duel => duel ? DUEL_VICTORY_LABEL : VICTORY_LABEL;

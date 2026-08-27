@@ -46,26 +46,33 @@ const TRI_MIDDLE = [[2, 1, 1], [1, 2, 1], [1, 1, 2]].map(t => TRI_INDEX[t.join('
      hier schon entscheiden.
    G Grasland · W Wald · B Gebirge · F Fluss · M Meer · I Insel                     */
 const TILE_POOL = [
-  { n: 'Weite Ebene', a: ['GGGGG', 'GGWG', 'GGG', 'WG', 'G'] },
-  { n: 'Kornkammer', a: ['GGWGG', 'GGGG', 'GGG', 'GW', 'G'] },
-  { n: 'Flusstal', a: ['GFGGW', 'GFGG', 'FGG', 'FW', 'F'] },
-  { n: 'Zwei Ströme', a: ['FGGFG', 'GFGF', 'GFG', 'GF', 'G'] },
-  { n: 'Waldland', a: ['WWGWW', 'WGGW', 'GGW', 'GW', 'W'] },
-  { n: 'Taiga', a: ['WWGGW', 'WGWG', 'GGW', 'WG', 'B'] },
-  { n: 'Urwald', a: ['WFWGW', 'WGFW', 'FGW', 'GW', 'W'] },
-  { n: 'Hochland', a: ['BBGBG', 'BGGB', 'GGB', 'GB', 'B'] },
-  { n: 'Gebirgskette', a: ['BBGBB', 'BGFB', 'GFB', 'BB', 'B'] },
-  { n: 'Bergsee', a: ['BFBGB', 'FGFB', 'GFG', 'BF', 'B'] },
-  { n: 'Karst', a: ['BGFGB', 'GGGB', 'GBG', 'FG', 'B'] },
-  { n: 'Steppe', a: ['GGBGW', 'GGGB', 'GWG', 'GB', 'W'] },
-  { n: 'Marschland', a: ['MFGFG', 'FGGF', 'GFG', 'FG', 'M'] },
-  { n: 'Küste', a: ['MMGGW', 'MGGG', 'GGW', 'GG', 'B'] },
-  { n: 'Bucht', a: ['MMMGG', 'MGGW', 'GGG', 'GW', 'G'] },
-  { n: 'Fjorde', a: ['MWMGW', 'MGGW', 'GGW', 'MG', 'B'] },
-  { n: 'Halbinsel', a: ['MGGGM', 'MGGM', 'GGG', 'MG', 'M'] },
-  { n: 'Inselgruppe', a: ['MIMIM', 'MIIM', 'IIM', 'MI', 'M'] },
-  { n: 'Archipel', a: ['IMIMM', 'IIIM', 'IIM', 'MI', 'I'] },
-  { n: 'Ferne Riffe', a: ['MMIMG', 'MIIM', 'IIG', 'MI', 'M'] },
+  // Binnenland – ohne Küste, damit auch trockene Ecken entstehen
+  { n: 'Weite Ebene', a: ['GWGGB', 'GGGF', 'GGW', 'WG', 'G'] },
+  { n: 'Kornkammer', a: ['MGWGB', 'GFGG', 'GGF', 'WG', 'G'] },
+  // Land mit einzelnen Meerfeldern an Ecken und Kanten. Ecken sind dafür der beste
+  // Platz: dort stoßen bis zu drei Plättchen zusammen, und sie liegen als einzige
+  // Felder neben keinem der drei mittigen – die Startgüte bleibt also unberührt.
+  { n: 'Flusstal', a: ['MFGGB', 'FGGF', 'GFG', 'BW', 'M'] },
+  { n: 'Hochland', a: ['BGBWM', 'GGGB', 'BGG', 'FB', 'M'] },
+  { n: 'Steppe', a: ['MGWGM', 'GGGG', 'GWG', 'GB', 'G'] },
+  { n: 'Taiga', a: ['WBWGM', 'MGGB', 'GGW', 'WG', 'B'] },
+  { n: 'Karst', a: ['MGFGW', 'GGGB', 'GBG', 'FG', 'M'] },
+  { n: 'Gebirgskette', a: ['MBGBM', 'BGFB', 'GFB', 'BG', 'B'] },
+  { n: 'Waldland', a: ['MGWGM', 'WGGW', 'GGW', 'WB', 'G'] },
+  { n: 'Urwald', a: ['MFWGM', 'FGGW', 'GFW', 'WG', 'G'] },
+  { n: 'Bergsee', a: ['BFBMM', 'FGFB', 'GFG', 'BW', 'M'] },
+  { n: 'Zwei Ströme', a: ['FGMMF', 'GFGF', 'GGG', 'FW', 'M'] },
+  // Küsten: Meer paarweise und in Zügen entlang der Kanten – trifft eine solche Kante
+  // auf eine andere, wächst daraus ein zusammenhängendes Meer.
+  { n: 'Marschland', a: ['MFGFM', 'FGGF', 'MFG', 'FW', 'M'] },
+  { n: 'Küste', a: ['MMGWB', 'MGGG', 'MGW', 'MG', 'F'] },
+  { n: 'Bucht', a: ['GMMGM', 'GGGM', 'GFG', 'WB', 'M'] },
+  { n: 'Fjorde', a: ['MWMGM', 'MGGW', 'MFF', 'GG', 'M'] },
+  { n: 'Halbinsel', a: ['MGGGM', 'MGGM', 'MFG', 'GB', 'M'] },
+  // Inselwelt: viel Meer, dafür Inseln (1/1/1) als Land
+  { n: 'Atoll', a: ['MMIMM', 'MIIM', 'MIG', 'IM', 'G'] },
+  { n: 'Inselgruppe', a: ['MIMIM', 'MIIM', 'MIG', 'MW', 'G'] },
+  { n: 'Ferne Riffe', a: ['MMIMG', 'MIIM', 'MGB', 'MI', 'G'] },
 ];
 // Plättchentext → 15 Gelände in TRI_IJK-Reihenfolge
 function tileTerrain(tile) { return tile.a.join('').split(''); }
@@ -162,8 +169,10 @@ function tilePlan(civs, seed) {
     n, shapeKey: shape.key, name: shape.name,
     tiles: shape.slots.map((_, i) => pool[i]),
     ori: shape.slots.map(() => Math.floor(rnd() * 3)),
+    // idx = Platz im Aufbau. Auf Plättchenkarten darf dieselbe Zivilisation mehrfach
+    // vorkommen, deshalb wird alles über idx geführt und nicht über civ.
     seats: seats.map((slot, i) => ({
-      slot, civ: civs[i], o: null, cell: null,
+      slot, idx: i, civ: civs[i], o: null, cell: null,
       free: seatFreeCells(shape, seats, i),
     })),
     revealed: false,
@@ -171,7 +180,6 @@ function tilePlan(civs, seed) {
   return plan;
 }
 const planShape = plan => TILE_SHAPES[plan.n];
-const seatOfCiv = (plan, civ) => plan.seats.find(s => s.civ === civ);
 const isSeatSlot = (plan, slot) => plan.seats.some(s => s.slot === slot);
 
 /* Gelände eines Plättchens in einer Lage: Feld n zeigt den Text an Position TRI_ROT[o][n] */
@@ -230,13 +238,14 @@ function tileMap(plan, opts) {
     const face = tileFaceTerrain(plan.tiles[slot], o);
     slotCells(sl).forEach((cube, i) => put(cube, face[i]));
   });
-  const capitals = {};
+  // Hauptstädte als Liste nach Platz: dieselbe Zivilisation kann mehrfach dabei sein.
+  const capitals = [];
   plan.seats.forEach(seat => {
     const cell = (opts.seat === seat && opts.cell != null) ? opts.cell : seat.cell;
     if (cell == null || !visible(seat.slot)) return;
-    if (opts.caps && !opts.caps.includes(seat.civ)) return;
+    if (opts.caps && !opts.caps.includes(seat.idx)) return;
     const [r, c] = cubeToRC(slotCells(shape.slots[seat.slot])[cell]);
-    capitals[seat.civ] = [r - r0, c - c0];
+    capitals[seat.idx] = { civ: seat.civ, r: r - r0, c: c - c0 };
   });
   return {
     name: plan.name, rows: grid.map(g => g.join('')), capitals,

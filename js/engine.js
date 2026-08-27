@@ -45,7 +45,26 @@ const popOf = (S, pi) => citiesOf(S, pi).reduce((a, x) => a + x.pop, 0);
 const worldPop = S => S.cities.reduce((a, x) => a + x.pop, 0);
 const capitalOf = (S, pi) => citiesOf(S, pi).find(x => x.cap);
 const roadLevel = (S, r, c) => S.roads[key(r, c)] || 0;
-const civOf = p => CIV_BY_KEY[p.civ] || BARB_CIV;
+/* Auf Plättchenkarten darf dieselbe Zivilisation mehrfach am Tisch sitzen. Damit die
+   Reiche unterscheidbar bleiben, bekommen die Doppelgänger im Aufbau einen eigenen Namen
+   („Russland II") und eine eigene Farbschattierung; civOf legt sie über die Zivilisation.
+   Ohne Doppelung ändert sich nichts – dann sind name und color leer. */
+const civOf = p => {
+  const base = CIV_BY_KEY[p.civ] || BARB_CIV;
+  if (!p.name && !p.color) return base;
+  return Object.assign({}, base, p.name ? { n: p.name } : null, p.color ? { color: p.color } : null);
+};
+/* Hauptstadt eines Reiches auf der Karte. Feste Karten führen sie nach Zivilisation,
+   Plättchenkarten nach Platz – dort kann es dieselbe Zivilisation zweimal geben. */
+function capitalSpot(map, p) {
+  const caps = map && map.capitals;
+  if (!caps) return null;
+  if (Array.isArray(caps)) {
+    const e = caps[p.slot];
+    return e ? [e.r, e.c] : null;
+  }
+  return caps[p.civ] || null;
+}
 
 /* Zivilisationsfähigkeit des Reiches ('basis' oder eine der Alternativen).
    Bots und die neutrale Barbarenfraktion haben KEINE Fähigkeit. */
@@ -77,9 +96,12 @@ function newGame(cfg) {
   // Feste Spielerreihenfolge: Russland → Griechenland → England → Wikinger.
   // Der Startspieler verschiebt nur den Einstiegspunkt in dieser Rotation.
   const ORDER = ['russland', 'griechenland', 'england', 'wikinger'];
-  const startCiv = cfg.players[cfg.startPlayer ?? 0] && cfg.players[cfg.startPlayer ?? 0].civ;
+  // Gleiche Zivilisationen behalten ihre Reihenfolge aus dem Aufbau (stabile Sortierung),
+  // und der Startspieler wird über den Platz bestimmt, nicht über die Zivilisation –
+  // sonst zeigte „Startspieler Russland" bei zwei Russlands auf das falsche Reich.
+  const startPc = cfg.players[cfg.startPlayer ?? 0];
   const ordered = cfg.players.slice().sort((a, b) => ORDER.indexOf(a.civ) - ORDER.indexOf(b.civ));
-  const startIdx = Math.max(0, ordered.findIndex(p => p.civ === startCiv));
+  const startIdx = Math.max(0, ordered.indexOf(startPc));
   const S = {
     v: 2, seed: (cfg.seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
     round: 1, cur: 0, over: null, log: [],
@@ -97,6 +119,7 @@ function newGame(cfg) {
     wonders: [], wpool: { 1: [], 2: [], 3: [] }, wgone: [],
     players: ordered.map(pc => ({
       civ: pc.civ, kind: pc.kind, diff: pc.diff || 'prinz', name: pc.name || null,
+      color: pc.color || null, slot: cfg.players.indexOf(pc),
       ability: pc.kind === 'bot' ? 'basis' : (pc.ability || 'basis'),
       power: 0, techs: {}, avail: {}, res: { sci: 0, food: 0, coins: 0 },
       copies: 0, nuked: false, dead: false,
@@ -113,7 +136,7 @@ function newGame(cfg) {
   });
   // Aufbau 5: Hauptstädte setzen
   S.players.forEach((p, i) => {
-    const pos = S.map.capitals[p.civ];
+    const pos = capitalSpot(S.map, p);
     if (!pos) return;
     // Russland "Siedlertrecks": auch die Hauptstadt startet mit 2 Bevölkerung
     const startPop = isAbil(p, 'siedler') ? 2 : 1;
@@ -945,19 +968,27 @@ function foundDistance(S, pi, r, c) {
   if (!cap) return 0;
   return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc));
 }
+/* Eine Stadt kostet Stadtkosten + Distanzkosten. Zwei Vergünstigungen greifen daran an:
+   Englands „Kolonisten" streicht die Stadtkosten, Kartografie die Distanzkosten. Hat man
+   beides, wird nicht etwa alles frei (und auch keine Pauschale von 1 fällig) – man zahlt
+   die günstigere der beiden Kosten. Am Anfang ist das die Stadtkosten (1 für die zweite
+   Stadt), später der Weg; ab der vierten Stadt wird es damit wieder spürbar teurer, statt
+   dauerhaft bei 1 zu bleiben. */
 function foundCost(S, pi, r, c) {
   const p = S.players[pi];
   const n = citiesOf(S, pi).length;
-  let base = n * (n + 1) / 2;                        // 1/3/6/10/15 …
-  if (isAbil(p, 'gruenden')) base = 0;               // England: keine Basiskosten
-  // Gründen kostet immer mindestens 1 Nahrung – sonst wäre es mit Englands Alternative
-  // plus Kartografie (keine Distanzkosten) vollständig gratis.
-  if (has(p, 'kartografie')) return Math.max(1, base);
-  const dist = foundDistance(S, pi, r, c);
+  const stadt = n * (n + 1) / 2;                     // 1/3/6/10/15 …
+  const ohneStadt = isAbil(p, 'gruenden');           // England: Kolonisten
+  const ohneWeg = has(p, 'kartografie');
   // Kein Weg = nicht gründbar. Früher wurde hier auf die Luftlinie ausgewichen, wodurch
-  // man ohne Navigation auf Inseln siedeln konnte.
-  if (dist == null) return Infinity;
-  return Math.max(1, base + dist);
+  // man ohne Navigation auf Inseln siedeln konnte. Mit Kartografie zählt der Weg zwar
+  // nicht für die Kosten, es muss ihn aber trotzdem geben (siehe canFound).
+  const dist = foundDistance(S, pi, r, c);
+  if (dist == null) return ohneWeg ? Math.max(1, stadt) : Infinity;
+  if (ohneStadt && ohneWeg) return Math.max(1, Math.min(stadt, dist));
+  if (ohneStadt) return Math.max(1, dist);
+  if (ohneWeg) return Math.max(1, stadt);
+  return Math.max(1, stadt + dist);
 }
 /* Steht auf einem Nachbarfeld eine fremde Armee? Dort wird nicht gesiedelt. */
 function enemyArmyAdjacent(S, pi, r, c) {
@@ -1313,14 +1344,24 @@ function captureCity(S, pi, city) {
 function victoryOption(S, p) {
   const duel = !!(S && S.duel);
   // Im Duell liegen alle Schwellen höher: >3/4 statt >=2/3, Theologie 7/10, UN 2/3
+  const L = victoryLabels(duel);
   const opts = duel
-    ? [{ frac: DUEL_VICTORY_FRAC, strict: true, label: '3/4' }]
-    : [{ frac: VICTORY_FRAC, strict: false, label: '2/3' }];
+    ? [{ frac: DUEL_VICTORY_FRAC, strict: true, label: L.base }]
+    : [{ frac: VICTORY_FRAC, strict: false, label: L.base }];
   if (has(p, 'un'))
-    opts.push({ frac: duel ? DUEL_UN_FRAC : UN_FRAC, strict: true, label: duel ? '2/3' : '1/2' });
+    opts.push({ frac: duel ? DUEL_UN_FRAC : UN_FRAC, strict: true, label: L.un });
   if (has(p, 'theologie'))
-    opts.push({ frac: duel ? DUEL_THEOLOGY_FRAC : THEOLOGY_FRAC, strict: true, label: duel ? '7/10' : '3/5' });
+    opts.push({ frac: duel ? DUEL_THEOLOGY_FRAC : THEOLOGY_FRAC, strict: true, label: L.theologie });
   return opts.sort((a, b) => a.frac - b.frac)[0];
+}
+/* Wirkungstext einer Technologie. Theologie und Vereinte Nationen senken die
+   Siegschwelle, und im Duell auf andere Werte als im normalen Spiel – der Bogen zeigte
+   dort bisher die Zahlen des Vierspielerspiels. */
+function techEffect(t, S) {
+  const L = victoryLabels(!!(S && S.duel));
+  if (t.k === 'theologie') return `>${L.theologie} der Bevölkerung zum Sieg`;
+  if (t.k === 'un') return `>${L.un} der Bevölkerung zum Sieg`;
+  return t.e;
 }
 function checkVictory(S, pi) {
   if (S.over) return S.over;
