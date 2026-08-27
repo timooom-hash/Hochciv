@@ -1359,8 +1359,8 @@ function victoryOption(S, p) {
    dort bisher die Zahlen des Vierspielerspiels. */
 function techEffect(t, S) {
   const L = victoryLabels(!!(S && S.duel));
-  if (t.k === 'theologie') return `>${L.theologie} der Bevölkerung zum Sieg`;
-  if (t.k === 'un') return `>${L.un} der Bevölkerung zum Sieg`;
+  if (t.k === 'theologie') return T('>%s der Bevölkerung zum Sieg', L.theologie);
+  if (t.k === 'un') return T('>%s der Bevölkerung zum Sieg', L.un);
   return t.e;
 }
 function checkVictory(S, pi) {

@@ -371,8 +371,8 @@ function redraw() {
   // Ist ein Sieg angemeldet, läuft die Runde noch zu Ende – das muss in der Kopfzeile
   // stehen, sonst wirkt das plötzliche Spielende willkürlich.
   const letzte = S.endRound != null && !S.over
-    ? ` · letzte Runde (${(S.claims || []).map(c => civOf(S.players[c.pi]).n).join(', ')})` : '';
-  $('hud-round').textContent = `Runde ${S.round} · Bevölkerung ${mine}/${all} (${pct} %)` +
+    ? ' · ' + T('letzte Runde (%s)', (S.claims || []).map(c => civOf(S.players[c.pi]).n).join(', ')) : '';
+  $('hud-round').textContent = T('Runde %s · Bevölkerung %s/%s (%s %)', S.round, mine, all, pct) +
     (ev ? ` · ${ev.n}` : '') + letzte;
   $('hud-sci').textContent = p.res.sci;
   $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
@@ -1094,7 +1094,7 @@ function mapOptions() {
   const out = [];
   if (n > 2) MAPS.forEach((m, i) => out.push([String(i), m.name]));
   out.push(['plaettchen', TILE_SHAPES[n].name]);
-  if (customMap && n > 2) out.push(['eigene', 'Eigene Karte']);
+  if (customMap && n > 2) out.push(['eigene', T('Eigene Karte')]);
   return out;
 }
 /* Die zuletzt bewusst gewählte Karte. Sie wird gemerkt, damit ein Ausflug in den
@@ -1163,24 +1163,24 @@ function renderSlots() {
     // Bei Zufall stehen die Fähigkeiten der Zivilisation noch nicht fest: dann gibt es
     // nur Zufall oder die Grundfähigkeit.
     const abils = zufall
-      ? [{ k: 'zufall', n: 'Zufall' }, { k: 'basis', n: 'Grundfähigkeit' }]
-      : civ.abilities.map((a, j) => ({ k: a.k, n: j === 0 ? a.n : `Alternative ${j + 1}: ${a.n}`, e: a.e }))
-        .concat([{ k: 'zufall', n: 'Zufall', e: 'Wird beim Spielstart ausgelost.' }]);
+      ? [{ k: 'zufall', n: T('Zufall') }, { k: 'basis', n: T('Grundfähigkeit') }]
+      : civ.abilities.map((a, j) => ({ k: a.k, n: j === 0 ? a.n : T('Alternative %s: %s', j + 1, a.n), e: a.e }))
+        .concat([{ k: 'zufall', n: T('Zufall'), e: T('Wird beim Spielstart ausgelost.') }]);
     const d = document.createElement('div');
     d.className = 'slot'; d.dataset.civ = civKey;
     d.innerHTML = ((frei || n < 4)
-      ? `<h3>${zufall ? '🎲' : SYM[civ.sym]} Platz ${i + 1}</h3>
-         <label class="row"><span>Zivilisation</span>
+      ? `<h3>${zufall ? '🎲' : SYM[civ.sym]} ${T('Platz %s', i + 1)}</h3>
+         <label class="row"><span>${T('Zivilisation')}</span>
            <select data-civpick>${CIVS.map(c =>
              `<option value="${c.k}"${c.k === civKey ? ' selected' : ''}>${c.n}</option>`).join('')}
-             <option value="zufall"${zufall ? ' selected' : ''}>Zufall</option>
+             <option value="zufall"${zufall ? ' selected' : ''}>${T('Zufall')}</option>
            </select></label>`
       : `<h3>${SYM[civ.sym]} ${civ.n}</h3>`) +
       `<div class="seg">
-        <button data-kind="human" class="${(alt[i] ? alt[i].kind === 'human' : i === 0) ? 'on' : ''}">Mensch</button>
-        <button data-kind="bot" class="${(alt[i] ? alt[i].kind === 'bot' : i !== 0) ? 'on' : ''}">Bot</button>
+        <button data-kind="human" class="${(alt[i] ? alt[i].kind === 'human' : i === 0) ? 'on' : ''}">${T('Mensch')}</button>
+        <button data-kind="bot" class="${(alt[i] ? alt[i].kind === 'bot' : i !== 0) ? 'on' : ''}">${T('Bot')}</button>
       </div>
-      <label class="row"><span>Fähigkeit</span>
+      <label class="row"><span>${T('Fähigkeit')}</span>
         <select data-abil="${zufall ? 'zufall' : civ.k}">${abils.map(a =>
           `<option value="${a.k}">${a.n}</option>`).join('')}
         </select></label>
@@ -1193,9 +1193,9 @@ function renderSlots() {
       const kind = d.querySelector('[data-kind].on').dataset.kind;
       sela.disabled = kind === 'bot';
       const a = abils.find(x => x.k === sela.value) || abils[0];
-      note.textContent = kind === 'bot' ? 'Bots erhalten keine Zivilisationsfähigkeit.'
-        : zufall ? 'Zivilisation und Fähigkeit werden beim Spielstart ausgelost.'
-          : (a.e || 'Wird beim Spielstart ausgelost.');
+      note.textContent = kind === 'bot' ? T('Bots erhalten keine Zivilisationsfähigkeit.')
+        : zufall ? T('Zivilisation und Fähigkeit werden beim Spielstart ausgelost.')
+          : (a.e || T('Wird beim Spielstart ausgelost.'));
     };
     sela.onchange = paint;
     d.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
@@ -1290,9 +1290,9 @@ function startPlayers() {
 let startWanted = null;
 function refreshStart() {
   const cfg = setupConfig(), sel = $('setup-start');
-  const label = p => p.civ === 'zufall' ? 'Zufällige Zivilisation'
+  const label = p => p.civ === 'zufall' ? T('Zufällige Zivilisation')
     : (CIV_BY_KEY[p.civ] ? CIV_BY_KEY[p.civ].n : p.civ);
-  sel.innerHTML = '<option value="zufall">Zufällig</option>' + cfg.map((p, i) =>
+  sel.innerHTML = `<option value="zufall">${T('Zufällig')}</option>` + cfg.map((p, i) =>
     `<option value="${i}">${label(p)}${p.kind === 'bot' ? ' (Bot)' : ''}</option>`).join('');
   const menschen = cfg.filter(p => p.kind === 'human').length;
   sel.value = (startWanted != null && [...sel.options].some(o => o.value === startWanted))
@@ -1458,11 +1458,70 @@ function edTap(r, c) {
 }
 
 /* ------------------------------------------------------------------ Start */
+/* ---------------------------------------------------------------- Sprache
+   Der feste Text aus index.html wird beim Start einmal eingesammelt (deutsche Fassung
+   als Schlüssel) und beim Sprachwechsel neu gesetzt. Dynamische Texte laufen ohnehin
+   durch T(); für sie genügt ein Neuzeichnen. */
+let staticText = null;
+function collectStatic() {
+  staticText = [];
+  const walk = document.createTreeWalker(document.body, 4 /* NodeFilter.SHOW_TEXT */);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    const t = n.nodeValue.trim();
+    if (!t || t.length < 2) continue;
+    if (n.parentNode && /SCRIPT|STYLE/.test(n.parentNode.nodeName)) continue;
+    staticText.push([n, n.nodeValue]);
+  }
+}
+function applyStaticLang() {
+  if (!staticText) return;
+  staticText.forEach(([n, de]) => {
+    if (!n.parentNode) return;                 // inzwischen neu gezeichnet
+    const roh = de.trim();
+    // Schlüssel ohne Zeilenumbrüche und Einrückung – im Markup umbrochene Sätze sollen
+    // im Wörterbuch als ein Satz stehen.
+    const neu = T(roh.replace(/\s+/g, ' '));
+    n.nodeValue = de.replace(roh, neu);
+  });
+}
+function langRow() {
+  const box = $('m-lang');
+  if (!box) return;
+  box.innerHTML = LANGS.map(l =>
+    `<button class="lang-btn${l.k === LANG ? ' on' : ''}" data-lang="${l.k}"
+       title="${l.n}" aria-label="${l.n}">${l.flag}</button>`).join('');
+  box.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => switchLang(b.dataset.lang));
+}
+function switchLang(k) {
+  if (k === LANG) return;
+  setLang(k);
+  document.documentElement.lang = k;
+  applyStaticLang();
+  langRow();
+  bootTexts();
+  // was gerade offen ist, neu zeichnen
+  if (S && $('screen-game').classList.contains('show')) redraw();
+  if ($('screen-setup').classList.contains('show')) setupScreen();
+  if ($('screen-editor').classList.contains('show')) editorScreen();
+  closeModal(); closeSheet();
+}
+/* Texte, die boot() einmalig setzt – beim Sprachwechsel dieselben Zeilen erneut. */
+function bootTexts() {
+  $('m-tutorial').textContent = T('Tutorial – geführtes Übungsspiel');
+  const ver = $('m-version');
+  if (ver) ver.textContent = 'Hochzeivilization ' + APP_VERSION;
+}
+
 function boot() {
+  initLang();
+  document.documentElement.lang = LANG;
+  collectStatic();
+  applyStaticLang();
+  langRow();
   customMap = load('hochciv.map');
   const saved = load('hochciv.save');
   $('m-continue').hidden = !saved;
-  $('m-tutorial').textContent = 'Tutorial – geführtes Übungsspiel';
+  bootTexts();
 
   $('m-new').onclick = () => { show('screen-setup'); setupScreen(); };
   // Tutorial: geführtes Übungsspiel in der normalen Oberfläche
@@ -1485,7 +1544,7 @@ function boot() {
 
   $('setup-go').onclick = () => {
     const players = startPlayers();      // Zufall auflösen, dann Ziffern und Farben
-    if (!players.some(p => p.kind === 'human')) return toast('Mindestens eine menschliche Zivilisation.');
+    if (!players.some(p => p.kind === 'human')) return toast(T('Mindestens eine menschliche Zivilisation.'));
     const duel = setupMode === 'duell';
     const pick = $('setup-map').value;
     const startWahl = $('setup-start').value;
@@ -1547,8 +1606,6 @@ function boot() {
   attachTaps($('pl-map'), plTap);
   $('pl-rot').onclick = placeRotate;
   $('pl-ok').onclick = placeConfirm;
-  const ver = $('m-version');
-  if (ver) ver.textContent = 'Hochzeivilization ' + APP_VERSION;
   initOrientation();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 }

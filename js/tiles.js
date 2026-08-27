@@ -90,8 +90,9 @@ function tileTerrain(tile) { return tile.a.join('').split(''); }
    3 Spieler: dasselbe Sechseck (samt Loch), dazu je ein Dreieck an drei Kanten –
      zusammen ein großes Dreieck aus neun Plättchen.
    4 Spieler: zwei Reihen zu fünf Dreiecken, zusammen ein gestrecktes Sechseck ohne
-     jedes Loch. Die beiden mittigen Plättchen liegen offen, um sie herum laufen acht;
-     die Spieler sitzen auf jedem zweiten davon.                                     */
+     jedes Loch. Die Spieler sitzen auf den vier Dreiecken, die mit ihrer breiten Seite
+     an der Ober- bzw. Unterkante liegen (je zwei oben und unten) – das sind die vier
+     Ecken der gestreckten Form. Die übrigen sechs liegen offen.                                     */
 const SL = (t, x, y, z) => ({ t, a: [x, y, z] });
 const TILE_SHAPES = {
   2: {
@@ -121,8 +122,9 @@ const TILE_SHAPES = {
       SL('A', 0, -5, 1), SL('B', 5, -6, 5), SL('A', 6, -11, 1), SL('B', 11, -12, 5), SL('A', 12, -17, 1),
     ],
     holes: [],                    // der Streifenverbund deckt lückenlos ab
-    // jedes zweite der acht äußeren Plättchen (2 und 7 liegen mittig)
-    seatSets: [[1, 4, 8, 5]],
+    // die beiden oberen und die beiden unteren Dreiecke: 1 und 3 liegen mit ihrer
+    // Fünferzeile an der Oberkante, 6 und 8 an der Unterkante
+    seatSets: [[1, 3, 6, 8]],
   },
 };
 /* Mindestabstand einer Hauptstadt zu jedem Feld der fremden Startplättchen. Die Regel
