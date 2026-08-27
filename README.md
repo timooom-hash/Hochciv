@@ -25,7 +25,9 @@ sonst behalten installierte Geräte die alte Fassung.
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
 | Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
 | Spielart | „Vier Reiche“, „Drei Reiche“ oder „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) |
-| Karte | Originalkarte, Große Karte, **Plättchenkarte**, Rasterkarte oder eigene aus dem Editor |
+| Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen |
+| Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
+| Karte | Originalkarte, Große Karte, **Plättchenkarte** (die Zufallskarte) oder eigene aus dem Editor |
 | Plättchenkarte | Zufallskarte aus Dreiecken zu 15 Feldern. Vor dem Spiel legt jedes Reich verdeckt sein eigenes Startdreieck: Lage wählen (drei), Hauptstadt setzen. Dann wird aufgedeckt |
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
 | 🌾 in der Kopfzeile | Städte füttern (nur mit Gentechnik oder Massenmedien) |
@@ -102,8 +104,13 @@ die einer fremden Hauptstadt näher als 3 Felder kommen könnten (Städte brauch
 Abstand, und gelegt wird blind). Bots drehen zufällig und setzen auf eines der drei
 mittigen Felder. Erst wenn alle fertig sind, wird aufgedeckt.
 
+Meer liegt immer am Rand eines Plättchens, oft an den Ecken – trifft beim Zusammenlegen
+Kante auf Kante, wächst daraus ein zusammenhängendes Meer. Etwa die Hälfte der Karten
+bekommt so eine Fläche von acht Feldern oder mehr, die andere Hälfte bleibt Landkarte.
+
 Neue Plättchen kommen in `js/tiles.js`, `TILE_POOL` – fünf Zeilen zu 5/4/3/2/1 Feldern.
-`node test.js` prüft dabei, dass die drei mittigen Felder Land sind und jedes davon im
+`node test.js` prüft dabei, dass jedes Plättchen mindestens drei Geländearten hat, dass
+Meer nur am Rand liegt und dass die drei mittigen Felder Land sind und jedes davon im
 ersten Zug mindestens 4 Nahrung bringt.
 
 * **Im Spiel:** *Karte bearbeiten* → Gelände antippen; Hauptstädte über die

@@ -27,6 +27,8 @@ const src = ['js/data.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expan
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
   + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
 const G = n => window.__get(n);
+const CIV_BY_KEY_TEST = k => G('CIV_BY_KEY')[k];
+const CIVS_TEST = () => G('CIVS');
 const SET = (n, v) => window.__set(n, v);
 // Das Auto-Weiterschalten im Tutorial läuft in der App über setTimeout. Im Test
 // wird die Verzögerung auf 0 gesetzt, damit es synchron und damit prüfbar abläuft.
@@ -274,24 +276,29 @@ step('Schwierigkeit ist global (ein Dropdown)', () => {
   if ($('setup-list').querySelector('[data-diff]')) throw new Error('noch Pro-Bot-Schwierigkeit vorhanden');
   console.log('       ' + [...sel.options].map(o => o.text).join(' · '));
 });
-step('Zufallskarte im Menü wählbar', () => {
+step('Kartenmenü: feste Karten und Plättchenkarte, kein Rastergenerator mehr', () => {
   const opts = [...$('setup-map').options].map(o => o.value);
-  if (!opts.includes('zufall')) throw new Error('keine Zufallskarte im Kartenmenü');
+  if (!opts.includes('plaettchen')) throw new Error('keine Plättchenkarte im Kartenmenü');
+  if (opts.includes('zufall')) throw new Error('die alte Rasterkarte steht noch im Menü');
+  if (!opts.includes('0')) throw new Error('die Originalkarte fehlt');
   console.log('       ' + [...$('setup-map').options].map(o => o.text).join(' · '));
 });
 step('1-gegen-1-Modus im Aufbau', () => {
   $('setup-mode').querySelector('[data-mode=duell]').onclick();
   const slots = [...$('setup-list').children];
   if (slots.length !== 2) throw new Error('nicht zwei Plätze, sondern ' + slots.length);
-  // Im Duell stehen nur Zufallskarten zur Wahl – die festen haben vier Startsterne.
+  // Im Duell gibt es nur die Plättchenkarte – die festen Karten haben vier Startsterne.
+  // Bei nur einer Möglichkeit bleibt die Kartenzeile weg.
   const karten = [...$('setup-map').options].map(o => o.value);
-  if (karten.includes('0')) throw new Error('feste Karten im Duell angeboten');
-  if (!karten.includes('plaettchen') || !karten.includes('zufall'))
-    throw new Error('Duell ohne beide Zufallskarten: ' + karten.join(','));
+  if (karten.join() !== 'plaettchen') throw new Error('Kartenauswahl im Duell: ' + karten.join(','));
+  if (!$('setup-map-row').hidden) throw new Error('Kartenzeile im Duell nicht versteckt');
+  if (!$('setup-map').disabled) throw new Error('Kartenauswahl im Duell nicht abgeschaltet');
   if ($('setup-duel-hint').hidden) throw new Error('kein Hinweis auf die Duellregeln');
   const picks = slots.map(x => x.querySelector('[data-civpick]'));
-  if (picks.some(p => !p) || picks[0].options.length !== 4)
-    throw new Error('nicht alle vier Zivilisationen wählbar');
+  // vier Zivilisationen plus „Zufall"
+  if (picks.some(p => !p) || picks[0].options.length !== 5)
+    throw new Error('Zivilisationsliste hat ' + (picks[0] ? picks[0].options.length : 0) + ' Einträge');
+  if ([...picks[0].options].pop().value !== 'zufall') throw new Error('kein Zufall in der Liste');
   // Kollision muss aufgelöst werden
   picks[0].value = slots[1].dataset.civ; picks[0].onchange();
   const now = [...$('setup-list').children].map(x => x.dataset.civ);
@@ -305,6 +312,7 @@ step('1-gegen-1-Modus im Aufbau', () => {
 });
 step('Originalkarte ist vorausgewählt', () => {
   const sel = $('setup-map');
+  if ($('setup-map-row').hidden) throw new Error('Kartenzeile fehlt bei vier Reichen');
   const chosen = sel.options[sel.selectedIndex >= 0 ? sel.selectedIndex : 0].text;
   if (!/^Originalkarte/.test(chosen)) throw new Error('vorausgewählt ist: ' + chosen);
   console.log('       ' + chosen);
@@ -325,7 +333,10 @@ step('Erweiterungen ankreuzbar (Ereignisse, Weltwunder)', () => {
 step('Fähigkeitswahl je Zivilisation', () => {
   const sels = [...$('setup-list').querySelectorAll('[data-abil]')];
   if (sels.length !== 4) throw new Error('nur ' + sels.length + ' Fähigkeits-Dropdowns');
-  if (sels[0].options.length !== 3) throw new Error('nicht drei Fähigkeiten je Reich');
+  // drei Fähigkeiten plus „Zufall"
+  if (sels[0].options.length !== 4)
+    throw new Error(sels[0].options.length + ' Einträge statt drei Fähigkeiten plus Zufall');
+  if ([...sels[0].options].pop().value !== 'zufall') throw new Error('kein Zufall in der Liste');
   const botSlot = $('setup-list').children[1];
   if (!botSlot.querySelector('[data-abil]').disabled) throw new Error('Bot-Fähigkeit nicht gesperrt');
   if (!/keine Zivilisationsfähigkeit/.test(botSlot.querySelector('.abil').textContent))
@@ -1444,9 +1455,167 @@ step('Spielende: Punktetafel und Mensch vor Bot', () => {
   console.log('       Punktetafel mit 2 Ansprüchen, Sieg an den Menschen');
   G('closeModal')();
 });
+step('Plättchenkarte: dieselbe Zivilisation mehrfach wählbar', () => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = 'plaettchen'; $('setup-map').onchange();
+  if ($('setup-double-hint').hidden) throw new Error('kein Hinweis auf die freie Wahl');
+  const slots = [...$('setup-list').children];
+  const picks = slots.map(x => x.querySelector('[data-civpick]'));
+  if (picks.some(p => !p)) throw new Error('bei vier Reichen fehlt die Zivilisationswahl');
+  // Alle vier Plätze fest setzen: zweimal Russland, das darf hier stehenbleiben
+  const setze = (i, k) => {
+    const sel = [...$('setup-list').children][i].querySelector('[data-civpick]');
+    sel.value = k; sel.onchange();
+  };
+  ['russland', 'russland', 'england', 'wikinger'].forEach((k, i) => setze(i, k));
+  const civs = [...$('setup-list').children].map(x => x.dataset.civ);
+  if (civs.join() !== 'russland,russland,england,wikinger')
+    throw new Error('die Doppelung wurde aufgelöst: ' + civs.join(','));
+  // verschiedene Fähigkeiten für die beiden
+  const abil = [...$('setup-list').children].map(x => x.querySelector('[data-abil]'));
+  abil[0].value = 'siedler'; abil[0].onchange();
+  const cfg = G('startPlayers')();
+  if (cfg[0].name !== 'Russland I' || cfg[1].name !== 'Russland II')
+    throw new Error('keine Ziffern für die Doppelgänger: ' + cfg.map(p => p.name).join(','));
+  if (cfg[0].color === cfg[1].color) throw new Error('beide Russlands in derselben Farbe');
+  if (cfg[0].ability === cfg[1].ability) throw new Error('Fähigkeit nicht übernommen');
+  // Startspielerliste: erst „Zufällig", dann die Plätze (dort steht die Zivilisation,
+  // die Ziffern fallen erst beim Start – die Wahl soll ja nicht vorwegnehmen, wer wer ist)
+  const startOpts = [...$('setup-start').options].map(o => o.text);
+  if (startOpts[0] !== 'Zufällig') throw new Error('kein Zufall als Startspieler: ' + startOpts[0]);
+  if (startOpts.length !== 5) throw new Error('Startspielerliste hat ' + startOpts.length + ' Einträge');
+  console.log('       ' + cfg.map(p => (p.name || p.civ) + '/' + p.ability).join(' · '));
+});
+step('Feste Karte lässt keine zwei gleichen Reiche zu', () => {
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  const civs = [...$('setup-list').children].map(x => x.dataset.civ);
+  if (new Set(civs).size !== 4) throw new Error('doppelte Zivilisation auf fester Karte: ' + civs.join(','));
+  const pick = [...$('setup-list').children][1].querySelector('[data-civpick]');
+  if (pick) {
+    pick.value = civs[0]; pick.onchange();
+    const jetzt = [...$('setup-list').children].map(x => x.dataset.civ);
+    if (new Set(jetzt).size !== 4) throw new Error('Kollision nicht aufgelöst: ' + jetzt.join(','));
+  }
+  const cfg = G('startPlayers')();
+  if (cfg.some(p => p.name)) throw new Error('ohne Doppelung darf es keine Ziffern geben');
+  if (cfg.some(p => p.color)) throw new Error('ohne Doppelung bleibt die eigene Farbe');
+  console.log('       ' + [...$('setup-list').children].map(x => x.dataset.civ).join(' · '));
+});
+step('Zwei gleiche Reiche spielen auf der Plättchenkarte', () => {
+  $('setup-map').value = 'plaettchen'; $('setup-map').onchange();
+  const setze = (i, k) => {
+    const sel = [...$('setup-list').children][i].querySelector('[data-civpick]');
+    sel.value = k; sel.onchange();
+  };
+  ['wikinger', 'wikinger', 'england', 'griechenland'].forEach((k, i) => setze(i, k));
+  [...$('setup-list').children].slice(1).forEach(x => x.querySelector('[data-kind="bot"]').onclick());
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+  $('setup-go').onclick();
+  // ein Mensch: legt selbst, danach wird aufgedeckt und gestartet
+  const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
+  G('plTap')(rcs[frei.indexOf(true)][0], rcs[frei.indexOf(true)][1]);
+  G('placeConfirm')(); G('placeConfirm')();
+  const S = G('S');
+  const wik = S.players.filter(p => p.civ === 'wikinger');
+  if (wik.length !== 2) throw new Error('nicht zwei Wikingerreiche im Spiel');
+  if (S.cities.length !== 4) throw new Error('nicht vier Hauptstädte');
+  if (new Set(S.cities.map(c => c.r + ',' + c.c)).size !== 4)
+    throw new Error('zwei Hauptstädte auf demselben Feld');
+  const namen = wik.map(p => G('civOf')(p).n);
+  if (namen[0] === namen[1]) throw new Error('beide heißen gleich: ' + namen.join(','));
+  if (G('civOf')(wik[0]).color === G('civOf')(wik[1]).color)
+    throw new Error('beide in derselben Farbe');
+  if ($('map').querySelectorAll('[data-r]').length !== 150)
+    throw new Error('die Karte hat nicht 150 Felder');
+  console.log('       ' + S.players.map(p => G('civOf')(p).n).join(' · '));
+});
+step('Zufall als Zivilisation, Fähigkeit und Startspieler', () => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = 'plaettchen'; $('setup-map').onchange();
+  const setze = (i, sel, wert) => {
+    const el = [...$('setup-list').children][i].querySelector(sel);
+    el.value = wert; el.onchange();
+  };
+  setze(0, '[data-civpick]', 'zufall');
+  setze(1, '[data-civpick]', 'zufall');
+  // Bei Zufall gibt es nur Zufall oder die Grundfähigkeit
+  const abil0 = [...$('setup-list').children][0].querySelector('[data-abil]');
+  if ([...abil0.options].map(o => o.value).join() !== 'zufall,basis')
+    throw new Error('Fähigkeitsliste bei Zufall: ' + [...abil0.options].map(o => o.value).join());
+  setze(2, '[data-abil]', 'zufall');            // bekannte Zivilisation, Fähigkeit gelost
+  // zwei Menschen ⇒ Startspieler steht auf Zufällig
+  [...$('setup-list').children].slice(0, 2).forEach(x => x.querySelector('[data-kind="human"]').onclick());
+  [...$('setup-list').children].slice(2).forEach(x => x.querySelector('[data-kind="bot"]').onclick());
+  if ($('setup-start').value !== 'zufall')
+    throw new Error('bei zwei Menschen ist Zufall nicht vorausgewählt: ' + $('setup-start').value);
+  // auflösen: echte Zivilisationen und echte Fähigkeiten
+  const alle = CIVS_TEST().map(c => c.k);
+  for (let versuch = 0; versuch < 20; versuch++) {
+    const cfg = G('startPlayers')();
+    if (cfg.some(p => p.civ === 'zufall')) throw new Error('Zufall nicht aufgelöst');
+    if (cfg.some(p => !alle.includes(p.civ))) throw new Error('unbekannte Zivilisation');
+    if (cfg.some(p => p.ability === 'zufall')) throw new Error('Fähigkeit nicht aufgelöst');
+    cfg.forEach(p => {
+      if (!G('CIV_BY_KEY')[p.civ].abilities.some(a => a.k === p.ability))
+        throw new Error('Fähigkeit passt nicht zur Zivilisation: ' + p.civ + '/' + p.ability);
+    });
+    if (new Set(cfg.map(p => G('civOf')(p).color)).size !== 4)
+      throw new Error('nicht vier verschiedene Farben: ' + cfg.map(p => G('civOf')(p).color).join(','));
+  }
+  console.log('       aufgelöst, vier verschiedene Farben, Startspieler zufällig');
+});
+step('Bei einem Menschen bleibt er selbst der Startspieler', () => {
+  [...$('setup-list').children].slice(1).forEach(x => x.querySelector('[data-kind="bot"]').onclick());
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+  if ($('setup-start').value === 'zufall')
+    throw new Error('mit nur einem Menschen sollte er vorausgewählt sein');
+  if ($('setup-start').value !== '0') throw new Error('nicht Platz 1: ' + $('setup-start').value);
+});
+step('Doppelte Zivilisation bekommt eine andere Zivilisationsfarbe, keine Schattierung', () => {
+  const setze = (i, k) => {
+    const el = [...$('setup-list').children][i].querySelector('[data-civpick]');
+    el.value = k; el.onchange();
+  };
+  ['griechenland', 'griechenland', 'england', 'wikinger'].forEach((k, i) => setze(i, k));
+  const cfg = G('startPlayers')();
+  const farben = cfg.map(p => G('civOf')(p).color);
+  const civFarben = CIVS_TEST().map(c => c.color);
+  if (new Set(farben).size !== 4) throw new Error('Farben nicht eindeutig: ' + farben.join(','));
+  if (!farben.every(f => civFarben.includes(f)))
+    throw new Error('keine Zivilisationsfarbe: ' + farben.join(','));
+  if (farben[0] !== CIV_BY_KEY_TEST('griechenland').color)
+    throw new Error('das erste Griechenland behält sein Blau nicht');
+  console.log('       ' + cfg.map(p => (p.name || p.civ) + ' ' + G('civOf')(p).color).join(' · '));
+});
+step('Technologiebogen: „hat sie" und „könnte sie" sind zu unterscheiden', () => {
+  frischesSpiel();
+  const S = G('S');
+  // zwei Menschen, damit die Möglichkeit-Marken überhaupt gezeigt werden
+  S.players[1].kind = 'human';
+  S.players[1].techs.rad = true;
+  S.players[1].avail.schrift = true;
+  G('techModal')();
+  const hat = $('ov-body').querySelectorAll('.owner-mark.has');
+  const kann = $('ov-body').querySelectorAll('.owner-mark.can');
+  if (!hat.length) throw new Error('keine „hat sie"-Marke');
+  if (!kann.length) throw new Error('keine „könnte sie"-Marke');
+  // gefüllt gegen leer: die Füllfarbe unterscheidet sich
+  const gefuellt = [...hat].every(m => /background:#/.test(m.getAttribute('style')));
+  const leer = [...kann].every(m => !/background:#/.test(m.getAttribute('style')));
+  if (!gefuellt) throw new Error('„hat sie" ist nicht ausgefüllt');
+  if (!leer) throw new Error('„könnte sie" ist ausgefüllt');
+  if (![...kann].every(m => m.querySelector('i'))) throw new Error('kein Fragezeichen an der Möglichkeit');
+  if (!$('ov-body').querySelector('.owner-legend')) throw new Error('keine Legende mit Beispielmarken');
+  console.log(`       ${hat.length} × hat, ${kann.length} × könnte, Legende vorhanden`);
+  G('closeModal')();
+});
 step('Drei Reiche im Aufbau', () => {
   $('m-new').onclick();
   $('setup-mode').querySelector('[data-mode=drei]').onclick();
+  // auf einer festen Karte sitzt jede Zivilisation genau einmal
+  $('setup-map').value = '0'; $('setup-map').onchange();
   const slots = [...$('setup-list').children];
   if (slots.length !== 3) throw new Error('nicht drei Plätze, sondern ' + slots.length);
   const civs = slots.map(x => x.dataset.civ);

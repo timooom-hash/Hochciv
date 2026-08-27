@@ -28,16 +28,16 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/data.js` | 471 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, Karten, Zufalls- und Duellkartengenerator inkl. Startgüte, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 349 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
-| `js/tiles.js` | 256 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1471 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/tiles.js` | 265 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
+| `js/engine.js` | 1512 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 515 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1516 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 1631 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 911 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 3542 | **1064 Assertions**, `node test.js` |
-| `smoke.js` | 1506 | **78 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 3646 | **1067 Assertions**, `node test.js` |
+| `smoke.js` | 1675 | **85 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 34 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 30 / 210 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` erzeugen (reportlab) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
@@ -73,20 +73,34 @@ Gedächtnis rekonstruieren.
 - **Weltwunder** (Erweiterung) mit Pyramidenregel, Kultursieg und vier eigenen Technologien
   (Baukräne, Wallfahrt, Militärlogistik, Raumfahrt). Bots bauen sie kostenlos, **ohne Effekte**
   — einzige Ausnahme: Militärlogistik wirkt auch für Bots.
-- **Karten:** Originalkarte (Standard), Große Karte, **Plättchenkarte** (Zufallskarte aus
-  Dreiecken, eigene Form je Spielerzahl), Rasterkarte (der alte Generator: 12 × 18, im
-  Duell 12 × 8, garantiert je Startplatz 4 Nahrung und ein siedelbares Feld in Distanz 3),
-  eigene aus dem Editor.
+- **Karten:** Originalkarte (Standard), Große Karte, **Plättchenkarte** (die Zufallskarte,
+  aus Dreiecken, eigene Form je Spielerzahl), eigene aus dem Editor. Der alte
+  Rastergenerator (12 × 18 bzw. 12 × 8) ist in v51 **ersatzlos entfallen**, samt
+  `randomMap`, `duelMap`, `makeRandomMap`, `MAP_MIX`, `RANDOM_CAPITALS`, `startFood`,
+  `startSpots`, `carveSpot`, `boostFood`. Geblieben ist aus dem Block nur `mapRng`.
 - **Plättchenkarte + Legephase:** 20 handentworfene Dreiecke zu 15 Feldern (`js/tiles.js`).
   2 Reiche → Sechseck aus 6 (Mitte bleibt **als Loch offen**), 3 → großes Dreieck aus 9
   (Loch), 4 → gestrecktes Sechseck aus 10 (lückenlos). Jedes Reich legt sein Startdreieck
   **verdeckt**: eine von drei Lagen, Hauptstadt frei auf Land (gesperrt nur, was einer
   fremden Hauptstadt näher als 3 kommen könnte). Bots legen zufällig auf eines der drei
   mittigen Felder. Danach Aufdecken, dann startet das Spiel.
+- **Aufbau (v51):** Zivilisation, Fähigkeit und Startspieler lassen sich **auslosen**
+  („Zufall", aufgelöst erst beim Start in `resolveRandom`); bei mehr als einem Menschen ist
+  der zufällige Startspieler die Vorgabe. Doppelgänger bekommen **je eine der vier
+  Zivilisationsfarben**, keine Schattierungen.
+- **Siegschwellen:** `VICTORY_LABEL` / `DUEL_VICTORY_LABEL` in `js/data.js` sind die eine
+  Quelle für Rechnung (`victoryOption`) und Anzeige (`techEffect`, Regelübersicht). Im
+  Duell zeigte der Bogen vorher die Werte des Vierspielerspiels.
+- **Zivilisationen (v51):** Auf Plättchenkarten darf jeder Platz frei wählen, **auch
+  mehrfach dieselbe** (Doppelgänger: „Russland I/II/III", eigene Farbschattierung). Auf
+  festen Karten bleibt jede Zivilisation einmalig. Identität ist damit `p.slot`, nicht
+  `p.civ`: Plättchenkarten führen `map.capitals` als **Liste** `[{civ,r,c}]`, feste Karten
+  weiter als Objekt; `capitalSpot()` kennt beide.
 - **Spielerzahlen 2, 3 und 4.** „Drei Reiche" ist neu (Standard-Siegschwellen, nicht die
   des Duells); freie Zivilisationswahl bei 2 und 3.
-- **1 gegen 1:** zwei frei gewählte Reiche, nur Zufallskarten (Plättchen- oder Rasterkarte
-  12 × 8), Wirtschaftssieg erst über 3/4 (Theologie 7/10, UN 2/3).
+- **1 gegen 1:** zwei frei gewählte Reiche, immer die Plättchenkarte aus sechs Dreiecken
+  (die Kartenzeile bleibt deshalb weg), Wirtschaftssieg erst über 3/4 (Theologie 7/10,
+  UN 2/3).
 - **Spielende (v51):** Nur der **Militärsieg** endet sofort. Wirtschafts-, Forschungs- und
   Kultursieg werden **angemeldet** (`claimVictory`, `S.claims`, `S.endRound`); gespielt wird
   bis zum **Rundenende**, dort entscheidet `resolveClaims`. Mehrere Ansprüche in derselben
@@ -188,6 +202,15 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   prüfen, die Bot-Verhalten beschreiben, und ggf. eine neue Würfelfolge suchen (in `test.js`
   ist der Ablauf zweimal auf Gleichheit gepinnt).
 
+### Gründungskosten (geändert in v51)
+
+`foundCost` rechnet Stadtkosten (1/3/6/10 …) + Distanzkosten. Englands **Kolonisten**
+streicht die Stadtkosten, **Kartografie** die Distanzkosten. Beides zusammen kostete bis
+v50 pauschal 1 Nahrung – ab der dritten Stadt praktisch gratis. Jetzt zahlt man die
+**günstigere der beiden** Kosten, also anfangs die Stadtkosten und später den Weg. Die
+Einzelvergünstigungen sind unverändert; der Mindestbetrag von 1 bleibt nur als Sperre
+gegen 0-Kosten-Sonderfälle (Reich ohne Stadt).
+
 ### Siegansprüche (neu in v51)
 
 - `S.over` wird an **zwei** Stellen gesetzt: sofort in `captureCity` (Militärsieg,
@@ -217,6 +240,12 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   keine „zwei Sechsecke".
 - Wer Plättchen ergänzt: die drei mittigen Felder müssen Land sein **und** je mindestens
   4 Nahrung bringen (Bots setzen dort). Der Test rechnet es nach und nennt die Spanne.
+  Zusätzlich geprüft: mit Russlands Bevölkerung 2 bleibt je Plättchen **mindestens ein**
+  mittiges Feld bei 4 (8 der 60 fallen dort auf 3, siehe `ANNAHMEN.md`).
+- **Meer nur am Rand**, und mit Dichte: einzelne Meerfelder in den Ecken bringen fast
+  nichts, weil sie beim Zusammenlegen selten auf anderes Meer treffen. Erst ab etwa einem
+  Viertel Meeranteil entstehen zusammenhängende Flächen (Schwellenverhalten, Zahlen in
+  `ANNAHMEN.md`). Der Test misst die größte Meeresfläche über feste Startwerte mit.
 
 ## Vollständige Bug-Historie (alle behoben — nicht versehentlich rückgängig machen)
 

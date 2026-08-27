@@ -250,6 +250,12 @@ mindestens 3 Felder Abstand zu jeder Stadt):
 
 ## 10c. Zufallskarte und 1 gegen 1 (neu am 17.8.)
 
+> **In v51 entfallen.** Der hier beschriebene Rastergenerator ist samt Startgüte-Garantie,
+> festen Startpunkten und Duellkarte aus dem Spiel entfernt; Zufallskarten entstehen
+> ausschließlich aus Dreiecksplättchen (Abschnitt „Zufallskarten aus Dreiecksplättchen").
+> Der Abschnitt bleibt als Begründungsgeschichte stehen – die Startgüte von 4 Nahrung ist
+> als Entwurfsregel für den Plättchenvorrat übernommen worden.
+
 **Zufallskarte** (im Kartenmenü wählbar): feste Größe 12 × 18 und feste Startpunkte wie auf
 der Originalkarte, nur das Gelände wird gewürfelt. Die Mischung folgt der gemessenen
 Verteilung der Originalkarte – 36 % Grasland, 30 % Meer, 15 % Wald, 9 % Gebirge, 8 % Fluss,
@@ -1486,3 +1492,228 @@ Hinweis wirkte das Spielende eine Runde später willkürlich. Im Protokoll steht
 Anspruch als Überschrift samt Erklärung, dass die Runde noch zu Ende gespielt wird. Das
 Spielende-Fenster zeigt bei mehreren Ansprüchen die **Punktetafel** (Bevölkerung, Wunder,
 Technologien, Summe) und markiert den Sieger fett.
+
+## Der Plättchenvorrat, zweiter Entwurf (v51)
+
+Der erste Vorrat hatte zwei Schwächen, die der Autor benannt hat: zu viele Plättchen mit
+nur zwei Geländearten, und zu wenig Meer am Rand, als dass beim Zusammenlegen größere
+Meere hätten entstehen können. Beides ist neu entworfen.
+
+**Vielfalt.** Jetzt hat jedes Plättchen mindestens drei Geländearten, 19 von 20 haben
+vier oder fünf. Ein Test hält das fest, sonst schleicht sich die Eintönigkeit beim
+nächsten Nachbessern wieder ein.
+
+**Meer an den Rändern.** Meer liegt ausschließlich auf Randfeldern – nur dort kann es
+sich mit dem Nachbarplättchen verbinden. Besonders geeignet sind die drei **Ecken**: dort
+stoßen bis zu drei Plättchen zusammen, und sie sind die einzigen Felder, die neben keinem
+der drei mittigen liegen – Meer dort kostet also nichts an Startgüte. 18 von 20 Plättchen
+tragen jetzt Meer (vorher 8), im Vorrat sind es 71 von 300 Feldern (24 %, vorher 11 %).
+
+**Wirkung, gemessen an 600 Karten** (je 200 Startwerte für 2, 3 und 4 Reiche, dieselben
+Startwerte für beide Vorräte). Gemessen wird die größte zusammenhängende Meeresfläche:
+
+| Vorrat | Meer auf der Karte | größte Fläche (Median) | Karten mit Fläche ≥ 8 |
+|---|---|---|---|
+| erster Entwurf | 13 % | 4 Felder | 10 % |
+| erster Versuch „mehr Einzelfelder" | 16 % | 4 Felder | 8 % |
+| **jetzt** | **24 %** | **8 Felder** | **51 %** |
+| Variante „dicht" (verworfen) | 27 % | 13 Felder | 88 % |
+
+Der erste Versuch zeigte etwas Lehrreiches: **mehr Meer allein bringt gar nichts**. Wer
+nur einzelne Meerfelder in die Ecken streut, bekommt mehr, aber kleinere Flächen – die
+Einzelfelder treffen beim Zusammenlegen fast nie auf ein anderes Meerfeld. Es braucht
+eine gewisse **Dichte** an den Kanten, damit Kante auf Kante trifft; das ist ein
+Schwellenverhalten, keine gleichmäßige Steigerung.
+
+Gegen die dichte Variante (27 %) habe ich mich entschieden: dort ist auf 88 % der Karten
+ein großes Meer, das ist dann kein Zufall mehr, sondern die Regel. Bei 24 % bekommt etwa
+die Hälfte der Karten ein richtiges Meer, die andere Hälfte bleibt Landkarte – die
+Streuung zwischen den Karten ist am größten, und darum ging es. Wer es nasser mag: das
+ist eine Frage von ein paar Buchstaben in `TILE_POOL`, der Test lässt 15 bis 30 % zu.
+
+**Preis dafür:** rund 12 % weniger Landfelder je Reich (4 Reiche: 28,5 statt 32,5). Meer
+bringt eine Münze und lässt sich mit Hafen und Seefahrt nutzen, aber Städte brauchen
+Land. Ob das die Partien spürbar verändert, muss der Autor am Tisch sehen.
+
+Unverändert gilt: die drei mittigen Felder sind Land und bringen jedes mindestens 4
+Nahrung. Auf den meerreichen Plättchen wird das über **Fluss- und Inselfelder** in der
+Mitte erreicht (1 Nahrung *und* 1 Münze), die die fehlende Nahrung der Meernachbarn über
+die Münzen ausgleichen.
+
+## Der alte Rastergenerator ist raus (v51)
+
+Zufallskarten entstehen jetzt nur noch aus Plättchen, also ist der Rastergenerator
+vollständig entfernt statt als zweite Möglichkeit stehen zu bleiben: `randomMap`,
+`duelMap`, `makeRandomMap`, `MAP_MIX`, `RANDOM_CAPITALS`, `DUEL_SIZE`, `DUEL_STARTS`,
+`pickTerrain`, `isLandKey`, `startFood`, `startSpots`, `carveSpot`, `boostFood`,
+`START_MIN_FOOD`, `LAND_KEYS` – dazu die Menüeinträge und 87 Zeilen Tests. `js/data.js`
+schrumpft von 471 auf 344 Zeilen. Geblieben ist `mapRng`, der Startwert-Zufallsgenerator;
+den braucht `js/tiles.js`.
+
+Zwei Folgen, die dabei bewusst in Kauf genommen sind:
+
+* **Im Duell gibt es nichts mehr zu wählen** – eine Auswahl mit einem einzigen Eintrag
+  wäre albern, also bleibt die Kartenzeile dort weg, wie schon vor v50.
+* **Die Startgüte-Garantie ist keine Rechenroutine mehr, sondern eine Entwurfsregel.**
+  Früher hat der Generator jeden Startplatz nachgebessert, bis er 4 Nahrung und ein
+  Gründungsfeld in Distanz 3 hergab. Auf Plättchenkarten sucht sich das jeder selbst aus;
+  garantiert ist nur noch, dass die drei mittigen Felder jedes Plättchens 4 Nahrung
+  bringen (Bots setzen dort). `START_MIN_FOOD` lebt deshalb nur noch als Erwartungswert
+  im Test weiter.
+
+## Gründungskosten: Kolonisten und Kartografie zusammen (v51)
+
+Eine Stadt kostet **Stadtkosten + Distanzkosten** (1/3/6/10 … plus Weglänge zur
+Hauptstadt). Englands Alternative **Kolonisten** streicht die Stadtkosten, die Technologie
+**Kartografie** die Distanzkosten. Wer beides hatte, zahlte bis v50 eine Pauschale von
+1 Nahrung – ab der dritten Stadt war Expansion damit praktisch umsonst.
+
+Neu (Vorgabe des Autors): **man zahlt immer die günstigere der beiden Kosten.**
+
+| Städte | Stadtkosten | Weg (Beispiel 9) | bis v50 | jetzt |
+|---|---|---|---|---|
+| 1 | 1 | 9 | 1 | 1 |
+| 2 | 3 | 9 | 1 | 3 |
+| 3 | 6 | 9 | 1 | 6 |
+| 4 | 10 | 9 | 1 | 9 |
+| 5 | 15 | 9 | 1 | 9 |
+
+Die Kombination bleibt also stark – sie deckelt die Kosten bei der Weglänge, statt sie
+mit jeder Stadt weiter steigen zu lassen –, ist aber nicht mehr gratis. Die einzelnen
+Vergünstigungen sind unverändert (Kolonisten: nur der Weg, Kartografie: nur die
+Stadtkosten). Der Mindestbetrag von 1 bleibt als Sperre für Sonderfälle stehen, etwa ein
+Reich, das alle Städte verloren hat und dessen Weglänge deshalb 0 wäre.
+
+## Startgüte nachgerechnet: Russland mit Bevölkerung 2, England mit zwei Städten (v51)
+
+Zwei Nachfragen des Autors, beide nachgerechnet statt geschätzt.
+
+### Gilt die Startgüte auch für Russland?
+
+Russlands „Siedlertrecks" lässt auch die **Hauptstadt** mit Bevölkerung 2 anfangen
+(`newGame`). Eine Stadt verbraucht je Bevölkerung 1 Nahrung und bringt 1 Münze, das
+Startbudget sinkt dadurch um **0 oder 1** gegenüber Bevölkerung 1 – um 1 genau dann, wenn
+die Münzsumme gerade ist (Münzen zählen 2:1).
+
+Ergebnis: **auf jedem der 20 Plättchen bleibt mindestens ein mittiges Feld bei 4 Nahrung**
+(bestes Feld je Plättchen: 4 bis 6). Ein Test hält das jetzt fest.
+
+Aber nicht jedes mittige Feld schafft es: **8 der 60 mittigen Felder** fallen für Russland
+auf 3. Betroffen sind Hochland (3/4/4), Taiga (3/3/4), Waldland (3/4/3), Küste (4/3/3),
+Bergsee, Karst, Fjorde und Ferne Riffe mit je einem Feld. Für Menschen ist das
+gleichgültig – sie suchen sich das Feld aus. **Bots setzen aber zufällig auf eines der
+drei**, ein Russland-Bot kann also auf Taiga mit 3 statt 4 Nahrung anfangen. Zwei mögliche
+Antworten darauf, beide klein: Bots das beste der drei mittigen Felder wählen lassen, oder
+die betroffenen Plättchen um je ein Nahrungsfeld anheben. Bisher ist keine umgesetzt, weil
+die Vorgabe „mindestens ein Feld je Plättchen" lautet.
+
+### Kann England in Runde 1 zwei Städte gründen?
+
+Zwei Städte kosten mindestens:
+
+* mit **Kolonisten** (keine Stadtkosten): 3 + 3 = **6 Nahrung** (Städte müssen 3 Felder
+  Abstand halten, der Weg ist also nie kürzer),
+* mit jeder anderen Fähigkeit: (1 + 3) + (3 + 3) = **10 Nahrung**.
+
+Geprüft an 11 671 Startplätzen (alle Lagen, alle erlaubten Felder, 360 Karten):
+
+| Fähigkeit | zwei Städte in Runde 1 | höchstes Startbudget |
+|---|---|---|
+| **Kolonisten** | **ja, an 8,8 % der Startplätze** | 7 Nahrung |
+| Seemacht | nein, an keinem | 9 Nahrung |
+| Handelsreich | ja, an 0,6 % | 10 Nahrung |
+
+**Kolonisten ist der Fall, der auffällt:** rund jeder elfte Startplatz erlaubt zwei Städte
+im ersten Zug (Beispiel: Bergsee, Budget 7, Kosten 3 + 4). Das ist kein Fehler, sondern
+die Fähigkeit – sie streicht genau die Kosten, die das sonst verhindern.
+
+**Seemacht kommt rechnerisch auf 10 und damit knapp heran, praktisch aber nie:** die
+Küstenprämie (+2 Nahrung, +2 Münzen) reicht nur, wenn die Hauptstadt außerdem fünf
+Fluss- oder Inselfelder als Nachbarn hat und ein Meerfeld. Diese Nachbarschaft kann der
+Vorrat rechnerisch gerade so hergeben, in der Stichprobe kam sie nie vor – das höchste
+tatsächlich erreichte Budget war 9.
+
+**Handelsreich** schafft es über die 1:1-Umrechnung von Münzen in Nahrung, ebenfalls nur
+in Ausnahmefällen (0,6 %).
+
+## Dieselbe Zivilisation mehrfach am Tisch (v51)
+
+Auf der **Plättchenkarte** wählt jeder Platz seine Zivilisation frei – auch zweimal
+dieselbe, mit gleicher oder verschiedener Fähigkeit. Auf den **festen Karten**
+(Originalkarte, Große Karte, eigene) sitzt jede Zivilisation weiterhin genau einmal: dort
+gehört zu jedem Reich ein fester Startstern, zwei Russlands hätten also keinen zweiten
+Startplatz. Wählt man dort trotzdem eine schon vergebene Zivilisation, zieht der andere
+Platz wie bisher auf eine freie um.
+
+### Was dafür umgebaut werden musste
+
+Bis v50 war die **Zivilisation die Identität** eines Reiches: `map.capitals` war nach
+Zivilisation geschlüsselt, der Startspieler wurde über sie gesucht, Name und Farbe kamen
+direkt aus `CIVS`. Mit Doppelgängern trägt jetzt der **Platz** die Identität:
+
+* `S.players[i].slot` ist die Nummer des Platzes aus dem Aufbau und überlebt das
+  Sortieren in die Zugreihenfolge.
+* Plättchenkarten führen ihre Hauptstädte als **Liste** `[{civ, r, c}, …]`, ein Eintrag je
+  Platz. Feste Karten bleiben beim Objekt `{russland: [r,c], …}` – `capitalSpot()` kennt
+  beide Formen, gespeicherte Partien und der Karteneditor ändern sich nicht.
+* Der Startspieler wird über die Objektidentität bestimmt (`ordered.indexOf`), nicht mehr
+  über `p.civ === startCiv`. Sonst hätte „Startspieler: Russland II" auf Russland I
+  gezeigt.
+
+### Ziffern und Farben
+
+Reiche derselben Zivilisation heißen **„Russland I", „Russland II", „Russland III"** und
+bekommen verschiedene Farbschattierungen (Original, 45 % heller, 40 % dunkler). Ohne
+Doppelung bleibt alles wie vorher – `name` und `color` sind dann leer und `civOf()` gibt
+unverändert den Eintrag aus `CIVS` zurück.
+
+Die Farbe ist dabei kein Schmuck: Städte, Armeen, Grenzen und Besitzmarken werden
+ausschließlich über sie unterschieden. Zwei Reiche in demselben Grün wären auf der Karte
+nicht auseinanderzuhalten – das Symbol ist bei gleicher Zivilisation ja auch dasselbe.
+
+**Nebenbei gefunden:** das Konfetti beim Sieg las `civOf(...).c`, ein Feld, das es nie gab
+(die Farbe heißt `color`). Es fiel nicht auf, weil `confetti()` ohne Farbe eine
+Standardfarbe nimmt. Jetzt fliegt es in der Farbe des Siegers.
+
+### Was gleich blieb
+
+Fähigkeiten hängen ohnehin am Spieler, nicht an der Zivilisation (`isAbil(p, …)`), zwei
+Russlands können also verschiedene Alternativen spielen. Regeln, die auf `p.civ` prüfen
+(Wikinger-Startarmee, Griechenlands Forschungsrabatt …), gelten für jedes der
+Doppelgänger-Reiche einzeln – so, wie man es erwartet.
+
+## Fünf Nachbesserungen im Aufbau und im Technologiebogen (v51)
+
+**Farben statt Schattierungen.** Doppelt besetzte Zivilisationen bekommen keine
+aufgehellten Varianten mehr, sondern **je eine der vier Zivilisationsfarben**: die erste
+behält ihre eigene, die Doppelgänger nehmen eine noch freie. Zwei Griechenland heißen also
+Griechenland I (blau) und Griechenland II (zum Beispiel Englands Rot, falls England nicht
+mitspielt, sonst Russlands Grün). Vier Plätze, vier Farben, keine Verwechslung. Die
+Ziffern im Namen bleiben, weil das Symbol bei gleicher Zivilisation dasselbe ist.
+
+**Zufall als Wahl.** Zivilisation und Fähigkeit haben je einen Eintrag „Zufall". Aufgelöst
+wird erst beim Spielstart (`resolveRandom`), damit im Aufbau wirklich Zufall steht und
+niemand vorher abliest, wer was bekommt. Ist die Zivilisation gelost, kann die Fähigkeit
+nur „Zufall" oder „Grundfähigkeit" sein – die Alternativen unterscheiden sich ja je
+Zivilisation. Auf festen Karten meidet die Auslosung bereits vergebene Zivilisationen.
+
+**Zufälliger Startspieler.** Neuer Eintrag „Zufällig", und er ist die **Vorgabe, sobald
+mehr als ein Mensch am Tisch sitzt** – sonst begänne immer Platz 1, was bei Hotseat-Partien
+ein stiller Vorteil wäre. Eine bewusste Wahl bleibt stehen (`startWanted`), die Vorgabe
+greift nur, solange niemand etwas anderes eingestellt hat.
+
+**Theologie und Vereinte Nationen im Duell.** Der Technologiebogen zeigte dort die Werte
+des Vierspielerspiels (3/5 und 1/2) statt der Duellwerte (7/10 und 2/3) – die Rechnung war
+richtig, nur die Anzeige nicht. Jetzt gibt es **eine** Quelle für beide: `VICTORY_LABEL`
+und `DUEL_VICTORY_LABEL` in `js/data.js`, benutzt von `victoryOption` (Rechnung) und
+`techEffect` (Anzeige). Die Regelübersicht rechnet ebenfalls damit, statt die Zahlen im
+Text zu wiederholen.
+
+**„Hat sie" gegen „könnte sie".** Die Marken an einer Technologiekachel unterschieden
+sich nur durch einen gestrichelten Ring und 45 % Deckkraft – bei gleicher Farbe und
+gleichem Symbol war das kaum zu sehen. Jetzt ist „hat sie erforscht" eine **ausgefüllte**
+Marke in der Reichsfarbe mit hellem Symbol, „könnte sie erforschen" eine **leere** mit
+farbigem Symbol, gestricheltem Rand und einem kleinen Fragezeichen. Voll gegen leer trägt
+auch bei 17 px und in Graustufen; das Fragezeichen ist der zweite, von der Farbe
+unabhängige Unterschied. Dazu zeigt die Legende beide Marken jetzt **als Beispiel**
+nebeneinander, statt sie zu beschreiben.
