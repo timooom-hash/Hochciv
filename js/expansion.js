@@ -73,7 +73,7 @@ function startRound(S) {
   const ev = S.evNext || rollEvent(S);
   S.evNext = null;
   S.event = { round: S.round, row: ev.row, col: ev.col, k: ev.k };
-  if (!ev.k) { log(S, 'info', `Ereignis: keines (Spalte ins Leere gewürfelt).`); return; }
+  if (!ev.k) { log(S, 'info', T('Ereignis: keines (Spalte ins Leere gewürfelt).')); return; }
   applyEvent(S);
 }
 function applyEvent(S) {
@@ -84,14 +84,14 @@ function applyEvent(S) {
   for (const pi of humanPlayers(S)) {
     const p = S.players[pi];
     if (hasWonder(S, pi, 'palast')) {
-      log(S, 'info', `${civOf(p).n}: Der Apostolische Palast schützt vor dem Ereignis.`);
+      log(S, 'info', T('%s: Der Apostolische Palast schützt vor dem Ereignis.', civOf(p).n));
       continue;
     }
     switch (S.event.k) {
       case 'pest': {
         let sum = 0;
         for (const c of citiesOf(S, pi)) sum += evPopLoss(S, c, Math.ceil(c.pop / 2));
-        log(S, 'warn', `${civOf(p).n}: Die Pest kostet ${sum} Bevölkerung.`);
+        log(S, 'warn', T('%s: Die Pest kostet %s Bevölkerung.', civOf(p).n, sum));
         break;
       }
       case 'sturmflut': {
@@ -102,18 +102,18 @@ function applyEvent(S) {
           sum += evPopLoss(S, c, Math.ceil(c.pop / 3));
           c.noGrow = S.round;
         }
-        log(S, 'warn', `${civOf(p).n}: Sturmflut kostet ${sum} Bevölkerung.`);
+        log(S, 'warn', T('%s: Sturmflut kostet %s Bevölkerung.', civOf(p).n, sum));
         break;
       }
       case 'kriegsmuedigkeit':
         p.power = 0;
-        log(S, 'warn', `${civOf(p).n}: Machtwert auf 0 zurückgesetzt.`);
+        log(S, 'warn', T('%s: Machtwert auf 0 zurückgesetzt.', civOf(p).n));
         break;
       case 'erdbeben': quakeWonder(S, pi); break;
       case 'buergerkrieg': {
         const n = armiesOf(S, pi).length;
         S.armies = S.armies.filter(a => a.owner !== pi);
-        log(S, 'warn', `${civOf(p).n}: Bürgerkrieg zerstört ${n} Armee(n).`);
+        log(S, 'warn', T('%s: Bürgerkrieg zerstört %s Armee(n).', civOf(p).n, n));
         break;
       }
       case 'barbaren': startBarbInvasion(S, pi); break;
@@ -125,23 +125,23 @@ function applyEvent(S) {
 /* Vulkanausbruch: Stadt auswürfeln, dann ein benachbartes Landfeld. */
 function erupt(S, pi) {
   const p = S.players[pi];
-  const city = rollCity(S, pi, 'Vulkanausbruch: Stadt');
-  if (!city) { log(S, 'info', `${civOf(p).n}: keine Stadt außer der Hauptstadt – kein Vulkan.`); return; }
+  const city = rollCity(S, pi, T('Vulkanausbruch: Stadt'));
+  if (!city) { log(S, 'info', T('%s: keine Stadt außer der Hauptstadt – kein Vulkan.', civOf(p).n)); return; }
   const spots = neighbors(city.r, city.c).filter(([r, c]) => {
     const t = terrainAt(S, r, c);
     return t && TERRAIN[t].land && !TERRAIN[t].block && !cityAt(S, r, c);
   });
   if (spots.length) {
     let idx = 0;
-    do { idx = d6(S, `Vulkanausbruch: Feld (1–${Math.min(spots.length, 6)})`); } while (idx > spots.length);
+    do { idx = d6(S, T('Vulkanausbruch: Feld (1–%s)', Math.min(spots.length, 6))); } while (idx > spots.length);
     const [r, c] = spots[idx - 1];
     S.map.rows[r] = S.map.rows[r].slice(0, c) + 'V' + S.map.rows[r].slice(c + 1);
     S.armies = S.armies.filter(a => !(a.r === r && a.c === c));
-    log(S, 'warn', `${civOf(p).n}: Feld ${r}/${c} ist jetzt ein Vulkan (unpassierbar, kein Ertrag).`);
+    log(S, 'warn', T('%s: Feld %s/%s ist jetzt ein Vulkan (unpassierbar, kein Ertrag).', civOf(p).n, r, c));
   }
   const want = Math.max(Math.ceil(city.pop * 3 / 4), 3);
   const lost = evPopLoss(S, city, want);
-  log(S, 'warn', `${civOf(p).n}: Die Stadt verliert ${lost} Bevölkerung.`);
+  log(S, 'warn', T('%s: Die Stadt verliert %s Bevölkerung.', civOf(p).n, lost));
 }
 /* Eine Stadt außer der Hauptstadt auswürfeln. */
 function rollCity(S, pi, why) {
@@ -168,11 +168,11 @@ function barbIndex(S) {
 }
 function startBarbInvasion(S, pi) {
   const p = S.players[pi];
-  const city = rollCity(S, pi, 'Barbareninvasion: Stadt');
-  if (!city) { log(S, 'info', `${civOf(p).n}: keine Stadt außer der Hauptstadt – keine Invasion.`); return; }
+  const city = rollCity(S, pi, T('Barbareninvasion: Stadt'));
+  if (!city) { log(S, 'info', T('%s: keine Stadt außer der Hauptstadt – keine Invasion.', civOf(p).n)); return; }
   const power = Math.max(10, 2 * powerOf(S, pi));
   const force = { cityId: city.id, owner: pi, power, hits: 0, left: 2 };
-  log(S, 'warn', `${civOf(p).n}: Barbaren mit Macht ${power} greifen die Stadt auf ${city.r}/${city.c} an.`);
+  log(S, 'warn', T('%s: Barbaren mit Macht %s greifen die Stadt auf %s/%s an.', civOf(p).n, power, city.r, city.c));
   (S.barbs = S.barbs || []).push(force);
   if (barbFight(S, force)) S.barbs = S.barbs.filter(f => f !== force);
 }
@@ -192,14 +192,14 @@ function barbFight(S, force) {
   force.left--;
   if (force.power > d) {
     force.hits++;
-    log(S, 'fight', `Barbaren: Angriff ${force.power} > Verteidigung ${d} (Zug ${force.hits}/2).`);
+    log(S, 'fight', T('Barbaren: Angriff %s > Verteidigung %s (Zug %s/2).', force.power, d, force.hits));
     if (force.hits >= 2) {
       captureCity(S, barbIndex(S), city);
       return true;
     }
     return force.left <= 0;
   }
-  log(S, 'fight', `Barbarenangriff abgewehrt (Angriff ${force.power} ≤ Verteidigung ${d}). Die Barbaren ziehen ab.`);
+  log(S, 'fight', T('Barbarenangriff abgewehrt (Angriff %s ≤ Verteidigung %s). Die Barbaren ziehen ab.', force.power, d));
   return true;                                              // keine zwei Runden in Folge mehr möglich
 }
 
@@ -255,7 +255,7 @@ function availableWonders(S) {
 function initWonderPools(S) {
   S.wpool = { 1: [], 2: [], 3: WONDERS_IN(3).map(w => w.k) };   // alle drei Stufe-3-Wunder
   refillPool(S, 1); refillPool(S, 2);
-  log(S, 'info', 'Verfügbare Weltwunder: ' +
+  log(S, 'info', T('Verfügbare Weltwunder: ') +
     [1, 2].map(l => `Stufe ${l}: ` + poolOf(S, l).map(k => WONDER_BY_KEY[k].n).join(', ')).join(' · '));
 }
 function refillPool(S, lvl) {
@@ -269,17 +269,17 @@ function refillPool(S, lvl) {
   }
 }
 function canBuildWonder(S, pi, city, wk, opts) {
-  if (!woOn(S)) return 'Ohne Weltwunder-Erweiterung.';
+  if (!woOn(S)) return T('Ohne Weltwunder-Erweiterung.');
   const w = WONDER_BY_KEY[wk];
-  if (!w) return 'Unbekanntes Wunder.';
-  if (!city || city.owner !== pi) return 'Nur in eigener Stadt.';
-  if (!poolOf(S, w.lvl).includes(wk)) return 'Dieses Wunder ist nicht verfügbar.';
-  if (wondersInCity(S, city).length >= 2) return 'Diese Stadt hat schon zwei Wunder.';
+  if (!w) return T('Unbekanntes Wunder.');
+  if (!city || city.owner !== pi) return T('Nur in eigener Stadt.');
+  if (!poolOf(S, w.lvl).includes(wk)) return T('Dieses Wunder ist nicht verfügbar.');
+  if (wondersInCity(S, city).length >= 2) return T('Diese Stadt hat schon zwei Wunder.');
   if (!wonderLevelOk(S, pi, w.lvl))
-    return `Erst mehr Wunder der Stufe ${w.lvl - 1} bauen (Stufe ${w.lvl} muss seltener bleiben).`;
+    return T('Erst mehr Wunder der Stufe %s bauen (Stufe %s muss seltener bleiben).', w.lvl - 1, w.lvl);
   if (!(opts && opts.free)) {
     const cost = wonderCost(S, pi);
-    if (available(S, pi, 'coins') < cost) return `Zu wenig Münzen (${cost} nötig).`;
+    if (available(S, pi, 'coins') < cost) return T('Zu wenig Münzen (%s nötig).', cost);
   }
   return null;
 }
@@ -290,7 +290,7 @@ function buildWonder(S, pi, city, wk, opts) {
   let cost = 0;
   if (!(opts && opts.free)) {
     cost = wonderCost(S, pi);
-    if (!pay(S, pi, 'coins', cost)) return `Zu wenig Münzen (${cost} nötig).`;
+    if (!pay(S, pi, 'coins', cost)) return T('Zu wenig Münzen (%s nötig).', cost);
   }
   const rangeBefore = moveAllowance(S, pi);
   S.wonders.push({ k: wk, lvl: w.lvl, owner: pi, cityId: city.id, r: city.r, c: city.c });
@@ -304,12 +304,12 @@ function buildWonder(S, pi, city, wk, opts) {
   // keine Singularität). Bots würfeln sie nach den normalen Bot-Forschungsregeln aus.
   if (has(p, 'raumfahrt') && p.kind !== 'bot') {
     addFreePick(S, pi, { n: 1, unlockedOnly: true, why: 'Raumfahrt' });
-    log(S, 'info', `${civOf(p).n}: Raumfahrt – eine Technologie gratis erforschbar.`);
+    log(S, 'info', T('%s: Raumfahrt – eine Technologie gratis erforschbar.', civOf(p).n));
   }
   if (!(opts && opts.noEffect)) applyWonderEffect(S, pi, city, w);
   if (w.lvl === 3) {
     p.cultureWin = S.round;
-    log(S, 'head', `${civOf(p).n} hat ein Weltwunder der Stufe 3 – Kultursieg zu Beginn des nächsten Zuges.`);
+    log(S, 'head', T('%s hat ein Weltwunder der Stufe 3 – Kultursieg zu Beginn des nächsten Zuges.', civOf(p).n));
   }
   return null;
 }
@@ -318,7 +318,7 @@ function applyWonderEffect(S, pi, city, w) {
   const p = S.players[pi];
   switch (w.k) {
     case 'bibliothek':
-      addFreePick(S, pi, { n: 1, maxAge: 1, why: 'Die große Bibliothek' });
+      addFreePick(S, pi, { n: 1, maxAge: 1, why: T('Die große Bibliothek') });
       break;
     case 'oxford':
       // "zwei momentan verfügbare Technologien": die Auswahl wird beim Bau festgehalten.
@@ -327,13 +327,13 @@ function applyWonderEffect(S, pi, city, w) {
       // Die Singularität gilt als verfügbar, sobald ihre Voraussetzungen erfüllt sind –
       // sie steht in keiner Techliste und braucht deshalb einen eigenen Eintrag.
       addFreePick(S, pi, {
-        n: 2, why: 'Universität von Oxford',
+        n: 2, why: T('Universität von Oxford'),
         only: techPool(S).filter(t => p.avail[t.k] && !p.techs[t.k]).map(t => t.k)
           .concat(singularityReady(p) && !p.techs.singularitaet ? ['singularitaet'] : []),
       });
       break;
     case 'gaerten':
-      for (const c of citiesOf(S, pi)) growFree(S, pi, c, 1, 'Hängende Gärten');
+      for (const c of citiesOf(S, pi)) growFree(S, pi, c, 1, T('Hängende Gärten'));
       break;
     case 'freiheit':
       for (const c of citiesOf(S, pi)) growFree(S, pi, c, 3, 'Freiheitsstatue');
@@ -351,15 +351,15 @@ function applyWonderEffect(S, pi, city, w) {
     }
     case 'canal':
       p.res.coins += 40;
-      log(S, 'act', `${civOf(p).n}: +40 Münzen (Canal du Midi).`);
+      log(S, 'act', T('%s: +40 Münzen (Canal du Midi).', civOf(p).n));
       break;
     case 'pentagon':
       p.power += 15;
-      log(S, 'act', `${civOf(p).n}: +15 Macht (Das Pentagon).`);
+      log(S, 'act', T('%s: +15 Macht (Das Pentagon).', civOf(p).n));
       break;
     case 'taj':
       p.doubleIncome = S.round + 1;
-      log(S, 'act', `${civOf(p).n}: nächste Runde doppelte Erträge (Taj Mahal).`);
+      log(S, 'act', T('%s: nächste Runde doppelte Erträge (Taj Mahal).', civOf(p).n));
       break;
     default: break;        // dauerhafte Wirkung, nichts zu tun
   }
@@ -407,7 +407,7 @@ function freePickOptions(S, pi) {
 function useFreePick(S, pi, tk) {
   const p = S.players[pi];
   const pick = freePick(p);
-  if (!pick || !freePickOptions(S, pi).some(t => t.k === tk)) return 'Nicht möglich.';
+  if (!pick || !freePickOptions(S, pi).some(t => t.k === tk)) return T('Nicht möglich.');
   const err = grantTech(S, pi, tk, pick.why);
   if (err) return err;
   pick.n--;
@@ -418,16 +418,16 @@ function useFreePick(S, pi, tk) {
 function quakeWonder(S, pi) {
   const p = S.players[pi];
   const mine = wondersOf(S, pi);
-  if (!mine.length) { log(S, 'info', `${civOf(p).n}: kein Weltwunder – Erdbeben ohne Folgen.`); return; }
+  if (!mine.length) { log(S, 'info', T('%s: kein Weltwunder – Erdbeben ohne Folgen.', civOf(p).n)); return; }
   if (hasWonder(S, pi, 'stonehenge')) {
-    log(S, 'info', `${civOf(p).n}: Stonehenge – Weltwunder können nicht zerstört werden.`);
+    log(S, 'info', T('%s: Stonehenge – Weltwunder können nicht zerstört werden.', civOf(p).n));
     return;
   }
   let idx = 0;
-  do { idx = d6(S, `Erdbeben: Wunder (1–${Math.min(mine.length, 6)})`); } while (idx > mine.length);
+  do { idx = d6(S, T('Erdbeben: Wunder (1–%s)', Math.min(mine.length, 6))); } while (idx > mine.length);
   const w = mine[idx - 1];
   removeWonder(S, w);
-  log(S, 'warn', `${civOf(p).n}: ${WONDER_BY_KEY[w.k].n} zerstört – kann nicht wieder gebaut werden.`);
+  log(S, 'warn', T('%s: %s zerstört – kann nicht wieder gebaut werden.', civOf(p).n, WONDER_BY_KEY[w.k].n));
 }
 function removeWonder(S, w) {
   S.wonders = S.wonders.filter(x => x !== w);
@@ -447,8 +447,8 @@ function loseCityWonders(S, city) {
     removeWonder(S, w);
   }
   log(S, 'fight', protectedBy
-    ? `Stonehenge: ${list.length} Weltwunder überstehen die Zerstörung der Stadt.`
-    : `${list.length} Weltwunder mit der Stadt zerstört – nicht wieder baubar.`);
+    ? T('Stonehenge: %s Weltwunder überstehen die Zerstörung der Stadt.', list.length)
+    : T('%s Weltwunder mit der Stadt zerstört – nicht wieder baubar.', list.length));
 }
 /* Stadt erobert: Wunder und ihre dauerhaften Effekte wechseln den Besitzer. */
 function takeCityWonders(S, city, from, to) {
@@ -456,7 +456,7 @@ function takeCityWonders(S, city, from, to) {
   const list = S.wonders.filter(w => w.cityId === city.id);
   if (!list.length) return;
   list.forEach(w => { w.owner = to; });
-  log(S, 'fight', `${civOf(S.players[to]).n} übernimmt ${list.length} Weltwunder: ` +
+  log(S, 'fight', T('%s übernimmt %s Weltwunder:', civOf(S.players[to]).n, list.length) +
     list.map(w => WONDER_BY_KEY[w.k].n).join(', ') + '.');
   const p = S.players[to];
   if (list.some(w => w.lvl === 3) && p.kind !== 'barbar') p.cultureWin = S.round;
@@ -467,7 +467,7 @@ function claimOrphanWonders(S, pi, city) {
   const list = S.wonders.filter(w => w.cityId == null && w.r === city.r && w.c === city.c);
   if (!list.length) return;
   list.forEach(w => { w.owner = pi; w.cityId = city.id; });
-  log(S, 'act', `${civOf(S.players[pi]).n} übernimmt ${list.length} freistehende(s) Weltwunder.`);
+  log(S, 'act', T('%s übernimmt %s freistehende(s) Weltwunder.', civOf(S.players[pi]).n, list.length));
   if (list.some(w => w.lvl === 3)) S.players[pi].cultureWin = S.round;
 }
 /* Kultursieg: zu Beginn des nächsten eigenen Zuges nach dem Bau – sofern das
@@ -480,7 +480,7 @@ function checkCultureVictory(S, pi) {
   if (p.cultureWin == null || S.round <= p.cultureWin) return null;
   if (S.claims && S.claims.some(c => c.pi === pi && c.how.startsWith('Kultursieg'))) return null;
   if (!wondersOf(S, pi).some(w => w.lvl === 3)) { p.cultureWin = null; return null; }
-  claimVictory(S, pi, 'Kultursieg (Weltwunder der Stufe 3)');
+  claimVictory(S, pi, T('Kultursieg (Weltwunder der Stufe 3)'));
   return S.over;
 }
 
@@ -497,18 +497,18 @@ function botWonderCity(S, pi) {
   const top = free.filter(c => c.pop === best);
   if (top.length === 1) return top[0];
   let idx = 0;
-  do { idx = d6(S, `Wunderstadt auswürfeln (1–${Math.min(top.length, 6)})`); } while (idx > top.length);
+  do { idx = d6(S, T('Wunderstadt auswürfeln (1–%s)', Math.min(top.length, 6))); } while (idx > top.length);
   return top[idx - 1];
 }
 function botWonderStep(S, pi) {
   if (!woOn(S) || S.over) return;
   const p = S.players[pi];
-  if (!botTry(S, p, 'Weltwunder bauen')) return;
+  if (!botTry(S, p, T('Weltwunder bauen'))) return;
   const city = botWonderCity(S, pi);
   if (!city) return;
   const cands = availableWonders(S).filter(w => !canBuildWonder(S, pi, city, w.k, { free: true }));
   if (!cands.length) return;
   let idx = 0;
-  do { idx = d6(S, `Wunder auswürfeln (1–${Math.min(cands.length, 6)})`); } while (idx > cands.length);
+  do { idx = d6(S, T('Wunder auswürfeln (1–%s)', Math.min(cands.length, 6))); } while (idx > cands.length);
   buildWonder(S, pi, city, cands[idx - 1].k, { free: true, noEffect: true });
 }

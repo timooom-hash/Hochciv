@@ -362,7 +362,7 @@ function redraw() {
   const p = P(S), civ = civOf(p);
   $('hud-sym').textContent = SYM[civ.sym];
   $('hud-sym').style.borderColor = civ.color;
-  $('hud-name').textContent = civ.n + (p.kind === 'bot' ? ' · Bot' : '');
+  $('hud-name').textContent = civ.n + (p.kind === 'bot' ? T(' · Bot') : '');
   const ev = curEvent();
   // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
   // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet.
@@ -398,7 +398,7 @@ function endTutorialPanel() {
 function tapHex(r, c) {
   if (S.over || P(S).kind === 'bot') return;
   if (ui.army) {
-    if (ui.tut && !tutMoveOk(r, c)) return toast('Im Tutorial: ziehe die Armee auf das goldene Feld.');
+    if (ui.tut && !tutMoveOk(r, c)) return toast(T('Im Tutorial: ziehe die Armee auf das goldene Feld.'));
     const e = moveArmy(S, ui.army, r, c);
     if (e) { toast(e); } else { ui.army = null; ui.sel = [r, c]; redraw(); return; }
   }
@@ -434,81 +434,81 @@ function openTile(r, c) {
     rows.push(`<button class="opt" id="${id}" ${off ? 'disabled' : ''}><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="cost">${cost || ''}</span></button>`);
     handlers.push([id, fn]);
   };
-  let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">Feld ${r}/${c} · Ertrag `
+  let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">${T('Feld %s/%s · Ertrag', r, c)} `
     + fmtY(tileYieldAt(S, pi, r, c)) + '</p>' + settleFact(r, c);
 
   if (city) {
     const owner = civOf(S.players[city.owner]);
     const wl = (S.wonders || []).filter(w => w.cityId === city.id);
-    head = `<h3>${owner.n}${city.cap ? ' · Hauptstadt' : ''}</h3>
-      <p class="sub">Bevölkerung ${city.pop} · Verteidigung ${defenseValue(S, city)}</p>` +
+    head = `<h3>${owner.n}${city.cap ? ' · ' + T('Hauptstadt') : ''}</h3>
+      <p class="sub">${T('Bevölkerung %s · Verteidigung %s', city.pop, defenseValue(S, city))}</p>` +
       (wl.length ? `<div class="wlist">${wl.map(w =>
-        `<span class="wtag">◈ ${WONDER_BY_KEY[w.k].n} (Stufe ${w.lvl})</span>`).join('')}</div>` : '');
+        `<span class="wtag">◈ ${WONDER_BY_KEY[w.k].n} (${T('Stufe %s', w.lvl)})</span>`).join('')}</div>` : '');
     if (city.owner === pi) {
       if (freeGrowthAvailable(S, pi, city))
-        btn('Kostenlos wachsen', `auf ${city.pop + 1} · Verbundwerkstoffe`, 'gratis',
+        btn(T('Kostenlos wachsen'), T('auf %s · Verbundwerkstoffe', city.pop + 1), T('gratis'),
           () => { const e = growCity(S, pi, city, 'free'); e ? toast(e) : redraw(); openTile(r, c); });
       const pc = growPrice(S, pi, city);
       const perr = canGrowPaid(S, pi, city);
-      btn('Bevölkerung wachsen', perr || `auf ${city.pop + 1}`, `${pc.food}🌾 ${pc.coins}🪙`,
+      btn(T('Bevölkerung wachsen'), perr || T('auf %s', city.pop + 1), `${pc.food}🌾 ${pc.coins}🪙`,
         () => { const e = growCity(S, pi, city, 'paid'); e ? toast(e) : redraw(); openTile(r, c); }, !!perr);
       if (S.wo) {
         const wcost = wonderCost(S, pi);
         const full = wondersInCity(S, city).length >= 2;
         const any = availableWonders(S).some(w => !canBuildWonder(S, pi, city, w.k));
-        btn('Weltwunder bauen', full ? 'diese Stadt hat schon zwei Wunder'
-          : any ? `${wondersInCity(S, city).length}/2 in dieser Stadt`
-            : 'nichts baubar (Münzen oder Stufenregel)', `${wcost}🪙`,
+        btn(T('Weltwunder bauen'), full ? T('diese Stadt hat schon zwei Wunder')
+          : any ? T('%s/2 in dieser Stadt', wondersInCity(S, city).length)
+            : T('nichts baubar (Münzen oder Stufenregel)'), `${wcost}🪙`,
           () => wonderSheet(city), full || !any);
       }
       const ac = armyCost(S, pi);
       // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
       const civil = payOpts(S, pi).foodOk;
-      btn('Armee bauen', civil ? 'Bürgerkrieg: auch mit Nahrung zahlbar'
-        : 'muss die Stadt noch verlassen', `${ac}🪙`,
+      btn(T('Armee bauen'), civil ? T('Bürgerkrieg: auch mit Nahrung zahlbar')
+        : T('muss die Stadt noch verlassen'), `${ac}🪙`,
         () => { const e = buildArmy(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
         available(S, pi, 'coins', payOpts(S, pi)) < ac || !!armyAt(S, r, c));
       if (slaveryUsable(p))
-        btn('Bevölkerung opfern', city.sacrificed === S.round ? 'diese Runde schon geopfert' : 'Sklaverei', '+10🪙',
+        btn(T('Bevölkerung opfern'), city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+10🪙',
           () => { const e = sacrifice(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
           city.pop < 2 || city.sacrificed === S.round);
       if (army && army.owner === pi)          // Armee steht in der Stadt und muss heraus
-        btn('Armee hier bewegen', army.born === S.round ? 'muss die Stadt noch verlassen'
-          : 'erreichbare Felder werden markiert', mp(army),
-          () => { ui.army = army; closeSheet(); redraw(); toast('Zielfeld antippen'); }, army.mp <= 0);
+        btn(T('Armee hier bewegen'), army.born === S.round ? T('muss die Stadt noch verlassen')
+          : T('erreichbare Felder werden markiert'), mp(army),
+          () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
     } else {
       const atk = attackersOn(S, pi, city).length;
       const sk = S.sieges[pi + '|' + city.id] || 0;
-      rows.push(`<p class="sub">Deine Armeen in Reichweite: ${atk} · Angriffswert ${attackValue(S, pi, atk)}
-        ${sk ? ` · Belagerung ${sk}/2` : ''}</p>`);
+      rows.push(`<p class="sub">${T('Deine Armeen in Reichweite: %s · Angriffswert %s', atk, attackValue(S, pi, atk))}
+        ${sk ? ' · ' + T('Belagerung %s/2', sk) : ''}</p>`);
     }
   } else if (army) {
     const owner = civOf(S.players[army.owner]);
-    head = `<h3>Armee · ${owner.n}</h3><p class="sub">Angriffswert ${powerOf(S, army.owner)} · ${mp(army)}</p>`;
+    head = `<h3>${T('Armee')} · ${owner.n}</h3><p class="sub">${T('Angriffswert %s', powerOf(S, army.owner))} · ${mp(army)}</p>`;
     if (army.owner === pi)
-      btn('Diese Armee bewegen', 'erreichbare Felder werden markiert', '',
-        () => { ui.army = army; closeSheet(); redraw(); toast('Zielfeld antippen'); }, army.mp <= 0);
+      btn(T('Diese Armee bewegen'), T('erreichbare Felder werden markiert'), '',
+        () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
   } else {
     const cost = foundCost(S, pi, r, c), ferr = canFound(S, pi, r, c);
     const costLabel = cost === Infinity ? '—' : `${cost}🌾`;
-    btn('Stadt gründen', ferr || 'Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)', costLabel,
+    btn(T('Stadt gründen'), ferr || T('Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)'), costLabel,
       () => { const e = foundCity(S, pi, r, c); e ? toast(e) : redraw(); closeSheet(); }, !!ferr);
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
-      btn('Feld kaufen', owned ? 'nur herrenlose Felder' : 'Kolonialismus', '5🪙',
+      btn(T('Feld kaufen'), owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, '5🪙',
         () => { const e = buyTile(S, pi, r, c); e ? toast(e) : redraw(); openTile(r, c); }, owned);
     }
   }
   if (has(p, 'atomwaffen')) {
     // Atomwaffenproteste sperren den Einsatz dauerhaft – dann ist der Knopf auch aus
     const banned = evNukeBan(S, pi);
-    btn('Atomschlag auf dieses Feld',
-      banned ? 'durch Atomwaffenproteste dauerhaft gesperrt'
-        : p.nuked ? 'diese Runde schon eingesetzt'
-          : 'zerstört alle Armeen hier und ringsum, auch eigene', '☢︎',
+    btn(T('Atomschlag auf dieses Feld'),
+      banned ? T('durch Atomwaffenproteste dauerhaft gesperrt')
+        : p.nuked ? T('diese Runde schon eingesetzt')
+          : T('zerstört alle Armeen hier und ringsum, auch eigene'), '☢︎',
       () => {
         const e = nuke(S, S.cur, r, c);
-        toast(e || 'Atomschlag ausgeführt'); redraw(); openTile(r, c);
+        toast(e || T('Atomschlag ausgeführt')); redraw(); openTile(r, c);
       }, p.nuked || banned);
   }
   // Die Stufen kommen aus roadTargets, nicht aus einer eigenen Rechnung – sonst weicht
@@ -518,12 +518,12 @@ function openTile(r, c) {
     const lvl = roadLevel(S, r, c);
     if (!ziele.length) {
       // Nichts baubar – trotzdem anzeigen, damit der Grund sichtbar ist.
-      btn(lvl >= 1 ? 'Eisenbahn bauen' : 'Straße bauen',
-        lvl >= 2 ? 'hier liegt schon eine Eisenbahn' : 'Eisenbahn noch nicht erforscht',
+      btn(lvl >= 1 ? T('Eisenbahn bauen') : T('Straße bauen'),
+        lvl >= 2 ? T('hier liegt schon eine Eisenbahn') : T('Eisenbahn noch nicht erforscht'),
         '–🪙', () => { }, true);
     } else ziele.forEach(z => {
-      btn(z === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
-        z === 2 ? 'Bewegung kostenlos · Handelsroute +2' : 'Bewegung ½ Punkt · Handelsroute +1',
+      btn(z === 2 ? T('Eisenbahn bauen') : T('Straße bauen'),
+        z === 2 ? T('Bewegung kostenlos · Handelsroute +2') : T('Bewegung ½ Punkt · Handelsroute +1'),
         roadPrice(S, pi, r, c, z) + '🪙',
         () => doRoad(r, c, z), available(S, pi, 'coins') < roadPrice(S, pi, r, c, z));
     });
@@ -538,9 +538,9 @@ function doRoad(r, c, ziel) {
   // Ausbau nur noch 1 statt 2. Deshalb muss das Blatt danach neu gezeichnet werden,
   // sonst steht am Knopf noch der alte Preis.
   const target = ziel || roadTarget(S, S.cur, r, c);
-  if (!target) return toast('Hier lässt sich nichts weiter bauen.');
+  if (!target) return toast(T('Hier lässt sich nichts weiter bauen.'));
   const e = buildRoad(S, S.cur, r, c, target);
-  e ? toast(e) : toast(target === 2 ? 'Eisenbahn gebaut' : 'Straße gebaut');
+  e ? toast(e) : toast(target === 2 ? T('Eisenbahn gebaut') : T('Straße gebaut'));
   redraw();
   openTile(r, c);
 }
@@ -548,24 +548,22 @@ function doRoad(r, c, ziel) {
 function armySheet() {
   const pi = S.cur, mine = armiesOf(S, pi);
   if (!mine.length)
-    return sheet(`<h3>Deine Armeen</h3><p class="sub">Du hast noch keine.
-      Eigene Stadt antippen → <em>Armee bauen</em> (${armyCost(S, pi)} Münzen).</p>`);
+    return sheet(`<h3>${T('Deine Armeen')}</h3><p class="sub">${T('Du hast noch keine. Eigene Stadt antippen → Armee bauen (%s Münzen).', armyCost(S, pi))}</p>`);
   const rows = mine.map((a, i) => {
     const inCity = cityAt(S, a.r, a.c);
-    const note = a.mp <= 0 ? 'diese Runde schon gezogen'
-      : inCity && a.born === S.round ? 'muss die Stadt noch verlassen'
-        : `auf ${TERRAIN[terrainAt(S, a.r, a.c)].name}`;
+    const note = a.mp <= 0 ? T('diese Runde schon gezogen')
+      : inCity && a.born === S.round ? T('muss die Stadt noch verlassen')
+        : T('auf %s', TERRAIN[terrainAt(S, a.r, a.c)].name);
     return `<button class="opt" data-i="${i}" ${a.mp <= 0 ? 'disabled' : ''}>
-      <span>Armee ${i + 1} · Feld ${a.r}/${a.c}<small>${note}</small></span>
+      <span>${T('Armee %s · Feld %s/%s', i + 1, a.r, a.c)}<small>${note}</small></span>
       <span class="cost">${mp(a)}</span></button>`;
   }).join('');
-  sheet(`<h3>Deine Armeen (${mine.length})</h3>
-    <p class="sub">Angriffswert des Reiches: ${powerOf(S, pi)}. Antippen wählt die Armee aus,
-    danach ein markiertes Feld antippen.</p>${rows}`);
+  sheet(`<h3>${T('Deine Armeen (%s)', mine.length)}</h3>
+    <p class="sub">${T('Angriffswert des Reiches: %s. Antippen wählt die Armee aus, danach ein markiertes Feld antippen.', powerOf(S, pi))}</p>${rows}`);
   $('sheet-body').querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
     const a = mine[+b.dataset.i];
     ui.army = a; ui.sel = [a.r, a.c];
-    closeSheet(); redraw(); toast('Zielfeld antippen');
+    closeSheet(); redraw(); toast(T('Zielfeld antippen'));
   });
 }
 
@@ -589,8 +587,8 @@ function ownerMark(civ, art, self) {
   const stil = hat
     ? `background:${civ.color};border-color:${civ.color};color:#fff`
     : `color:${civ.color};border-color:${civ.color}`;
-  const titel = hat ? `${civ.n}${self ? ' (du)' : ''} hat sie erforscht`
-    : `${civ.n} könnte sie erforschen`;
+  const titel = hat ? T('%s%s hat sie erforscht', civ.n, self ? ' (du)' : '')
+    : T('%s könnte sie erforschen', civ.n);
   return `<span class="owner-mark ${hat ? 'has' : 'can'}${self ? ' self' : ''}"
     style="${stil}" title="${titel}">${SYM[civ.sym]}${hat ? '' : '<i>?</i>'}</span>`;
 }
@@ -623,13 +621,13 @@ function yieldRow(label, glyph, color, count, y, opts = {}) {
 }
 function yieldOverview(S, pi) {
   const b = incomeBreakdown(S, pi);
-  let h = '<div class="yield-panel"><h4 class="yhead">Ertrag nächster Zug</h4>';
+  let h = `<div class="yield-panel"><h4 class="yhead">${T('Ertrag nächster Zug')}</h4>`;
   for (const r of b.rows)
     h += yieldRow(r.name, TERRAIN_GLYPH[r.key] || '▪', TERRAIN[r.key].color, r.count, r.y);
   for (const e of (b.extra || []))
     h += yieldRow(e.name, e.glyph || '✦', '#c8a86a', e.count, e.y);
-  h += yieldRow('Bevölkerung', '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
-  h += yieldRow('Summe', '∑', '#6b5d47', null, b.total, { cls: 'sum' });
+  h += yieldRow(T('Bevölkerung'), '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
+  h += yieldRow(T('Summe'), '∑', '#6b5d47', null, b.total, { cls: 'sum' });
   // Vorschau: kein Einkommen, sondern was die Armeen zu Zugende erbeuten (Wikinger)
   for (const e of (b.preview || []))
     h += yieldRow(e.name, e.glyph || '⚔︎', '#b08a4a', null, e.y, { cls: 'prev' });
@@ -639,18 +637,14 @@ function yieldOverview(S, pi) {
 /* ------------------------------------------------------------------ Technologien */
 function techModal() {
   const pi = S.cur, p = P(S);
-  const others = S.players.filter((pl, i) => i !== pi && !pl.dead)
-    .map(pl => `<span style="color:${civOf(pl).color}">${SYM[civOf(pl).sym]}</span> ${civOf(pl).n}`).join(' · ');
-  // Legende mit echten Marken: zwei Beispiele in der Farbe eines Mitspielers, damit
-  // „hat sie" und „könnte sie" direkt nebeneinander vergleichbar sind.
+  // Nur die kleine Legende mit zwei Beispielmarken – der erklärende Absatz darüber ist
+  // raus, er stand in jeder Ansicht im Weg.
   const bsp = S.players.find((pl, i) => i !== pi && !pl.dead);
-  let grid = others
-    ? `<p class="sub" style="margin:-2px 0 10px">Marken an einer Technologie zeigen die
-       anderen Reiche: ${others} · dein Reich ist zusätzlich umrandet.</p>
-       <p class="sub owner-legend" style="margin:-4px 0 10px">
-         ${ownerMark(civOf(bsp), 'hat', false)} <span>hat sie erforscht</span>
+  let grid = bsp
+    ? `<p class="sub owner-legend" style="margin:-2px 0 10px">
+         ${ownerMark(civOf(bsp), 'hat', false)} <span>${T('hat sie erforscht')}</span>
          ${humanCount(S) > 1
-        ? `${ownerMark(civOf(bsp), 'kann', false)} <span>könnte sie erforschen</span>` : ''}
+        ? `${ownerMark(civOf(bsp), 'kann', false)} <span>${T('könnte sie erforschen')}</span>` : ''}
        </p>`
     : '';
   grid += '<div class="techgrid">';
@@ -664,7 +658,7 @@ function techModal() {
         const can = avail && available(S, pi, 'sci') >= cost;
         // Sklaverei wird mit der ersten Technologie der Moderne obsolet – im Bogen sichtbar.
         const dead = t.k === 'sklaverei' && owned && !slaveryUsable(p);
-        const eff = dead ? 'obsolet – seit der Moderne nicht mehr nutzbar' : techEffect(t, S);
+        const eff = dead ? T('obsolet – seit der Moderne nicht mehr nutzbar') : techEffect(t, S);
         // Verfügbar zerfällt in zwei Zustände: bezahlbar (afford) und zu teuer (costly).
         // Rein grafisch – der Kostenwert steht ohnehin schon in der Kachel.
         const state = owned ? 'owned' : avail ? (can ? 'avail afford' : 'avail costly') : 'locked';
@@ -682,25 +676,25 @@ function techModal() {
     : sing ? (singCan ? 'avail afford' : 'avail costly') : 'locked';
   grid += `<button class="tech ${singState}" style="margin-top:10px"
       ${singCan ? 'data-tech="singularitaet"' : 'disabled'}>
-      <span class="c">${sc}</span><b>Singularität</b><span class="eff">${SINGULARITY.e}</span></button>`;
+      <span class="c">${sc}</span><b>${SINGULARITY.n}</b><span class="eff">${SINGULARITY.e}</span></button>`;
   // Griechenland "Freie Forschung": eine verfügbare Tech bis Industrialisierung gratis
   const ft = freeTechOptions(S, pi);
   if (ft.length) {
-    grid += '<p class="sub" style="margin-top:14px">Freie Forschung (1× pro Runde, kostenlos)</p>';
+    grid += `<p class="sub" style="margin-top:14px">${T('Freie Forschung (1× pro Runde, kostenlos)')}</p>`;
     grid += ft.map(t => `<button class="tech avail afford" data-freetech="${t.k}">
-      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
+      <span class="c">${T('gratis')}</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
   }
   const bp = backPickOptions(S, pi);
   if (bp.length) {
-    grid += `<p class="sub" style="margin-top:14px">Rückschau: eine Technologie aus ${FIELDS[backPick(p).f]}, früheres Zeitalter, kostenlos</p>`;
+    grid += `<p class="sub" style="margin-top:14px">${T('Rückschau: eine Technologie aus %s, früheres Zeitalter, kostenlos', FIELDS[backPick(p).f])}</p>`;
     grid += bp.map(t => `<button class="tech avail afford" data-backtech="${t.k}">
-      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
+      <span class="c">${T('gratis')}</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
   }
   const cop = copyableTechs(S, pi);
   if (cop.length) {
     const anyFree = internetAvailable(S, pi) && cop.some(o => o.freeOk);
-    grid += `<p class="sub" style="margin-top:14px">Technologien kopieren${
-      anyFree ? ' · 1× gratis per Internet' : ''}</p>`;
+    grid += `<p class="sub" style="margin-top:14px">${T('Technologien kopieren')}${
+      anyFree ? ' · ' + T('1× gratis per Internet') : ''}</p>`;
     cop.slice(0, 40).forEach(o => {
       // je Technologie ggf. zwei Knöpfe: bezahlt und/oder gratis
       const buttons = [];
@@ -721,7 +715,7 @@ function techModal() {
     <aside class="tech-aside">${yieldOverview(S, pi)}</aside>
     <div class="tech-main">${grid}</div>
   </div>`;
-  modal(`Technologien · ${available(S, pi, 'sci')} Wissenschaft verfügbar`, layout);
+  modal(T('Technologien · %s Wissenschaft verfügbar', available(S, pi, 'sci')), layout);
   $('overlay').classList.add('wide');
   if (ui.tut) tutGateTechs();
   $('ov-body').querySelectorAll('[data-tech]').forEach(b => b.onclick = () => {
@@ -746,15 +740,16 @@ function powerSheet() {
   // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
   const pi = S.cur, price = powerPrice(S, pi);
   const maxN = Math.floor(available(S, pi, 'coins', payOpts(S, pi)) / price);
-  let h = `<h3>Macht kaufen</h3><p class="sub">${price} Münzen = 1 Macht · aktuell ${P(S).power} Macht.
-    Zu Zugbeginn verlierst du ${has(P(S), 'panzer') ? '1/4' : has(P(S), 'stahl') ? '1/3' : '1/2'} davon.` +
-    (payOpts(S, pi).foodOk ? ' Bürgerkrieg: auch mit Nahrung zahlbar.' : '') + '</p>';
+  let h = `<h3>${T('Macht kaufen')}</h3><p class="sub">` +
+    T('%s Münzen = 1 Macht · aktuell %s Macht. Zu Zugbeginn verlierst du %s davon.',
+      price, P(S).power, has(P(S), 'panzer') ? '1/4' : has(P(S), 'stahl') ? '1/3' : '1/2') +
+    (payOpts(S, pi).foodOk ? ' ' + T('Bürgerkrieg: auch mit Nahrung zahlbar.') : '') + '</p>';
   [1, 5, maxN].forEach((n, i) => {
     if (n <= 0 || (i === 2 && maxN <= 5)) return;
-    h += `<button class="opt" data-n="${n}"><span>+${n} Macht${i === 2 ? '<small>alles ausgeben</small>' : ''}</span>
+    h += `<button class="opt" data-n="${n}"><span>${T('+%s Macht', n)}${i === 2 ? `<small>${T('alles ausgeben')}</small>` : ''}</span>
       <span class="cost">${n * price}🪙</span></button>`;
   });
-  if (maxN <= 0) h += '<p class="sub">Nicht genug Münzen.</p>';
+  if (maxN <= 0) h += `<p class="sub">${T('Nicht genug Münzen.')}</p>`;
   sheet(h);
   $('sheet-body').querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
     const e = buyPower(S, S.cur, +b.dataset.n); e ? toast(e) : null; redraw(); powerSheet();
@@ -815,7 +810,7 @@ function endHumanTurn() {
   const warn = pendingWarnings(S, S.cur);
   if (warn.length && !ui.confirmedEnd) {
     ui.confirmedEnd = true;
-    toast(warn[0] + ' Nochmal tippen zum Bestätigen.');
+    toast(warn[0] + ' ' + T('Nochmal tippen zum Bestätigen.'));
     return;
   }
   ui.confirmedEnd = false; ui.army = null; ui.sel = null; ui.mode = null;
@@ -841,10 +836,10 @@ function runBots() {
   const entries = logSince(S, sinceSeq);
   const lines = entries.length
     ? logHtml(entries)
-    : '<div class="logline info">Keine Aktionen in dieser Runde.</div>';
+    : `<div class="logline info">${T('Keine Aktionen in dieser Runde.')}</div>`;
   ui.botLock = true;                   // Sheet ist jetzt gesperrt: nur „Weiter" führt weiter
-  sheet(`<h3>${civOf(p).n} (Bot)</h3><p class="sub">Runde ${S.round}</p>${lines}
-    <button class="btn wide" id="bot-next">Weiter</button>`);
+  sheet(`<h3>${civOf(p).n} (${T('Bot')})</h3><p class="sub">${T('Runde %s', S.round)}</p>${lines}
+    <button class="btn wide" id="bot-next">${T('Weiter')}</button>`);
   $('sheet').classList.add('locked');
   $('bot-next').onclick = () => {
     ui.botLock = false;
@@ -858,24 +853,24 @@ function runBots() {
 }
 function gameOver() {
   const o = S.over, w = o.winner;
-  const namen = (o.winners || [w]).map(i => civOf(S.players[i]).n).join(' und ');
-  const titel = o.shared ? `${namen} gewinnen gemeinsam.` : `${namen} gewinnt.`;
+  const namen = (o.winners || [w]).map(i => civOf(S.players[i]).n).join(T(' und '));
+  const titel = o.shared ? T('%s gewinnen gemeinsam.', namen) : T('%s gewinnt.', namen);
   // Bei mehreren Siegansprüchen die Punkte offenlegen: Bevölkerung + Wunder + Techs.
   let tafel = '';
   if (o.score && o.score.length > 1) {
-    tafel = `<table class="tbl" style="margin:10px 0"><tr><th>Reich</th><th>Bev.</th>
-      <th>Wunder</th><th>Techs</th><th>Punkte</th></tr>` +
+    tafel = `<table class="tbl" style="margin:10px 0"><tr><th>${T('Reich')}</th><th>${T('Bev.')}</th>
+      <th>${T('Wunder')}</th><th>${T('Techs')}</th><th>${T('Punkte')}</th></tr>` +
       o.score.map(x => `<tr${(o.winners || []).includes(x.pi) ? ' style="font-weight:700"' : ''}>
         <td>${civOf(S.players[x.pi]).n}</td><td>${x.pop}</td><td>${x.wonders}</td>
         <td>${x.techs}</td><td>${x.total}</td></tr>`).join('') + '</table>' +
       `<p class="sub">${o.score.map(x => `${civOf(S.players[x.pi]).n}: ${x.how}`).join(' · ')}</p>` +
       (o.tiebreak === 'mensch'
-        ? '<p class="sub">Gleichstand nach Punkten – bei Gleichstand geht der Sieg an den Menschen.</p>'
+        ? `<p class="sub">${T('Gleichstand nach Punkten – bei Gleichstand geht der Sieg an den Menschen.')}</p>`
         : '');
   }
-  modal('Spielende', `<p style="font-family:var(--serif);font-size:22px;margin:0 0 6px">
+  modal(T('Spielende'), `<p style="font-family:var(--serif);font-size:22px;margin:0 0 6px">
     ${titel}</p><p class="sub">${o.how}</p>${tafel}
-    <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">Zurück zum Menü</button>`);
+    <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">${T('Zurück zum Menü')}</button>`);
   confetti(civOf(S.players[w]).color);
 }
 /* Kleiner Sieggruß: ein paar Papierschnipsel, die einmal durchs Bild fallen.
@@ -916,59 +911,60 @@ function worldModal() {
   if (S.ev) {
     const ev = curEvent();
     h += ev
-      ? `<div class="evbox"><b>Ereignis: ${ev.n}</b><p>${ev.e}</p>
-         ${hasWonder(S, pi, 'palast') ? '<p>Der Apostolische Palast schützt dich davor.</p>' : ''}</div>`
-      : `<div class="evbox"><b>Kein Ereignis in dieser Runde</b><p>Der Spaltenwürfel ging ins Leere.</p></div>`;
+      ? `<div class="evbox"><b>${T('Ereignis: %s', ev.n)}</b><p>${ev.e}</p>
+         ${hasWonder(S, pi, 'palast') ? `<p>${T('Der Apostolische Palast schützt dich davor.')}</p>` : ''}</div>`
+      : `<div class="evbox"><b>${T('Kein Ereignis in dieser Runde')}</b><p>${T('Der Spaltenwürfel ging ins Leere.')}</p></div>`;
     if (hasWonder(S, pi, 'orakel')) {
       const nx = peekNextEvent(S);
-      const nn = nx && nx.k ? EVENT_BY_KEY[nx.k].n : 'keines';
-      h += `<p class="sub">Das Orakel sieht für die nächste Runde: <b>${nn}</b></p>`;
+      const nn = nx && nx.k ? EVENT_BY_KEY[nx.k].n : T('keines');
+      h += `<p class="sub">${T('Das Orakel sieht für die nächste Runde: %s', '<b>' + nn + '</b>')}</p>`;
     }
     if ((S.barbs || []).length)
-      h += `<p class="sub">Barbaren belagern ${S.barbs.length} Stadt/Städte.</p>`;
-    if (S.nukeBan) h += '<p class="sub">Atomwaffenproteste: Atomwaffen sind gesperrt.</p>';
+      h += `<p class="sub">${T('Barbaren belagern %s Stadt/Städte.', S.barbs.length)}</p>`;
+    if (S.nukeBan) h += `<p class="sub">${T('Atomwaffenproteste: Atomwaffen sind gesperrt.')}</p>`;
   }
   if (S.wo) {
     const c = wonderCounts(S, pi);
-    h += `<p class="sub" style="margin-top:12px">Deine Weltwunder — Stufe 1: ${c[1]} · Stufe 2: ${c[2]} · Stufe 3: ${c[3]}
-      · nächstes Wunder ${wonderCost(S, pi)} Münzen</p>`;
+    h += `<p class="sub" style="margin-top:12px">` +
+      T('Deine Weltwunder — Stufe 1: %s · Stufe 2: %s · Stufe 3: %s · nächstes Wunder %s Münzen',
+        c[1], c[2], c[3], wonderCost(S, pi)) + '</p>';
     h += '<div class="wlist">' + (wondersOf(S, pi).map(w =>
-      `<span class="wtag">${WONDER_BY_KEY[w.k].n}${w.cityId == null ? ' (freistehend)' : ''}</span>`).join('')
-      || '<span class="sub">noch keins</span>') + '</div>';
+      `<span class="wtag">${WONDER_BY_KEY[w.k].n}${w.cityId == null ? ' (' + T('freistehend') + ')' : ''}</span>`).join('')
+      || `<span class="sub">${T('noch keins')}</span>`) + '</div>';
     for (const lvl of [1, 2, 3]) {
       const pool = poolOf(S, lvl);
       if (!pool.length) continue;
-      h += `<p class="sub" style="margin-top:10px">Verfügbar, Stufe ${lvl}</p>`;
+      h += `<p class="sub" style="margin-top:10px">${T('Verfügbar, Stufe %s', lvl)}</p>`;
       h += pool.map(k => `<div class="tech ${wonderLevelOk(S, pi, lvl) ? 'avail' : 'locked'}">
         <span class="c">${WONDER_BY_KEY[k].lvl}</span><b>${WONDER_BY_KEY[k].n}</b>
         <span class="eff">${WONDER_BY_KEY[k].e}</span></div>`).join('');
     }
     const others = S.players.map((pl, i) => i).filter(i => i !== pi && wondersOf(S, i).length);
     if (others.length) {
-      h += '<p class="sub" style="margin-top:10px">Andere Reiche</p>';
+      h += `<p class="sub" style="margin-top:10px">${T('Andere Reiche')}</p>`;
       h += others.map(i => `<p style="font-size:12px;margin:2px 0">
         <b style="color:${civOf(S.players[i]).color}">${civOf(S.players[i]).n}</b>: ` +
         wondersOf(S, i).map(w => WONDER_BY_KEY[w.k].n).join(', ') + '</p>').join('');
     }
   }
-  if (!S.ev && !S.wo) h = '<p class="sub">Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.</p>';
-  modal('Welt', h);
+  if (!S.ev && !S.wo) h = `<p class="sub">${T('Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.')}</p>`;
+  modal(T('Welt'), h);
 }
 /* Weltwunder in einer Stadt bauen */
 function wonderSheet(city) {
   const pi = S.cur;
   const cost = wonderCost(S, pi);
-  let h = `<h3>Weltwunder bauen</h3>
-    <p class="sub">Kosten ${cost} Münzen · diese Stadt hat ${wondersInCity(S, city).length}/2 Wunder ·
-    verfügbar: ${available(S, pi, 'coins')} Münzen</p>`;
+  let h = `<h3>${T('Weltwunder bauen')}</h3><p class="sub">` +
+    T('Kosten %s Münzen · diese Stadt hat %s/2 Wunder · verfügbar: %s Münzen',
+      cost, wondersInCity(S, city).length, available(S, pi, 'coins')) + '</p>';
   const list = availableWonders(S);
   const rows = list.map(w => {
     const err = canBuildWonder(S, pi, city, w.k);
     return `<button class="opt" data-w="${w.k}" ${err ? 'disabled' : ''}>
-      <span>${w.n}<small>Stufe ${w.lvl} · ${w.e}${err ? ' · ' + err : ''}</small></span>
+      <span>${w.n}<small>${T('Stufe %s', w.lvl)} · ${w.e}${err ? ' · ' + err : ''}</small></span>
       <span class="cost">${cost}🪙</span></button>`;
   }).join('');
-  sheet(h + (rows || '<p class="sub">Keine Wunder verfügbar.</p>'));
+  sheet(h + (rows || `<p class="sub">${T('Keine Wunder verfügbar.')}</p>`));
   $('sheet-body').querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
     const e = buildWonder(S, S.cur, city, b.dataset.w);
     if (e) return toast(e);
@@ -993,41 +989,39 @@ function foodSheet() {
 
   const zeile = (n, v, cls) => `<div class="fl ${cls || ''}"><span>${n}</span>
     <b>${v > 0 ? '+' : ''}${v} 🌾</b></div>`;
-  let h = `<h3>Nahrung diese Runde</h3>
+  let h = `<h3>${T('Nahrung diese Runde')}</h3>
     <div class="foodcalc">
-      ${zeile('Das Land produziert', land)}
-      ${zeile(`Die Bevölkerung isst (${popOf(S, pi)})`, -isst)}
-      ${gedeckt ? zeile(`Davon aus ${p.popCoveredBy && p.popCoveredBy.sci ? 'Wissenschaft' : ''}${
-        p.popCoveredBy && p.popCoveredBy.sci && p.popCoveredBy.coins ? ' und ' : ''}${
-        p.popCoveredBy && p.popCoveredBy.coins ? 'Münzen' : ''} bestritten`, gedeckt, 'plus') : ''}
-      ${zeile('Bleibt nutzbar', p.res.food, 'sum')}
-      ${p.foodDeficit ? `<p class="hint warn-t">Ungedeckt: ${p.foodDeficit} 🌾 – die Nahrung
-        bleibt bei 0, die Bevölkerung nimmt keinen Schaden.</p>` : ''}
+      ${zeile(T('Das Land produziert'), land)}
+      ${zeile(T('Die Bevölkerung isst (%s)', popOf(S, pi)), -isst)}
+      ${gedeckt ? zeile(T('Davon aus %s bestritten', [
+        p.popCoveredBy && p.popCoveredBy.sci ? T('Wissenschaft') : '',
+        p.popCoveredBy && p.popCoveredBy.coins ? T('Münzen') : ''].filter(Boolean).join(' ' + T('und') + ' ')),
+        gedeckt, 'plus') : ''}
+      ${zeile(T('Bleibt nutzbar'), p.res.food, 'sum')}
+      ${p.foodDeficit ? `<p class="hint warn-t">${T('Ungedeckt: %s 🌾 – die Nahrung bleibt bei 0, die Bevölkerung nimmt keinen Schaden.', p.foodDeficit)}</p>` : ''}
     </div>`;
 
   if (!src.length) {
-    h += `<p class="hint">Mit <b>Gentechnik</b> oder <b>Massenmedien</b> ließe sich ein Teil
-      davon aus Wissenschaft oder Münzen bestreiten.</p>`;
+    h += T('<p class="hint">Mit <b>Gentechnik</b> oder <b>Massenmedien</b> ließe sich ein Teil davon aus Wissenschaft oder Münzen bestreiten.</p>');
     sheet(h); return;
   }
-  h += `<p class="sub" style="margin-top:10px">Aus anderen Quellen bestreiten –
-    höchstens ${isst}, also nur die tatsächlichen Kosten.</p>`;
+  h += T('<p class="sub" style="margin-top:10px">Aus anderen Quellen bestreiten – höchstens %s, also nur die tatsächlichen Kosten.</p>', isst);
   src.forEach(x => {
     const have = p.res[x.kind];
     const steps = [...new Set([1, 5, Math.min(offen, have)])]
       .filter(n => n > 0 && n <= Math.min(offen, have)).sort((a, c) => a - c);
     const schon = (p.popCoveredBy && p.popCoveredBy[x.kind]) || 0;
-    h += `<p class="sub" style="margin-top:8px">${x.n}: ${have} übrig${
-      schon ? ` · ${schon} eingesetzt` : ''}</p>`;
-    if (!steps.length && !schon) { h += '<p class="hint">Nichts einzusetzen.</p>'; return; }
+    h += `<p class="sub" style="margin-top:8px">${T('%s: %s übrig', x.n, have)}${
+      schon ? ' · ' + T('%s eingesetzt', schon) : ''}</p>`;
+    if (!steps.length && !schon) { h += `<p class="hint">${T('Nichts einzusetzen.')}</p>`; return; }
     steps.forEach(n => {
-      h += `<button class="opt" data-k="${x.kind}" data-n="${n}"><span>${n} ${x.n} einsetzen${
-        n === offen ? '<small>deckt alles, was die Bevölkerung isst</small>' : ''}</span>
+      h += `<button class="opt" data-k="${x.kind}" data-n="${n}"><span>${T('%s %s einsetzen', n, x.n)}${
+        n === offen ? `<small>${T('deckt alles, was die Bevölkerung isst')}</small>` : ''}</span>
         <span class="cost">+${n}🌾</span></button>`;
     });
     if (schon)
       h += `<button class="opt ghost" data-back="${x.kind}" data-n="${schon}">
-        <span>${schon} ${x.n} zurücknehmen</span><span class="cost">−${schon}🌾</span></button>`;
+        <span>${T('%s %s zurücknehmen', schon, x.n)}</span><span class="cost">−${schon}🌾</span></button>`;
   });
   sheet(h);
   $('sheet-body').querySelectorAll('[data-k]').forEach(b2 => b2.onclick = () => {
@@ -1052,12 +1046,12 @@ function freePickModal() {
   const pi = S.cur, p = P(S);
   const pick = freePick(p);
   const list = pick ? freePickOptions(S, pi) : backPickOptions(S, pi);
-  const title = pick ? pick.why : 'Rückschau';
+  const title = pick ? pick.why : T('Rückschau');
   if (!list.length) { closeModal(); return; }
-  const h = `<p class="sub">${pick ? `Noch ${pick.n} kostenlose Technologie(n).` :
-    'Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.'}</p>` +
+  const h = `<p class="sub">${pick ? T('Noch %s kostenlose Technologie(n).', pick.n) :
+    T('Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.')}</p>` +
     list.map(t => `<button class="tech avail" data-free="${t.k}">
-      <span class="c">gratis</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
+      <span class="c">${T('gratis')}</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
   modal(title, h);
   $('ov-body').querySelectorAll('[data-free]').forEach(b => b.onclick = () => {
     const e = pick ? useFreePick(S, S.cur, b.dataset.free) : useBackPick(S, S.cur, b.dataset.free);
@@ -1074,10 +1068,11 @@ function humanTurnStart() {
   const p = P(S);
   if (S.over) return gameOver();
   const ev = curEvent();
-  toast(ev ? `${civOf(p).n} ist am Zug · Ereignis: ${ev.n}` : civOf(p).n + ' ist am Zug');
+  toast(ev ? T('%s ist am Zug · Ereignis: %s', civOf(p).n, ev.n)
+    : T('%s ist am Zug', civOf(p).n));
   // Mit Gentechnik/Massenmedien gehört die Nahrungsrechnung zu Zugbeginn entschieden.
   if (canFeed(p) && popOpen(ensureFoodState(S, S.cur)) > 0) foodSheet();
-  else if (p.foodDeficit > 0) toast(`Nahrungsdefizit ${p.foodDeficit} – Nahrung bleibt bei 0.`);
+  else if (p.foodDeficit > 0) toast(T('Nahrungsdefizit %s – Nahrung bleibt bei 0.', p.foodDeficit));
   else if (freePick(p)) freePickModal();
 }
 
@@ -1313,7 +1308,7 @@ let placeState = null;
 function startPlacement(cfg) {
   const seed = Math.floor(Math.random() * 2 ** 31);
   const plan = tilePlan(cfg.players.map(p => p.civ), seed);
-  if (!plan) return toast('Für diese Spielerzahl gibt es keine Plättchenkarte.');
+  if (!plan) return toast(T('Für diese Spielerzahl gibt es keine Plättchenkarte.'));
   const rnd = mapRng(seed + 12345);
   placeState = { cfg, plan, rnd, queue: [], at: 0, o: 0, cell: null, done: false };
   plan.seats.forEach(seat => {
@@ -1341,10 +1336,7 @@ function placeStep() {
   // Hotseat: zwischen zwei Menschen wird das Gerät übergeben, vorher nichts gezeigt.
   if (st.queue.length > 1) {
     const civ = seatCiv(placeSeatNow());
-    modal('Verdeckt legen', `<p class="sub">${SYM[civ.sym]} <b>${civ.n}</b> ist dran.
-      Das eigene Startplättchen sehen die anderen erst nach dem Aufdecken – jetzt also
-      Gerät übergeben.</p>
-      <button class="btn primary wide" id="pl-gate">Plättchen ansehen</button>`);
+    modal('Verdeckt legen', T('<p class="sub">%s <b>%s</b> ist dran. Das eigene Startplättchen sehen die anderen erst nach dem Aufdecken – jetzt also Gerät übergeben.</p> <button class="btn primary wide" id="pl-gate">Plättchen ansehen</button>', SYM[civ.sym], civ.n));
     $('pl-gate').onclick = closeModal;
   }
 }
@@ -1368,17 +1360,18 @@ function drawPlace() {
   drawMap($('pl-map'), map, opts);
   const note = $('pl-note');
   if (st.done) {
-    note.innerHTML = `Alle Plättchen liegen offen. ${plan.n} Reiche, ` +
-      `${shape.slots.length} Dreiecke.`;
+    note.innerHTML = T('Alle Plättchen liegen offen. %s Reiche, %s Dreiecke.',
+      plan.n, shape.slots.length);
     $('pl-rot').hidden = true;
-    $('pl-ok').textContent = 'Spiel beginnen';
+    $('pl-ok').textContent = T('Spiel beginnen');
   } else {
     const civ = seatCiv(seat), tile = TILE_POOL[plan.tiles[seat.slot]];
-    note.innerHTML = `<b>${SYM[civ.sym]} ${civ.n}</b> · „${tile.n}" · Lage ${st.o + 1} von 3 · ` +
-      (st.cell == null ? 'Hauptstadt auf ein markiertes Feld tippen'
-        : 'Hauptstadt gesetzt – „Fertig", wenn es passt');
+    note.innerHTML = `<b>${SYM[civ.sym]} ${civ.n}</b> · „${tile.n}" · ` +
+      T('Lage %s von 3', st.o + 1) + ' · ' +
+      (st.cell == null ? T('Hauptstadt auf ein markiertes Feld tippen')
+        : T('Hauptstadt gesetzt – „Fertig", wenn es passt'));
     $('pl-rot').hidden = false;
-    $('pl-ok').textContent = 'Fertig';
+    $('pl-ok').textContent = T('Fertig');
   }
 }
 function plTap(r, c) {
@@ -1386,9 +1379,9 @@ function plTap(r, c) {
   if (!seat) return;
   const rcs = slotRC(st.plan, seat.slot);
   const i = rcs.findIndex(x => x[0] === r && x[1] === c);
-  if (i < 0) return toast('Nur auf dem eigenen Plättchen.');
+  if (i < 0) return toast(T('Nur auf dem eigenen Plättchen.'));
   if (!placeOptions(st.plan, seat, st.o)[i])
-    return toast('Nur auf Land – und nicht so nah an einem fremden Startplättchen.');
+    return toast(T('Nur auf Land – und nicht so nah an einem fremden Startplättchen.'));
   st.cell = i;
   drawPlace();
 }
@@ -1405,7 +1398,7 @@ function placeConfirm() {
   if (!st) return;
   if (st.done) return placeGo();
   const seat = placeSeatNow();
-  if (st.cell == null) return toast('Erst die Hauptstadt setzen.');
+  if (st.cell == null) return toast(T('Erst die Hauptstadt setzen.'));
   const err = placeSeat(st.plan, seat, st.o, st.cell);
   if (err) return toast(err);
   st.at++;
@@ -1447,7 +1440,7 @@ function edTap(r, c) {
   if (c < 0 || c >= editMap.rows[r].length) return;
   if (edTool.startsWith('cap:')) {
     const civ = edTool.slice(4);
-    if (!TERRAIN[editMap.rows[r][c]].land) return toast('Hauptstädte nur auf Land.');
+    if (!TERRAIN[editMap.rows[r][c]].land) return toast(T('Hauptstädte nur auf Land.'));
     editMap.capitals[civ] = [r, c];
   } else {
     const row = editMap.rows[r];
@@ -1501,6 +1494,8 @@ function switchLang(k) {
   bootTexts();
   // was gerade offen ist, neu zeichnen
   if (S && $('screen-game').classList.contains('show')) redraw();
+  // das Tutorialpanel behält sonst den Text, mit dem es gezeichnet wurde
+  if (ui && ui.tut && typeof renderTutPanel === 'function') renderTutPanel();
   if ($('screen-setup').classList.contains('show')) setupScreen();
   if ($('screen-editor').classList.contains('show')) editorScreen();
   closeModal(); closeSheet();
@@ -1533,8 +1528,8 @@ function boot() {
   $('m-rules').onclick = () => rulesModal();
   $('m-continue').onclick = () => { endTutorialPanel(); S = load('hochciv.save'); startGameScreen(); };
   $('m-load').onclick = () => upload(txt => {
-    try { endTutorialPanel(); S = JSON.parse(txt); saveGame(); startGameScreen(); toast('Spielstand geladen'); }
-    catch (e) { toast('Datei nicht lesbar'); }
+    try { endTutorialPanel(); S = JSON.parse(txt); saveGame(); startGameScreen(); toast(T('Spielstand geladen')); }
+    catch (e) { toast(T('Datei nicht lesbar')); }
   });
   document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => show('screen-menu'));
   $('ov-close').onclick = closeModal;
@@ -1573,13 +1568,11 @@ function boot() {
     // turnWanted() ist die gespeicherte Wahl – nicht html.turn, das zusätzlich vom
     // Bildschirm abhängt (gedreht wird nur das Spiel).
     const on = turnWanted();
-    modal('Menü', `<button class="btn wide" id="mm-rules">Regeln &amp; Technologien</button>
-      <button class="btn wide" id="mm-turn">Hochkant drehen: ${on ? 'an' : 'aus'}</button>
-      <p class="hint" style="margin:6px 2px 0">Hält man das Gerät im <b>Spiel</b> hochkant,
-        dreht die App sich selbst quer, damit die Karte breit steht. Menü, Aufbau und
-        Editor bleiben unberührt. iOS erlaubt keine echte Orientierungssperre.</p>
-      <button class="btn wide" id="mm-export">Spielstand exportieren</button>
-      <button class="btn wide" id="mm-quit">Spiel beenden</button>`);
+    modal(T('Menü'), `<button class="btn wide" id="mm-rules">${T('Regeln & Technologien')}</button>
+      <button class="btn wide" id="mm-turn">${T('Hochkant drehen: %s', on ? T('an') : T('aus'))}</button>
+      <p class="hint" style="margin:6px 2px 0">${T('Hält man das Gerät im Spiel hochkant, dreht die App sich selbst quer, damit die Karte breit steht. Menü, Aufbau und Editor bleiben unberührt. iOS erlaubt keine echte Orientierungssperre.')}</p>
+      <button class="btn wide" id="mm-export">${T('Spielstand exportieren')}</button>
+      <button class="btn wide" id="mm-quit">${T('Spiel beenden')}</button>`);
     $('mm-rules').onclick = rulesModal;
     $('mm-turn').onclick = () => { setTurn(!turnWanted()); closeModal(); };
     $('mm-export').onclick = () => download('hochzeiv-spielstand.json', JSON.stringify(S));
@@ -1587,10 +1580,10 @@ function boot() {
   };
   $('ed-save').onclick = () => {
     customMap = editMap; store('hochciv.map', editMap);
-    toast('Karte gespeichert'); show('screen-menu');
+    toast(T('Karte gespeichert')); show('screen-menu');
   };
   $('ed-export').onclick = () => download('hochzeiv-karte.json', JSON.stringify(editMap, null, 1));
-  $('ed-import').onclick = () => upload(txt => { editMap = JSON.parse(txt); drawEditor(); toast('Karte geladen'); });
+  $('ed-import').onclick = () => upload(txt => { editMap = JSON.parse(txt); drawEditor(); toast(T('Karte geladen')); });
   $('ed-reset').onclick = () => { editMap = JSON.parse(JSON.stringify(DEFAULT_MAP)); drawEditor(); };
   $('ed-size').onclick = () => {
     const r = prompt('Zeilen', editMap.rows.length), c = prompt('Spalten', editMap.rows[0].length);
@@ -1617,52 +1610,38 @@ function startGameScreen() {
   else setTimeout(humanTurnStart, 60);
 }
 function rulesModal() {
-  modal('Kurzregeln', `
-    <p class="sub">Zugablauf</p>
+  modal(T('Kurzregeln'), `
+    <p class="sub">${T('Zugablauf')}</p>
     <ol style="font-size:14px;line-height:1.5;padding-left:20px">
-      <li>Einkommen aus allen Feldern rund um deine Städte plus Bevölkerung.</li>
-      <li>Macht halbiert sich (aufgerundet).</li>
-      <li>Aktionen in beliebiger Reihenfolge, beliebig oft.</li>
-      <li>Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen.
-        Zwei Züge in Folge stärker → Stadt erobert.</li>
-      <li>Sieg: Singularität · ${victoryLabels(!!(S && S.duel)).base} der Weltbevölkerung
-        (UN ${victoryLabels(!!(S && S.duel)).un}, Theologie ${victoryLabels(!!(S && S.duel)).theologie}) ·
-        gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das
-        Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte
-        (Bevölkerung + Wunder + Technologien).</li>
+      <li>${T('Einkommen aus allen Feldern rund um deine Städte plus Bevölkerung.')}</li>
+      <li>${T('Macht halbiert sich (aufgerundet).')}</li>
+      <li>${T('Aktionen in beliebiger Reihenfolge, beliebig oft.')}</li>
+      <li>${T('Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen. Zwei Züge in Folge stärker → Stadt erobert.')}</li>
+      <li>${T('Sieg: Singularität · %s der Weltbevölkerung (UN %s, Theologie %s) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
+        victoryLabels(!!(S && S.duel)).base, victoryLabels(!!(S && S.duel)).un,
+        victoryLabels(!!(S && S.duel)).theologie)}</li>
     </ol>
-    <p class="sub">Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
-    2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.</p>
-    <p class="sub">Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert,
-    sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein
-    Ereignis dieser Runde zählt dafür nicht. Gentechnik (Wissenschaft) und Massenmedien
-    (Münzen) heben die Grenze auf: zu Zugbeginn lässt sich damit bestreiten, was die
-    Bevölkerung isst – höchstens diese Kosten, also kein allgemeiner Umtausch.</p>
-    <p class="sub"><b>Handelsrouten:</b> jede eigene Stadt außer der Hauptstadt, die über
-    einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über
-    eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße.</p>
-    <p class="sub">Geländeerträge je Feld</p>
+    <p class="sub">${T('Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen. 2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.')}</p>
+    <p class="sub">${T('Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik (Wissenschaft) und Massenmedien (Münzen) heben die Grenze auf: zu Zugbeginn lässt sich damit bestreiten, was die Bevölkerung isst – höchstens diese Kosten, also kein allgemeiner Umtausch.')}</p>
+    <p class="sub">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße.')}</p>
+    <p class="sub">${T('Geländeerträge je Feld')}</p>
     <table style="width:100%;font-size:13px;border-collapse:collapse">
-      <tr style="color:var(--ink-soft);font-size:11px"><th align="left">Feld</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>
+      <tr style="color:var(--ink-soft);font-size:11px"><th align="left">${T('Feld')}</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>
       ${Object.values(TERRAIN).filter(t => !t.off).map(t => `<tr style="border-top:1px solid var(--rule)">
         <td>${t.name}</td>${t.yield.map(n => `<td align="center">${n || '·'}</td>`).join('')}</tr>`).join('')}
-      <tr style="border-top:1px solid var(--rule)"><td>Stadt (je Bevölkerung)</td>
+      <tr style="border-top:1px solid var(--rule)"><td>${T('Stadt (je Bevölkerung)')}</td>
         <td align="center">1</td><td align="center">−1</td><td align="center">1</td></tr>
     </table>
-    <p class="sub">Zivilisationen — je drei wählbare Fähigkeiten (Bots haben keine)</p>
+    <p class="sub">${T('Zivilisationen — je drei wählbare Fähigkeiten (Bots haben keine)')}</p>
     ${CIVS.map(c => `<p style="font-size:13px;margin:6px 0"><b>${SYM[c.sym]} ${c.n}</b><br>` +
-      c.abilities.map((a, j) => `<span style="color:var(--ink-soft)">${j === 0 ? 'Grund' : 'Alt. ' + (j + 1)}:</span> ${a.e}`).join('<br>') +
+      c.abilities.map((a, j) => `<span style="color:var(--ink-soft)">${j === 0 ? T('Grund') : T('Alt. %s', j + 1)}:</span> ${a.e}`).join('<br>') +
       '</p>').join('')}
-    <p class="sub">Weltwunder (Erweiterung)</p>
-    <p style="font-size:13px;margin:4px 0">Kosten 10/20/30/40 … für das 1./2./3./4. Wunder.
-      Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. Je Stadt zwei Wunder.
-      Ein Wunder der Stufe 3 gewinnt zu Beginn des nächsten Zuges.</p>
-    <p class="sub">Ereignisse (Erweiterung)</p>
-    <p style="font-size:13px;margin:4px 0">Zu Rundenbeginn wird gewürfelt: Zeile, dann Spalte.
-      Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.</p>
-    <p class="sub">Alle Technologien</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">Kosten links, Wirkung rechts.
-      Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.</p>
+    <p class="sub">${T('Weltwunder (Erweiterung)')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Kosten 10/20/30/40 … für das 1./2./3./4. Wunder. Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. Je Stadt zwei Wunder. Ein Wunder der Stufe 3 gewinnt zu Beginn des nächsten Zuges.')}</p>
+    <p class="sub">${T('Ereignisse (Erweiterung)')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Zu Rundenbeginn wird gewürfelt: Zeile, dann Spalte. Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.')}</p>
+    <p class="sub">${T('Alle Technologien')}</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);
@@ -1670,7 +1649,7 @@ function rulesModal() {
         return `<p class="rule-age">${an}</p>` + list.map(t =>
           `<div class="rule-tech"><span class="c">${t.c}</span><b>${t.n}</b><i>${techEffect(t, S)}</i></div>`).join('');
       }).join('')).join('')}
-    <p class="rule-field">Sieg</p>
+    <p class="rule-field">${T('Sieg')}</p>
     <div class="rule-tech"><span class="c">${SINGULARITY.c}</span><b>${SINGULARITY.n}</b>
       <i>${SINGULARITY.e}</i></div>`);
 }

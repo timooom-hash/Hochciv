@@ -26,7 +26,7 @@ function botTurn(S, pi) {
 
   // 1 Bevölkerungswachstum
   for (const city of citiesOf(S, pi))
-    if (botTry(S, p, 'Wachstum')) { city.pop++; log(S, 'act', `${civOf(p).n}: Stadt wächst auf ${city.pop}.`); }
+    if (botTry(S, p, 'Wachstum')) { city.pop++; log(S, 'act', T('%s: Stadt wächst auf %s.', civOf(p).n, city.pop)); }
 
   // 2 Siedeln
   if (capital && botTry(S, p, 'Siedeln')) botSettle(S, pi, capital);
@@ -35,9 +35,9 @@ function botTurn(S, pi) {
   botWonderStep(S, pi);
 
   // 3 Armee bauen
-  if (capital && botTry(S, p, 'Armee bauen') && !armyAt(S, capital.r, capital.c)) {
+  if (capital && botTry(S, p, T('Armee bauen')) && !armyAt(S, capital.r, capital.c)) {
     S.armies.push({ id: S.nextId++, owner: pi, r: capital.r, c: capital.c, mp: 0, born: S.round });
-    log(S, 'act', `${civOf(p).n}: neue Armee in der Hauptstadt.`);
+    log(S, 'act', T('%s: neue Armee in der Hauptstadt.', civOf(p).n));
   }
 
   // 4 Armeen bewegen: erst die abgestimmten Prioritäten 1–6, dann jede übrige für sich
@@ -115,11 +115,11 @@ function botSettle(S, pi, capital) {
     let pick = spots[0];
     if (spots.length > 1) {
       let idx = 0;
-      do { idx = d6(S, `Siedlerziel auswürfeln (1–${Math.min(spots.length, 6)})`); } while (idx > spots.length);
+      do { idx = d6(S, T('Siedlerziel auswürfeln (1–%s)', Math.min(spots.length, 6))); } while (idx > spots.length);
       pick = spots[idx - 1];
     }
     r = pick[0]; c = pick[1]; prev = null;
-    log(S, 'info', `${civOf(p).n}: Siedler zieht auf ${r}/${c} (nächstes siedelbares Feld).`);
+    log(S, 'info', T('%s: Siedler zieht auf %s/%s (nächstes siedelbares Feld).', civOf(p).n, r, c));
     return true;
   };
   if (!goToNearest()) { log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`); return; }
@@ -129,7 +129,7 @@ function botSettle(S, pi, capital) {
       if (d6(S, 'Siedeln? (3+)') >= 3) {
         const pop = isAbil(p, 'siedler') ? 2 : 1;
         S.cities.push({ id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round });
-        log(S, 'act', `${civOf(p).n}: Siedler gründet Stadt auf ${r}/${c}.`);
+        log(S, 'act', T('%s: Siedler gründet Stadt auf %s/%s.', civOf(p).n, r, c));
         return;
       }
     }
@@ -192,7 +192,7 @@ function botStep(S, pi, army, goal, why) {
   const c = cost(goal);
   if (c == null) return false;
   army.mp -= c; army.r = goal[0]; army.c = goal[1];
-  log(S, 'act', `${civOf(S.players[pi]).n}: Armee ${why} → ${goal[0]}/${goal[1]}.`);
+  log(S, 'act', T('%s: Armee %s → %s/%s.', civOf(S.players[pi]).n, why, goal[0], goal[1]));
   return true;
 }
 /* Eine Stadt gilt als belagert, wenn der letzte Zugkampf gewonnen wurde – der nächste
@@ -263,7 +263,7 @@ function botPlanArmies(S, pi) {
     if (noetig == null || schon.length + koennen.length < noetig) return false;
     for (const a of schon) if (!a.botDone) belege(a);        // gut stehende bleiben stehen
     let offenZiel = alle ? Infinity : Math.max(0, noetig - schon.length);
-    const why = alle ? 'stürmt die belagerte Hauptstadt' : 'schließt die Belagerung ab';
+    const why = alle ? T('stürmt die belagerte Hauptstadt') : T('schließt die Belagerung ab');
     while (offenZiel > 0) {
       let best = null;
       for (const a of offen()) {
@@ -289,7 +289,7 @@ function botPlanArmies(S, pi) {
   for (const city of eigene) {
     const feinde = threateningArmies(S, pi, city);
     if (!feinde.length) continue;
-    const label = city.cap ? 'die Hauptstadt' : 'eine Stadt';
+    const label = city.cap ? T('die Hauptstadt') : T('eine Stadt');
     // (a) flankieren – schlägt die angreifende Armee ganz aus dem Spiel
     for (const a of offen()) {
       const { tiles, cost } = botReach(S, pi, a);
@@ -297,7 +297,7 @@ function botPlanArmies(S, pi) {
       for (const e of feinde)
         for (const t of tiles)
           if (botFlankOk(S, pi, a, e, t) && cost(t) < bestC) { bestT = t; bestC = cost(t); }
-      if (bestT && botStep(S, pi, a, bestT, `flankiert einen Angreifer auf ${label}`)) belege(a);
+      if (bestT && botStep(S, pi, a, bestT, T('flankiert einen Angreifer auf %s', label))) belege(a);
     }
     // (b) verteidigen: in Reichweite der Stadt, möglichst dicht am Angreifer
     for (const a of offen()) {
@@ -357,7 +357,7 @@ function botMoveArmy(S, pi, army) {
         powerOf(S, c.owner) * 10 + (c.cap ? -5 : 0)));   // schwächster Gegner, Hauptstadt −5
       return best * 100 + cost(t);
     });
-    if (goal) why = 'greift eine gegnerische Stadt an';
+    if (goal) why = T('greift eine gegnerische Stadt an');
   }
 
   // Priorität 8: gegnerische Armee flankieren – schwächste zuerst
@@ -381,7 +381,7 @@ function botMoveArmy(S, pi, army) {
       const e = candidates.find(x => x.t[0] === t[0] && x.t[1] === t[1]).e;
       return powerOf(S, e.owner) * 100 + cost(t);
     });
-    if (goal) why = 'flankiert eine gegnerische Armee';
+    if (goal) why = T('flankiert eine gegnerische Armee');
   }
 
   // Priorität 9: innerhalb des eigenen Reiches an den Rand ziehen, dem eine gegnerische
@@ -398,7 +398,7 @@ function botMoveArmy(S, pi, army) {
       const realmCells = [...own].map(unkey);
       goal = chooseBy(tiles, t =>
         Math.min(...realmCells.map(rc => hexDistance(rc[0], rc[1], t[0], t[1]))) * 10 + cost(t));
-      if (goal && (goal[0] !== army.r || goal[1] !== army.c)) why = 'kehrt ins eigene Reich zurück';
+      if (goal && (goal[0] !== army.r || goal[1] !== army.c)) why = T('kehrt ins eigene Reich zurück');
       else goal = null;
     } else {
     const rim = inRealm.filter(t =>
@@ -438,7 +438,7 @@ function botMoveArmy(S, pi, army) {
   if (goal) {
     army.mp -= cost(goal);
     army.r = goal[0]; army.c = goal[1];
-    log(S, 'act', `${civOf(p).n}: Armee ${why} → ${goal[0]}/${goal[1]}.`);
+    log(S, 'act', T('%s: Armee %s → %s/%s.', civOf(p).n, why, goal[0], goal[1]));
   }
 }
 
@@ -453,8 +453,8 @@ function botResearch(S, pi, avoidFields = []) {
   // Singularität, sobald ein Feld der Moderne schon beforscht ist
   if (techPool(S).some(t => t.f === field && t.age === 3 && p.techs[t.k])) {
     p.techs.singularitaet = true;
-    log(S, 'act', `${civOf(p).n} erforscht die Singularität!`);
-    claimVictory(S, pi, 'Forschungssieg (Singularität)');   // fällt am Rundenende
+    log(S, 'act', T('%s erforscht die Singularität!', civOf(p).n));
+    claimVictory(S, pi, T('Forschungssieg (Singularität)'));   // fällt am Rundenende
     return field;
   }
   // höchstes erforschbares Zeitalter in diesem Feld
@@ -474,6 +474,6 @@ function botResearch(S, pi, avoidFields = []) {
   // nur das Ergebnis wird getauscht, damit die feste Würfelfolge unberührt bleibt.
   if (typeof tutBotTech === 'function') tech = tutBotTech(S, pi, field) || tech;
   p.techs[tech.k] = true;
-  log(S, 'act', `${civOf(p).n} erforscht ${tech.n}.`);
+  log(S, 'act', T('%s erforscht %s.', civOf(p).n, tech.n));
   return field;   // Bots bestimmen ihr Zeitalter aus den erforschten Techs, kein avail nötig
 }
