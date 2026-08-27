@@ -429,9 +429,16 @@ function openTile(r, c) {
   if (!t) return closeSheet();
   const city = cityAt(S, r, c), army = armyAt(S, r, c);
   const rows = [], handlers = [];
+  /* Der erste Parameter ist der **deutsche** Text: er wird hier übersetzt und zusätzlich
+     als `data-label` mitgegeben. Daran erkennt das Tutorial seine Knöpfe – es prüft
+     Beschriftungen mit deutschen Ausdrücken, und die passen sonst nicht mehr, sobald die
+     Oberfläche auf Englisch steht (dann war „Stadt gründen" gesperrt und das Tutorial
+     hing fest). */
   const btn = (label, sub, cost, fn, off) => {
     const id = 'x' + (handlers.length + 1) + Math.random().toString(36).slice(2, 6);
-    rows.push(`<button class="opt" id="${id}" ${off ? 'disabled' : ''}><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><span class="cost">${cost || ''}</span></button>`);
+    rows.push(`<button class="opt" id="${id}" data-label="${label}" ${off ? 'disabled' : ''}>` +
+      `<span>${T(label)}${sub ? `<small>${sub}</small>` : ''}</span>` +
+      `<span class="cost">${cost || ''}</span></button>`);
     handlers.push([id, fn]);
   };
   let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">${T('Feld %s/%s · Ertrag', r, c)} `
@@ -446,17 +453,17 @@ function openTile(r, c) {
         `<span class="wtag">◈ ${WONDER_BY_KEY[w.k].n} (${T('Stufe %s', w.lvl)})</span>`).join('')}</div>` : '');
     if (city.owner === pi) {
       if (freeGrowthAvailable(S, pi, city))
-        btn(T('Kostenlos wachsen'), T('auf %s · Verbundwerkstoffe', city.pop + 1), T('gratis'),
+        btn('Kostenlos wachsen', T('auf %s · Verbundwerkstoffe', city.pop + 1), T('gratis'),
           () => { const e = growCity(S, pi, city, 'free'); e ? toast(e) : redraw(); openTile(r, c); });
       const pc = growPrice(S, pi, city);
       const perr = canGrowPaid(S, pi, city);
-      btn(T('Bevölkerung wachsen'), perr || T('auf %s', city.pop + 1), `${pc.food}🌾 ${pc.coins}🪙`,
+      btn('Bevölkerung wachsen', perr || T('auf %s', city.pop + 1), `${pc.food}🌾 ${pc.coins}🪙`,
         () => { const e = growCity(S, pi, city, 'paid'); e ? toast(e) : redraw(); openTile(r, c); }, !!perr);
       if (S.wo) {
         const wcost = wonderCost(S, pi);
         const full = wondersInCity(S, city).length >= 2;
         const any = availableWonders(S).some(w => !canBuildWonder(S, pi, city, w.k));
-        btn(T('Weltwunder bauen'), full ? T('diese Stadt hat schon zwei Wunder')
+        btn('Weltwunder bauen', full ? T('diese Stadt hat schon zwei Wunder')
           : any ? T('%s/2 in dieser Stadt', wondersInCity(S, city).length)
             : T('nichts baubar (Münzen oder Stufenregel)'), `${wcost}🪙`,
           () => wonderSheet(city), full || !any);
@@ -464,16 +471,16 @@ function openTile(r, c) {
       const ac = armyCost(S, pi);
       // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
       const civil = payOpts(S, pi).foodOk;
-      btn(T('Armee bauen'), civil ? T('Bürgerkrieg: auch mit Nahrung zahlbar')
+      btn('Armee bauen', civil ? T('Bürgerkrieg: auch mit Nahrung zahlbar')
         : T('muss die Stadt noch verlassen'), `${ac}🪙`,
         () => { const e = buildArmy(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
         available(S, pi, 'coins', payOpts(S, pi)) < ac || !!armyAt(S, r, c));
       if (slaveryUsable(p))
-        btn(T('Bevölkerung opfern'), city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+10🪙',
+        btn('Bevölkerung opfern', city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+10🪙',
           () => { const e = sacrifice(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
           city.pop < 2 || city.sacrificed === S.round);
       if (army && army.owner === pi)          // Armee steht in der Stadt und muss heraus
-        btn(T('Armee hier bewegen'), army.born === S.round ? T('muss die Stadt noch verlassen')
+        btn('Armee hier bewegen', army.born === S.round ? T('muss die Stadt noch verlassen')
           : T('erreichbare Felder werden markiert'), mp(army),
           () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
     } else {
@@ -486,23 +493,23 @@ function openTile(r, c) {
     const owner = civOf(S.players[army.owner]);
     head = `<h3>${T('Armee')} · ${owner.n}</h3><p class="sub">${T('Angriffswert %s', powerOf(S, army.owner))} · ${mp(army)}</p>`;
     if (army.owner === pi)
-      btn(T('Diese Armee bewegen'), T('erreichbare Felder werden markiert'), '',
+      btn('Diese Armee bewegen', T('erreichbare Felder werden markiert'), '',
         () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
   } else {
     const cost = foundCost(S, pi, r, c), ferr = canFound(S, pi, r, c);
     const costLabel = cost === Infinity ? '—' : `${cost}🌾`;
-    btn(T('Stadt gründen'), ferr || T('Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)'), costLabel,
+    btn('Stadt gründen', ferr || T('Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)'), costLabel,
       () => { const e = foundCity(S, pi, r, c); e ? toast(e) : redraw(); closeSheet(); }, !!ferr);
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
-      btn(T('Feld kaufen'), owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, '5🪙',
+      btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, '5🪙',
         () => { const e = buyTile(S, pi, r, c); e ? toast(e) : redraw(); openTile(r, c); }, owned);
     }
   }
   if (has(p, 'atomwaffen')) {
     // Atomwaffenproteste sperren den Einsatz dauerhaft – dann ist der Knopf auch aus
     const banned = evNukeBan(S, pi);
-    btn(T('Atomschlag auf dieses Feld'),
+    btn('Atomschlag auf dieses Feld',
       banned ? T('durch Atomwaffenproteste dauerhaft gesperrt')
         : p.nuked ? T('diese Runde schon eingesetzt')
           : T('zerstört alle Armeen hier und ringsum, auch eigene'), '☢︎',
@@ -554,7 +561,7 @@ function armySheet() {
     const note = a.mp <= 0 ? T('diese Runde schon gezogen')
       : inCity && a.born === S.round ? T('muss die Stadt noch verlassen')
         : T('auf %s', TERRAIN[terrainAt(S, a.r, a.c)].name);
-    return `<button class="opt" data-i="${i}" ${a.mp <= 0 ? 'disabled' : ''}>
+    return `<button class="opt" data-i="${i}" data-label="Armee wählen" ${a.mp <= 0 ? 'disabled' : ''}>
       <span>${T('Armee %s · Feld %s/%s', i + 1, a.r, a.c)}<small>${note}</small></span>
       <span class="cost">${mp(a)}</span></button>`;
   }).join('');
@@ -746,7 +753,7 @@ function powerSheet() {
     (payOpts(S, pi).foodOk ? ' ' + T('Bürgerkrieg: auch mit Nahrung zahlbar.') : '') + '</p>';
   [1, 5, maxN].forEach((n, i) => {
     if (n <= 0 || (i === 2 && maxN <= 5)) return;
-    h += `<button class="opt" data-n="${n}"><span>${T('+%s Macht', n)}${i === 2 ? `<small>${T('alles ausgeben')}</small>` : ''}</span>
+    h += `<button class="opt" data-n="${n}" data-label="+${n} Macht"><span>${T('+%s Macht', n)}${i === 2 ? `<small>${T('alles ausgeben')}</small>` : ''}</span>
       <span class="cost">${n * price}🪙</span></button>`;
   });
   if (maxN <= 0) h += `<p class="sub">${T('Nicht genug Münzen.')}</p>`;

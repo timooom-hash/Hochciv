@@ -484,7 +484,9 @@ function tutGateSheet(r, c) {
   const body = $('sheet-body');
   if (!body) return;
   body.querySelectorAll('.opt').forEach(b => {
-    const txt = b.textContent || '';
+    // Geprüft wird der **deutsche** Schlüssel aus data-label, nicht die Beschriftung:
+    // die ist auf Englisch anders, und die Regeln des Tutorials sind deutsch notiert.
+    const txt = b.dataset.label || b.textContent || '';
     const okLabel = al.labels === null || al.labels.some(rx => rx.test(txt));
     if (!okLabel || !tutHexOk(r, c)) b.disabled = true;
   });
