@@ -95,7 +95,7 @@ function powerOf(S, pi) {
 function newGame(cfg) {
   // Feste Spielerreihenfolge: Russland → Griechenland → England → Wikinger.
   // Der Startspieler verschiebt nur den Einstiegspunkt in dieser Rotation.
-  const ORDER = ['russland', 'griechenland', 'england', 'wikinger'];
+  // ORDER (Zugreihenfolge) kommt aus js/civs.js, erzeugt aus data/civs.json
   // Gleiche Zivilisationen behalten ihre Reihenfolge aus dem Aufbau (stabile Sortierung),
   // und der Startspieler wird über den Platz bestimmt, nicht über die Zivilisation –
   // sonst zeigte „Startspieler Russland" bei zwei Russlands auf das falsche Reich.
@@ -419,7 +419,11 @@ function incomeBreakdown(S, pi) {
     pyy[1] += f * mult;
     pyy[2] += py[2] * city.pop * mult;
   }
-  if (sea) extra.push({ name: T('Städte am Meer'), glyph: '⚓', count: sea, y: [2 * sea, 2 * sea, 2 * sea] });
+  // Seemacht (v53): +1 je Küstenstadt auf alle drei Erträge, vorher +2
+  if (sea) extra.push({
+    name: T('Städte am Meer'), glyph: '⚓', count: sea,
+    y: [SEA_CITY_BONUS * sea, SEA_CITY_BONUS * sea, SEA_CITY_BONUS * sea],
+  });
   // Handelsrouten: Städte, die über Straßen (+1) oder durchgehend Eisenbahn (+2) an
   // der Hauptstadt hängen. Grundregel, gilt also auch für Bots.
   const tr = tradeRoutes(S, pi);
@@ -852,11 +856,17 @@ function paidGrowthAvailable(S, pi, city) {
   return (city.grown || 0) < lim.max && paidGrowthUsed(city) < lim.paid;
 }
 /* Preis für bezahltes Wachstum. Russland "Fruchtbarkeit": keine Nahrungskosten. */
+/* Wachstumskosten: je Bevölkerung 1 Nahrung und 1 Münze.
+   Russlands „Fruchtbarkeit" streicht die Nahrung, die Dampfmaschine die Münzen.
+   Englands „Kolonisten" (v53) zahlt dagegen **doppelt** – die Fähigkeit macht das
+   Gründen fast umsonst, also kostet das Wachsen in diesen Städten mehr. */
+const GROW_ABIL_FACTOR = { gruenden: 2 };
 function growPrice(S, pi, city) {
   const p = S.players[pi];
+  const f = GROW_ABIL_FACTOR[abilityOf(p)] || 1;
   return {
-    food: isAbil(p, 'wachstum') ? 0 : city.pop,
-    coins: has(p, 'dampfmaschine') ? 0 : city.pop,
+    food: isAbil(p, 'wachstum') ? 0 : city.pop * f,
+    coins: has(p, 'dampfmaschine') ? 0 : city.pop * f,
   };
 }
 // Das kostenlose Kontingent ist NICHT an die Reihenfolge gebunden: es zählt, wie viele

@@ -56,8 +56,8 @@ const DATA_EN = {
     },
     england: {
       basis: ['Trading empire', 'Coins = food for all purposes (1:1 both ways)'],
-      gruenden: ['Colonists', 'Founding cities costs no base cost (distance cost only; with Cartography whichever of the two is cheaper)'],
-      kuestenstaedte: ['Sea power', 'Every city adjacent to sea yields +2 science, food and coins'],
+      gruenden: ['Colonists', 'Founding cities costs no base cost (distance cost only; with Cartography whichever of the two is cheaper). Population growth costs double'],
+      kuestenstaedte: ['Sea power', 'Every city adjacent to sea yields +1 science, food and coins'],
     },
     russland: {
       basis: ['Taiga', '+1 food in forest'],
@@ -202,7 +202,9 @@ function snapshotGerman() {
     evmode: Object.fromEntries(EVENT_MODES.map(m => [m.k, m.n])),
     maps: MAPS.map(m => m.name),
     shapes: Object.fromEntries(Object.values(TILE_SHAPES).map(s => [s.key, s.name])),
-    civ: Object.fromEntries(CIVS.map(c => [c.k, c.n])),
+    // Barbaren gehören dazu, sonst bleibt ihr Name beim Zurückschalten englisch
+    civ: Object.fromEntries(CIVS.map(c => [c.k, c.n])
+      .concat(typeof BARB_CIV === 'object' ? [[BARB_CIV.k, BARB_CIV.n]] : [])),
     abil: Object.fromEntries(CIVS.map(c => [c.k, Object.fromEntries(c.abilities.map(a => [a.k, pair(a)]))])),
     tech: Object.fromEntries(TECHS.map(t => [t.k, pair(t)]).concat([['singularitaet', pair(SINGULARITY)]])),
     event: Object.fromEntries(Object.values(EVENT_BY_KEY).map(e => [e.k, pair(e)])),

@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v52';
+const APP_VERSION = 'v53';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -116,6 +116,8 @@ TECHS.forEach(t => { t.age = ageOfCost(t.c); });
    Griechenland hat KEINEN Würfelbonus auf die Techverfügbarkeit (nur den Rabatt). */
 const SINGULARITY_BASE = 100;
 const KREML_SURCHARGE = 50;        // Weltwunder "Der Kreml": Singularität teurer, für alle
+// Englands „Seemacht": Zuschlag je Stadt am Meer auf jeden der drei Erträge (v53: 1)
+const SEA_CITY_BONUS = 1;
 const VICTORY_FRAC = 2 / 3;        // Standard-Siegschwelle
 const THEOLOGY_FRAC = 3 / 5;       // mit Theologie
 const UN_FRAC = 1 / 2;             // mit Vereinte Nationen
@@ -142,48 +144,10 @@ function techsIn(field, age, S) {
 /* Jede Zivilisation hat drei wählbare Fähigkeiten: die Grundfähigkeit und die zwei
    Alternativen aus dem Zivilisationsbogen. Im Aufbau wird eine davon gewählt.
    Bots erhalten grundsätzlich KEINE Zivilisationsfähigkeit. */
-const CIVS = [
-  {
-    k: 'griechenland', n: 'Griechenland', sym: 'star', color: '#2f6f8f',
-    ability: 'Techs 1/2/3/4/5 günstiger (je Zeitalter)',
-    abilities: [
-      { k: 'basis', n: 'Günstige Forschung', e: 'Techs 1/2/3/4/5 günstiger (je Zeitalter)' },
-      { k: 'gratistech', n: 'Freie Forschung', e: '1× pro Runde eine verfügbare Technologie der Industrialisierung oder früher umsonst erforschen' },
-      { k: 'rueckschau', n: 'Rückschau', e: 'Bei jeder erforschten Technologie zusätzlich eine beliebige (auch nicht freigeschaltete) eines früheren Zeitalters umsonst' },
-    ],
-  },
-  {
-    k: 'england', n: 'England', sym: 'cross', color: '#8f2f3f',
-    ability: 'Münzen = Nahrung für alle Belange',
-    abilities: [
-      { k: 'basis', n: 'Handelsreich', e: 'Münzen = Nahrung für alle Belange (1:1 in beide Richtungen)' },
-      { k: 'gruenden', n: 'Kolonisten', e: 'Städte gründen kostet keine Basiskosten (nur Distanzkosten; mit Kartografie die günstigere der beiden)' },
-      { k: 'kuestenstaedte', n: 'Seemacht', e: 'Jede Stadt, die an Meer angrenzt, bringt +2 Wissenschaft, Nahrung und Münzen' },
-    ],
-  },
-  {
-    k: 'russland', n: 'Russland', sym: 'square', color: '#3f6f3f',
-    ability: '+1 Nahrung in Wald',
-    abilities: [
-      { k: 'basis', n: 'Taiga', e: '+1 Nahrung in Wald' },
-      { k: 'wachstum', n: 'Fruchtbarkeit', e: 'Bevölkerungswachstum kostet keine Nahrung' },
-      { k: 'siedler', n: 'Siedlertrecks', e: 'Städte werden mit 2 Bevölkerung gegründet' },
-    ],
-  },
-  {
-    k: 'wikinger', n: 'Wikingerreich', sym: 'triangle', color: '#6f4f8f',
-    ability: 'Kostenlose Armee am Start; eine Armee zählt nicht für Baukosten von Armeen',
-    abilities: [
-      { k: 'basis', n: 'Seefahrer', e: 'Kostenlose Armee am Start; eine Armee zählt nicht für Baukosten von Armeen' },
-      { k: 'kampfertrag', n: 'Beutezüge', e: 'Steht eine Armee neben einer gegnerischen Armee oder Stadt, bringt sie je Punkt Überlegenheit 1 Wissenschaft, Nahrung und Münze' },
-      { k: 'armeemacht', n: 'Kriegerkultur', e: 'Jede eigene Armee gibt +2 Macht' },
-    ],
-  },
-];
-const CIV_BY_KEY = {};
-CIVS.forEach(c => { CIV_BY_KEY[c.k] = c; });
-// Barbaren: neutrale Fraktion, entsteht nur durch das Ereignis "Barbareninvasion".
-const BARB_CIV = { k: 'barbaren', n: 'Barbaren', sym: 'skull', color: '#7a6a55', ability: '' };
+/* Die Zivilisationen stehen nicht hier, sondern in js/civs.js – erzeugt aus
+   data/civs.json (siehe README). Neues Reich: JSON ändern, `node tools_civs.js` laufen
+   lassen. Dort steht auch ORDER, die Zugreihenfolge, und BARB_CIV. */
+
 
 /* Zwei Karten stehen zur Wahl. Die Originalkarte ist aus dem gedruckten Bogen
    ausgemessen, die große ist im selben Stil erzeugt: zusammenhängende Landmassen,
