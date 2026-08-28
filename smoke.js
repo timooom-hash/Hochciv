@@ -1757,6 +1757,45 @@ step('Tutorial: die ersten Aufgaben lassen sich auch auf Englisch lösen', () =>
   if (de === en) throw new Error('die Beschriftung wechselt nicht: ' + de);
   console.log(`       Schritt 4 gelöst · Knopf deutsch „${de}", englisch „${en}"`);
 });
+step('Tutorial: auch der Straßenschritt geht auf Englisch', () => {
+  // Zweiter Fall desselben Fehlers: die Straßenknöpfe hießen auf Englisch „Build road"
+  // und passten nicht mehr zum Ausdruck /Straße bauen/.
+  const bis = (sprache) => {
+    G('switchLang')(sprache);
+    G('tutorialStart')();
+    const N = G('TUT_STEPS').length;
+    for (let g = 0; g < 200; g++) {
+      const st = G('tutStep')();
+      const labels = (st.allow && st.allow.labels || []).map(String).join(' ');
+      if (/Straße bauen/.test(labels)) return st;
+      if (!G('tutDone')()) {
+        if (!st.auto) throw new Error(sprache + ': Schritt ' + (G('ui').tut.i + 1) + ' ohne auto()');
+        st.auto(); G('redraw')();
+        continue;
+      }
+      if (G('ui').tut.i >= N - 1) throw new Error(sprache + ': Straßenschritt nicht gefunden');
+      G('tutMove')(1);
+    }
+    throw new Error(sprache + ': zu viele Runden');
+  };
+  for (const sprache of ['de', 'en']) {
+    const st = bis(sprache);
+    const feld = st.allow.hex()[0];
+    G('closeSheet')();
+    G('tapHex')(feld[0], feld[1]);
+    const knopf = [...$('sheet-body').querySelectorAll('.opt')]
+      .find(b => b.dataset.label === 'Straße bauen');
+    if (!knopf) throw new Error(sprache + ': kein Straßenknopf');
+    if (knopf.disabled) throw new Error(sprache + ': Straße bauen ist gesperrt');
+    const vorher = Object.keys(G('S').roads || {}).length;
+    knopf.onclick();
+    if (Object.keys(G('S').roads || {}).length !== vorher + 1)
+      throw new Error(sprache + ': keine Straße gebaut');
+    G('tutorialQuit')();
+  }
+  G('switchLang')('de');
+  console.log('       Straßenschritt in beiden Sprachen baubar');
+});
 step('Drei Reiche im Aufbau', () => {
   $('m-new').onclick();
   $('setup-mode').querySelector('[data-mode=drei]').onclick();

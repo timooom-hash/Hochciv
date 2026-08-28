@@ -3709,5 +3709,56 @@ function tutRun() {
     ['Schrift', 'Grasland', 'Antike', 'Weite Ebene'], 'zurück auf Deutsch stimmt alles wieder');
 }
 
+/* =================== Tutorialschienen bleiben sprachunabhängig
+   Das Tutorial filtert die Knöpfe im Aktionsblatt über deutsche Ausdrücke. Damit das
+   auch auf Englisch trägt, tragen die Knöpfe ihren **deutschen** Schlüssel als
+   `data-label` – die sichtbare Beschriftung wechselt, der Schlüssel nicht. Zweimal ist
+   genau das schiefgegangen (Schritt 4 „Stadt gründen", Schritt 24 „Straße bauen"),
+   deshalb prüft dieser Block die Quelle statt der Oberfläche.                       */
+{
+  const ui = fs.readFileSync(__dirname + '/js/ui.js', 'utf8');
+  // 1) Kein btn()-Aufruf darf im **ersten** Parameter eine Übersetzung bekommen –
+  //    dort steht der Schlüssel. In den übrigen Parametern ist T(…) richtig.
+  const ersteParameter = [];
+  for (const m of ui.matchAll(/\bbtn\(/g)) {
+    let i = m.index + m[0].length, tiefe = 0, arg = '';
+    for (; i < ui.length; i++) {
+      const ch = ui[i];
+      if (ch === '(' || ch === '[') tiefe++;
+      else if (ch === ')' || ch === ']') { if (!tiefe) break; tiefe--; }
+      else if (ch === ',' && !tiefe) break;
+      arg += ch;
+    }
+    ersteParameter.push(arg.trim());
+  }
+  eq(ersteParameter.filter(a => a.includes('T(')), [],
+    'btn() bekommt im ersten Parameter immer den deutschen Schlüssel, nie T(…)');
+  // 2) Alle deutschen Schlüssel einsammeln, die die Oberfläche vergeben kann
+  const schluessel = [
+    ...[...ui.matchAll(/btn\(\s*'([^']+)'/g)].map(m => m[1]),
+    ...[...ui.matchAll(/btn\([^']*\?\s*'([^']+)'\s*:\s*'([^']+)'/g)].flatMap(m => [m[1], m[2]]),
+    ...[...ui.matchAll(/data-label="([^"]+)"/g)].map(m => m[1]),
+  ];
+  eq(schluessel.length > 10, true, `die Oberfläche vergibt ${schluessel.length} Knopf-Schlüssel`);
+  // 3) Jeder Ausdruck des Tutorials muss auf mindestens einen davon passen
+  const ohne = [];
+  TUT_STEPS.forEach((st, i) => {
+    (st.allow && st.allow.labels || []).forEach(rx => {
+      if (!schluessel.some(k => rx.test(k))) ohne.push(`${i + 1}: ${rx}`);
+    });
+  });
+  eq(ohne, [], 'jeder Knopf-Ausdruck des Tutorials trifft einen vorhandenen Schlüssel');
+  // 4) Titel und Aufgaben aller Schritte haben eine englische Fassung
+  setLang('en', { quiet: true });
+  const fehlt = [];
+  TUT_STEPS.forEach((st, i) => {
+    if (st.t && st.t !== 'Hochzeivilization' && T(st.t) === st.t) fehlt.push(`${i + 1} Titel`);
+    if (st.task && T(st.task) === st.task) fehlt.push(`${i + 1} Aufgabe`);
+  });
+  eq(fehlt, [], 'alle 29 Tutorialschritte haben Titel und Aufgabe auf Englisch');
+  clearMissing();
+  setLang('de', { quiet: true });
+}
+
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
 process.exit(fails ? 1 : 0);

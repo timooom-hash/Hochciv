@@ -1832,8 +1832,36 @@ der sichtbaren Beschriftung – die Schienen sind damit sprachunabhängig, und d
 `TUT_STEPS` bleiben so notiert, wie sie geschrieben wurden. Dasselbe gilt für die Knöpfe
 im Machtblatt und die Zeilen im Armeeblatt.
 
-**Warum es niemand gemerkt hat:** Der bestehende Smoke-Schritt „in jedem Schritt ist nur
-das Vorgesehene anklickbar" lief nur auf Deutsch, und dort stimmten Beschriftung und
-Schlüssel überein. Jetzt gibt es einen Schritt, der **Schritt 4 in beiden Sprachen löst**
-(Feld antippen, gründen, weiterschalten) – und einen Durchlauf über alle 29 Schritte in
-beiden Sprachen habe ich beim Beheben gefahren.
+**Zweiter Fall derselben Sorte:** Beim ersten Durchgang blieben zwei `btn()`-Aufrufe
+übersetzt, weil sie die Beschriftung über einen Bedingungsoperator wählen
+(`btn(z === 2 ? T('Eisenbahn bauen') : T('Straße bauen'), …)`). Auf Englisch hing das
+Tutorial deshalb erneut, diesmal beim Straßenbau (Schritt 24). Deshalb steht die Regel
+jetzt nicht nur im Kommentar, sondern in `test.js`:
+
+* **kein `btn()`-Aufruf** darf im ersten Parameter ein `T(…)` enthalten (der Test liest
+  `js/ui.js` und zerlegt die Aufrufe selbst),
+* **jeder Ausdruck** aus `TUT_STEPS` muss auf mindestens einen tatsächlich vergebenen
+  Schlüssel passen – ein Tippfehler in `labels` fällt damit auf, ohne die Oberfläche zu
+  starten,
+* **alle 29 Schritte** haben Titel und Aufgabe auf Englisch.
+
+Dazu zwei Smoke-Schritte, die Schritt 4 (gründen) und Schritt 24 (Straße bauen) **in
+beiden Sprachen wirklich lösen**. Der alte Schritt „in jedem Schritt ist nur das
+Vorgesehene anklickbar" lief nur auf Deutsch – dort stimmten Beschriftung und Schlüssel
+überein, deshalb fiel nichts auf.
+
+## Nachtrag zur Übersetzung: was beim ersten Durchgang durchgerutscht ist
+
+Drei Stellen, alle vom Autor gemeldet:
+
+* **Zwei Tutorialtitel** (6/29 „Die Hauptstadt wachsen lassen", 10/29 „Forschen: Papier")
+  und fünf weitere plus zwei Aufgabentexte hatten keinen Eintrag im Wörterbuch. Der
+  Sprachwechsel zeigte sie deshalb deutsch. Jetzt prüft `test.js` alle 29 Schritte.
+* **Die Straßenknöpfe** (siehe oben).
+* **„Ertrag beim Siedeln"** im Feldblatt. Diese Zeile erscheint nur, wenn auf dem Feld
+  auch wirklich gegründet werden kann – der Durchlauf, der die deutschen Reste zählt,
+  tippt auf die Hauptstadt und kam nie in diesen Zweig. Solche Zweige findet nur ein
+  Blick in die Quelle: ein Skript, das alle Zeichenketten mit deutschen Wörtern sucht,
+  die nicht durch `T()` laufen. Genau so sind die letzten drei Stellen gefunden worden
+  (dazu zwei eingebettete Wörter in Protokollzeilen: „Wissenschaft/Münzen" und
+  „Eisenbahn/Straße" in einem Bedingungsoperator).
