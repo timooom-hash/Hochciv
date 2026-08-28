@@ -1865,3 +1865,52 @@ Drei Stellen, alle vom Autor gemeldet:
   die nicht durch `T()` laufen. Genau so sind die letzten drei Stellen gefunden worden
   (dazu zwei eingebettete Wörter in Protokollzeilen: „Wissenschaft/Münzen" und
   „Eisenbahn/Straße" in einem Bedingungsoperator).
+
+## Balance v53: Kolonisten und Seemacht
+
+Zwei Änderungen auf Wunsch des Autors, beide an Englands Alternativen:
+
+**Kolonisten** (Städte gründen ohne Basiskosten) zahlt jetzt **doppelt für
+Bevölkerungswachstum** – bei Bevölkerung 4 also 8 Nahrung und 8 Münzen statt 4 und 4. Die
+Fähigkeit drückt die Expansionskosten auf die Weglänge; der Ausgleich sitzt jetzt dort, wo
+England sonst am billigsten weiterkam. Umgesetzt als Tabelle `GROW_ABIL_FACTOR` in
+`js/engine.js` – wer weitere Fähigkeiten mit Wachstumsfaktor will, trägt sie dort ein.
+
+Wichtig: Russlands **Fruchtbarkeit** (keine Nahrung) und die **Dampfmaschine** (keine
+Münzen) greifen weiter *vor* dem Faktor, streichen ihren Anteil also ganz. Mit
+Dampfmaschine kostet Kolonisten-Wachstum 8 Nahrung und 0 Münzen.
+
+**Seemacht** bringt je Stadt am Meer **+1** auf alle drei Erträge statt +2
+(`SEA_CITY_BONUS` in `js/data.js`). Bei vier Küstenstädten sind das 12 Ertragspunkte je
+Runde statt 24 – die Fähigkeit war damit stärker als jede Technologie im Spiel.
+
+Beide Zahlen stehen als benannte Konstanten im Code, nicht in der Formel; ein Test liest
+sie und rechnet gegen, statt die Zahlen zu wiederholen.
+
+## Zivilisationen in data/civs.json (v53)
+
+Die vier Reiche standen als Literal in `js/data.js`. Sie liegen jetzt in
+**`data/civs.json`**; `node tools_civs.js` erzeugt daraus `js/civs.js`, das die App per
+`<script>` lädt.
+
+**Warum der Umweg über eine erzeugte Datei?** Die App läuft auch als einzelne HTML-Datei
+von der Festplatte, und `fetch('data/civs.json')` darf unter `file://` nicht lesen. Ein
+asynchroner Start hätte außerdem `boot()` und alle Prüfläufe umgebaut. Also: JSON als
+Quelle zum Pflegen, erzeugte JS-Datei zum Laden – und ein Test, der beide vergleicht.
+Wer die JSON ändert und das Erzeugen vergisst, merkt es im nächsten Testlauf, nicht im
+Spiel.
+
+`tools_civs.js` prüft beim Erzeugen die Form: Schlüssel klein und eindeutig, Farbe als
+`#rrggbb`, genau drei Fähigkeiten, die erste heißt `basis`. Der Test prüft zusätzlich, dass
+**jede Alternativfähigkeit im Code auch vorkommt** – eine Fähigkeit, die in der Auswahl
+steht und nichts tut, fällt damit auf.
+
+**Zwei Reihenfolgen, die nicht dasselbe sind:** die Reihenfolge in der JSON ist die
+**Anzeigereihenfolge** (Aufbau, Regelbogen, Legenden), das Feld `order` die
+**Zugreihenfolge** (`ORDER`, früher als Literal in `newGame`). Beim ersten Entwurf hatte
+ich CIVS nach `order` sortiert – damit stand plötzlich Russland im Aufbau oben und vier
+Tests fielen um. Der Generator hält die beiden jetzt auseinander.
+
+**Nebenbei gefunden:** Beim Zurückschalten von Englisch auf Deutsch blieb der Name der
+Barbaren englisch. Der Sprachwechsel sichert die deutschen Namen aus `CIVS` – und die
+Barbaren stehen nicht in `CIVS`. Jetzt werden sie mitgesichert.

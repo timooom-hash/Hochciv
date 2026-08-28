@@ -151,6 +151,27 @@ python3 tools_startplaettchen_pdf.py  # tiles.json → Startplaettchen.pdf (brau
 
 Der Bogen kann so nicht vom Spiel abweichen – er wird aus derselben Quelle gebaut.
 
+### Neue Zivilisation hinzufügen
+
+Alle Reiche stehen in **`data/civs.json`** – Name, Zeichen, Farbe, Zugreihenfolge und je
+drei Fähigkeiten. Danach:
+
+```bash
+node tools_civs.js     # schreibt js/civs.js aus data/civs.json
+node test.js           # prüft, dass beide zusammenpassen
+```
+
+Die Reihenfolge in der JSON ist die **Anzeigereihenfolge** (Aufbau, Regelbogen), das Feld
+`order` die **Zugreihenfolge** im Spiel. Was die JSON nicht enthält, sind die Regeln: eine
+neue Alternativfähigkeit braucht zusätzlich Code in `js/engine.js`, der ihren Schlüssel
+über `isAbil(p, '…')` prüft – der Test meldet eine Fähigkeit, die nirgends geprüft wird.
+Englische Namen und Wirkungstexte kommen in `js/i18n.js` unter `DATA_EN.civ` und
+`DATA_EN.abil`.
+
+Warum die JSON nicht direkt geladen wird: die App läuft auch als einzelne HTML-Datei von
+der Festplatte, und von `file://` darf `fetch` nicht lesen. Deshalb ist die JSON die
+Quelle und `js/civs.js` die daraus erzeugte Fassung.
+
 ## Prüfprogramme (nur für die Entwicklung)
 
 ```bash
@@ -175,5 +196,6 @@ js/bots.js            Bot-Züge nach den Bot-Regeln
 js/ui.js              Karte, Gesten, Aktionsblätter, Editor
 sw.js                 Offline-Cache
 ANNAHMEN.md           wo die Regeln offen sind und wie hier entschieden wurde
+data/civs.json        die Zivilisationen – Quelle für js/civs.js (node tools_civs.js)
 Startplaettchen.pdf   Druckbogen der 20 Plättchen (aus js/tiles.js erzeugt)
 ```

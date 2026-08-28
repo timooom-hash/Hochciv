@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
+for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -2127,7 +2127,9 @@ const duellKarte = (civA, civB, seed) => {
   const sea = cityAtSea(S, cap);
   const b = incomeBreakdown(S, 0);
   eq(b.extra.some(e => e.name === 'Städte am Meer'), sea, 'Küstenzeile erscheint nur bei Meeresanschluss');
-  if (sea) eq(b.extra.find(e => e.name === 'Städte am Meer').y, [2, 2, 2], '+2 auf alle drei Erträge');
+  if (sea) eq(b.extra.find(e => e.name === 'Städte am Meer').y,
+    [SEA_CITY_BONUS, SEA_CITY_BONUS, SEA_CITY_BONUS],
+    `Seemacht: +${SEA_CITY_BONUS} auf alle drei Erträge (v53: 1 statt 2)`);
 }
 
 /* Russland: Alternativen */
@@ -3758,6 +3760,92 @@ function tutRun() {
   eq(fehlt, [], 'alle 29 Tutorialschritte haben Titel und Aufgabe auf Englisch');
   clearMissing();
   setLang('de', { quiet: true });
+}
+
+/* ============================ Zivilisationen aus data/civs.json (v53)
+   Die JSON ist die Quelle, js/civs.js die daraus erzeugte Fassung. Dieser Block prüft,
+   dass beide zusammenpassen – wer die JSON ändert und `node tools_civs.js` vergisst,
+   merkt es hier und nicht erst im Spiel.                                            */
+{
+  const roh = JSON.parse(fs.readFileSync(__dirname + '/data/civs.json', 'utf8'));
+  eq(roh.civs.map(c => c.k), CIVS.map(c => c.k),
+    'js/civs.js steht in derselben Reihenfolge wie data/civs.json (Anzeigereihenfolge)');
+  eq(roh.civs.slice().sort((a, b) => a.order - b.order).map(c => c.k), ORDER,
+    'ORDER ist die Zugreihenfolge aus dem Feld order');
+  roh.civs.forEach(c => {
+    const civ = CIV_BY_KEY[c.k];
+    eq([civ.n, civ.sym, civ.color], [c.n, c.sym, c.color], `${c.k}: Name, Zeichen und Farbe`);
+    eq(civ.abilities.map(a => [a.k, a.n, a.e]), c.abilities.map(a => [a.k, a.n, a.e]),
+      `${c.k}: drei Fähigkeiten wie in der JSON`);
+    eq(civ.ability, c.abilities[0].e, `${c.k}: ability ist die Grundfähigkeit`);
+  });
+  eq([BARB_CIV.k, BARB_CIV.n, BARB_CIV.color],
+    [roh.barbaren.k, roh.barbaren.n, roh.barbaren.color], 'Barbaren kommen ebenfalls aus der JSON');
+  // Formvorschriften, die tools_civs.js beim Erzeugen erzwingt
+  eq(CIVS.every(c => /^[a-z]+$/.test(c.k)), true, 'Schlüssel sind kleingeschrieben');
+  eq(CIVS.every(c => /^#[0-9a-f]{6}$/i.test(c.color)), true, 'Farben sind #rrggbb');
+  eq(new Set(CIVS.map(c => c.color)).size, CIVS.length, 'jede Zivilisation hat eine eigene Farbe');
+  eq(CIVS.every(c => c.abilities.length === 3 && c.abilities[0].k === 'basis'), true,
+    'je drei Fähigkeiten, die erste ist die Grundfähigkeit');
+  eq(new Set(CIVS.map(c => c.sym)).size, CIVS.length, 'jede Zivilisation hat ein eigenes Zeichen');
+  // Jeder Fähigkeitsschlüssel, der nicht 'basis' ist, muss im Code auch vorkommen –
+  // sonst hängt eine Alternative in der Auswahl, ohne etwas zu tun.
+  const code = ['js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ui.js']
+    .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
+  const ohneWirkung = CIVS.flatMap(c => c.abilities.filter(a => a.k !== 'basis').map(a => a.k))
+    .filter(k => !code.includes(`'${k}'`));
+  eq(ohneWirkung, [], 'jede Alternativfähigkeit wird im Code auch geprüft');
+}
+
+/* ==================================== Balance v53: Kolonisten und Seemacht */
+{
+  // Achtung: newGame sortiert in die Zugreihenfolge – der Platz im Aufbau ist nicht der
+  // Index im Spiel. Deshalb wird hier nach Zivilisation gesucht.
+  const mk = (civ, abil) => {
+    const S = newGame({
+      seed: 12, players: [{ civ, kind: 'human', ability: abil },
+        { civ: civ === 'england' ? 'russland' : 'england', kind: 'bot' }],
+    });
+    S.ich = S.players.findIndex(p => p.civ === civ && p.kind === 'human');
+    return S;
+  };
+  // Kolonisten: Wachstum kostet doppelt
+  const A = mk('england', 'gruenden'), B = mk('england', 'basis');
+  const ca = capitalOf(A, A.ich), cb = capitalOf(B, B.ich);
+  ca.pop = cb.pop = 3;
+  eq(growPrice(A, A.ich, ca), { food: 6, coins: 6 },
+    'Kolonisten: Wachstum kostet doppelt (2 × Bevölkerung)');
+  eq(growPrice(B, B.ich, cb), { food: 3, coins: 3 }, 'Handelsreich zahlt weiterhin einfach');
+  // Fruchtbarkeit und Dampfmaschine greifen unverändert – auch zusammen mit dem Faktor
+  const R = mk('russland', 'wachstum');
+  capitalOf(R, R.ich).pop = 3;
+  eq(growPrice(R, R.ich, capitalOf(R, R.ich)), { food: 0, coins: 3 }, 'Fruchtbarkeit: keine Nahrung');
+  A.players[A.ich].techs.dampfmaschine = true;
+  eq(growPrice(A, A.ich, ca), { food: 6, coins: 0 },
+    'Dampfmaschine streicht die Münzen, auch verdoppelt');
+  // und die Kosten kommen auch beim Wachsen an
+  delete A.players[A.ich].techs.dampfmaschine;
+  A.players[A.ich].res = { sci: 0, food: 20, coins: 20 };
+  A.cur = A.ich;
+  const vor = { f: A.players[A.ich].res.food, c: A.players[A.ich].res.coins };
+  eq(growCity(A, A.ich, ca), null, 'die Stadt wächst');
+  eq([vor.f - A.players[A.ich].res.food, vor.c - A.players[A.ich].res.coins], [6, 6],
+    'bezahlt wurden 6 Nahrung und 6 Münzen');
+  // Seemacht: +1 statt +2
+  eq(SEA_CITY_BONUS, 1, 'Seemacht gibt +1 je Küstenstadt');
+  {
+    const S = newGame({
+      seed: 3, players: [{ civ: 'england', kind: 'human', ability: 'kuestenstaedte' },
+        { civ: 'russland', kind: 'bot' }],
+    });
+    const ich = S.players.findIndex(p => p.civ === 'england');
+    const b = incomeBreakdown(S, ich);
+    const zeile = b.extra.find(e => e.name === 'Städte am Meer');
+    if (zeile) eq(zeile.y, [zeile.count, zeile.count, zeile.count],
+      'die Zeile bringt +1 je Stadt am Meer');
+    // Gegenprobe: mit doppeltem Zuschlag wäre es das Doppelte
+    if (zeile) eq(zeile.y[0] * 2, zeile.count * 2, 'vor v53 waren es +2 – jetzt die Hälfte');
+  }
 }
 
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
