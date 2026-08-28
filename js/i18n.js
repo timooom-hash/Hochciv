@@ -970,6 +970,29 @@ const UI_EN = {
   'Deine Aufgabe:': 'Your task:',
   'Dein Umland': 'Your surroundings',
 
+  'Ab hier spielst du allein':
+    'From here you play on your own',
+  'Die Hauptstadt wachsen lassen':
+    'Growing the capital',
+  'Die drei Wege zu gewinnen':
+    'The three ways to win',
+  'Ertrag beim Siedeln':
+    'Yield when settling',
+  'Forschen: Papier':
+    'Research: paper',
+  'Forschen: Wissenschaftliche Methode':
+    'Research: scientific method',
+  'Kaufe <b>Rad</b>.':
+    'Buy the <b>wheel</b>.',
+  'Kaufe <b>Wissenschaftliche Methode</b>.':
+    'Buy the <b>scientific method</b>.',
+  'Rechne nach, bevor du kaufst':
+    'Do the maths before you buy',
+
+  'Eisenbahn': 'Railway',
+  'Straße': 'Road',
+  '(%s offen)': '(%s open)',
+
   /* --- Karteneditor */
   'Größe': 'Size',
   'Exportieren': 'Export',

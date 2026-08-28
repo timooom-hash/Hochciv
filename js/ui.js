@@ -420,7 +420,7 @@ function settleFact(r, c) {
   if (canFound(S, pi, r, c)) return '';
   const g = settleGain(S, pi, r, c);
   return `<div class="tile-facts">
-    <span class="fact"><span class="fact-k">Ertrag beim Siedeln</span>
+    <span class="fact"><span class="fact-k">${T('Ertrag beim Siedeln')}</span>
       <span class="fact-v">${fmtGain(g)}</span></span></div>`;
 }
 function openTile(r, c) {
@@ -525,11 +525,11 @@ function openTile(r, c) {
     const lvl = roadLevel(S, r, c);
     if (!ziele.length) {
       // Nichts baubar – trotzdem anzeigen, damit der Grund sichtbar ist.
-      btn(lvl >= 1 ? T('Eisenbahn bauen') : T('Straße bauen'),
+      btn(lvl >= 1 ? 'Eisenbahn bauen' : 'Straße bauen',
         lvl >= 2 ? T('hier liegt schon eine Eisenbahn') : T('Eisenbahn noch nicht erforscht'),
         '–🪙', () => { }, true);
     } else ziele.forEach(z => {
-      btn(z === 2 ? T('Eisenbahn bauen') : T('Straße bauen'),
+      btn(z === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
         z === 2 ? T('Bewegung kostenlos · Handelsroute +2') : T('Bewegung ½ Punkt · Handelsroute +1'),
         roadPrice(S, pi, r, c, z) + '🪙',
         () => doRoad(r, c, z), available(S, pi, 'coins') < roadPrice(S, pi, r, c, z));

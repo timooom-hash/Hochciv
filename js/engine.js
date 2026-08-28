@@ -608,9 +608,9 @@ function coverPop(S, pi, kind, amount) {
   p.popCoveredBy = p.popCoveredBy || { sci: 0, coins: 0 };
   p.popCoveredBy[kind] = (p.popCoveredBy[kind] || 0) + amount;
   p.popDefPart = (p.popDefPart || 0) + deckt;      // wie viel davon ins Defizit floss
-  log(S, 'act', `${civOf(p).n}: ${amount} ${kind === 'sci' ? 'Wissenschaft' : 'Münzen'} ` +
+  log(S, 'act', `${civOf(p).n}: ${amount} ${kind === 'sci' ? T('Wissenschaft') : T('Münzen')} ` +
     T('versorgen die Bevölkerung – Nahrung %s', p.res.food) +
-    (p.foodDeficit ? ` (${p.foodDeficit} offen)` : '') + '.');
+    (p.foodDeficit ? ' ' + T('(%s offen)', p.foodDeficit) : '') + '.');
   return null;
 }
 /* Eine Deckung zurücknehmen – der Betrag geht in die ursprüngliche Quelle zurück.
@@ -1115,7 +1115,7 @@ function buildRoad(S, pi, r, c, target) {
   if (price == null) return 'Schon vorhanden.';
   if (!pay(S, pi, 'coins', price)) return T('Zu wenig Münzen.');
   S.roads[k] = target;
-  log(S, 'act', T('%s: %s auf %s/%s (%s Münzen).', civOf(p).n, target === 2 ? 'Eisenbahn' : 'Straße', r, c, price));
+  log(S, 'act', T('%s: %s auf %s/%s (%s Münzen).', civOf(p).n, target === 2 ? T('Eisenbahn') : T('Straße'), r, c, price));
   return null;
 }
 function hasModernTech(p) {
