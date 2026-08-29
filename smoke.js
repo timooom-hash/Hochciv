@@ -41,8 +41,31 @@ const step = (label, fn) => {
 };
 
 step('Menü gerendert', () => { if (!$('m-new')) throw new Error('kein Startknopf'); });
-step('Tutorial: Übungsspiel startet in der Spieloberfläche', () => {
+step('Tutorial fragt zuerst nach Erfahrung', () => {
   $('m-tutorial').onclick();
+  if (!$('overlay').classList.contains('show')) throw new Error('keine Frage gestellt');
+  if (!$('tut-ja') || !$('tut-nein')) throw new Error('Ja/Nein fehlen');
+  const txt = $('ov-body').textContent;
+  if (!/Erfahrung/.test(txt)) throw new Error('Frage fehlt: ' + txt.slice(0, 60));
+  // „Ja" führt in die kurze Fassung, „Nein" in die lange – beide mit denselben Aufgaben
+  $('tut-ja').onclick();
+  const kurz = G('tutList')().length;
+  if (!G('ui').tut.kurz) throw new Error('Ja führt nicht in die kurze Fassung');
+  G('tutorialQuit')();
+  $('m-tutorial').onclick(); $('tut-nein').onclick();
+  const lang = G('tutList')().length;
+  if (G('ui').tut.kurz) throw new Error('Nein führt nicht in die lange Fassung');
+  if (!(kurz < lang)) throw new Error(`kurz ${kurz} ist nicht kürzer als lang ${lang}`);
+  const aufgabenKurz = G('TUT_STEPS').filter(s2 => s2.task && s2.kurz !== false).length;
+  const aufgabenLang = G('TUT_STEPS').filter(s2 => s2.task).length;
+  if (aufgabenKurz !== aufgabenLang)
+    throw new Error(`kurze Fassung hat ${aufgabenKurz} statt ${aufgabenLang} Aufgaben`);
+  console.log(`       kurz ${kurz} Schritte, lang ${lang} · beide ${aufgabenLang} Aufgaben`);
+  G('tutorialQuit')();
+});
+step('Tutorial: Übungsspiel startet in der Spieloberfläche', () => {
+  $('m-tutorial').onclick(); $('tut-nein').onclick();
+  $('tut-nein').onclick();
   if (!$('screen-game').classList.contains('show')) throw new Error('Tutorial öffnet nicht das Spiel');
   if ($('tut-panel').hidden) throw new Error('kein Erklärpanel unter der Karte');
   if ($('map').querySelectorAll('[data-r]').length !== 216) throw new Error('Karte fehlt');

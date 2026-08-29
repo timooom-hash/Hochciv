@@ -1914,3 +1914,44 @@ Tests fielen um. Der Generator hält die beiden jetzt auseinander.
 **Nebenbei gefunden:** Beim Zurückschalten von Englisch auf Deutsch blieb der Name der
 Barbaren englisch. Der Sprachwechsel sichert die deutschen Namen aus `CIVS` – und die
 Barbaren stehen nicht in `CIVS`. Jetzt werden sie mitgesichert.
+
+## Zwei Tutorialfassungen (v54)
+
+Beim Öffnen fragt das Tutorial zuerst: **„Hast du schon Erfahrung mit Spielen wie
+Civilization?"** – „Nein" führt in die bisherige ausführliche Fassung (29 Schritte),
+„Ja" in eine kurze (24 Schritte, 27 % der Textmenge).
+
+**Beide Fassungen kommen aus einer Schrittliste.** Jeder Schritt trägt zusätzlich ein Feld
+`kurz`: entweder einen kurzen Text oder `false` – dann fällt der Schritt in der kurzen
+Fassung weg. Das ist der wichtige Teil der Bauweise: die **Aufgaben sind identisch**, weil
+es sie nur einmal gibt. Eine zweite Liste hätte über kurz oder lang auseinandergelebt.
+
+Weggelassen werden nur reine Lesetexte: „Dein Umland", „Runde 2: exponentielles Wachstum",
+„Rechne nach, bevor du kaufst", „Jede Bevölkerung isst", „Die drei Anfängerfehler". Ihre
+Kernaussagen stecken, wo sie gebraucht werden, in den Kurztexten der Aufgabenschritte (die
+Nahrungsgrenze etwa beim Wachsen-Schritt).
+
+**Schritte mit Nebenwirkung dürfen nie wegfallen** – „Eine gegnerische Armee vor der Stadt"
+ist ein Lesetext, setzt aber per `enter` die griechische Armee aufs Brett. Ein Test prüft
+deshalb: jeder Schritt mit `enter`, `dice`, `goal` oder `task` ist in beiden Fassungen
+dabei.
+
+**Was die kurze Fassung erklärt** (und nur das): Ressourcen verfallen am Zugende ·
+Kampfrechnung und „zwei Züge in Folge" · Zufall im Technologiebaum · Zivilisations-
+fähigkeiten · Siegwege samt Anmeldung und Punktvergleich · Handelsrouten · Nahrungsgrenze ·
+wie Bots würfeln. Ein Test hält diese Stichworte fest, damit sie beim nächsten Kürzen
+nicht verschwinden.
+
+### Der Siegtext war veraltet
+
+Beide Fassungen sagen jetzt, was seit v51 gilt: **nur der Militärsieg endet sofort**, alle
+anderen werden angemeldet und die Runde wird zu Ende gespielt; erfüllen mehrere in
+derselben Runde eine Bedingung, entscheiden **Bevölkerung + Weltwunder + Technologien**,
+bei Gleichstand der Mensch vor dem Bot; ein Anspruch bleibt gültig, auch wenn die Bedingung
+später wegfällt. Der alte Text behauptete noch, der Wirtschaftssieg greife „am Ende deines
+Zuges".
+
+**Eine Ausnahme von einer alten Regel:** Das Tutorial erwähnt sonst keine Erweiterungen
+(die Übungspartie läuft ohne sie). Der Punktvergleich zählt aber Weltwunder mit, also muss
+das Wort im Siegschritt stehen – ohne Erweiterung sind es null für alle. Der Test erlaubt
+das Wort deshalb genau dort und nirgends sonst.

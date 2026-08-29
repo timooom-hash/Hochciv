@@ -2792,11 +2792,22 @@ const duellKarte = (civA, civB, seed) => {
     eq(bad.length, 0, 'keine Feldkoordinaten in den Texten: ' + bad.join(', '));
     ui = { sel: null, army: null, mode: null, botTimer: null };
   }
-  // Keine Erwähnung der Erweiterungen
+  // Keine Erwähnung der Erweiterungen. Ausnahme: der Siegschritt muss sagen, wie der
+  // Punktvergleich am Rundenende rechnet – und dort zählen Weltwunder mit (ohne die
+  // Erweiterung sind es null für alle). Nur dieser eine Schritt darf das Wort führen.
   {
-    const all = TUT_STEPS.map(st => st.html.toString()).join(' ');
-    for (const w of ['Weltwunder', 'Ereignis', 'Kultursieg', '1 gegen 1', 'Zufallskarte', 'Karteneditor'])
+    const text = st => [st.html, st.kurz].filter(x => typeof x === 'function')
+      .map(f => f.toString()).join(' ');
+    const sieg = TUT_STEPS.filter(s2 => /Wege zu gewinnen/.test(s2.t));
+    eq(sieg.length, 1, 'es gibt genau einen Siegschritt');
+    const andere = TUT_STEPS.filter(s2 => !/Wege zu gewinnen/.test(s2.t)).map(text).join(' ');
+    const all = TUT_STEPS.map(text).join(' ');
+    for (const w of ['Ereignis', 'Kultursieg', '1 gegen 1', 'Zufallskarte', 'Karteneditor'])
       eq(all.includes(w), false, `„${w}" kommt im Tutorial nicht vor`);
+    eq(andere.includes('Weltwunder'), false, '„Weltwunder" nur im Siegschritt');
+    eq(/Bevölkerung \+ Weltwunder \+ Technologien/.test(text(sieg[0])), true,
+      'der Siegschritt nennt die Punkte für den Vergleich am Rundenende');
+    eq(/sofort/.test(text(sieg[0])), true, 'und dass nur der Militärsieg sofort endet');
   }
   // Jede Aktionsart wird mindestens einmal mit Klickweg erklärt (Wiederholungen sind raus)
   const all = TUT_STEPS.map(st => st.html.toString()).join(' ');
@@ -3846,6 +3857,49 @@ function tutRun() {
     // Gegenprobe: mit doppeltem Zuschlag wäre es das Doppelte
     if (zeile) eq(zeile.y[0] * 2, zeile.count * 2, 'vor v53 waren es +2 – jetzt die Hälfte');
   }
+}
+
+/* ====================== Zwei Tutorialfassungen aus einer Schrittliste (v54)
+   „Ja, ich kenne solche Spiele" führt in eine kurze Fassung: **dieselben Aufgaben**,
+   nur die Eigenheiten dieses Spiels erklärt. Was hier geprüft wird, ist genau das:
+   dass die Kurzfassung nichts weglässt, was den Ablauf trägt.                       */
+{
+  const kurz = TUT_STEPS.filter(st => st.kurz !== false);
+  eq(TUT_STEPS.every(st => st.kurz !== undefined), true,
+    'jeder Schritt sagt, was in der kurzen Fassung mit ihm passiert');
+  eq(TUT_STEPS.filter(st => st.task).every(st => st.kurz !== false), true,
+    'die kurze Fassung enthält jede Aufgabe der langen');
+  eq(TUT_STEPS.filter(st => st.enter || st.dice).every(st => st.kurz !== false), true,
+    'kein Schritt mit Nebenwirkung (enter/dice) fällt weg');
+  eq(TUT_STEPS.filter(st => st.goal).every(st => st.kurz !== false), true,
+    'kein Schritt mit Ziel fällt weg');
+  eq(kurz.length < TUT_STEPS.length, true,
+    `die kurze Fassung ist kürzer (${kurz.length} statt ${TUT_STEPS.length} Schritte)`);
+  eq(kurz[0].t, TUT_STEPS[0].t, 'sie beginnt mit demselben Schritt');
+  eq(kurz[kurz.length - 1].t, TUT_STEPS[TUT_STEPS.length - 1].t, 'und endet mit demselben');
+  // Textmenge: „deutlich abgespeckt" soll auch messbar sein
+  const laenge = x => (typeof x === 'function' ? x() : x || '').length;
+  const lang = TUT_STEPS.reduce((a, st) => a + laenge(st.html), 0);
+  const kurzL = kurz.reduce((a, st) => a + laenge(st.kurz || st.html), 0);
+  eq(kurzL < lang / 2, true, `die kurze Fassung hat weniger als die Hälfte Text ` +
+    `(${kurzL} von ${lang} Zeichen, ${Math.round(100 * kurzL / lang)} %)`);
+  // Die Schlüsselpraktiken müssen in der kurzen Fassung vorkommen
+  const text = kurz.map(st => laenge(st.kurz || st.html) && (typeof (st.kurz || st.html) === 'function'
+    ? (st.kurz || st.html)() : (st.kurz || st.html))).join(' ');
+  [['verfallen', 'Ressourcen verfallen'], ['zwei Züge in Folge', 'Kampfsystem'],
+   ['zufällig', 'Zufall im Technologiebaum'], ['Zivilisationsfähigkeit', 'Reichsfähigkeiten'],
+   ['Militärsieg', 'Siegwege'], ['Punkte', 'Punktvergleich am Rundenende']]
+    .forEach(([wort, was]) => eq(text.includes(wort), true, `die kurze Fassung erklärt ${was}`));
+  // und beide Fassungen auf Englisch
+  setLang('en', { quiet: true });
+  const ohne = [];
+  TUT_STEPS.forEach((st, i) => {
+    if (typeof st.kurz === 'function' && /[äöüß]/.test(st.kurz())) ohne.push(`${i + 1} kurz`);
+    if (typeof st.html === 'function' && /[äöüß]/.test(st.html())) ohne.push(`${i + 1} lang`);
+  });
+  eq(ohne, [], 'beide Fassungen sind auf Englisch übersetzt');
+  clearMissing();
+  setLang('de', { quiet: true });
 }
 
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');

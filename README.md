@@ -129,6 +129,19 @@ Neue Plättchen kommen in `js/tiles.js`, `TILE_POOL` – fünf Zeilen zu 5/4/3/2
 Meer nur am Rand liegt und dass die drei mittigen Felder Land sind und jedes davon im
 ersten Zug mindestens 4 Nahrung bringt.
 
+## Tutorial
+
+Beim Öffnen kommt eine Frage: **schon Erfahrung mit Spielen wie Civilization?**
+
+* **Nein** → die ausführliche Fassung, 29 Schritte, erklärt alles von Grund auf.
+* **Ja** → eine kurze Fassung, 24 Schritte, **dieselben Aufgaben**, aber nur die
+  Eigenheiten dieses Spiels: Ressourcen verfallen am Zugende, Kampfrechnung, Zufall im
+  Technologiebaum, Zivilisationsfähigkeiten, die Siegwege samt Punktvergleich.
+
+Beide kommen aus einer Schrittliste (`TUT_STEPS` in `js/tutorial.js`): jeder Schritt hat
+neben `html` ein Feld `kurz` – kurzer Text oder `false` für „in der kurzen Fassung nicht
+dabei". Aufgaben stehen damit nur einmal im Code und können nicht auseinanderlaufen.
+
 * **Im Spiel:** *Karte bearbeiten* → Gelände antippen; Hauptstädte über die
   Zivilisationsfelder der Palette setzen, oben rechts mit ✓ speichern.
   Über *Exportieren* / *Importieren* lässt sich die Karte als Datei sichern.
