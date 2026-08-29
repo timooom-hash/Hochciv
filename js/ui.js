@@ -117,6 +117,10 @@ function load(k) { try { const v = localStorage.getItem(k); return v ? JSON.pars
 function saveGame() { if (S) store('hochciv.save', S); }
 
 /* ------------------------------------------------------------------ Kartenzeichnung */
+/* Text, der in HTML eingesetzt wird. Die Texte kommen aus den eigenen Tabellen, aber
+   Anführungszeichen in title-Attributen zerlegen sonst das Markup. */
+const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function svgEl(n, attrs) {
   const e = document.createElementNS('http://www.w3.org/2000/svg', n);
   for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -362,7 +366,11 @@ function redraw() {
   const p = P(S), civ = civOf(p);
   $('hud-sym').textContent = SYM[civ.sym];
   $('hud-sym').style.borderColor = civ.color;
-  $('hud-name').textContent = civ.n + (p.kind === 'bot' ? T(' · Bot') : '');
+  // Neben dem Reichsnamen steht die Fähigkeit – ausgelost oder gewählt, hier sieht man,
+  // was man hat. Bots haben keine.
+  const abil = abilInfo(p);
+  $('hud-name').innerHTML = esc(civ.n) + (p.kind === 'bot' ? T(' · Bot') : '') +
+    (abil ? `<span class="hud-abil" title="${esc(abil.e)}">${esc(abil.n)}</span>` : '');
   const ev = curEvent();
   // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
   // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet.
@@ -914,7 +922,17 @@ function curEvent() {
 /* „Welt": Ereignis dieser Runde, Weltwunder, Barbaren – alles auf einen Blick. */
 function worldModal() {
   const pi = S.cur, p = P(S);
-  let h = '';
+  // Wer ist wer: Reich, Farbe und Fähigkeit. Bei ausgelosten Fähigkeiten ist das die
+  // Stelle, an der man in Ruhe nachliest, was man (und die anderen) bekommen hat.
+  let h = `<p class="sub">${T('Die Reiche')}</p><div class="civ-list">` +
+    S.players.filter(x => x.kind !== 'barbar').map((x, i) => {
+      const c = civOf(x), a = abilInfo(x);
+      return `<div class="civ-row${i === pi ? ' self' : ''}">
+        <span class="civ-chip" style="border-color:${c.color};color:${c.color}">${SYM[c.sym]}</span>
+        <span class="civ-n">${esc(c.n)}${x.dead ? ' · ' + T('ausgeschieden') : ''}</span>
+        <span class="civ-a">${a ? `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`
+        : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
+    }).join('') + '</div>';
   if (S.ev) {
     const ev = curEvent();
     h += ev
@@ -954,7 +972,7 @@ function worldModal() {
         wondersOf(S, i).map(w => WONDER_BY_KEY[w.k].n).join(', ') + '</p>').join('');
     }
   }
-  if (!S.ev && !S.wo) h = `<p class="sub">${T('Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.')}</p>`;
+  if (!S.ev && !S.wo) h += `<p class="sub">${T('Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.')}</p>`;
   modal(T('Welt'), h);
 }
 /* Weltwunder in einer Stadt bauen */

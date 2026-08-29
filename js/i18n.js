@@ -1058,6 +1058,10 @@ const UI_EN = {
   'Nein – alles erklären':
     'No – explain everything',
 
+  'Die Reiche': 'The empires',
+  'Bots haben keine Fähigkeit': 'Bots have no ability',
+  'ausgeschieden': 'eliminated',
+
   /* --- Karteneditor */
   'Größe': 'Size',
   'Exportieren': 'Export',

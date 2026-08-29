@@ -73,6 +73,15 @@ function abilityOf(p) {
   return p.ability || 'basis';
 }
 function isAbil(p, k) { return abilityOf(p) === k; }
+/* Die Fähigkeit eines Reiches als Objekt {k, n, e} – für die Anzeige. Bots haben keine.
+   Wichtig, seit sich Zivilisation und Fähigkeit auslosen lassen: wer würfeln lässt, muss
+   im Spiel nachsehen können, was er bekommen hat. */
+function abilInfo(p) {
+  const k = abilityOf(p);
+  if (!k) return null;
+  const civ = CIV_BY_KEY[p.civ];
+  return (civ && civ.abilities.find(a => a.k === k)) || null;
+}
 
 /* Machtwert: Bots haben immer ihre Gesamtbevölkerung als Macht.
    Zuschläge (Wikinger "Kriegerkultur", Zeusstatue) erhöhen den Machtwert,
