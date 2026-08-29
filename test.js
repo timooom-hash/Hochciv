@@ -2758,6 +2758,21 @@ const duellKarte = (civA, civB, seed) => {
   eq(!!m, true, 'sw.js nennt eine Version');
   eq(APP_VERSION, m[1], `APP_VERSION (${APP_VERSION}) passt zu sw.js (${m && m[1]})`);
   eq(/^v\d+$/.test(APP_VERSION), true, 'die Version hat die Form vNN');
+  /* Der Service Worker liefert zuerst aus dem Cache und legt einen neuen nur an, wenn
+     sich VERSION ändert. Wer Code ändert, ohne zu erhöhen, liefert eine Fassung aus, die
+     bei niemandem ankommt – nach v54 genau so passiert. Deshalb steht in sw.js ein Hash
+     über die zwischengespeicherten Dateien, den dieser Test nachrechnet. */
+  {
+    const crypto = require('crypto');
+    const liste = [...sw.match(/const FILES = \[([\s\S]*?)\];/)[1]
+      .matchAll(/'\.\/([^']+)'/g)].map(x => x[1])
+      .filter(f => f && !/^icons\//.test(f) && f !== 'manifest.webmanifest');
+    const h = crypto.createHash('sha1');
+    liste.slice().sort().forEach(f => { h.update(f); h.update(fs.readFileSync(__dirname + '/' + f)); });
+    const ist = h.digest('hex').slice(0, 12);
+    const soll = (sw.match(/const BUILD_HASH = '([^']*)'/) || [])[1];
+    eq(ist, soll, `sw.js kennt den Stand der Dateien (sonst: node tools_version.js)`);
+  }
 }
 
 /* ==================================================== Tutorial

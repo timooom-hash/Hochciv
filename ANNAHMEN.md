@@ -1979,3 +1979,26 @@ dort ist die Verdeckung Teil der Regel.
 Im Code: `abilInfo(p)` in `js/engine.js` liefert `{k, n, e}` oder `null` für Bots. Ein Test
 prüft, dass **alle zwölf** Fähigkeiten darüber auffindbar sind – eine neue Zivilisation aus
 `data/civs.json` fällt damit sofort auf, wenn ihre Fähigkeiten nicht sauber verdrahtet sind.
+
+## Fehler beim Ausrollen: geänderte Dateien, gleiche Version (v55)
+
+**Gemeldet:** „Ich sehe nach dem Updaten der Dateien immer noch v54, und nichts in der
+Kopfzeile."
+
+**Ursache:** Der Service Worker liefert `cache-first` und legt einen neuen Cache nur an,
+wenn sich `VERSION` in `sw.js` ändert. Die Fähigkeit in der Kopfzeile kam **nach** dem
+Versionssprung auf v54 dazu, ohne erneut zu erhöhen – `sw.js` war damit Byte für Byte
+dieselbe Datei wie vorher, der Browser hatte keinen Anlass, irgendetwas neu zu laden, und
+lieferte weiter das alte JavaScript. Der Code war korrekt und lag auch in den Dateien; er
+kam nur nicht an. Die angezeigte v54 war kein Hinweis auf eine alte Kopie, sondern
+schlicht dieselbe Nummer wie vorher.
+
+**Behoben:** Version auf v55, und ein Werkzeug, das den Fehler künftig unmöglich macht:
+
+* `node tools_version.js` erhöht die Nummer, schreibt `APP_VERSION`, `VERSION` und einen
+  **`BUILD_HASH`** über alle zwischengespeicherten Dateien.
+* `node test.js` rechnet den Hash nach. Wurde etwas geändert, ohne die Version zu erhöhen,
+  schlägt der Test an und nennt das Werkzeug beim Namen.
+
+Damit ist „Datei geändert, Version vergessen" kein stiller Fehler mehr, sondern ein roter
+Testlauf. Bisher fiel es nur auf, wenn jemand das Ergebnis am Gerät nicht sah.

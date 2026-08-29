@@ -186,6 +186,20 @@ Warum die JSON nicht direkt geladen wird: die App läuft auch als einzelne HTML-
 der Festplatte, und von `file://` darf `fetch` nicht lesen. Deshalb ist die JSON die
 Quelle und `js/civs.js` die daraus erzeugte Fassung.
 
+### Version erhöhen (wichtig beim Ausrollen)
+
+Der Service Worker liefert **zuerst aus dem Cache**. Ein neuer Cache entsteht nur, wenn
+sich `VERSION` in `sw.js` ändert – wer Dateien ändert und die Version stehen lässt, rollt
+etwas aus, das bei niemandem ankommt. Deshalb vor dem Hochladen:
+
+```bash
+node tools_version.js        # v54 → v55, schreibt auch APP_VERSION und BUILD_HASH
+node test.js                 # meckert, wenn Dateien geändert und die Version gleich blieb
+python3 build_single.py      # Einzeldatei neu bauen
+```
+
+Im Browser reicht danach ein Neuladen; die alte Fassung räumt der Service Worker selbst weg.
+
 ## Prüfprogramme (nur für die Entwicklung)
 
 ```bash
