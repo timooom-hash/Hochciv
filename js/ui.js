@@ -1303,6 +1303,19 @@ function refreshStart() {
   sel.onchange = () => { startWanted = sel.value; };
 }
 
+/* Vor dem Tutorial die eine Frage, die den Umfang bestimmt: Wer solche Spiele kennt,
+   braucht keine Erklärung, was eine Stadt ist – wohl aber die Eigenheiten dieses Spiels.
+   Beide Fassungen führen durch **dieselben** Aktionen. */
+function tutorialAsk() {
+  modal(T('Tutorial'), `<p class="sub">${T('Hast du schon Erfahrung mit Spielen wie Civilization?')}</p>
+    <button class="btn primary wide" id="tut-ja">${T('Ja – kurze Fassung')}</button>
+    <p class="hint" style="margin:2px 2px 10px">${T('Dieselben Schritte, aber nur die Eigenheiten dieses Spiels: Sieg, Kampf, Ressourcen, Zufall im Technologiebaum.')}</p>
+    <button class="btn wide" id="tut-nein">${T('Nein – alles erklären')}</button>
+    <p class="hint" style="margin:2px 2px 0">${T('Das ausführliche Tutorial in 29 Schritten.')}</p>`);
+  $('tut-ja').onclick = () => { closeModal(); tutorialStart({ kurz: true }); };
+  $('tut-nein').onclick = () => { closeModal(); tutorialStart({ kurz: false }); };
+}
+
 /* ------------------------------------------------- Startplättchen legen
    Eine Plättchenkarte entsteht nicht im Aufbau, sondern in einer eigenen Phase:
    die offenen Dreiecke liegen schon, jedes Reich legt sein eigenes selbst – Lage
@@ -1527,7 +1540,7 @@ function boot() {
 
   $('m-new').onclick = () => { show('screen-setup'); setupScreen(); };
   // Tutorial: geführtes Übungsspiel in der normalen Oberfläche
-  $('m-tutorial').onclick = () => tutorialStart();
+  $('m-tutorial').onclick = tutorialAsk;
   $('tut-prev').onclick = () => tutMove(-1);
   $('tut-next').onclick = () => tutMove(1);
   $('tut-quit').onclick = () => tutorialQuit();
