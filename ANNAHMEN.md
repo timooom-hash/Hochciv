@@ -1955,3 +1955,27 @@ Zuges".
 (die Übungspartie läuft ohne sie). Der Punktvergleich zählt aber Weltwunder mit, also muss
 das Wort im Siegschritt stehen – ohne Erweiterung sind es null für alle. Der Test erlaubt
 das Wort deshalb genau dort und nirgends sonst.
+
+## Ausgeloste Fähigkeit ablesbar machen (v54)
+
+Seit Zivilisation und Fähigkeit sich auslosen lassen, fehlte die Gegenprobe: im Spiel
+stand nirgends, **was** ausgelost wurde. Wer „Zufall" wählte, wusste hinterher nicht, ob
+er Seemacht oder Kolonisten spielt.
+
+Zwei Stellen zeigen es jetzt:
+
+* **Kopfzeile** – neben dem Reichsnamen steht der Kurzname der Fähigkeit („Griechenland ·
+  Rückschau"), der Wirkungstext hängt als `title` daran. Immer sichtbar, ohne Tippen.
+* **Weltblatt** (`ⓘ`) – eine Liste „Die Reiche" mit Farbe, Symbol, Namen, Fähigkeit und
+  Wirkungstext für **alle** Mitspieler; das eigene Reich ist umrandet, bei Bots steht
+  „Bots haben keine Fähigkeit". Dort ist Platz für den ganzen Satz, den die Kopfzeile nur
+  als Kurzform zeigt.
+
+Die Fähigkeit anderer **menschlicher** Reiche ist damit offen einsehbar. Das ist Absicht:
+im Aufbau wird sie ohnehin vor aller Augen gewählt, und bei Hotseat-Partien wäre eine
+verdeckte Fähigkeit nur eine Gedächtnisübung. Nur die Startplättchen bleiben verdeckt –
+dort ist die Verdeckung Teil der Regel.
+
+Im Code: `abilInfo(p)` in `js/engine.js` liefert `{k, n, e}` oder `null` für Bots. Ein Test
+prüft, dass **alle zwölf** Fähigkeiten darüber auffindbar sind – eine neue Zivilisation aus
+`data/civs.json` fällt damit sofort auf, wenn ihre Fähigkeiten nicht sauber verdrahtet sind.

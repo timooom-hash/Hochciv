@@ -3902,5 +3902,33 @@ function tutRun() {
   setLang('de', { quiet: true });
 }
 
+/* ========================= Ausgeloste Fähigkeit muss ablesbar sein (v54) */
+{
+  const S = newGame({
+    seed: 5, players: [
+      { civ: 'england', kind: 'human', ability: 'kuestenstaedte' },
+      { civ: 'russland', kind: 'bot' }],
+  });
+  const ich = S.players.findIndex(p => p.kind === 'human');
+  const a = abilInfo(S.players[ich]);
+  eq([a.k, a.n], ['kuestenstaedte', 'Seemacht'], 'abilInfo liefert Schlüssel und Kurznamen');
+  eq(typeof a.e, 'string', 'und den Wirkungstext');
+  eq(abilInfo(S.players[1 - ich]), null, 'Bots haben keine');
+  // Grundfähigkeit, wenn nichts gewählt wurde
+  const B = newGame({ seed: 5, players: [{ civ: 'wikinger', kind: 'human' }, { civ: 'england', kind: 'bot' }] });
+  eq(abilInfo(B.players[B.players.findIndex(p => p.kind === 'human')]).k, 'basis',
+    'ohne Wahl ist es die Grundfähigkeit');
+  // jede Fähigkeit jeder Zivilisation ist über abilInfo auffindbar
+  const fehlt = [];
+  CIVS.forEach(c => c.abilities.forEach(ab => {
+    const S2 = newGame({ seed: 1, players: [{ civ: c.k, kind: 'human', ability: ab.k },
+      { civ: c.k === 'england' ? 'russland' : 'england', kind: 'bot' }] });
+    const p2 = S2.players.find(x => x.kind === 'human');
+    const got = abilInfo(p2);
+    if (!got || got.k !== ab.k || got.n !== ab.n) fehlt.push(`${c.k}/${ab.k}`);
+  }));
+  eq(fehlt, [], 'alle 12 Fähigkeiten sind ablesbar');
+}
+
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
 process.exit(fails ? 1 : 0);

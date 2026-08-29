@@ -1819,6 +1819,46 @@ step('Tutorial: auch der Straßenschritt geht auf Englisch', () => {
   G('switchLang')('de');
   console.log('       Straßenschritt in beiden Sprachen baubar');
 });
+step('Ausgeloste Fähigkeit ist im Spiel ablesbar', () => {
+  // Wer Zivilisation oder Fähigkeit auslosen lässt, muss im Spiel nachsehen können,
+  // was dabei herausgekommen ist – vorher stand das nirgends.
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  const sel = $('setup-list').children[0].querySelector('[data-abil]');
+  sel.value = 'zufall'; sel.onchange();
+  [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  $('setup-go').onclick();
+  const S = G('S');
+  const ich = S.players.findIndex(p => p.kind !== 'bot');
+  const a = G('abilInfo')(S.players[ich]);
+  if (!a) throw new Error('keine Fähigkeit ermittelt');
+  if (a.k === 'zufall') throw new Error('Zufall nicht aufgelöst');
+  // Kopfzeile
+  const chip = $('hud-name').querySelector('.hud-abil');
+  if (!chip) throw new Error('keine Fähigkeit in der Kopfzeile');
+  if (chip.textContent !== a.n) throw new Error('Kopfzeile zeigt ' + chip.textContent);
+  if (!chip.getAttribute('title')) throw new Error('kein Wirkungstext als Titel');
+  // Weltblatt: alle Reiche mit Fähigkeit
+  G('worldModal')();
+  const rows = [...$('ov-body').querySelectorAll('.civ-row')];
+  if (rows.length !== S.players.filter(p => p.kind !== 'barbar').length)
+    throw new Error(rows.length + ' Zeilen im Weltblatt');
+  const meine = rows.find(r => r.classList.contains('self'));
+  if (!meine) throw new Error('das eigene Reich ist nicht hervorgehoben');
+  if (!meine.textContent.includes(a.n)) throw new Error('Fähigkeit fehlt im Weltblatt');
+  if (!rows.some(r => /keine Fähigkeit/.test(r.textContent)))
+    throw new Error('bei Bots fehlt der Hinweis');
+  G('closeModal')();
+  // und auf Englisch. Achtung: a ist das Objekt aus CIVS, dessen n beim Sprachwechsel
+  // mitwandert – der deutsche Name muss vorher als Zeichenkette festgehalten werden.
+  const de = String(a.n);
+  G('switchLang')('en'); G('redraw')();
+  const en = $('hud-name').querySelector('.hud-abil').textContent;
+  if (en === de) throw new Error('Fähigkeitsname wechselt die Sprache nicht: ' + en);
+  G('switchLang')('de'); G('redraw')();
+  console.log(`       ausgelost: ${de} · englisch: ${en}`);
+});
 step('Drei Reiche im Aufbau', () => {
   $('m-new').onclick();
   $('setup-mode').querySelector('[data-mode=drei]').onclick();
