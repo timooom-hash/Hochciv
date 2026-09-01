@@ -1278,7 +1278,8 @@ function nameDoubles(players) {
     delete p.colorOf;
     if (zaehler[p.civ] < 2) return;
     const k = lauf[p.civ] = (lauf[p.civ] || 0) + 1;
-    p.name = `${civ.n} ${ROMAN[k - 1] || k}`;
+    p.roman = ROMAN[k - 1] || String(k);      // civOf baut den Namen daraus
+    p.name = `${civ.n} ${p.roman}`;           // für Anzeigen, die nur den Text kennen
   });
   return players;
 }
@@ -1357,10 +1358,36 @@ function startPlacement(cfg) {
   show('screen-place');
   placeStep();
 }
+/* Ertragsübersicht für die gewählte Hauptstadt – dasselbe, was im Spiel vor dem Siedeln
+   steht. Gerechnet wird auf einer Wegwerf-Partie mit dem Kartenstand, den dieser Platz
+   gerade sehen darf: verdeckte Nachbarplättchen zählen nicht mit, sonst verriete die
+   Zahl, was dort liegt. Grenzt das Feld an noch Verdecktes, steht ein Hinweis dabei. */
+function placeYield(plan, seat, st) {
+  if (st.cell == null) return '';
+  const shape = TILE_SHAPES[plan.n];
+  const shown = shape.slots.map((_, i) => i)
+    .filter(i => !isSeatSlot(plan, i) || i === seat.slot);
+  const map = tileMap(plan, { show: shown, seat, o: st.o, cell: st.cell, caps: [seat.idx] });
+  const pl = st.cfg.players[seat.idx];   // st ist placeState, trägt die Aufstellung
+  const T0 = newGame({ seed: 1, map, players: [{ civ: pl.civ, kind: 'human', ability: pl.ability }] });
+  if (!T0.cities.length) return '';
+  const c = T0.cities[0];
+  const y = income(T0, 0);
+  const offen = neighbors(c.r, c.c)
+    .some(([r, cc]) => !map.rows[r] || !map.rows[r][cc] || map.rows[r][cc] === 'X');
+  return `<span class="pl-yield"><b>${T('Ertragsübersicht')}</b> ` +
+    `${fmtGain({ sci: y.sci, food: y.food, coins: y.coins })}` +
+    (offen ? ` <i>${T('– noch verdeckte Nachbarfelder kommen dazu')}</i>` : '') + '</span>';
+}
 /* Anzeige eines Sitzes: bei doppelten Zivilisationen der Platzname („Russland II") */
 function seatCiv(seat) {
   const pl = placeState.cfg.players[seat.idx] || {};
-  return civOf({ civ: seat.civ, name: pl.name, color: pl.color });
+  return civOf({ civ: seat.civ, name: pl.name, roman: pl.roman, color: pl.color });
+}
+/* Fähigkeit dieses Platzes – auch dann schon gültig, wenn sie ausgelost wurde. */
+function seatAbil(seat) {
+  const pl = placeState.cfg.players[seat.idx] || {};
+  return abilInfo({ civ: seat.civ, kind: pl.kind || 'human', ability: pl.ability });
 }
 function placeSeatNow() {
   const st = placeState;
@@ -1403,11 +1430,16 @@ function drawPlace() {
     $('pl-rot').hidden = true;
     $('pl-ok').textContent = T('Spiel beginnen');
   } else {
-    const civ = seatCiv(seat), tile = TILE_POOL[plan.tiles[seat.slot]];
-    note.innerHTML = `<b>${SYM[civ.sym]} ${civ.n}</b> · „${tile.n}" · ` +
-      T('Lage %s von 3', st.o + 1) + ' · ' +
+    // Kein Plättchenname mehr – er sagt nichts über das Feld, das man wählt. Dafür die
+    // Fähigkeit: bei ausgeloster Zivilisation ist das hier die erste Stelle, an der man
+    // sieht, was man spielt.
+    const civ = seatCiv(seat), abil = seatAbil(seat);
+    note.innerHTML = `<b>${SYM[civ.sym]} ${esc(civ.n)}</b>` +
+      (abil ? ` · <span class="pl-abil" title="${esc(abil.e)}">${esc(abil.n)}</span>` : '') +
+      ' · ' + T('Lage %s von 3', st.o + 1) + ' · ' +
       (st.cell == null ? T('Hauptstadt auf ein markiertes Feld tippen')
-        : T('Hauptstadt gesetzt – „Fertig", wenn es passt'));
+        : T('Hauptstadt gesetzt – „Fertig", wenn es passt')) +
+      placeYield(plan, seat, st);
     $('pl-rot').hidden = false;
     $('pl-ok').textContent = T('Fertig');
   }

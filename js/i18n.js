@@ -1062,6 +1062,9 @@ const UI_EN = {
   'Bots haben keine Fähigkeit': 'Bots have no ability',
   'ausgeschieden': 'eliminated',
 
+  'Ertragsübersicht': 'Yield overview',
+  '– noch verdeckte Nachbarfelder kommen dazu': '– hidden neighbouring tiles will add to this',
+
   /* --- Karteneditor */
   'Größe': 'Size',
   'Exportieren': 'Export',

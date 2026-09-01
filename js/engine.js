@@ -51,8 +51,11 @@ const roadLevel = (S, r, c) => S.roads[key(r, c)] || 0;
    Ohne Doppelung ändert sich nichts – dann sind name und color leer. */
 const civOf = p => {
   const base = CIV_BY_KEY[p.civ] || BARB_CIV;
-  if (!p.name && !p.color) return base;
-  return Object.assign({}, base, p.name ? { n: p.name } : null, p.color ? { color: p.color } : null);
+  if (!p.name && !p.color && !p.roman) return base;
+  // roman ist die Ziffer der Doppelgänger („II"); der Name wird daraus erst hier gebaut,
+  // damit er beim Sprachwechsel mitwandert (p.name bleibt für alte Spielstände).
+  const n = p.roman ? `${base.n} ${p.roman}` : p.name;
+  return Object.assign({}, base, n ? { n } : null, p.color ? { color: p.color } : null);
 };
 /* Hauptstadt eines Reiches auf der Karte. Feste Karten führen sie nach Zivilisation,
    Plättchenkarten nach Platz – dort kann es dieselbe Zivilisation zweimal geben. */
@@ -128,7 +131,7 @@ function newGame(cfg) {
     wonders: [], wpool: { 1: [], 2: [], 3: [] }, wgone: [],
     players: ordered.map(pc => ({
       civ: pc.civ, kind: pc.kind, diff: pc.diff || 'prinz', name: pc.name || null,
-      color: pc.color || null, slot: cfg.players.indexOf(pc),
+      roman: pc.roman || null, color: pc.color || null, slot: cfg.players.indexOf(pc),
       ability: pc.kind === 'bot' ? 'basis' : (pc.ability || 'basis'),
       power: 0, techs: {}, avail: {}, res: { sci: 0, food: 0, coins: 0 },
       copies: 0, nuked: false, dead: false,
