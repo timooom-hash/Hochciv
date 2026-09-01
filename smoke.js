@@ -1390,6 +1390,38 @@ step('Verdeckt: sichtbar sind nur die offenen Plättchen und das eigene', () => 
   if (erlaubt < 5) throw new Error('kaum ein Feld erlaubt: ' + erlaubt);
   console.log('       ' + felder + ' Felder sichtbar, ' + hl + ' erlaubte Hauptstadtfelder');
 });
+step('Legephase: kein Plättchenname, dafür Fähigkeit und Ertragsübersicht', () => {
+  const seat = G('placeSeatNow')();
+  const note = $('pl-note');
+  // 1) kein Plättchenname mehr
+  const namen = G('TILE_POOL').map(t => t.n);
+  const drin = namen.filter(n => note.textContent.includes(n));
+  if (drin.length) throw new Error('Plättchenname in der Zeile: ' + drin.join(','));
+  // 2) die Fähigkeit steht da – auch wenn sie ausgelost wurde
+  const chip = note.querySelector('.pl-abil');
+  const a = G('seatAbil')(seat);
+  if (!a) throw new Error('keine Fähigkeit ermittelt');
+  if (!chip) throw new Error('Fähigkeit fehlt in der Legephase');
+  if (chip.textContent !== a.n) throw new Error('falsche Fähigkeit: ' + chip.textContent);
+  if (!chip.getAttribute('title')) throw new Error('kein Wirkungstext als Titel');
+  // 3) vor dem Setzen keine Ertragszeile, danach schon
+  if (note.querySelector('.pl-yield')) throw new Error('Ertrag schon vor dem Setzen');
+  const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
+  const mitte = G('TRI_MIDDLE').find(i => frei[i]);
+  G('plTap')(rcs[mitte][0], rcs[mitte][1]);
+  const y = $('pl-note').querySelector('.pl-yield');
+  if (!y) throw new Error('keine Ertragsübersicht nach dem Setzen');
+  if (!/🔬/.test(y.textContent) || !/🌾/.test(y.textContent) || !/🪙/.test(y.textContent))
+    throw new Error('Ertragsübersicht ohne die drei Erträge: ' + y.textContent);
+  // Mitte-Feld: alle sechs Nachbarn liegen auf dem eigenen Plättchen, also kein Hinweis
+  if (/verdeckte/.test(y.textContent))
+    throw new Error('Hinweis auf Verdecktes, obwohl das Feld mittig liegt');
+  console.log('       ' + chip.textContent + ' · ' + y.textContent.replace(/\s+/g, ' '));
+  // Wahl zurücknehmen: die folgenden Schritte prüfen den Zustand vor dem Setzen
+  G('placeState').cell = null;
+  G('drawPlace')();
+  if ($('pl-note').querySelector('.pl-yield')) throw new Error('Ertragszeile bleibt stehen');
+});
 step('Drehen zeigt dasselbe Plättchen in einer anderen Lage', () => {
   const karte = () => G('tileMap')(G('placeState').plan, {
     show: [G('placeSeatNow')().slot], seat: G('placeSeatNow')(), o: G('placeState').o,

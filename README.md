@@ -154,9 +154,15 @@ dabei". Aufgaben stehen damit nur einmal im Code und können nicht auseinanderla
 
 ### Druckbogen der Plättchen
 
-`Startplaettchen.pdf` (6 Seiten A4) zeigt alle 20 Plättchen zum Nachschlagen oder
-Ausschneiden: Seite 1 die Legende, die Legeregeln und die drei Formen, danach vier
-Plättchen je Seite mit Umrisslinie. Neu erzeugen nach Änderungen an `TILE_POOL`:
+`Startplaettchen.pdf` (3 Seiten A4 quer) zeigt alle 20 Plättchen zum Ausschneiden – in der
+Optik des Spiels (dieselben Farben und Geländezeichen, dieselbe dünne Feldlinie),
+Feldbreite rund 20 mm. Auf dem Bogen steht **nichts außer den Plättchen**: kein
+Hintergrund, keine Überschrift, keine Namen, kein Umriss. Zwischen den Dreiecken bleiben
+4 mm Luft; sie wechseln zeilenweise die Richtung (Spitze unten, Spitze oben, …) und
+greifen so mit ihren Schrägen ineinander, ohne sich zu berühren – dadurch passen acht auf
+eine Seite statt vier.
+
+Neu erzeugen nach Änderungen an `TILE_POOL`:
 
 ```bash
 node tools_startplaettchen_dump.js    # liest js/tiles.js → tiles.json

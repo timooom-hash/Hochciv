@@ -2002,3 +2002,63 @@ schlicht dieselbe Nummer wie vorher.
 
 Damit ist „Datei geändert, Version vergessen" kein stiller Fehler mehr, sondern ein roter
 Testlauf. Bisher fiel es nur auf, wenn jemand das Ergebnis am Gerät nicht sah.
+
+## Druckbogen, zweite Fassung (v55)
+
+Der Autor wollte den Bogen anders: Optik wie im Spiel, keine Einkreisungen, größer, nichts
+außer den Plättchen, wenig Weißraum. Alle fünf Punkte hängen zusammen, deshalb ist der
+Bogen neu gebaut statt nachgebessert.
+
+* **Optik wie im Spiel:** dieselben Geländefarben und dieselben Zeichen wie auf dem Brett –
+  Grasbüschel, Wellen, Bergdreieck, Waldspitzen, Flussschlaufe, Inselpunkt. Sie sind aus
+  `terrainGlyph` (js/ui.js) übernommen und mit `R / 30` skaliert, weil die Zeichen dort für
+  den Feldradius 30 gebaut sind. Buchstaben und Ringe sind weg.
+* **Nichts außer den Plättchen:** kein Papierhintergrund, keine Kopfzeile, keine
+  Seitenzahl, keine Namen, keine Legende. Die Legendenseite der ersten Fassung ist damit
+  entfallen – die Erträge stehen im Regelbogen der App.
+* **Mit Luft, aber verzahnt:** die Dreiecke stehen frei, mit **4 mm Abstand** ringsum, und
+  wechseln zeilenweise die Richtung (Spitze unten, Spitze oben, …). Dadurch greifen ihre
+  Schrägen ineinander, ohne sich zu berühren: der Vorschub von einem Dreieck zum nächsten
+  beträgt nur drei statt fünf Feldbreiten. So stehen **acht** Plättchen auf einer
+  A4-Querseite statt vier – bei gleichzeitig **größeren** Feldern.
+
+**Ergebnis:** Feldbreite 19,8 mm statt 17 mm, **3 Seiten statt 6**.
+
+**Kein Umriss.** Ein erster Entwurf legte die Dreiecke lückenlos ineinander und zog dafür
+einen dicken Rand um jedes – ohne Fuge wäre sonst nicht zu sehen gewesen, wo geschnitten
+wird. Der Autor wollte beides nicht: die Luft zwischen den Dreiecken übernimmt jetzt die
+Aufgabe des Umrisses, und jedes Feld trägt nur noch die dünne Linie, die es im Spiel auch
+hat.
+
+**Was das kostet:** ohne Namen auf dem Bogen sind die Plättchen nur noch am Muster zu
+erkennen. Wer sie beschriftet haben will, setzt in `tools_startplaettchen_pdf.py` eine
+Textzeile je Block – die Vorgabe lautete aber ausdrücklich „nichts außer den Plättchen".
+
+## Legephase: drei Nachbesserungen (v56)
+
+**Plättchennamen weg.** In der Hinweiszeile stand „Weite Ebene", „Fjorde" und so weiter.
+Der Name sagt nichts darüber, welches Feld man wählt, und nahm Platz weg. Die Namen
+bleiben in `TILE_POOL` als **interne Bezeichnung** – Testmeldungen sagen weiter
+„Fjorde: zu wenig Nahrung", und der **Druckbogen** führt sie weiter, dort sind sie ein
+Register, um über gedruckte Plättchen zu reden. Wenn sie auch dort verschwinden sollen,
+ist das eine Zeile in `tools_startplaettchen_pdf.py`.
+
+**Fähigkeit sichtbar.** Bei ausgeloster Zivilisation war die Legephase die erste Stelle,
+an der man sein Reich sah – aber nicht seine Fähigkeit. Jetzt steht sie neben dem
+Reichsnamen, der Wirkungstext hängt als `title` daran. `seatAbil()` holt sie über
+`abilInfo` aus der Aufstellung, greift also auch, bevor die Partie existiert.
+
+**Ertragsübersicht nach dem Setzen.** Sobald die Hauptstadt liegt, steht darunter, was sie
+einbringt – dieselbe Rechnung wie „Ertrag beim Siedeln" im Spiel (`income` auf einer
+Wegwerf-Partie, Fähigkeiten also eingerechnet).
+
+Wichtig dabei: gerechnet wird auf dem Kartenstand, den **dieser Platz sehen darf**.
+Verdeckte Nachbarplättchen zählen nicht mit – sonst verriete die Zahl, was dort liegt.
+Grenzt das gewählte Feld an noch Verdecktes, steht der Hinweis „noch verdeckte
+Nachbarfelder kommen dazu" dabei; auf den drei mittigen Feldern kann er nie erscheinen,
+weil dort alle sechs Nachbarn auf dem eigenen Plättchen liegen.
+
+**Nebenbei behoben:** Der Name eines Doppelgängers („Griechenland II") war eine fest
+zusammengebaute Zeichenkette und blieb beim Sprachwechsel deutsch. Gespeichert wird jetzt
+nur die **Ziffer** (`p.roman`), den Namen setzt `civOf` bei jeder Anzeige neu zusammen.
+Alte Spielstände mit `p.name` funktionieren unverändert weiter.

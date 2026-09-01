@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 28.8., `sw.js` v55)
+# Hochzeivilization — Projekt-Übergabe (Stand 28.8., `sw.js` v56)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -37,14 +37,14 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 | `js/engine.js` | 1531 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 515 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1705 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 1737 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 673 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 3950 | **1148 Assertions**, `node test.js` |
-| `smoke.js` | 1924 | **93 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 3964 | **1153 Assertions**, `node test.js` |
+| `smoke.js` | 1956 | **94 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 20 / 34 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 59 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_civs.js` | 80 | `data/civs.json` → `js/civs.js` |
-| `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 30 / 210 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` erzeugen (reportlab) |
+| `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 30 / 200 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
 Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION hochzählen — zusammen mit
@@ -93,6 +93,9 @@ Gedächtnis rekonstruieren.
   **verdeckt**: eine von drei Lagen, Hauptstadt frei auf Land (gesperrt nur, was einer
   fremden Hauptstadt näher als 3 kommen könnte). Bots legen zufällig auf eines der drei
   mittigen Felder. Danach Aufdecken, dann startet das Spiel.
+- **Legephase (v56):** keine Plättchennamen mehr in der Oberfläche (nur noch intern und im
+  Druckbogen), dafür die Fähigkeit des Platzes und – nach dem Setzen der Hauptstadt – eine
+  **Ertragsübersicht**. Sie rechnet nur mit den Plättchen, die dieser Platz sehen darf.
 - **Ausrollen (v55):** `node tools_version.js` vor jedem Hochladen – der Service Worker
   ist cache-first, ohne neue `VERSION` kommt eine Änderung bei niemandem an. `test.js`
   prüft das über `BUILD_HASH` und schlägt an, wenn Dateien geändert und die Version gleich

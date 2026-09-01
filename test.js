@@ -3945,5 +3945,19 @@ function tutRun() {
   eq(fehlt, [], 'alle 12 Fähigkeiten sind ablesbar');
 }
 
+/* ================= Doppelgängernamen wandern mit der Sprache (v56) */
+{
+  const p = { civ: 'griechenland', kind: 'human', roman: 'II', color: '#8f2f3f' };
+  eq(civOf(p).n, 'Griechenland II', 'Ziffer hängt am Namen');
+  eq(civOf(p).color, '#8f2f3f', 'die geliehene Farbe bleibt');
+  setLang('en', { quiet: true });
+  eq(civOf(p).n, 'Greece II', 'auf Englisch wandert auch der Doppelgängername mit');
+  setLang('de', { quiet: true });
+  // alte Spielstände kennen nur name – der wird weiter benutzt
+  eq(civOf({ civ: 'england', kind: 'human', name: 'England II' }).n, 'England II',
+    'gespeicherte Namen ohne Ziffer funktionieren weiter');
+  eq(civOf({ civ: 'england', kind: 'human' }).n, 'England', 'ohne beides der normale Name');
+}
+
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
 process.exit(fails ? 1 : 0);
