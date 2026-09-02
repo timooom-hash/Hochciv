@@ -1344,7 +1344,7 @@ verzerrt die Form. Ein Test prüft es.
   Spielerzahlen – bei drei und vier wäre offenes Legen sonst ein Vorteil für den, der
   zuletzt legt.
 
-### Hauptstadt „frei\" – mit einer Einschränkung
+### Hauptstadt „frei" – mit einer Einschränkung
 
 Gesetzt werden darf auf **jedes Landfeld des eigenen Plättchens**, mit einer Ausnahme:
 Felder, die einem **fremden Startplättchen näher als 3 Felder** kommen könnten, sind
@@ -1375,17 +1375,17 @@ Werte ≥ 1. Ein Test rechnet alle 60 Fälle nach; die Spanne liegt bei 4 bis 7 
 ### Felder außerhalb der Karte
 
 Plättchenkarten sind nicht rechteckig, die Datenstruktur aber schon. Alles, was nicht zur
-Form gehört, ist das neue Gelände **`X` „Kein Feld\"**: wird nicht gezeichnet, ist nicht
+Form gehört, ist das neue Gelände **`X` „Kein Feld"**: wird nicht gezeichnet, ist nicht
 antippbar, unpassierbar, bringt nichts und taucht in keiner Ertragsübersicht auf.
 `isOff(t)` unterscheidet es vom Vulkan, der ein echtes (nur wertloses) Feld ist.
 
 Im **Karteneditor** wird `X` blass und gestrichelt gezeichnet und bleibt antippbar –
-sonst ließe sich ein versehentlich gesetztes „Kein Feld\" nicht zurücknehmen. Damit lassen
+sonst ließe sich ein versehentlich gesetztes „Kein Feld" nicht zurücknehmen. Damit lassen
 sich auch eigene Karten mit beliebigem Umriss bauen.
 
 ### Drei Reiche
 
-Bisher gab es „Vier Reiche\" und „1 gegen 1\". Für die Dreiecksform mit neun Plättchen
+Bisher gab es „Vier Reiche" und „1 gegen 1". Für die Dreiecksform mit neun Plättchen
 brauchte es einen **Drei-Reiche-Modus**: drei Plätze mit freier Zivilisationswahl wie im
 Duell. Siegschwellen sind die **Standardschwellen** (2/3), nicht die des Duells – die
 höhere Duellschwelle hängt daran, dass es dort nur einen Gegner gibt.
@@ -1397,7 +1397,7 @@ vierte Startstern bleibt dann einfach unbenutzt.
 
 Das Kartenmenü hängt jetzt an der Spielerzahl: die Plättchenkarte hat für 2, 3 und 4
 Reiche eine eigene Form, die festen Karten haben vier Startsterne und passen nicht ins
-Duell. Die alten Rastergeneratoren bleiben als **„Rasterkarte\"** erhalten (12 × 8 im
+Duell. Die alten Rastergeneratoren bleiben als **„Rasterkarte"** erhalten (12 × 8 im
 Duell, 12 × 18 sonst) – wer die Legephase nicht will, hat damit weiter eine Zufallskarte
 in einem Zug. Die zuletzt bewusst gewählte Karte wird gemerkt (`setupMapWanted`), damit
 ein Ausflug in den Duellmodus die Wahl nicht still umstellt.
@@ -2062,3 +2062,168 @@ weil dort alle sechs Nachbarn auf dem eigenen Plättchen liegen.
 zusammengebaute Zeichenkette und blieb beim Sprachwechsel deutsch. Gespeichert wird jetzt
 nur die **Ziffer** (`p.roman`), den Namen setzt `civOf` bei jeder Anzeige neu zusammen.
 Alte Spielstände mit `p.name` funktionieren unverändert weiter.
+
+## Die Übergabe pflegt sich nicht selbst (v57)
+
+Nach der Frage „taugt das Zip für einen neuen Chat?" habe ich `UEBERGABE.md` gegen die
+Dateien geprüft, statt sie zu überfliegen – und drei Sorten Altlast gefunden:
+
+* **Kennzahlen von vorgestern:** „muss grün sein — 816 Assertions" und „68 Schritte",
+  während es 1153 und 94 sind. Wer damit anfängt, hält einen grünen Lauf für falsch.
+* **Zeilenzahlen** in der Dateitabelle, um bis zu 7 Zeilen daneben.
+* **Prosa**, die überholt war: „Deutsche Oberfläche" (ist zweisprachig), die
+  Versionsnummer in der Kopfzeile, ein Arbeitsverzeichnis, das es nicht mehr gibt.
+
+Interessant war der Gegenbefund: die Zeile zum Druckbogen („A4 quer, 3 Seiten, Spieloptik,
+verzahnt mit 4 mm Luft") hielt ich für veraltet – sie stimmte, **meine Erinnerung** war
+veraltet. Über eine so lange Sitzung ist die Datei die Quelle, nicht das Gedächtnis.
+
+**Behoben und abgesichert:**
+
+* `node tools_docs.js` setzt Zeilenzahlen, Assertions, Smoke-Schritte und die Dateizahl
+  neu (mit Testläufen; `--schnell` lässt sie weg).
+* `node tools_version.js` schreibt jetzt auch **Datum und Version in die Kopfzeile** der
+  Übergabe.
+* `node test.js` prüft die **Zeilenzahlen** der Dateitabelle und dass **jede Quelldatei
+  dort auftaucht** – eine neue Datei ohne Eintrag fällt sofort auf.
+
+Damit ist die Übergabe kein Dokument mehr, das man pflegen *muss*, sondern eines, das
+meckert, wenn es nicht gepflegt ist.
+
+## Vier Nachbesserungen am Rand des Spiels (v58)
+
+Vier Wünsche, die alle nichts an den Regeln ändern, aber am Weg ins Spiel und aus dem
+Spiel heraus. Zusammen genommen: die zweite Partie soll leichter zu beginnen sein als die
+erste, und die erste soll weniger Fragen stellen.
+
+### 1. „Nochmal spielen" am Spielende
+
+Wer allein gegen Bots spielt, bekommt am Spielende einen zweiten, hervorgehobenen Knopf
+über dem Weg ins Menü: **dieselbe Aufstellung, ein ausgelostes Reich** – und nach einem
+Sieg **eine Stufe schwerer**. Ohne ihn führt der einzige Weg zur nächsten Partie über
+Menü → Neues Spiel → alles wieder einstellen, und das ist genau der Moment, in dem man
+es dann doch bleiben lässt.
+
+**Wie „dieselben Einstellungen" gespeichert sind.** `newGame` legt ein `recipe` in den
+Spielstand: die **rohe** Wahl aus dem Aufbau, `zufall` noch nicht aufgelöst. Roh ist der
+Punkt – wer mit ausgelostem Reich gestartet ist, bekommt beim nächsten Mal ein neues, und
+das Rezept muss dafür nichts wissen. Es liegt im Spielstand und nicht in einer Variablen
+der Oberfläche, damit der Knopf auch nach einem Neuladen der App noch weiß, was er
+wiederholen soll. Die Regeln lesen das Rezept nie.
+
+**Nur bei genau einem Menschen.** Zu mehreren gehört die Aufstellung nicht einem allein;
+ein ausgelostes Reich wäre eine Entscheidung über die anderen hinweg. Gezählt werden
+Plätze, nicht Überlebende (`humanSeats`): wessen Hauptstadt gefallen ist, saß trotzdem mit
+am Tisch. Barbaren sind eine Ereignisfraktion und kein Platz. Spielstände aus früheren
+Fassungen und das Tutorial haben kein Rezept – dort erscheint der Knopf nicht.
+
+**Das ausgeloste Reich musste wirklich ausgelost werden.** Der erste Entwurf setzte den
+Platz des Menschen im Rezept auf `zufall` und ließ `resolveRandom` machen. Auf den festen
+Karten sitzt aber jede Zivilisation genau einmal, und die Auslosung nimmt nur, was noch
+frei ist: bei vier Reichen ist das **genau das eigene alte**. Man hätte jedes Mal
+dasselbe Reich bekommen, und weil es sich um einen Zufall handelt, wäre das lange nicht
+aufgefallen. Jetzt wird wirklich getauscht: gezogen wird aus allen vier Zivilisationen,
+und wer die gezogene hatte, übernimmt die alte des Menschen. Die Reiche bleiben damit
+paarweise verschieden, und auf der Plättchenkarte (wo Doppelte erlaubt sind) bleibt es
+bei der freien Auslosung. `smoke.js` fährt 16 Wiederholungen und besteht auf Abwechslung –
+eine Zusicherung über das Ergebnis, nicht über die Absicht.
+
+**Eine Stufe schwerer nach einem Sieg.** `DIFFICULTIES` steht von leicht nach schwer
+(Siedler … David); eine Stufe weiter heißt, die Bots brauchen weniger auf dem Würfel. Am
+Ende der Liste bleibt es bei David – ein Grad wird nicht erfunden, der Hinweistext sagt
+das dann auch. Nach einer Niederlage bleibt der Grad, wie er war: wer gerade verloren hat,
+braucht keine Beförderung.
+
+### 2. Ein Tipp am Spielende
+
+Unter dem Ergebnis steht ein zufälliger Spieltipp – gewonnen wie verloren. Die 43 Tipps
+sind die Sammlung des Autors, wörtlich übernommen (`TIPS` in `js/data.js`, englisch in
+`DATA_EN.tips` an derselben Stelle der Liste, wie bei `AGES` und `FIELDS`).
+
+**Einmal je Partie, nicht je Aufruf.** `gameOver()` wird aus fünf Wegen erreicht (Zugende,
+Bot-Fenster, Forschen, Machtkauf, ein neu geladener beendeter Spielstand). Ein bei jedem
+Aufruf neu gezogener Tipp würde beim Zurückblättern wechseln und wie ein Fehler aussehen.
+Gezogen wird deshalb einmal und die **Nummer** in `S.tip` gemerkt – die Nummer, nicht der
+Satz, damit ein Sprachwechsel den Tipp mitnimmt.
+
+Geprüft wird an den Tipps nur, was still schiefgehen könnte: gleiche Länge beider Listen
+(eine vergessene Übersetzung trüge sonst den deutschen Satz ins englische Spiel) und keine
+Doppelten. Ob ein Tipp inhaltlich noch stimmt, prüft nichts – die Namen darin sind Prosa,
+keine Schlüssel. Wer eine Technologie umbenennt, muss hier nachsehen.
+
+### 3. Erweiterungsmodule in den Einstellungen
+
+Ereignisse und Weltwunder sind Erweiterungen des Grundspiels, standen im Aufbau aber
+gleichberechtigt neben Karte und Schwierigkeit. Wer zum ersten Mal spielt, wird damit nach
+Regeln gefragt, die er noch nicht kennt. Beide sind jetzt **Module** und ab Werk **aus**;
+eingeschaltet werden sie im Hauptmenü unter *Einstellungen* (geräteweit, gespeichert unter
+`hochciv.opts`).
+
+**Das Modul macht die Wahl verfügbar, es trifft sie nicht.** Ist ein Modul aus, fehlt seine
+Zeile im Aufbau ganz. Ist es an, steht dort wieder das gewohnte Häkchen und entscheidet
+weiterhin je Partie. Am Spiel selbst ändert das nichts: die Vorgabe im Aufbau war schon
+immer „ohne", eine Partie mit abgeschalteten Modulen läuft also genau wie bisher eine
+ohne Häkchen.
+
+**Abschalten löscht das Häkchen mit.** Sonst könnte ein Modul, das jemand einmal
+eingeschaltet und angehakt hat, nach dem Abschalten unsichtbar weiterlaufen – Zeile weg,
+Häkchen noch gesetzt. Genau diese Sorte Fehler findet man später nur schwer.
+
+### 4. „Grundfähigkeit" bei ausgelostem Reich entfällt
+
+Wer im Aufbau die Zivilisation auslosen ließ, konnte bei der Fähigkeit zwischen *Zufall*
+und *Grundfähigkeit* wählen. Der zweite Eintrag benannte nichts: die Grundfähigkeit heißt
+bei jedem Reich anders und wirkt anders (Günstige Forschung, Handelsreich, Taiga,
+Seefahrer), und welche man bekäme, entschied ohnehin erst die Auslosung. Es blieb also nur
+die Wahl zwischen „irgendeine der drei" und „die erste von dreien, welche auch immer das
+ist". Die Zeile ist ersatzlos weg; bei ausgelostem Reich steht die Fähigkeit auf *Zufall*
+und das Menü still. Bei bekannter Zivilisation ändert sich nichts – dort stehen die drei
+Fähigkeiten weiter mit ihren richtigen Namen.
+
+### Nebenbei behoben: `hidden` wirkte auf Zeilen nicht
+
+Aufgefallen an der Zeile *Ereignisstärke*: sie war im Code längst versteckt
+(`$('setup-evmode-row').hidden = true`) und stand trotzdem im Aufbau. Grund ist die
+Rangfolge der Stilbögen – `[hidden] { display: none }` steht nur im Bogen des Browsers,
+und der verliert gegen **jede** Regel aus `style.css`, egal wie unspezifisch. `.row
+{ display: flex }` hat also jede versteckte Zeile trotzdem gezeigt. Dass es niemandem
+auffiel, lag auch am Test: geprüft wurde `.hidden`, die **Eigenschaft**, und die war die
+ganze Zeit korrekt `true`. Ein `[hidden] { display: none !important }` in `style.css`
+behebt es für alle Zeilen auf einmal – `#tut-panel[hidden]` war die Einzelfalllösung
+desselben Problems und ist damit überflüssig geworden, bleibt aber harmlos stehen.
+
+## Fehler: Der Koloss stellte seine Armeen in der Hauptstadt (v58)
+
+Gemeldet: die zwei kostenlosen Armeen des Kolosses erscheinen immer in der Hauptstadt,
+statt in der Stadt, die das Wunder gebaut hat.
+
+Ursache war eine Zeile in `spawnFreeArmies`: `const cap = capitalOf(S, pi)`. Die Funktion
+kannte den Bauort gar nicht – sie bekommt nur `(S, pi)`, weil sie an drei Stellen
+aufgerufen wird (Wunderbau, nach jeder Armeebewegung, zu Zugbeginn). Aufgefallen ist es
+lange nicht, weil Wunder meistens in der Hauptstadt gebaut werden; dort war das Ergebnis
+zufällig richtig. Der bestehende Test baute den Koloss ebenfalls in der Hauptstadt und
+war damit blind für den Fehler.
+
+**Warum der Ort gemerkt werden muss.** Auf einem Feld steht nur eine Armee, die zweite
+wartet also in der Warteschlange `p.freeArmies` – und die überdauert Züge. Ein Parameter
+am Aufruf hätte nur die erste Armee richtig gesetzt; die zweite wäre beim nächsten
+`spawnFreeArmies` wieder in der Hauptstadt gelandet. Der Bauort steht deshalb als
+Stadt-Id in `p.freeArmyCity` und wird geleert, sobald die Schlange leer ist.
+
+**Wenn die Stadt wegfällt.** Wird die Kolossstadt erobert oder zerstört, während noch
+eine Armee wartet, rücken die Armeen in die Hauptstadt nach – besser dort als gar nicht,
+und eine verschluckte Gratisarmee wäre der schlimmere Fehler. Alte Spielstände ohne
+`freeArmyCity` laufen über denselben Weg und verhalten sich wie bisher.
+
+**Mitgezogen:** das Protokoll und die Zugende-Warnung nannten fest die Hauptstadt. Beide
+nennen jetzt die richtige Stadt (die Hauptstadt heißt so, jede andere steht bei ihren
+Koordinaten – wie beim Gründen). Der Test baut ausdrücklich in einer zweiten Stadt und
+prüft die wartende Armee mit; ohne die Korrektur schlägt er an drei Stellen an.
+
+## Nachtrag: Regelmodus aus der README (v58)
+
+Die README beschrieb weiter ein Dropdown *Originalregeln / Experimentell v2* im Aufbau.
+Das gibt es seit der Vereinheitlichung nicht mehr – `smoke.js` prüft sogar, dass
+`setup-rules` **nicht** existiert. Der Abschnitt ist ersatzlos gestrichen; im Code war
+ohnehin nichts davon übrig. Was die frühere v2 ausmachte, steht als Erklärung weiter in
+`js/data.js` über `SINGULARITY_BASE` und in dieser Datei bei der Vereinheitlichung.

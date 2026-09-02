@@ -10,7 +10,14 @@ const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,
     w.onerror=e=>errs.push(e);
   }});
 const w=dom.window, $=id=>w.document.getElementById(id);
+// Erweiterungen sind ab Werk aus und haben dann keine Zeile im Aufbau – erst über die
+// Einstellungen zuschalten, dann wie zuvor ankreuzen.
+w.eval("show('screen-options'); optionsScreen();");
+$('opt-events').checked=true; $('opt-events').onchange();
+$('opt-wonders').checked=true; $('opt-wonders').onchange();
 w.eval("show('screen-setup'); setupScreen();");
+if ($('setup-events-row').hidden || $('setup-wonders-row').hidden)
+  { console.log('FEHLER: Modulzeilen fehlen im Aufbau'); process.exit(1); }
 $('setup-events').checked=true; $('setup-events').onchange();
 $('setup-wonders').checked=true;
 $('setup-go').onclick();

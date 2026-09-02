@@ -25,11 +25,33 @@
       <button class="btn" id="m-continue" hidden>Spiel fortsetzen</button>
       <button class="btn" id="m-tutorial">Tutorial</button>
       <button class="btn" id="m-editor">Karte bearbeiten</button>
+      <button class="btn ghost" id="m-options">Einstellungen</button>
       <button class="btn ghost" id="m-rules">Regeln &amp; Technologien</button>
       <button class="btn ghost" id="m-load">Spielstand laden</button>
     </div>
     <div class="lang-row" id="m-lang"></div>
     <p class="menu-version" id="m-version"></p>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------ Einstellungen -->
+<section id="screen-options" class="screen">
+  <header class="bar">
+    <button class="icon-btn" data-back>‹</button>
+    <h2>Einstellungen</h2>
+  </header>
+  <div class="pad">
+    <p class="hint">Erweiterungsmodule sind ab Werk aus: der Aufbau zeigt dann nur, was
+      jedes Spiel braucht. Eingeschaltet erscheint das Modul im Aufbau als eigene Zeile
+      und bleibt dort je Partie an- und abwählbar.</p>
+    <label class="row"><span>Modul: Ereignisse</span>
+      <input type="checkbox" id="opt-events"></label>
+    <p class="hint">Zu Rundenbeginn wird ein Ereignis gewürfelt – Pest, Dürre,
+      Barbareninvasion und weitere. Trifft nur Menschen, nie Bots.</p>
+    <label class="row"><span>Modul: Weltwunder</span>
+      <input type="checkbox" id="opt-wonders"></label>
+    <p class="hint">Städte können Weltwunder bauen, vier zusätzliche Technologien kommen
+      in den Bogen. Ein Weltwunder der Stufe 3 gewinnt das Spiel.</p>
   </div>
 </section>
 
@@ -57,11 +79,11 @@
       zweimal dieselbe Zivilisation (mit gleicher oder anderer Fähigkeit). Doppelte
       bekommen Ziffern und eine eigene Farbe. Auf den festen Karten sitzt jede
       Zivilisation genau einmal.</p>
-    <label class="row"><span>Mit Ereignissen</span>
+    <label class="row" id="setup-events-row" hidden><span>Mit Ereignissen</span>
       <input type="checkbox" id="setup-events"></label>
     <label class="row" id="setup-evmode-row" hidden><span>Ereignisstärke</span>
       <select id="setup-evmode"></select></label>
-    <label class="row"><span>Mit Weltwundern</span>
+    <label class="row" id="setup-wonders-row" hidden><span>Mit Weltwundern</span>
       <input type="checkbox" id="setup-wonders"></label>
     <label class="row"><span>Schwierigkeit (alle Bots)</span>
       <select id="setup-diff"></select></label>

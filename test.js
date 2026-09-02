@@ -2490,6 +2490,47 @@ const duellKarte = (civA, civB, seed) => {
     eq(armiesOf(S, 0).filter(a => cityAt(S, a.r, a.c)).length, 1,
       'genau eine Armee steht jetzt noch in der Stadt');
   }
+  /* Der Koloss stellt seine Armeen in DER STADT, DIE IHN GEBAUT HAT – nicht in der
+     Hauptstadt. Das war ein Fehler: `spawnFreeArmies` nahm immer `capitalOf`, und weil
+     Wunder meist in der Hauptstadt gebaut werden, fiel es lange nicht auf. Geprüft wird
+     deshalb ausdrücklich mit einer zweiten Stadt, auch für die WARTENDE Armee: die
+     Warteschlange überdauert Züge, der Ort muss also gemerkt bleiben. */
+  {
+    S.armies = S.armies.filter(a => a.owner !== 0);       // beide Städte frei machen
+    p.res.food = 99;
+    const H = S.map.rows.length, W = S.map.rows[0].length;
+    let zweite = null;
+    for (let r = 0; r < H && !zweite; r++) for (let c = 0; c < W; c++) {
+      if (!isLand(S, r, c) || cityAt(S, r, c)) continue;
+      if (hexDistance(r, c, cap.r, cap.c) < 2) continue;
+      if (foundCity(S, 0, r, c) === null) { zweite = cityAt(S, r, c); break; }
+    }
+    eq(!!zweite && !zweite.cap, true, 'eine zweite Stadt steht (nicht die Hauptstadt)');
+    p.freeArmies = 0; p.freeArmyCity = null;
+    applyWonderEffect(S, 0, zweite, WONDER_BY_KEY.koloss);
+    const erste = armiesOf(S, 0).find(a => a.r === zweite.r && a.c === zweite.c);
+    eq(!!erste, true, 'die erste Armee steht in der Kolossstadt, nicht in der Hauptstadt');
+    eq(armyAt(S, cap.r, cap.c), undefined, 'in der Hauptstadt steht keine');
+    eq(p.freeArmyCity, zweite.id, 'die Stadt ist für die wartende Armee gemerkt');
+    eq(pendingWarnings(S, 0).some(w => w.includes(`${zweite.r}/${zweite.c}`)), true,
+      'die Warnung nennt die Kolossstadt und nicht die Hauptstadt');
+    // Die erste zieht heraus – die zweite rückt in DIESELBE Stadt nach
+    const raus = neighbors(zweite.r, zweite.c).find(([r, c]) =>
+      isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c));
+    erste.mp = moveAllowance(S, 0);
+    eq(moveArmy(S, erste, raus[0], raus[1]), null, 'die erste zieht heraus');
+    eq(!!armyAt(S, zweite.r, zweite.c), true, 'die zweite rückt in der Kolossstadt nach');
+    eq(armyAt(S, cap.r, cap.c), undefined, 'auch die zweite landet nicht in der Hauptstadt');
+    eq(p.freeArmies, 0, 'die Warteschlange ist leer');
+    eq(p.freeArmyCity, null, 'und die gemerkte Stadt ist wieder frei');
+    // Fällt die Kolossstadt weg, gehen wartende Armeen nicht verloren
+    p.freeArmies = 1; p.freeArmyCity = 99999;             // Stadt, die es nicht gibt
+    S.armies = S.armies.filter(a => a.owner !== 0);
+    spawnFreeArmies(S, 0);
+    eq(!!armyAt(S, cap.r, cap.c), true,
+      'ohne die Kolossstadt rückt die Armee in die Hauptstadt nach');
+    S.armies = S.armies.filter(a => a.owner !== 0);
+  }
   const before = cap.pop;
   applyWonderEffect(S, 0, cap, WONDER_BY_KEY.angkor);
   eq(cap.pop > before, true, 'Angkor Wat lässt die Stadt wachsen');
@@ -3700,6 +3741,15 @@ function tutRun() {
   eq(DATA_EN.ages.length, AGES.length, 'Zeitalter übersetzt');
   eq(DATA_EN.fields.length, FIELDS.length, 'Technologiefelder übersetzt');
   eq(DATA_EN.maps.length, MAPS.length, 'Kartennamen übersetzt');
+  /* Spieltipps. Sie stehen am Spielende und werden nur angezeigt – nichts im Code hängt
+     an ihrem Wortlaut. Geprüft wird deshalb nur, was still schiefgehen könnte: eine
+     vergessene Übersetzung (dann trüge das englische Spiel den deutschen Satz) und ein
+     doppelt eingefügter Tipp. */
+  eq(DATA_EN.tips.length, TIPS.length, `alle ${TIPS.length} Spieltipps haben eine englische Fassung`);
+  eq(TIPS.filter(t => !t || !t.trim()).length, 0, 'kein leerer Tipp');
+  eq(DATA_EN.tips.filter(t => !t || !t.trim()).length, 0, 'keine leere Übersetzung');
+  eq(new Set(TIPS).size, TIPS.length, 'kein Tipp steht zweimal in der Liste');
+  eq(new Set(DATA_EN.tips).size, DATA_EN.tips.length, 'und keine Übersetzung zweimal');
 
   // Umschalten und zurück
   setLang('en', { quiet: true });
@@ -3711,6 +3761,9 @@ function tutRun() {
   eq(EVENT_BY_KEY.pest.n, 'The Plague', 'Ereignisse wechseln');
   eq(AGES[0], 'Antiquity', 'Zeitalter wechseln');
   eq(TILE_POOL[0].n, 'Open Plain', 'Plättchennamen wechseln');
+  eq(TIPS[0], DATA_EN.tips[0], 'Spieltipps wechseln mit');
+  eq(TIPS.some(t => /[äöüß]/.test(t)), false,
+    'auf Englisch ist kein deutscher Tipp übrig: ' + (TIPS.find(t => /[äöüß]/.test(t)) || '').slice(0, 40));
   eq(TILE_SHAPES[2].name, 'Tile map (6 triangles)', 'Kartenformen wechseln');
   // techEffect rechnet weiter mit den Duellschwellen, jetzt auf Englisch
   eq(techEffect(TECH_BY_KEY.theologie, { duel: true }), '>7/10 of the population to win',
@@ -3735,6 +3788,7 @@ function tutRun() {
   setLang('de', { quiet: true });
   eq([TECH_BY_KEY.schrift.n, TERRAIN.G.name, AGES[0], TILE_POOL[0].n],
     ['Schrift', 'Grasland', 'Antike', 'Weite Ebene'], 'zurück auf Deutsch stimmt alles wieder');
+  eq(TIPS[0].startsWith('Es ist nicht immer korrekt'), true, 'auch die Spieltipps sind zurück');
 }
 
 /* =================== Tutorialschienen bleiben sprachunabhängig

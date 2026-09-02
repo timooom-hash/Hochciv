@@ -24,8 +24,9 @@ sonst behalten installierte Geräte die alte Fassung.
 | Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
 | Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
+| Einstellungen | Im Hauptmenü: die Erweiterungsmodule **Ereignisse** und **Weltwunder** zuschalten. Ab Werk sind beide aus und fehlen im Aufbau ganz; eingeschaltet steht dort wieder das Häkchen und entscheidet je Partie |
 | Spielart | „Vier Reiche“, „Drei Reiche“ oder „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) |
-| Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen |
+| Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen. Bei ausgelostem Reich steht die Fähigkeit zwangsläufig ebenfalls auf Zufall |
 | Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
 | Fähigkeit sehen | Die eigene Fähigkeit steht in der Kopfzeile neben dem Reichsnamen; das Weltblatt (ⓘ) listet alle Reiche mit Fähigkeit und Wirkung |
 | Karte | Originalkarte, Große Karte, **Plättchenkarte** (die Zufallskarte) oder eigene aus dem Editor |
@@ -56,25 +57,25 @@ Ein Anspruch bleibt gültig, auch wenn die Bedingung später wieder wegfällt. B
 **Gleichstand gewinnt der Mensch** vor dem Bot; mehrere Menschen gleichauf teilen den
 Sieg. Das Spielende zeigt dann die Punktetafel.
 
+Unter dem Ergebnis steht immer ein **Spieltipp** aus der Tippsammlung – gewonnen wie
+verloren. Gezogen wird einer je Partie, er wechselt also nicht, wenn man das Fenster
+noch einmal öffnet. Die Tipps stehen in `TIPS` (`js/data.js`), englisch in
+`DATA_EN.tips` an derselben Stelle der Liste.
+
+Wer **allein gegen Bots** spielt, findet dort außerdem **„Nochmal spielen"**: dieselbe
+Aufstellung, aber ein ausgelostes Reich samt ausgeloster Fähigkeit – und nach einem Sieg
+eine Stufe schwerer (bei David bleibt es dabei). Auf der Plättchenkarte wird dafür neu
+gelegt. Zu mehreren Menschen gibt es den Knopf nicht: die Aufstellung gehört dann nicht
+einem allein. Möglich ist das, weil `newGame` die rohe Wahl aus dem Aufbau als `recipe`
+im Spielstand ablegt – Spielstände aus älteren Fassungen haben keines und zeigen nur den
+Weg ins Menü.
+
 Straßen laufen durch Städte hindurch: ein Stadtfeld zählt selbst als Straße oder
 Eisenbahn, sobald ein solches Feld daran grenzt.
 
 Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
 Bezahlt wird automatisch mit dem günstigsten Umrechnungskurs
 (2 Münzen = 1 Nahrung/Wissenschaft, mit England, Gilden, Alchemie usw. entsprechend besser).
-
-## Regelmodus
-
-Im Aufbaubildschirm unter **Regeln** wählbar:
-
-* **Originalregeln** – die Regeln des gedruckten Hefts.
-* **Experimentell v2** – Singularität kostet 100, Griechenland ohne Würfelbonus, zwei neue
-  Technologien (Keramik, Theologie), Verbundwerkstoffe gibt ein kostenloses Wachstum,
-  Sklaverei wird in der Moderne obsolet, Theologie senkt die Siegschwelle, Bots forschen
-  doppelt. Details in `ANNAHMEN.md`, Abschnitt 9.
-
-Der gewählte Modus steht während des Spiels im Rundentitel und wird im Spielstand
-gespeichert.
 
 ## Sprache
 
@@ -199,9 +200,13 @@ sich `VERSION` in `sw.js` ändert – wer Dateien ändert und die Version stehen
 etwas aus, das bei niemandem ankommt. Deshalb vor dem Hochladen:
 
 ```bash
-node tools_version.js        # v54 → v55, schreibt auch APP_VERSION und BUILD_HASH
-node test.js                 # meckert, wenn Dateien geändert und die Version gleich blieb
+node tools_version.js        # Nummer +1, schreibt APP_VERSION, BUILD_HASH und die
+                             # Kopfzeile von UEBERGABE.md
 python3 build_single.py      # Einzeldatei neu bauen
+node tools_version.js $(…)   # danach nochmal mit derselben Nummer: die Einzeldatei
+                             # gehört mit in den BUILD_HASH
+node tools_docs.js           # Zahlen in UEBERGABE.md nachziehen (führt die Tests aus)
+node test.js                 # meckert, wenn etwas davon vergessen wurde
 ```
 
 Im Browser reicht danach ein Neuladen; die alte Fassung räumt der Service Worker selbst weg.

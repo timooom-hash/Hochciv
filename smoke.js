@@ -343,6 +343,40 @@ step('Originalkarte ist vorausgewählt', () => {
 step('Kein Regelmodus-Dropdown mehr', () => {
   if ($('setup-rules')) throw new Error('das v2-Dropdown existiert noch');
 });
+step('Erweiterungsmodule sind ab Werk aus und verstecken ihre Aufbauzeilen', () => {
+  if (!$('m-options')) throw new Error('kein Einstellungen-Knopf im Hauptmenü');
+  if (!$('setup-events-row').hidden) throw new Error('Ereigniszeile ohne Modul sichtbar');
+  if (!$('setup-wonders-row').hidden) throw new Error('Wunderzeile ohne Modul sichtbar');
+  if ($('setup-events').checked || $('setup-wonders').checked)
+    throw new Error('Häkchen gesetzt, obwohl das Modul aus ist');
+  console.log('       Aufbau ohne Module: Ereignis- und Wunderzeile weg');
+});
+step('Einstellungen schalten die Module zu', () => {
+  $('m-options').onclick();
+  if (!window.document.getElementById('screen-options').classList.contains('show'))
+    throw new Error('Einstellungen öffnen nicht');
+  if ($('opt-events').checked || $('opt-wonders').checked)
+    throw new Error('Module sind nicht ab Werk aus');
+  $('opt-events').checked = true; $('opt-events').onchange();
+  $('opt-wonders').checked = true; $('opt-wonders').onchange();
+  // Der Aufbau richtet sich beim Öffnen danach
+  $('m-new').onclick();
+  if ($('setup-events-row').hidden || $('setup-wonders-row').hidden)
+    throw new Error('Modulzeilen erscheinen nicht im Aufbau');
+  console.log('       beide Module an, Zeilen im Aufbau sichtbar');
+});
+step('Ein abgeschaltetes Modul nimmt sein Häkchen mit', () => {
+  $('setup-events').checked = true; $('setup-events').onchange();
+  $('m-options').onclick();
+  $('opt-events').checked = false; $('opt-events').onchange();
+  $('m-new').onclick();
+  if (!$('setup-events-row').hidden) throw new Error('Ereigniszeile bleibt nach dem Abschalten');
+  if ($('setup-events').checked)
+    throw new Error('das Häkchen überlebt das Abschalten – Ereignisse liefen unsichtbar weiter');
+  // wieder an für die folgenden Schritte
+  $('m-options').onclick(); $('opt-events').checked = true; $('opt-events').onchange();
+  $('m-new').onclick();
+});
 step('Erweiterungen ankreuzbar (Ereignisse, Weltwunder)', () => {
   if (!$('setup-events') || !$('setup-wonders')) throw new Error('Checkboxen fehlen');
   if (!$('setup-evmode-row').hidden) throw new Error('Ereignisstärke wird ohne Ereignisse gezeigt');
@@ -1518,6 +1552,149 @@ step('Spielende: Punktetafel und Mensch vor Bot', () => {
   console.log('       Punktetafel mit 2 Ansprüchen, Sieg an den Menschen');
   G('closeModal')();
 });
+step('Spielende zeigt immer einen Tipp aus der Sammlung', () => {
+  G('gameOver')();
+  const tip = $('ov-body').querySelector('.tip');
+  if (!tip) throw new Error('kein Tipp am Spielende');
+  const TIPS = G('TIPS');
+  const text = tip.textContent.replace(/^\s*Tipp\s*/, '').trim();
+  if (!TIPS.includes(text)) throw new Error('der Tipp stammt nicht aus TIPS: ' + text.slice(0, 50));
+  // Ein Tipp je Partie, nicht je Aufruf: gameOver() kommt aus mehreren Wegen
+  const nochmal = (G('gameOver')(), $('ov-body').querySelector('.tip').textContent);
+  if (nochmal !== tip.textContent) throw new Error('der Tipp wechselt bei jedem Aufruf');
+  console.log('       „' + text.slice(0, 52) + '…\" · bleibt über mehrere Aufrufe gleich');
+  G('closeModal')();
+});
+step('Solo: „Nochmal spielen" startet dieselbe Aufstellung mit ausgelostem Reich', () => {
+  // Ein Mensch, drei Bots, Originalkarte – wie im Schritt davor aufgesetzt
+  const alt = G('S');
+  const menschAlt = alt.players.find(p => p.kind === 'human');
+  if (G('humanSeats')(alt).length !== 1) throw new Error('kein Solospiel');
+  if (!alt.recipe) throw new Error('kein Rezept im Spielstand');
+  G('gameOver')();
+  if (!$('go-again')) throw new Error('kein „Nochmal spielen\"-Knopf');
+  if (!$('go-again').classList.contains('primary'))
+    throw new Error('der Knopf ist nicht hervorgehoben');
+  if (!$('go-menu')) throw new Error('kein Weg zurück ins Menü');
+  // Reihenfolge: erst nochmal spielen, dann das Menü
+  const knoepfe = [...$('ov-body').querySelectorAll('button')].map(b => b.id);
+  if (knoepfe.indexOf('go-again') > knoepfe.indexOf('go-menu'))
+    throw new Error('der Menüknopf steht vor dem Wiederholen');
+  $('go-again').onclick();
+  const neu = G('S');
+  if (neu === alt || neu.over) throw new Error('kein frisches Spiel');
+  if (!window.document.getElementById('screen-game').classList.contains('show'))
+    throw new Error('das neue Spiel wird nicht gezeigt');
+  const menschNeu = neu.players.find(p => p.kind === 'human');
+  if (!menschNeu) throw new Error('kein Mensch im neuen Spiel');
+  // Ein echtes Reich mit einer Fähigkeit, die dazu gehört
+  if (menschNeu.ability === 'zufall') throw new Error('Fähigkeit nicht aufgelöst');
+  if (!G('CIV_BY_KEY')[menschNeu.civ].abilities.some(a => a.k === menschNeu.ability))
+    throw new Error('Fähigkeit passt nicht zum Reich: ' + menschNeu.civ + '/' + menschNeu.ability);
+  if (neu.players.length !== alt.players.length) throw new Error('andere Spielerzahl');
+  if (neu.map.name !== alt.map.name) throw new Error('andere Karte: ' + neu.map.name);
+  if (!!neu.ev !== !!alt.ev || !!neu.wo !== !!alt.wo) throw new Error('andere Erweiterungen');
+  if ($('confetti')) throw new Error('die Schnipsel des alten Spiels liegen noch');
+  console.log('       ' + menschAlt.civ + ' → ' + menschNeu.civ +
+    ' (' + menschNeu.ability + '), ' + neu.players.length + ' Reiche, ' + neu.map.name);
+});
+step('Wiederholtes „Nochmal spielen" verteilt die Reiche wirklich', () => {
+  /* Der Stolperstein: auf den festen Karten sitzt jede Zivilisation genau einmal. Ein
+     einfaches „Zufall" zieht deshalb nur aus dem, was frei ist – bei vier Reichen genau
+     das eigene alte, man bekäme jedes Mal dasselbe. Getestet wird also nicht die Absicht,
+     sondern das Ergebnis über viele Läufe. */
+  const gezogen = new Set();
+  for (let i = 0; i < 16; i++) {
+    G('rematch')(false);
+    const S = G('S');
+    gezogen.add(S.players.find(p => p.kind === 'human').civ);
+    const civs = S.players.map(p => p.civ);
+    if (new Set(civs).size !== civs.length)
+      throw new Error('zwei Reiche auf einem Startstern: ' + civs.join(','));
+  }
+  if (gezogen.size < 3)
+    throw new Error('kaum Abwechslung, nur: ' + [...gezogen].join(' · '));
+  console.log('       16 Läufe, Reiche des Menschen: ' + [...gezogen].sort().join(' · '));
+});
+step('Nach einem Sieg eine Stufe schwerer, nach einer Niederlage gleich', () => {
+  const S = G('S');
+  const mensch = S.players.findIndex(p => p.kind === 'human');
+  const bot = S.players.findIndex(p => p.kind === 'bot');
+  const gradVor = S.players[bot].diff;
+  // Sieg des Menschen
+  G('claimVictory')(S, mensch, 'Wirtschaftssieg (Test)');
+  let guard = 0;
+  while (!G('S').over && guard++ < 8) G('endTurn')(S);
+  if (!S.over) throw new Error('das Spiel endet nicht');
+  G('gameOver')();
+  if (!/schwerer/.test($('ov-body').textContent))
+    throw new Error('der Sieg kündigt keine höhere Schwierigkeit an: ' + $('ov-body').textContent.slice(0, 120));
+  $('go-again').onclick();
+  const nachSieg = G('S').players.find(p => p.kind === 'bot').diff;
+  if (nachSieg !== G('nextDiff')(gradVor))
+    throw new Error(`nach dem Sieg ${nachSieg} statt ${G('nextDiff')(gradVor)}`);
+  // Niederlage: derselbe Grad
+  const T2 = G('S');
+  const botIdx = T2.players.findIndex(p => p.kind === 'bot');
+  G('claimVictory')(T2, botIdx, 'Forschungssieg (Test)');
+  guard = 0;
+  while (!G('S').over && guard++ < 8) G('endTurn')(T2);
+  G('gameOver')();
+  if (/schwerer/.test($('ov-body').textContent))
+    throw new Error('auch die Niederlage erhöht die Schwierigkeit');
+  $('go-again').onclick();
+  const nachNiederlage = G('S').players.find(p => p.kind === 'bot').diff;
+  if (nachNiederlage !== nachSieg)
+    throw new Error(`nach der Niederlage ${nachNiederlage} statt ${nachSieg}`);
+  console.log(`       ${gradVor} → Sieg → ${nachSieg} → Niederlage → ${nachNiederlage}`);
+});
+step('Am höchsten Grad erhöht auch ein Sieg nicht weiter', () => {
+  const S = G('S');
+  S.players.forEach(p => { p.diff = 'david'; });
+  S.recipe.players.forEach(p => { p.diff = 'david'; });
+  const mensch = S.players.findIndex(p => p.kind === 'human');
+  S.over = { winner: mensch, winners: [mensch], how: 'Probe', shared: false };
+  G('gameOver')();
+  const hinweis = [...$('ov-body').querySelectorAll('p.sub')]
+    .map(p => p.textContent).find(t => /Dieselben/.test(t)) || '';
+  if (!/nicht/.test(hinweis)) throw new Error('kein Hinweis auf den höchsten Grad: ' + hinweis);
+  $('go-again').onclick();
+  const jetzt = G('S').players.find(p => p.kind === 'bot').diff;
+  if (jetzt !== 'david') throw new Error('über David hinaus erhöht: ' + jetzt);
+  console.log('       ' + hinweis);
+});
+step('Ein Spielstand ohne Rezept zeigt nur den Weg ins Menü', () => {
+  // Spielstände aus Fassungen vor „Nochmal spielen" tragen kein Rezept, und das
+  // Tutorial setzt keines – dort darf der Knopf nicht erscheinen, aber der Tipp schon.
+  const S = G('S');
+  delete S.recipe;
+  const mensch = S.players.findIndex(p => p.kind === 'human');
+  S.over = { winner: mensch, winners: [mensch], how: 'Probe', shared: false };
+  G('gameOver')();
+  if ($('go-again')) throw new Error('Knopf ohne Rezept – womit sollte er neu starten?');
+  if (!$('go-menu')) throw new Error('auch der Menüweg fehlt');
+  if (!$('ov-body').querySelector('.tip')) throw new Error('der Tipp fehlt');
+  console.log('       kein Wiederholen, Menü und Tipp da');
+  G('closeModal')();
+});
+step('Zu mehreren gibt es kein „Nochmal spielen"', () => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  [...$('setup-list').children].slice(0, 2).forEach(x => x.querySelector('[data-kind="human"]').onclick());
+  [...$('setup-list').children].slice(2).forEach(x => x.querySelector('[data-kind="bot"]').onclick());
+  $('setup-go').onclick();
+  const S = G('S');
+  if (G('humanSeats')(S).length !== 2) throw new Error('kein Spiel mit zwei Menschen');
+  G('claimVictory')(S, S.players.findIndex(p => p.kind === 'human'), 'Wirtschaftssieg (Test)');
+  let guard = 0;
+  while (!G('S').over && guard++ < 8) G('endTurn')(S);
+  G('gameOver')();
+  if ($('go-again')) throw new Error('bei zwei Menschen wird ein Reich ausgelost');
+  if (!$('ov-body').querySelector('.tip')) throw new Error('aber der Tipp fehlt');
+  console.log('       zwei Menschen: nur Menü, Tipp trotzdem da');
+  G('closeModal')();
+});
 step('Plättchenkarte: dieselbe Zivilisation mehrfach wählbar', () => {
   $('m-new').onclick();
   $('setup-mode').querySelector('[data-mode=vier]').onclick();
@@ -1604,10 +1781,11 @@ step('Zufall als Zivilisation, Fähigkeit und Startspieler', () => {
   };
   setze(0, '[data-civpick]', 'zufall');
   setze(1, '[data-civpick]', 'zufall');
-  // Bei Zufall gibt es nur Zufall oder die Grundfähigkeit
+  // Bei ausgelostem Reich gibt es nur noch den Zufall – „Grundfähigkeit" ist weg
   const abil0 = [...$('setup-list').children][0].querySelector('[data-abil]');
-  if ([...abil0.options].map(o => o.value).join() !== 'zufall,basis')
+  if ([...abil0.options].map(o => o.value).join() !== 'zufall')
     throw new Error('Fähigkeitsliste bei Zufall: ' + [...abil0.options].map(o => o.value).join());
+  if (!abil0.disabled) throw new Error('Fähigkeitsmenü bei Zufall nicht stillgelegt');
   setze(2, '[data-abil]', 'zufall');            // bekannte Zivilisation, Fähigkeit gelost
   // zwei Menschen ⇒ Startspieler steht auf Zufällig
   [...$('setup-list').children].slice(0, 2).forEach(x => x.querySelector('[data-kind="human"]').onclick());

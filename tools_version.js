@@ -55,4 +55,14 @@ sw = /const BUILD_HASH = '[^']*'/.test(sw)
   : sw.replace(/const FILES = \[/, `const BUILD_HASH = '${hash}';   // von tools_version.js\nconst FILES = [`);
 fs.writeFileSync(swPfad, sw);
 
+/* Die Kopfzeile der Übergabe nennt die Version – sonst steht dort bald eine alte. */
+const uPfad = path.join(wurzel, 'UEBERGABE.md');
+if (fs.existsSync(uPfad)) {
+  const heute = new Date();
+  const datum = `${heute.getDate()}.${heute.getMonth() + 1}.`;
+  const u = fs.readFileSync(uPfad, 'utf8')
+    .replace(/^(# Hochzeivilization — Projekt-Übergabe \(Stand )[^,]+(, `sw\.js` )v\d+\)/m,
+      `$1${datum}$2${neu})`);
+  fs.writeFileSync(uPfad, u);
+}
 console.log(`${alt} → ${neu} · BUILD_HASH ${hash} · ${dateien(sw).length} Dateien im Cache`);

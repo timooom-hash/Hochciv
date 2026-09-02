@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 28.8., `sw.js` v56)
+# Hochzeivilization — Projekt-Übergabe (Stand 2.9., `sw.js` v59)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -7,16 +7,18 @@ Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden k
 Eine **offline spielbare Web-App** eines selbstgebauten Civilization-artigen Hex-Brettspiels,
 gebaut für den Autor (deutschsprachig). Zielplattform: **iPad, über GitHub Pages zum
 Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-Engine mit
-automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Oberfläche.
+automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
+und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
 ## Wo alles liegt
 
-- **Arbeitsverzeichnis:** `/home/claude/hochciv/` — **wird bei Container-Resets geleert.**
+- **Arbeitsverzeichnis:** ein eigener Ordner unter `/home/claude/` (bisher `hochciv/`,
+  zuletzt `proj/hochzeivilization/`) — **wird bei Container-Resets geleert.**
   Zu Beginn jeder Session wiederherstellen:
   `mkdir -p /home/claude/hochciv && cd /home/claude && unzip -o -q /mnt/user-data/uploads/hochzeivilization.zip -d /home/claude/unz && cp -r /home/claude/unz/hochzeivilization/. /home/claude/hochciv/`
   (oder aus `/mnt/user-data/outputs/hochzeivilization/`, falls noch vorhanden).
   Danach `npm install jsdom --no-fund --no-audit` — für `smoke.js` und `check_single.js` nötig.
-- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (21 Dateien),
+- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (31 Dateien),
   `hochzeivilization.zip`, und `hochzeivilization-einzeldatei.html` — Letzteres ist, was der
   Autor tatsächlich aufs iPad lädt.
 - **Wichtig beim Paketieren:** `node_modules` und `package*.json` ausschließen
@@ -28,28 +30,35 @@ automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Deutsche Ob
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1097 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1176 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 50 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 313 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
-| `js/hex.js` | 108 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
+| `js/data.js` | 373 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 267 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1531 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
-| `js/expansion.js` | 515 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
+| `js/engine.js` | 1560 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/expansion.js` | 518 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1737 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 1900 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 673 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 3964 | **1153 Assertions**, `node test.js` |
-| `smoke.js` | 1956 | **94 Schritte** durch die echte UI via jsdom, `node smoke.js` |
-| `build_single.py` / `check_single.js` | 20 / 34 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
-| `tools_version.js` | 59 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
-| `tools_civs.js` | 80 | `data/civs.json` → `js/civs.js` |
-| `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 30 / 200 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
+| `test.js` | 4018 | **1172 Assertions**, `node test.js` |
+| `smoke.js` | 2134 | **104 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
+| `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
+| `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
+| `tools_civs.js` | 78 | `data/civs.json` → `js/civs.js` |
+| `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
-Weitere: `index.html`, `css/style.css`, `sw.js` (**VERSION hochzählen — zusammen mit
-`APP_VERSION` in `js/data.js`**, ein Test bindet beide aneinander), `manifest.webmanifest`,
-`icons/`, `README.md`.
+Weitere: `index.html`, `css/style.css`, `sw.js`, `manifest.webmanifest`, `icons/`,
+`README.md`, `Startplaettchen.pdf` (erzeugter Druckbogen).
+
+**Vor jedem Ausrollen `node tools_version.js`** — der Service Worker liefert cache-first,
+ohne neue `VERSION` kommt eine Änderung bei niemandem an. Das Werkzeug setzt `VERSION`,
+`APP_VERSION` und einen `BUILD_HASH` über die zwischengespeicherten Dateien; `test.js`
+rechnet den Hash nach und schlägt an, wenn Dateien geändert und die Version gleich blieb.
+**Zahlen in dieser Übergabe:** `node tools_docs.js` zieht Zeilenzahlen, Assertions und
+Smoke-Schritte nach (von Hand veralten sie zuverlässig).
 
 ## Regelheft
 
@@ -65,7 +74,9 @@ Gedächtnis rekonstruieren.
   Wachstum, Sklaverei ab Moderne obsolet (im Bogen durchgestrichen), Siegschwellen stapeln
   nicht, Bots forschen zweimal. Griechenland hat **keinen** Würfelbonus.
 - **Zivilisationsfähigkeiten:** je Reich drei zur Wahl (Grund + zwei Alternativen aus dem
-  Civs-Bogen), im Aufbau umschaltbar. **Bots erhalten keinerlei Fähigkeit.**
+  Civs-Bogen), im Aufbau umschaltbar. **Bots erhalten keinerlei Fähigkeit.** Wird das Reich
+  ausgelost, steht auch die Fähigkeit auf *Zufall* – die frühere Option „Grundfähigkeit"
+  ist in v58 entfallen, sie benannte nichts Bestimmtes.
 - **Nahrungsgrenze:** Die Nahrungsproduktion darf nicht negativ werden, Wachstum wird sonst
   blockiert — gerechnet auf dem **dauerhaften** Wert (`baseIncome`), ein Ereignis dieser
   Runde zählt nicht. Gentechnik und Massenmedien heben die Grenze auf: zu Zugbeginn öffnet
@@ -75,9 +86,20 @@ Gedächtnis rekonstruieren.
   Weg mit ihr verbunden ist, bringt +1 auf alle Erträge; bei reiner Eisenbahn +2. Gemischte
   Strecken zählen als Straße.
 - **Ereignisse** (Erweiterung, hart/leicht) mit Barbaren als neutraler Fraktion.
+  Seit v58 ein **Modul**: ab Werk aus, im Hauptmenü unter *Einstellungen* zuschaltbar.
 - **Weltwunder** (Erweiterung) mit Pyramidenregel, Kultursieg und vier eigenen Technologien
   (Baukräne, Wallfahrt, Militärlogistik, Raumfahrt). Bots bauen sie kostenlos, **ohne Effekte**
-  — einzige Ausnahme: Militärlogistik wirkt auch für Bots.
+  — einzige Ausnahme: Militärlogistik wirkt auch für Bots. Seit v58 ebenfalls ein **Modul**:
+  ab Werk aus, im Hauptmenü unter *Einstellungen* zuschaltbar.
+- **Einstellungen (v58):** eigener Bildschirm im Hauptmenü (`screen-options`), Wahl unter
+  `hochciv.opts`. Ist ein Modul aus, fehlt seine Zeile im Aufbau ganz **und sein Häkchen
+  wird gelöscht** – sonst liefe ein abgeschaltetes Modul unsichtbar weiter. Ist es an,
+  entscheidet das gewohnte Häkchen weiter je Partie.
+- **Spielende (v58):** unter dem Ergebnis steht immer ein **Spieltipp** (43 Stück in `TIPS`,
+  englisch in `DATA_EN.tips`; einer je Partie, Nummer in `S.tip` gemerkt). Allein gegen Bots
+  zusätzlich **„Nochmal spielen"**: dieselbe Aufstellung, ausgelostes Reich samt Fähigkeit,
+  nach einem Sieg eine Stufe schwerer (bei David bleibt es dabei). Grundlage ist `S.recipe`,
+  die **rohe** Aufbauwahl mit noch unaufgelöstem `zufall`.
 - **Karten:** Originalkarte (Standard), Große Karte, **Plättchenkarte** (die Zufallskarte,
   aus Dreiecken, eigene Form je Spielerzahl), eigene aus dem Editor. Der alte
   Rastergenerator (12 × 18 bzw. 12 × 8) ist in v51 **ersatzlos entfallen**, samt
@@ -150,10 +172,10 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 816 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1172 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (68 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (104 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -235,6 +257,28 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Index kommt aus `tut-count`.
 - **Gedrehte Darstellung und Media Queries** vertragen sich nicht. Neue layoutkritische
   Regeln gehören an `w-wide`/`w-side`/`w-narrow`, nicht an `@media (min-width…)`.
+- **`hidden` allein versteckt nichts, was in `style.css` ein `display` bekommt** (v58).
+  `[hidden] { display: none }` steht nur im Bogen des Browsers und verliert gegen **jede**
+  Autorenregel, auch gegen `.row { display: flex }`. Seit v58 steht deshalb ein globales
+  `[hidden] { display: none !important }` ganz oben in `style.css` — wer es entfernt, bringt
+  jede versteckte Zeile im Aufbau zurück. Achtung auch beim Testen: `el.hidden` prüft die
+  **Eigenschaft** und war die ganze Zeit korrekt, während die Zeile sichtbar blieb.
+- **`resolveRandom` zieht nur aus dem, was frei ist.** Auf den festen Karten sitzt jede
+  Zivilisation genau einmal; bei vier Reichen bleibt für einen einzelnen `zufall`-Platz
+  genau eine übrig — nämlich seine eigene alte. „Nochmal spielen" tauscht deshalb selbst
+  (ziehen aus allen vier, Halter bekommt die alte) statt `zufall` zu setzen. Wer daran
+  etwas ändert, prüft das über viele Läufe, nicht über einen: ein Zufall, der immer
+  dasselbe liefert, sieht bei einem Lauf richtig aus (`smoke.js` fährt 16).
+- **Wunderwirkungen bekommen ihre Stadt (`city`), Warteschlangen müssen sie sich merken.**
+  `applyWonderEffect(S, pi, city, w)` weiß, wo gebaut wurde — `spawnFreeArmies(S, pi)` nicht,
+  weil es auch nach jeder Armeebewegung und zu Zugbeginn läuft. Wer eine Wirkung baut, die
+  über den Bauzug hinaus nachwirkt, legt den Ort in den Spielerzustand (Vorbild:
+  `p.freeArmyCity` beim Koloss). Ein Parameter am Aufruf reicht nicht: er wirkt nur beim
+  ersten Mal. Und: Tests für ortsabhängige Wirkungen dürfen **nicht** in der Hauptstadt
+  bauen, sonst sind sie blind (genau das verdeckte den Koloss-Fehler).
+- **`S.recipe` ist die rohe Aufbauwahl, nicht die aufgelöste.** Wer dort das aufgelöste
+  `players` ablegt, macht „Nochmal spielen" zu „genau dasselbe nochmal". Die Regeln lesen
+  das Rezept nie; es gehört der Oberfläche.
 - **Tutorial-Determinismus** hängt an drei Dingen zusammen: feste Würfelfolge `TUT_DICE`,
   vorgegebene Würfe je Schritt (`dice`) und die Schienen. Ändert sich die Engine an einer
   Stelle, die Würfe verbraucht, verschiebt sich der ganze Ablauf — dann die Textstellen
@@ -372,6 +416,18 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
 - **Techbogen** markiert, welche Technologien andere MENSCHEN erforschen könnten (blass und
   gestrichelt umkringelt, gegen satt und durchgezogen für „hat sie").
 - **Versionsnummer im Hauptmenü** aus `APP_VERSION` (js/data.js).
+- **`hidden` wirkte auf Aufbauzeilen nicht** (v58): `.row { display: flex }` schlug das
+  `[hidden]` des Browsers, sichtbar an der Zeile *Ereignisstärke*, die ohne Ereignisse
+  stehen blieb. Global gelöst mit `[hidden] { display: none !important }`.
+- **„Nochmal spielen" hätte immer dasselbe Reich gegeben** (v58, vor der Auslieferung
+  gefunden): siehe „Bekannte Fragilitäten", `resolveRandom` zieht nur aus dem Freien.
+
+**Regeln**
+- **Der Koloss stellte seine Armeen in der Hauptstadt** statt in der Stadt, die ihn gebaut
+  hat (v58). `spawnFreeArmies` kannte den Bauort nicht und nahm `capitalOf`. Der Ort steht
+  jetzt als Stadt-Id in `p.freeArmyCity` — nötig, weil die zweite Armee in der
+  Warteschlange über Züge hinweg wartet. Fällt die Stadt weg, rücken sie in die Hauptstadt
+  nach. Protokoll und Zugende-Warnung nennen ebenfalls die richtige Stadt.
 
 ## Offene Punkte / bewusst nicht umgesetzt
 
