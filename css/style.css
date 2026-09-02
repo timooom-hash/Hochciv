@@ -30,6 +30,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--parchment);color
   html.turn{--safe-t:0px;--safe-b:0px;--fall:105vw}   /* gedreht ist „unten" die kurze Seite */
 }
 button,select,input{font:inherit;color:inherit}
+/* Das hidden-Attribut muss auch bei Zeilen wirken. Der Browser setzt dafür nur
+   `[hidden]{display:none}` in seinem eigenen Stilbogen – und der verliegt gegen JEDE
+   Regel von hier, egal wie unspezifisch. `.row{display:flex}` hat deshalb bisher jede
+   versteckte Zeile trotzdem gezeigt (aufgefallen an „Ereignisstärke", die ohne
+   Ereignisse sichtbar blieb, während `.hidden` im Code längst true war). */
+[hidden]{display:none !important}
 .screen{position:fixed;inset:0;display:none;flex-direction:column;padding-top:var(--safe-t)}
 .screen.show{display:flex}
 
@@ -301,6 +307,14 @@ body.blocked .actionbar{pointer-events:none;opacity:.4}
 
 /* Hinweise erscheinen oben unter der Kopfzeile. Unten würden sie die Aktionsleiste
    überlagern – man trifft dann versehentlich „Zug beenden". */
+/* Spieltipp am Spielende. Abgesetzt wie eine Randnotiz im Regelheft: eigene Fläche,
+   Linie an der Seite, ruhiger als das Ergebnis darüber – er soll auffallen, aber nicht
+   mit der Siegmeldung um Aufmerksamkeit streiten. */
+.tip{background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--red);
+  border-radius:0 9px 9px 0;padding:9px 11px;margin:14px 0 0;font-size:13px;line-height:1.5}
+.tip b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-soft);margin-bottom:3px;font-weight:600}
+
 /* Sieggruß: Papierschnipsel fallen einmal durchs Bild. Liegt über allem, fängt aber
    keine Berührungen ab, damit „Zurück zum Menü" sofort erreichbar bleibt.
    Im gedrehten Hochformat fällt es mit der App, nicht mit dem Gerät – der Kasten hängt
