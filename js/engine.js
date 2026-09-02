@@ -124,6 +124,10 @@ function newGame(cfg) {
     cities: [], armies: [], nextId: 1,
     // 1-gegen-1: nur zwei Reiche, kleinere Karte, höhere Siegschwelle
     duel: !!cfg.duel,
+    /* Die Rohwahl aus dem Aufbau, bevor „Zufall" aufgelöst wurde – die Oberfläche baut
+       daraus „Nochmal spielen" am Spielende. Liegt im Spielstand, damit das auch nach
+       einem Neuladen noch geht. Die Regeln lesen sie nie; das Tutorial setzt keine. */
+    recipe: cfg.recipe || null,
     // Erweiterungen: Ereignisse und Weltwunder werden im Aufbau zugeschaltet
     ev: cfg.events ? { mode: cfg.eventMode === 'easy' ? 'easy' : 'hard' } : null,
     wo: !!cfg.wonders,
@@ -1060,21 +1064,37 @@ function armyCost(S, pi) {
    Bezahlen – sonst sperrt der Knopf einen Kauf, den die Regel erlauben würde (genau
    dieser Fehler trat im Bürgerkrieg auf). */
 function payOpts(S, pi) { return { foodOk: evActive(S, pi, 'buergerkrieg') }; }
-/* Kostenlose Armeen (Der Koloss) erscheinen wie gebaute IN der Hauptstadt und müssen
-   sie verlassen. Weil dort nur eine Armee stehen kann, kommt die nächste erst, wenn die
-   vorige weggezogen ist – deshalb die Warteschlange p.freeArmies.
+/* Kostenlose Armeen (Der Koloss) erscheinen wie gebaute IN DER STADT, DIE DAS WUNDER
+   GEBAUT HAT, und müssen sie verlassen. Weil dort nur eine Armee stehen kann, kommt die
+   nächste erst, wenn die vorige weggezogen ist – deshalb die Warteschlange p.freeArmies.
+   Wo sie warten, steht in p.freeArmyCity (Stadt-Id): die Schlange überdauert Züge, und
+   bis sie leer ist, muss der Ort bekannt bleiben.
    Aufgerufen beim Wunderbau, nach jeder Armeebewegung und zu Zugbeginn. */
+function freeArmyCity(S, pi) {
+  const p = S.players[pi];
+  // Fällt die Stadt zwischenzeitlich weg oder wechselt den Besitzer, rücken die Armeen
+  // in die Hauptstadt nach – besser dort als gar nicht. Alte Spielstände ohne
+  // freeArmyCity landen über denselben Weg ebenfalls in der Hauptstadt.
+  const stadt = S.cities.find(c => c.id === p.freeArmyCity && c.owner === pi);
+  return stadt || capitalOf(S, pi);
+}
 function spawnFreeArmies(S, pi) {
   const p = S.players[pi];
   let n = 0;
   while ((p.freeArmies || 0) > 0) {
-    const cap = capitalOf(S, pi);
-    if (!cap || armyAt(S, cap.r, cap.c)) break;      // besetzt: die nächste wartet
-    S.armies.push({ id: S.nextId++, owner: pi, r: cap.r, c: cap.c,
+    const stadt = freeArmyCity(S, pi);
+    if (!stadt || armyAt(S, stadt.r, stadt.c)) break;      // besetzt: die nächste wartet
+    S.armies.push({ id: S.nextId++, owner: pi, r: stadt.r, c: stadt.c,
       mp: moveAllowance(S, pi), born: S.round });
     p.freeArmies--; n++;
-    log(S, 'act', T('%s: kostenlose Armee in der Hauptstadt – muss sie noch verlassen.', civOf(p).n));
+    // Städte haben keine Namen – die Hauptstadt heißt so, jede andere steht bei ihren
+    // Koordinaten, genauso wie beim Gründen im Protokoll.
+    log(S, 'act', stadt.cap
+      ? T('%s: kostenlose Armee in der Hauptstadt – muss sie noch verlassen.', civOf(p).n)
+      : T('%s: kostenlose Armee in der Stadt auf %s/%s – muss sie noch verlassen.',
+        civOf(p).n, stadt.r, stadt.c));
   }
+  if (!p.freeArmies) p.freeArmyCity = null;
   return n;
 }
 function buildArmy(S, pi, city) {
@@ -1499,8 +1519,14 @@ function blockingIssues(S, pi) {
 function pendingWarnings(S, pi) {
   const out = [];
   // Armeen in Städten stehen in blockingIssues – hier bleiben nur die weichen Hinweise.
-  if ((S.players[pi].freeArmies || 0) > 0)
-    out.push(T('Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Hauptstadt frei ist.'));
+  if ((S.players[pi].freeArmies || 0) > 0) {
+    // Gewartet wird auf die Stadt, die den Koloss gebaut hat – nicht auf die Hauptstadt.
+    const stadt = freeArmyCity(S, pi);
+    out.push(stadt && !stadt.cap
+      ? T('Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Stadt auf %s/%s frei ist.',
+        stadt.r, stadt.c)
+      : T('Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Hauptstadt frei ist.'));
+  }
   return out;
 }
 /* Schritt 4 + 5 des Zuges. Läuft für Menschen wie Bots an genau einer Stelle –

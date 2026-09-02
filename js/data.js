@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v56';
+const APP_VERSION = 'v59';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -310,3 +310,63 @@ const DUEL_UN_FRAC = 2 / 3;
 const VICTORY_LABEL = { base: '2/3', theologie: '3/5', un: '1/2' };
 const DUEL_VICTORY_LABEL = { base: '3/4', theologie: '7/10', un: '2/3' };
 const victoryLabels = duel => duel ? DUEL_VICTORY_LABEL : VICTORY_LABEL;
+
+/* ---------------------------------------------------------------- Spieltipps
+   Kurze Ratschläge zum Spielen, wörtlich aus der Tippsammlung des Autors. Sie stehen
+   am Spielende unter dem Ergebnis – dort schaut man ohnehin hin, und dort nützt ein
+   Hinweis für die nächste Partie am meisten.
+
+   Reine Anzeigetexte, keine Regeln: nichts im Code hängt an ihrem Wortlaut oder ihrer
+   Reihenfolge, und die Nummer eines Tipps hat keine Bedeutung. Englisch steht in
+   `DATA_EN.tips` an derselben Stelle der Liste – wie bei AGES und FIELDS.
+
+   Erweitern: hier eine Zeile anhängen UND eine an derselben Stelle in `DATA_EN.tips`.
+   `node test.js` prüft, dass beide Listen gleich lang und ohne Doppelte sind – eine
+   vergessene Übersetzung würde sonst still den deutschen Satz ins englische Spiel
+   tragen. Ob ein Tipp inhaltlich noch stimmt, prüft nichts: die Namen darin sind
+   Prosa, nicht Schlüssel. Wer eine Technologie umbenennt, muss hier nachsehen.       */
+const TIPS = [
+  'Es ist nicht immer korrekt durch Griechenlands Basisfähigkeit kostenlose Technologien sofort zu erforschen. Durch Philosophie kann ein späteres Forschen auch wertvoll sein.',
+  'Griechenlands Rückschau hat einen langsamen Start, aber wird zum Ende hin immer besser.',
+  'Der Schlüssel zu Griechenlands Rückschau ist es, frühestmöglich eine Technologie des Mittelalters forschen zu können.',
+  'Mit Griechenlands freier Forschung ist ein explosiver Start ein Muss.',
+  'Englands Handelsreich erlaubt hohe Flexibilität.',
+  'Mit Englands Seemacht kann das Siedeln am Meer besser sein als Binnenstädte, muss es aber nicht.',
+  'Englands Kolonisten haben nur einen Vorteil, solange es noch Platz zum Siedeln auf der Karte gibt. Plane dementsprechend.',
+  'Die kostenlose Armee der Wikinger kann sowohl offensiv als auch defensiv den entscheidenden Vorteil bringen.',
+  'Ein erfolgreicher Beutezug kann mit der entsprechenden Wikingerfähigkeit ausreichen, um einen Schneeballeffekt auszulösen.',
+  'Mit Kriegerkultur brauchen die Wikinger vor allem viele Armeen. Bedenke, dass dauerhafte Macht durch Armeen auch für die Machtreduktion zählt.',
+  'Russlands Taiga kann man entweder ausnutzen, indem man in den Wald siedelt, oder indem man zuerst alle anderen Plätze besiedelt, da der Wald für den Gegner auch weniger wert ist.',
+  'Die russischen Siedlertrecks erlauben es, in einer neu gegründeten Stadt sofort Sklaverei zu nutzen.',
+  'Mit den russischen Siedlertrecks ist es umso wichtiger, die anfänglichen Siedlungen so zu planen, dass man in späteren Runden weiter expandieren kann.',
+  'Russlands Fruchtbarkeit bringt im Allgemeinen früher größere Städte. Du solltest besonders früh nach Wachstums- und Stadttechnologien im Forschungs- und Produktionsfeld suchen.',
+  'Sklaverei bringt früh viele Münzen, kostet aber langfristig Wachstum und Effizienz. Habe besser einen Plan, wie die frühen Münzen sich auszahlen.',
+  'Keramik kann den Nachteil von Sklaverei gut ausgleichen.',
+  'Frühe Gilden und Sklaverei sorgen für schnelles Wachstum.',
+  'Du kannst in einem Zug erst die Sklaverei in allen Städten nutzen und dann die Computertechnik forschen.',
+  'Wenn mehrere Gegner häufig die Sklaverei nutzen, kann ein Wirtschaftssieg oft leichter zu erreichen sein.',
+  'Sei auf der Hut, wenn ein Nachbar Belagerungsmaschinen forschen kann.',
+  'Ein gut ausgebautes Straßennetz kann ebenso viel Einkommen bringen wie eine andere Einkommenstechnologie.',
+  'Früh Alchemie zu erforschen bringt hohe Flexibilität mit sich.',
+  'Die Wissenschaftliche Methode zahlt sich idealerweise noch im selben Zug aus.',
+  'Mit Computertechnik ist es viel einfacher, die nötige Forschung für die Singularität zu generieren.',
+  'Gilden können einen frühen Siedlungsvorsprung generieren.',
+  'Verbundwerkstoffe erlauben eine deutlich bessere Wachstumskurve.',
+  'Mit Taktik wird sowohl Defensive als auch Offensive leichter.',
+  'Technologien, die Macht günstiger machen, lohnen sich oft schon, wenn man zum ersten Mal Macht kauft.',
+  'Wenn man früh oder regelmäßig verteidigen muss, kann eine Technologie mit weniger Machtreduktion als Wirtschaftstechnologie fungieren.',
+  'Kombiniere Burgenbau und Schießpulver.',
+  'Mit Schießpulver können Armeen an Schlüsselpunkten das ganze Reich sicher halten.',
+  'Wenn du Dynamit erforschen kannst, könnte es ein guter Zeitpunkt sein, in die Offensive zu gehen.',
+  'Raketentechnik erlaubt das Angreifen und Verteidigen mehrerer Städte gleichzeitig.',
+  'Kombiniere Raketentechnik mit Schießpulver.',
+  'Kombiniere Raketentechnik mit Taktik.',
+  'Kombiniere Burgenbau mit Taktik.',
+  'Burgenbau erlaubt es dir, mit einer Stadt und Armee zu flankieren.',
+  'Atomwaffen können als defensive Gefängnisfreikarte verwendet werden.',
+  'Bürokratie ist gut für die Wirtschaft.',
+  'Kundschafterei ist im Allgemeinen nicht effizient, aber für Schlüsseltechnologien unbezahlbar.',
+  'Kartografie kann entweder für frühen Siedlungsvorsprung oder eine späte, weit entfernte Siedlung nützlich sein.',
+  'Spionage hilft extrem beim Gewinnen des Tiebreakers.',
+  'Ohne Theologie oder Vereinte Nationen wird es sehr schwierig, einen Wirtschaftssieg zu gewinnen.',
+];

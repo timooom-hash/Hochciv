@@ -866,6 +866,82 @@ function runBots() {
     else humanTurnStart();
   };
 }
+/* ------------------------------------------------------------- Nochmal spielen
+   Allein gegen Bots steht am Spielende ein zweiter, hervorgehobener Knopf: dieselbe
+   Aufstellung, aber ein ausgelostes Reich – und nach einem Sieg eine Stufe schwerer.
+   Gedacht für die Runde nach der Runde: nichts wieder einstellen, nicht dreimal
+   hintereinander dasselbe Reich, und ein Sieg zieht von selbst weiter.
+
+   Nur bei EINEM Menschen: zu mehreren gehört die Aufstellung nicht einem allein, und ein
+   ausgeloster Platz wäre eine Entscheidung über andere hinweg. Dann bleibt es beim Weg
+   über den Aufbau.                                                                     */
+// Plätze, nicht Überlebende: ein Mensch, dessen Hauptstadt gefallen ist, saß trotzdem
+// mit am Tisch. Barbaren sind eine Ereignisfraktion und kein Platz.
+const humanSeats = S => S.players
+  .map((p, i) => i).filter(i => !['bot', 'barbar'].includes(S.players[i].kind));
+// Der einzige Mensch – oder −1, wenn es mehrere sind oder kein Rezept vorliegt
+// (Tutorial und von Hand geladene Spielstände älterer Fassungen haben keines).
+function soloHuman(S) {
+  const h = humanSeats(S);
+  return (S && S.recipe && h.length === 1) ? h[0] : -1;
+}
+/* Eine Stufe schwerer. DIFFICULTIES steht von leicht nach schwer (Siedler … David):
+   weiter hinten heißt, die Bots brauchen weniger auf dem Würfel. Am Ende der Liste
+   bleibt es dabei – wir erfinden keinen Grad. */
+const nextDiff = k => {
+  const i = DIFFICULTIES.findIndex(d => d.k === k);
+  return DIFFICULTIES[Math.min(DIFFICULTIES.length - 1, (i < 0 ? 2 : i) + 1)].k;
+};
+const diffName = k => (DIFFICULTIES.find(d => d.k === k) || DIFFICULTIES[2]).n;
+// Der Aufbau setzt einen Grad für alle Plätze, gelesen wird deshalb der erste.
+const recipeDiff = rec => ((rec.players || []).find(p => p.diff) || {}).diff || 'prinz';
+
+function rematch(harder) {
+  const rec = JSON.parse(JSON.stringify(S.recipe));
+  const frei = rec.mapPick === 'plaettchen';    // dort darf ein Reich doppelt sitzen
+  rec.players.forEach((p, i) => {
+    if (harder) p.diff = nextDiff(p.diff);
+    if (p.kind !== 'human') return;
+    // Ausgelostes Reich – und damit auch eine ausgeloste Fähigkeit.
+    p.ability = 'zufall';
+    if (frei) { p.civ = 'zufall'; return; }     // freie Auslosung erledigt startFromRecipe
+    /* Auf den festen Karten sitzt jede Zivilisation genau einmal. Ein simples „Zufall"
+       hilft hier nicht: die Auslosung nimmt nur, was noch frei ist, und bei vier Reichen
+       ist das genau das eigene alte – man bekäme jedes Mal dasselbe. Deshalb wird hier
+       wirklich getauscht: gezogen wird aus allen vier, und wer das gezogene Reich hatte,
+       übernimmt das alte des Menschen. Die Reiche bleiben damit paarweise verschieden. */
+    const alle = CIVS.map(c => c.k);
+    const gezogen = alle[Math.floor(Math.random() * alle.length)];
+    const vorher = p.civ;
+    const halter = rec.players.find((q, j) => j !== i && q.civ === gezogen);
+    if (halter) halter.civ = vorher;
+    p.civ = gezogen;
+  });
+  startFromRecipe(rec);
+}
+function startFromRecipe(rec) {
+  const frei = rec.mapPick === 'plaettchen';       // dort darf ein Reich doppelt sitzen
+  const players = nameDoubles(resolveRandom(JSON.parse(JSON.stringify(rec.players)), frei));
+  const cfg = {
+    players, duel: rec.mode === 'duell', recipe: rec,
+    startPlayer: rec.start === 'zufall' ? Math.floor(Math.random() * players.length)
+      : Math.min(players.length - 1, Math.max(0, +rec.start || 0)),
+    events: rec.events, eventMode: rec.eventMode, wonders: rec.wonders,
+  };
+  // Vom alten Spiel darf nichts stehen bleiben: gesperrtes Bot-Blatt, offenes Fenster,
+  // die Schnipsel des letzten Sieges. endTutorialPanel setzt ui zurück, auch botLock.
+  endTutorialPanel();
+  $('sheet').classList.remove('locked');
+  closeModal(); closeSheet();
+  const schnipsel = $('confetti'); if (schnipsel) schnipsel.remove();
+  // Plättchenkarte: erst legen alle ihr Startdreieck neu, dann beginnt das Spiel.
+  if (frei) return startPlacement(cfg);
+  cfg.map = rec.mapPick === 'eigene' ? (customMap || DEFAULT_MAP)
+    : (MAPS[+rec.mapPick] || DEFAULT_MAP);
+  S = newGame(cfg);
+  startGameScreen();
+}
+
 function gameOver() {
   const o = S.over, w = o.winner;
   const namen = (o.winners || [w]).map(i => civOf(S.players[i]).n).join(T(' und '));
@@ -883,9 +959,32 @@ function gameOver() {
         ? `<p class="sub">${T('Gleichstand nach Punkten – bei Gleichstand geht der Sieg an den Menschen.')}</p>`
         : '');
   }
+  /* Ein Tipp fürs nächste Mal, gewonnen oder verloren. Gelost wird EINMAL je Partie und
+     im Spielstand gemerkt: gameOver() wird aus mehreren Wegen aufgerufen (Zugende,
+     Bot-Fenster, Forschen, ein neu geladener beendeter Spielstand), und ein bei jedem
+     Aufruf anderer Tipp sähe wie ein Fehler aus. */
+  if (S.tip == null) { S.tip = Math.floor(Math.random() * TIPS.length); saveGame(); }
+  const tipp = `<p class="tip"><b>${T('Tipp')}</b>${esc(TIPS[S.tip % TIPS.length])}</p>`;
+  /* Allein gegen Bots: „Nochmal spielen" vor und über dem Weg ins Menü – der häufigere
+     Wunsch nach einer Partie ist die nächste Partie. */
+  const mensch = soloHuman(S);
+  const gewonnen = mensch >= 0 && (o.winners || [w]).includes(mensch);
+  let nochmal = '';
+  if (mensch >= 0) {
+    const alt = recipeDiff(S.recipe), neu = gewonnen ? nextDiff(alt) : alt;
+    const sub = !gewonnen
+      ? T('Dieselben Einstellungen, ausgelostes Reich, Schwierigkeit %s.', diffName(alt))
+      : neu !== alt
+        ? T('Dieselben Einstellungen, ausgelostes Reich – und eine Stufe schwerer: %s.', diffName(neu))
+        : T('Dieselben Einstellungen, ausgelostes Reich. Schwerer als %s geht es nicht.', diffName(alt));
+    nochmal = `<button class="btn primary wide" id="go-again">${T('Nochmal spielen')}</button>
+      <p class="sub" style="margin:6px 2px 0;text-align:center">${sub}</p>`;
+  }
   modal(T('Spielende'), `<p style="font-family:var(--serif);font-size:22px;margin:0 0 6px">
-    ${titel}</p><p class="sub">${o.how}</p>${tafel}
-    <button class="btn wide" onclick="store('hochciv.save',null);location.reload()">${T('Zurück zum Menü')}</button>`);
+    ${titel}</p><p class="sub">${o.how}</p>${tafel}${tipp}${nochmal}
+    <button class="btn wide" id="go-menu">${T('Zurück zum Menü')}</button>`);
+  if ($('go-again')) $('go-again').onclick = () => rematch(gewonnen);
+  $('go-menu').onclick = () => { store('hochciv.save', null); location.reload(); };
   confetti(civOf(S.players[w]).color);
 }
 /* Kleiner Sieggruß: ein paar Papierschnipsel, die einmal durchs Bild fallen.
@@ -1101,6 +1200,50 @@ function humanTurnStart() {
   else if (freePick(p)) freePickModal();
 }
 
+/* ------------------------------------------------ Einstellungen: Erweiterungsmodule
+   Ereignisse und Weltwunder sind Erweiterungen des Grundspiels. Ab Werk sind beide AUS
+   und tauchen im Aufbau überhaupt nicht auf – wer das erste Mal spielt, wird nicht nach
+   Regeln gefragt, die er noch nicht kennt. Eingeschaltet erscheint je Modul die bekannte
+   Zeile im Aufbau und entscheidet weiterhin je Partie: das Modul macht die Wahl
+   verfügbar, es trifft sie nicht.
+
+   Die Wahl gilt geräteweit und bleibt gespeichert. Sie ändert am Spiel selbst nichts:
+   ein Spiel mit abgeschalteten Modulen läuft genau wie eines, in dem beide Häkchen
+   fehlen – die Vorgabe im Aufbau war schon immer „ohne\".                             */
+const MODULES = [
+  { k: 'ereignisse', box: 'opt-events', row: 'setup-events-row', flag: 'setup-events' },
+  { k: 'wunder', box: 'opt-wonders', row: 'setup-wonders-row', flag: 'setup-wonders' },
+];
+const OPT_KEY = 'hochciv.opts';
+const modules = { ereignisse: false, wunder: false };
+function loadModules() {
+  const o = load(OPT_KEY) || {};
+  MODULES.forEach(m => { modules[m.k] = !!o[m.k]; });
+}
+function optionsScreen() {
+  MODULES.forEach(m => {
+    const box = $(m.box);
+    box.checked = !!modules[m.k];
+    box.onchange = () => {
+      modules[m.k] = box.checked;
+      store(OPT_KEY, modules);
+    };
+  });
+}
+/* Zeilen abgeschalteter Module aus dem Aufbau nehmen – und ihr Häkchen löschen. Ohne das
+   Löschen könnte ein Modul, das jemand einmal eingeschaltet und angehakt hat, nach dem
+   Abschalten unsichtbar weiterlaufen: die Zeile wäre weg, das Häkchen noch gesetzt. */
+function applyModules() {
+  MODULES.forEach(m => {
+    const on = !!modules[m.k];
+    if (!on) $(m.flag).checked = false;
+    $(m.row).hidden = !on;
+  });
+  evmodeRow();
+}
+// Die Ereignisstärke gehört zu den Ereignissen und hängt an deren Häkchen.
+function evmodeRow() { $('setup-evmode-row').hidden = !$('setup-events').checked; }
+
 /* ------------------------------------------------------------------ Aufbau */
 // 'vier' = alle vier Reiche, 'drei' = drei Reiche, 'duell' = 1 gegen 1
 let setupMode = 'vier';
@@ -1143,9 +1286,9 @@ function setupScreen() {
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
     `<option value="${x.k}"${x.k === 'prinz' ? ' selected' : ''}>${x.n}</option>`).join('');
-  const evBox = $('setup-events');
-  evBox.onchange = () => { $('setup-evmode-row').hidden = !evBox.checked; };
-  $('setup-evmode-row').hidden = !evBox.checked;
+  $('setup-events').onchange = evmodeRow;
+  // Erweiterungsmodule: was in den Einstellungen aus ist, steht hier nicht zur Wahl
+  applyModules();
   // Der gewählte Modus bleibt erhalten, wenn man den Aufbau erneut öffnet
   $('setup-mode').querySelectorAll('[data-mode]').forEach(b =>
     b.classList.toggle('on', b.dataset.mode === setupMode));
@@ -1180,10 +1323,13 @@ function renderSlots() {
   chosen.forEach((civKey, i) => {
     const zufall = civKey === 'zufall';
     const civ = zufall ? null : CIV_BY_KEY[civKey];
-    // Bei Zufall stehen die Fähigkeiten der Zivilisation noch nicht fest: dann gibt es
-    // nur Zufall oder die Grundfähigkeit.
+    /* Bei ausgeloster Zivilisation stehen ihre Fähigkeiten noch nicht fest – dann bleibt
+       auch bei der Fähigkeit nur der Zufall. Eine Zeile „Grundfähigkeit" gab es hier
+       früher; sie ist ersatzlos weg. Sie benannte nichts: die Grundfähigkeit heißt bei
+       jedem Reich anders und wirkt anders (Günstige Forschung, Handelsreich, Taiga,
+       Seefahrer), und welche man bekommt, entscheidet erst die Auslosung. */
     const abils = zufall
-      ? [{ k: 'zufall', n: T('Zufall') }, { k: 'basis', n: T('Grundfähigkeit') }]
+      ? [{ k: 'zufall', n: T('Zufall') }]
       : civ.abilities.map((a, j) => ({ k: a.k, n: j === 0 ? a.n : T('Alternative %s: %s', j + 1, a.n), e: a.e }))
         .concat([{ k: 'zufall', n: T('Zufall'), e: T('Wird beim Spielstart ausgelost.') }]);
     const d = document.createElement('div');
@@ -1211,7 +1357,9 @@ function renderSlots() {
     const note = d.querySelector('.abil');
     const paint = () => {
       const kind = d.querySelector('[data-kind].on').dataset.kind;
-      sela.disabled = kind === 'bot';
+      // Bots haben keine Fähigkeit, und bei ausgelostem Reich gibt es nur den Zufall –
+      // beides ist keine Wahl, also steht das Menü still.
+      sela.disabled = kind === 'bot' || zufall;
       const a = abils.find(x => x.k === sela.value) || abils[0];
       note.textContent = kind === 'bot' ? T('Bots erhalten keine Zivilisationsfähigkeit.')
         : zufall ? T('Zivilisation und Fähigkeit werden beim Spielstart ausgelost.')
@@ -1249,6 +1397,18 @@ function setupConfig() {
     diff,
     ability: slot.querySelector('[data-abil]').value,
   }));
+}
+/* Rezept einer Partie: die ROHE Wahl aus dem Aufbau, „Zufall" noch nicht aufgelöst.
+   Genau das macht es wiederverwendbar – wer mit ausgeloster Zivilisation gestartet ist,
+   bekommt beim nächsten Mal eine neue. Wandert in den Spielstand (S.recipe), damit
+   „Nochmal spielen" auch nach einem Neuladen noch weiß, wie aufgesetzt war. */
+function setupRecipe(mapPick, startWahl) {
+  return {
+    mode: setupMode, mapPick, start: startWahl,
+    events: $('setup-events').checked, eventMode: $('setup-evmode').value,
+    wonders: $('setup-wonders').checked,
+    players: setupConfig(),
+  };
 }
 /* Sitzt eine Zivilisation mehrfach am Tisch, bekommen ihre Reiche römische Ziffern und
    je eine der vier Zivilisationsfarben – keine Schattierungen. Die erste behält ihre
@@ -1584,11 +1744,13 @@ function boot() {
   applyStaticLang();
   langRow();
   customMap = load('hochciv.map');
+  loadModules();
   const saved = load('hochciv.save');
   $('m-continue').hidden = !saved;
   bootTexts();
 
   $('m-new').onclick = () => { show('screen-setup'); setupScreen(); };
+  $('m-options').onclick = () => { show('screen-options'); optionsScreen(); };
   // Tutorial: geführtes Übungsspiel in der normalen Oberfläche
   $('m-tutorial').onclick = tutorialAsk;
   $('tut-prev').onclick = () => tutMove(-1);
@@ -1613,12 +1775,13 @@ function boot() {
     const duel = setupMode === 'duell';
     const pick = $('setup-map').value;
     const startWahl = $('setup-start').value;
+    const recipe = setupRecipe(pick, startWahl);
     const cfg = {
-      players, duel,
+      players, duel, recipe,
       startPlayer: startWahl === 'zufall'
         ? Math.floor(Math.random() * players.length) : +startWahl,
-      events: $('setup-events').checked, eventMode: $('setup-evmode').value,
-      wonders: $('setup-wonders').checked,
+      events: recipe.events, eventMode: recipe.eventMode,
+      wonders: recipe.wonders,
     };
     endTutorialPanel();
     // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.

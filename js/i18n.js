@@ -179,6 +179,53 @@ const DATA_EN = {
     kreml: ['The Kremlin', 'The research cost of the Singularity rises by 50 for everyone.'],
     freiheit: ['The Statue of Liberty', 'All your cities grow by 3 population for free.'],
   },
+  /* Spieltipps – dieselbe Reihenfolge wie TIPS in js/data.js, ein Eintrag je Zeile.
+     Ein Tipp mehr dort heißt: ein Tipp mehr hier. */
+  tips: [
+    'Researching free technologies immediately with Greece\u2019s base ability is not always right. With Philosophy, researching later can be valuable too.',
+    'Greece\u2019s Hindsight starts slowly but keeps getting better towards the end.',
+    'The key to Greece\u2019s Hindsight is being able to research a technology of the Middle Ages as early as possible.',
+    'With Greece\u2019s Free research, an explosive start is a must.',
+    'England\u2019s Trading empire allows for great flexibility.',
+    'With England\u2019s Sea power, settling by the sea can be better than inland cities \u2013 but it does not have to be.',
+    'England\u2019s Colonists are only an advantage while there is still room to settle on the map. Plan accordingly.',
+    'The free Viking army can make the decisive difference, both on the attack and on the defence.',
+    'With the matching Viking ability, one successful raid can be enough to set off a snowball effect.',
+    'With Warrior culture the Vikings need armies above all. Remember that permanent power from armies also counts towards the power reduction.',
+    'You can make use of Russia\u2019s Taiga either by settling in the forest, or by settling everywhere else first \u2013 the forest is worth less to your opponent as well.',
+    'Russia\u2019s Settler treks let you use Slavery in a newly founded city right away.',
+    'With Russia\u2019s Settler treks it matters all the more to plan the first settlements so that you can keep expanding in later rounds.',
+    'Russia\u2019s Fertility generally means bigger cities earlier. You should look for growth and city technologies in the research and production fields especially early on.',
+    'Slavery brings plenty of coins early but costs growth and efficiency in the long run. Better have a plan for how those early coins pay off.',
+    'Pottery makes up nicely for the drawback of Slavery.',
+    'Early Guilds and Slavery make for fast growth.',
+    'In a single turn you can first use Slavery in all your cities and then research Computing.',
+    'If several opponents use Slavery a lot, an economic victory is often easier to reach.',
+    'Be on your guard when a neighbour is able to research Siege engines.',
+    'A well-built road network can bring in as much income as another income technology.',
+    'Researching Alchemy early brings a lot of flexibility with it.',
+    'Ideally the Scientific method pays for itself in the very same turn.',
+    'With Computing it is far easier to generate the research needed for the Singularity.',
+    'Guilds can generate an early settling lead.',
+    'Composites allow for a much better growth curve.',
+    'Tactics makes both defence and offence easier.',
+    'Technologies that make power cheaper often pay off the very first time you buy power.',
+    'If you have to defend early or regularly, a technology with less power reduction can work as an economic technology.',
+    'Combine Castles with Gunpowder.',
+    'With Gunpowder, armies at key points can keep a whole empire safe.',
+    'When you can research Dynamite, it might be a good moment to go on the offensive.',
+    'Rocketry allows you to attack and defend several cities at once.',
+    'Combine Rocketry with Gunpowder.',
+    'Combine Rocketry with Tactics.',
+    'Combine Castles with Tactics.',
+    'Castles let you flank with a city and an army.',
+    'Nuclear weapons can be used as a defensive get-out-of-jail-free card.',
+    'Bureaucracy is good for the economy.',
+    'Scouting is generally not efficient, but priceless for key technologies.',
+    'Cartography can be useful either for an early settling lead or for one late, far-away settlement.',
+    'Espionage helps enormously in winning the tiebreaker.',
+    'Without Theology or the United Nations, an economic victory becomes very hard to win.',
+  ],
   tile: {
     'Weite Ebene': 'Open Plain', 'Kornkammer': 'Breadbasket', 'Flusstal': 'River Valley',
     'Hochland': 'Highland', 'Steppe': 'Steppe', 'Taiga': 'Taiga', 'Karst': 'Karst',
@@ -210,6 +257,7 @@ function snapshotGerman() {
     event: Object.fromEntries(Object.values(EVENT_BY_KEY).map(e => [e.k, pair(e)])),
     wonder: Object.fromEntries(WONDERS.map(w => [w.k, pair(w)])),
     tile: Object.fromEntries(TILE_POOL.map(t => [t.n, t.n])),
+    tips: TIPS.slice(),
   };
 }
 /* Schreibt die Texte der gewählten Sprache in die Spielobjekte. */
@@ -233,6 +281,8 @@ function applyDataLang() {
   set(SINGULARITY, D.tech.singularitaet);
   Object.values(EVENT_BY_KEY).forEach(e => set(e, D.event[e.k]));
   WONDERS.forEach(w => set(w, D.wonder[w.k]));
+  // Spieltipps: reine Anzeigetexte, Zuordnung über die Position in der Liste
+  D.tips.forEach((n, i) => { if (n) TIPS[i] = n; });
   // Plättchennamen: Schlüssel ist der deutsche Name, deshalb über den Vorrat gehen
   TILE_POOL.forEach((t, i) => {
     if (!t.de) t.de = t.n;
@@ -256,6 +306,17 @@ const UI_EN = {
   'Karte bearbeiten': 'Edit map',
   'Regeln & Technologien': 'Rules & technologies',
   'Spielstand laden': 'Load save',
+
+  /* --- Einstellungen (Erweiterungsmodule) */
+  'Einstellungen': 'Settings',
+  'Erweiterungsmodule sind ab Werk aus: der Aufbau zeigt dann nur, was jedes Spiel braucht. Eingeschaltet erscheint das Modul im Aufbau als eigene Zeile und bleibt dort je Partie an- und abwählbar.':
+    'Expansion modules are off out of the box, so the setup screen only shows what every game needs. Switch one on and it appears in the setup screen as a row of its own, still to be chosen per game.',
+  'Modul: Ereignisse': 'Module: events',
+  'Zu Rundenbeginn wird ein Ereignis gewürfelt – Pest, Dürre, Barbareninvasion und weitere. Trifft nur Menschen, nie Bots.':
+    'At the start of each round an event is rolled – plague, drought, barbarian invasion and more. Only affects humans, never bots.',
+  'Modul: Weltwunder': 'Module: wonders',
+  'Städte können Weltwunder bauen, vier zusätzliche Technologien kommen in den Bogen. Ein Weltwunder der Stufe 3 gewinnt das Spiel.':
+    'Cities can build wonders, and four extra technologies join the sheet. A level 3 wonder wins the game.',
 
   /* --- Aufbau */
   'Aufbau': 'Setup',
@@ -282,7 +343,6 @@ const UI_EN = {
   'Zufall': 'Random',
   'Zufällig': 'Random',
   'Zufällige Zivilisation': 'Random civilisation',
-  'Grundfähigkeit': 'Base ability',
   'Zivilisation': 'Civilisation',
   'Platz %s': 'Seat %s',
   'Alternative %s: %s': 'Alternative %s: %s',
@@ -377,6 +437,7 @@ const UI_EN = {
   '%s: keine Stadt außer der Hauptstadt – kein Vulkan.': '%s: no city besides the capital – no volcano.',
   '%s: keine Stadt außer der Hauptstadt – keine Invasion.': '%s: no city besides the capital – no invasion.',
   '%s: kostenlose Armee in der Hauptstadt – muss sie noch verlassen.': '%s: free army in the capital – it still has to leave.',
+  '%s: kostenlose Armee in der Stadt auf %s/%s – muss sie noch verlassen.': '%s: free army in the city at %s/%s – it still has to leave.',
   '%s: kostenloses Wachstum (%s) nicht möglich – Nahrungsgrenze.': '%s: free growth (%s) not possible – food limit.',
   '%s: neue Armee in der Hauptstadt.': '%s: new army in the capital.',
   '%s: nächste Runde doppelte Erträge (Taj Mahal).': '%s: double yields next round (Taj Mahal).',
@@ -412,6 +473,7 @@ const UI_EN = {
   'Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.': 'Dark Age: no research is possible this round.',
   'Eine Armee steht noch in einer Stadt – sie muss erst herausziehen.': 'An army is still inside a city – it has to move out first.',
   'Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Hauptstadt frei ist.': 'A free army is still waiting – it arrives once the capital is clear.',
+  'Eine kostenlose Armee wartet noch – sie kommt erst, wenn die Stadt auf %s/%s frei ist.': 'A free army is still waiting – it arrives once the city at %s/%s is clear.',
   'Einkommen: %s Wissenschaft, %s Nahrung, %s Münzen.': 'Income: %s science, %s food, %s coins.',
   'Eisenbahn noch nicht erforscht.': 'Railway not researched yet.',
   'Erdbeben: Wunder (1–%s)': 'Earthquake: wonder (1–%s)',
@@ -725,6 +787,16 @@ const UI_EN = {
     'Tap the target tile',
   'Zurück zum Menü':
     'Back to the menu',
+  'Tipp':
+    'Tip',
+  'Nochmal spielen':
+    'Play again',
+  'Dieselben Einstellungen, ausgelostes Reich, Schwierigkeit %s.':
+    'Same settings, a drawn empire, difficulty %s.',
+  'Dieselben Einstellungen, ausgelostes Reich – und eine Stufe schwerer: %s.':
+    'Same settings, a drawn empire – and one step harder: %s.',
+  'Dieselben Einstellungen, ausgelostes Reich. Schwerer als %s geht es nicht.':
+    'Same settings, a drawn empire. It does not get harder than %s.',
   'alles ausgeben':
     'spend everything',
   'an':

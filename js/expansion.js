@@ -342,9 +342,12 @@ function applyWonderEffect(S, pi, city, w) {
       growFree(S, pi, city, 9, 'Angkor Wat');
       break;
     case 'koloss': {
-      // Zwei kostenlose Armeen – sie erscheinen in der Hauptstadt und müssen sie
-      // verlassen, nacheinander: auf einem Feld steht nur eine Armee.
+      /* Zwei kostenlose Armeen – sie erscheinen in DER STADT, DIE DEN KOLOSS GEBAUT HAT
+         (nicht in der Hauptstadt), und müssen sie verlassen, nacheinander: auf einem Feld
+         steht nur eine Armee. Wo sie warten, merkt sich p.freeArmyCity, weil die
+         Warteschlange über Züge hinweg bestehen bleibt. */
       p.freeArmies = (p.freeArmies || 0) + 2;
+      p.freeArmyCity = city ? city.id : null;
       log(S, 'act', `${civOf(p).n}: Der Koloss stellt zwei kostenlose Armeen.`);
       spawnFreeArmies(S, pi);
       break;
