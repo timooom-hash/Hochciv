@@ -71,39 +71,39 @@ const DATA_EN = {
     },
   },
   tech: {
-    schrift: ['Writing', 'City: +1 science'],
+    schrift: ['Writing', 'Per population: +1 science'],
     mathematik: ['Mathematics', 'Forest: +1 science'],
     astronomie: ['Astronomy', 'Sea: +1 science'],
     philosophie: ['Philosophy', '+1 when rolling for tech availability'],
     papier: ['Paper', 'Grassland: +1 science'],
     alchemie: ['Alchemy', '1:1 science → coins'],
     buchdruck: ['Printing', 'River: +1 science'],
-    universitaet: ['Universities', 'City: +1 science'],
+    universitaet: ['Universities', 'Per population: +1 science'],
     wiss_methode: ['Scientific method', 'Tech costs −2/−4/−6/−8/−10 (by age)'],
     chemie: ['Chemistry', 'Mountains: +1 science'],
     elektrizitaet: ['Electricity', 'Forest: +1 science'],
     biologie: ['Biology', 'Grassland: +1 science'],
     computertechnik: ['Computing', '1:1 coins → science'],
-    gentechnik: ['Genetic engineering', 'Use science to feed a city'],
+    gentechnik: ['Genetic engineering', 'Use science to feed the population'],
     raumfahrt: ['Spaceflight', 'One free technology with every wonder built'],
     ki: ['Artificial intelligence', 'Forest: +1 science'],
     landwirtschaft: ['Agriculture', 'Grassland: +1 food'],
     fischerei: ['Fishing', 'Sea: +1 food'],
     rad: ['The wheel', 'Roads'],
-    keramik: ['Pottery', 'Grow cities twice per round'],
+    keramik: ['Pottery', 'Grow population twice per round'],
     bewaesserung: ['Irrigation', 'Mountains: +1 food'],
     segeln: ['Sailing', 'Sea: +1 food'],
     muehlentechnik: ['Mills', 'River: +1 coin'],
     baukraene: ['Cranes', 'Wonders cost 2/4/6/8/… less'],
     gilden: ['Guilds', '1:1 coins → food'],
-    dampfmaschine: ['Steam engine', 'No coin cost for city growth'],
+    dampfmaschine: ['Steam engine', 'No coin cost for population growth'],
     eisenbahn: ['Railway', 'Railways'],
     kunstduenger: ['Fertiliser', 'Forest: +1 food'],
-    fliessband: ['Assembly line', 'City: +1 coin'],
+    fliessband: ['Assembly line', 'Per population: +1 coin'],
     verbundwerkstoffe: ['Composites', 'One extra free growth per city'],
     gruene_revolution: ['Green revolution', 'Grassland: +1 coin'],
     containerlogistik: ['Container shipping', 'Sea: +1 coin'],
-    robotik: ['Robotics', 'City: +1 coin'],
+    robotik: ['Robotics', 'Per population: +1 coin'],
     taktik: ['Tactics', 'Flanking from any two positions'],
     eisenverarbeitung: ['Ironworking', '4 coins = 1 power'],
     belagerung: ['Siege engines', '+5 attack against cities'],
@@ -113,14 +113,14 @@ const DATA_EN = {
     militaerlogistik: ['Military logistics', '+1 movement per wonder you own'],
     schiesspulver: ['Gunpowder', 'Zone of control'],
     gewehre: ['Rifles', '3 coins = 1 power'],
-    panzerschiff: ['Ironclad', 'Movement = 6, movement on and across water'],
+    panzerschiff: ['Ironclad', 'Movement = 6, movement on and across sea'],
     dynamit: ['Dynamite', 'Armies have double attack against cities'],
-    maschinengewehr: ['Machine gun', 'Cities have +2 defence per size'],
+    maschinengewehr: ['Machine gun', 'Cities: +2 defence per population'],
     panzer: ['Tanks', 'Power loss = 1/4'],
     luftwaffe: ['Air force', 'Movement = 9, ignores obstacles'],
     raketentechnik: ['Rocketry', 'Armies have one more ring of range'],
     atomwaffen: ['Nuclear weapons', 'Once per round pick a tile and its surroundings, destroying all armies there'],
-    navigation: ['Navigation', 'Movement across water'],
+    navigation: ['Navigation', 'Movement across sea'],
     demokratie: ['Democracy', 'Army cost = 4 × count'],
     wallfahrt: ['Pilgrimage', '+3 to all yields per wonder you own'],
     sklaverei: ['Slavery', 'Sacrifice city population → 10 coins · becomes obsolete in the Modern Age'],
@@ -133,7 +133,7 @@ const DATA_EN = {
     spionage: ['Espionage', 'Copy a tech (1× its cost in coins)'],
     militaergericht: ['Military tribunal', 'No population lost when conquering'],
     kolonialismus: ['Colonialism', 'Buy a tile for 5 coins'],
-    massenmedien: ['Mass media', 'Use coins to feed a city'],
+    massenmedien: ['Mass media', 'Use coins to feed the population'],
     un: ['United Nations', '>1/2 of the population to win'],
     oekologie: ['Ecology', 'Cities: +1 food per 2 population (rounded down)'],
     internet: ['Internet', 'Copy 1 tech per round'],
@@ -385,10 +385,10 @@ const UI_EN = {
   ' %s Weltwunder mit der Stadt zerstört – nicht wieder baubar.': ' %s wonders destroyed with the city – cannot be rebuilt.',
   ' %s Wissenschaft': ' %s science',
   ' und ': ' and ',
-  ' · Gleichstand, Mensch vor Bot': ' · tie, human before bot',
+  ' · Mensch vor Bot': ' · human before bot',
   ' · Weltwunder': ' · wonders',
   ' – Nahrung bleibt bei 0.': ' – food stays at 0.',
-  ' – bei Gleichstand geht der Sieg an den Menschen.': ' – on a tie the win goes to the human.',
+  ' – bei mehreren Ansprüchen geht der Sieg an den Menschen.': ' – with several claims the win goes to the human.',
   ' – die Bevölkerung kann aus Wissenschaft/Münzen versorgt werden.': ' – the population can be fed from science/coins.',
   '%s erforscht %s (%s).': '%s researches %s (%s).',
   '%s erforscht %s.': '%s researches %s.',
@@ -683,8 +683,8 @@ const UI_EN = {
     'Free research (once per round, free)',
   'Für diese Spielerzahl gibt es keine Plättchenkarte.':
     'There is no tile map for this number of players.',
-  'Gleichstand nach Punkten – bei Gleichstand geht der Sieg an den Menschen.':
-    'Tie on points – on a tie the win goes to the human.',
+  'Melden Mensch und Bot in derselben Runde einen Sieg an, gewinnt der Mensch – auch mit weniger Punkten.':
+    'If a human and a bot both claim a victory in the same round, the human wins – even with fewer points.',
   'Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)':
     'base cost + distance to the capital (via passable tiles)',
   'Hauptstadt':
@@ -933,14 +933,14 @@ const UI_EN = {
     'Research and technologies',
   'Jede Bevölkerung isst':
     'Every population eats',
-  'Kaufe <b>Fischerei</b> und <b>Eisenverarbeitung</b> (je 0).':
-    'Buy <b>fishing</b> and <b>ironworking</b> (0 each).',
-  'Kaufe <b>Stadtmauern</b> und <b>Burgenbau</b>.':
-    'Buy <b>city walls</b> and <b>castles</b>.',
+  'Forsche <b>Fischerei</b> und <b>Eisenverarbeitung</b> (je 0).':
+    'Research <b>fishing</b> and <b>ironworking</b> (0 each).',
+  'Forsche <b>Stadtmauern</b> und <b>Burgenbau</b>.':
+    'Research <b>city walls</b> and <b>castles</b>.',
   'Lass <b>beide</b> golden umrandeten Städte je einmal wachsen.':
     'Grow <b>both</b> gold-outlined cities once each.',
-  'Pflastere die vier <b>goldenen Felder</b> – je Feld antippen und <b>Straße bauen</b>.':
-    'Pave the four <b>golden tiles</b> – tap each tile and <b>build road</b>.',
+  'Baue Straßen auf den vier <b>goldenen Feldern</b> – je Feld antippen und <b>Straße bauen</b>.':
+    'Build roads on the four <b>golden tiles</b> – tap each tile and <b>build road</b>.',
   'Runde 2: exponentielles Wachstum':
     'Round 2: exponential growth',
   'Straßen: die Städte verbinden':
@@ -963,6 +963,8 @@ const UI_EN = {
     'What the bots did',
   'Willkommen':
     'Welcome',
+  'Aktionen':
+    'Actions',
   'Woher deine Ressourcen kommen':
     'Where your resources come from',
   'Zieh die Armee auf das <b>goldene Feld</b>.':
@@ -975,10 +977,10 @@ const UI_EN = {
     'Two technologies for nothing',
   'Zweimal Bevölkerung wachsen':
     'Growing population twice',
-  'Öffne <b>Forschen</b> und kaufe <b>Papier</b>.':
-    'Open <b>Research</b> and buy <b>paper</b>.',
-  'Öffne <b>Forschen</b> und kaufe <b>Schrift</b>.':
-    'Open <b>Research</b> and buy <b>writing</b>.',
+  'Öffne <b>Forschen</b> und forsche <b>Papier</b>.':
+    'Open <b>Research</b> and research <b>paper</b>.',
+  'Öffne <b>Forschen</b> und forsche <b>Schrift</b>.':
+    'Open <b>Research</b> and research <b>writing</b>.',
   'Öffne einmal das <b>Protokoll</b>.':
     'Open the <b>log</b> once.',
 
@@ -994,8 +996,8 @@ const UI_EN = {
     '<p><b>City walls</b> (3 science) give <b>every</b> one of your cities +5 defence. <b>Castles</b> (3) put an immobile, virtual army into every city: it <b>projects your power value onto the city</b> – only that makes bought power help your defence as well. You have 9 science.</p> <p>Defence is <b>1</b> right now, attack <b>5</b>. Walls alone bring you to 6 – but the bot keeps growing. That is why power follows in the next step.</p> <p><b>Why both?</b> Walls work in all cities at once, cost once and never shrink. Castles make your power count for defence without a real army having to stand next to the city – and the virtual army does not count towards the cost of further armies.</p>',
   '<p>Alle sechs Felder rund um deine Hauptstadt sind unter deiner Kontrolle und bringen dir Einkommen – sie sind gerade golden umrandet. Das Feld <i>unter</i> der Stadt bringt nichts.</p> <p>Jede weitere Stadt bringt bis zu sechs neue Felder dazu. Deshalb ist Ausbreitung wichtiger als große Einzelstädte.</p>':
     '<p>All six tiles around your capital are under your control and bring you income – they are outlined in gold right now. The tile <i>under</i> the city yields nothing.</p> <p>Every further city adds up to six new tiles. That is why spreading out matters more than large single cities.</p>',
-  '<p>Armeen ziehen <b>3 Felder</b> weit, nicht über Wasser (bis eine Technologie das ändert), nicht auf Städte und nicht auf andere Armeen. Später erhöhen Panzerschiff und Luftwaffe die Reichweite, Straßen und Eisenbahn ebenfalls.</p> <p><b>Warum auf das goldene Feld?</b> Es liegt am Rand deines Reichs in Richtung Griechenland. Dort steht die Armee als Wache: sie verteidigt die Stadt nebenan mit und blockiert später ggf. mit <b>Schießpulver</b> den Durchmarsch.</p> <p><b>So bewegst du:</b> Deine Armee steht noch <i>in</i> der Stadt, in der du sie gebaut hast. Stadt antippen → <b>Armee hier bewegen</b> → dann das goldene Zielfeld antippen. Steht eine Armee im freien Feld, heißt der Knopf <b>Diese Armee bewegen</b>. Erreichbare Felder werden hell markiert.</p>':
-    '<p>Armies move <b>3 tiles</b>, not across water (until a technology changes that), not onto cities and not onto other armies. Later the ironclad and the air force increase the range, as do roads and railways.</p> <p><b>Why onto the golden tile?</b> It lies at the edge of your empire towards Greece. There the army stands guard: it helps defend the city next to it and can later block the way through with <b>gunpowder</b>.</p> <p><b>How to move:</b> Your army is still <i>inside</i> the city where you built it. Tap the city → <b>Move army from here</b> → then tap the golden target tile. If an army stands in open terrain, the button reads <b>Move this army</b>. Reachable tiles are highlighted.</p>',
+  '<p>Armeen ziehen <b>3 Felder</b> weit, nicht über Meer (bis eine Technologie das ändert), nicht auf Städte und nicht auf andere Armeen. Später erhöhen Panzerschiff und Luftwaffe die Reichweite, Straßen und Eisenbahn ebenfalls.</p> <p><b>Warum auf das goldene Feld?</b> Es liegt am Rand deines Reichs in Richtung Griechenland. Dort steht die Armee als Wache: sie verteidigt die Stadt nebenan mit und blockiert später ggf. mit <b>Schießpulver</b> den Durchmarsch.</p> <p><b>So bewegst du:</b> Deine Armee steht noch <i>in</i> der Stadt, in der du sie gebaut hast. Stadt antippen → <b>Armee hier bewegen</b> → dann das goldene Zielfeld antippen. Steht eine Armee im freien Feld, heißt der Knopf <b>Diese Armee bewegen</b>. Erreichbare Felder werden hell markiert.</p>':
+    '<p>Armies move <b>3 tiles</b>, never across sea (until a technology changes that), never onto cities and never onto other armies. Later the ironclad and the air force raise the range, and so do roads and railways.</p> <p><b>Why that golden tile?</b> It sits on the edge of your empire facing Greece. There the army stands guard: it helps defend the city next to it and, later with <b>gunpowder</b>, can block the way through.</p> <p><b>How to move:</b> Your army is still <i>inside</i> the city where you built it. Tap the city → <b>Move army here</b> → then tap the golden target tile. Once an army stands on open ground, the button reads <b>Move this army</b>. Reachable tiles are highlighted.</p>',
   '<p>Auch die 12 Nahrung sollen nicht verfallen. Eine vierte Stadt kostet <b>9 Nahrung</b> – 6 Basiskosten bei drei bestehenden Städten plus Weg. Teuer, aber es ist die einzige Ausgabe, die dauerhaft etwas zurückgibt.</p> <p><b>Warum dieses Feld?</b> Ringsum liegen 4 × Grasland, 1 × Gebirge, 1 × Meer, das bringt <b>+7 🔬, +4 🌾, +3 🪙</b> je Runde. Es liegt südlich deiner Hauptstadt, also im Rücken – weg von der griechischen Grenze, wo gerade gekämpft wird. </p> <div class="tut-key"><b>Merke</b> Vier Städte sind fast immer besser als zwei große: jede bringt eigene Felder, wächst billiger und verteilt das Risiko. Die Basiskosten steigen zwar (1/3/6/10), aber sie sind einmalig – der Ertrag bleibt.</div>':
     '<p>The 12 food should not go to waste either. A fourth city costs <b>9 food</b> – 6 base cost with three existing cities plus the distance. Expensive, but it is the only spending that keeps paying you back.</p> <p><b>Why this tile?</b> Around it lie 4 × grassland, 1 × mountains, 1 × sea, which brings <b>+7 🔬, +4 🌾, +3 🪙</b> per round. It lies south of your capital, so at your back – away from the Greek border where the fighting is.</p> <div class="tut-key"><b>Remember</b> Four cities are almost always better than two large ones: each brings its own tiles, grows more cheaply and spreads the risk. The base cost does rise (1/3/6/10), but it is a one-off – the yield stays.</div>',
   '<p>Bots ziehen ihre Armeen nach festen Prioritäten – und <b>die eigene Hauptstadt steht ganz oben</b>, noch vor „eine begonnene Belagerung zu Ende bringen". Wer eine Armee neben ihre Hauptstadt stellt, zwingt sie zum Rückzug.</p> <p>Um die griechische Hauptstadt zu bedrohen, musst du ihren <b>Verteidigungswert von 3</b> überbieten. Dafür dienen die folgenden drei Schritte:</p> <div class="tut-calc"> <div><span><b>Belagerungsmaschinen</b> forschen (+5 Angriff gegen Städte)</span><b>2 🔬</b></div> <div><span><b>3 Macht</b> kaufen (statt 4)</span><b>12 🪙</b></div> <div><span>Armee auf das <b>goldene Feld</b> daneben ziehen</span><b>3 Bewegung</b></div> </div> <p>Danach greift deine Armee mit <b>8 statt 3</b> an – mehr als die 3, die dort stehen. Am Ende deines Zuges gewinnst du den Kampf, und Griechenlands Hauptstadt steht bei <b>Zug 1 von 2</b>: noch ein Erfolg, und sie gehört dir. Genau das zwingt den Bot, seine Armeen zurückzuholen, statt deine Stadt zu Ende zu belagern.</p> <p>Dein Vorrat geht dabei genau auf – übrig bleiben <b>1 Wissenschaft</b> und <b>4 Münzen</b>, beides brauchst du gleich noch.</p> <p><b>So kaufst du</b> Macht: unten auf <b>Macht</b> → die Menge antippen.</p> <div class="tut-key"><b>Merke</b> Angriff ist oft die billigere Verteidigung. Eine Armee an der richtigen Stelle bindet zwei gegnerische – und kostet dich weniger, als deren Angriff aufzuwiegen. Bots verteidigen ihre Hauptstadt, sobald dort ein erster Angriff durchkam; eine Armee, die bloß danebensteht, beeindruckt sie nicht.</div>':
@@ -1028,8 +1030,8 @@ const UI_EN = {
     '<p>Every city may grow once per round. The capital costs 2 food and 2 coins, the younger city only 1 each. Small cities grow more cheaply.</p> <p><b>Why both?</b> Otherwise food and coins expire. And because the cost rises with size, it is more efficient to grow many small cities evenly than one big one.</p>',
   '<p>Macht ist der Angriffswert <i>jeder</i> deiner Armeen und zählt zur Verteidigung benachbarter eigener Städte. Ein Punkt kostet dank Eisenverarbeitung <b>4 statt 5 Münzen</b>; du hast 16. Der Haken: zu Beginn jedes Zuges <b>halbiert</b> sich deine Macht (aufgerundet).</p> <p><b>Die naheliegende Rechnung.</b> Kauf dir 4 Macht, dann steht deine belagerte Stadt bei:</p> <div class="tut-calc"> <div><span>Bevölkerung der Stadt</span><b>1</b></div> <div><span>Stadtmauern</span><b>+5</b></div> <div><span>Burgenbau (virtuelle Armee = dein Machtwert)</span><b>+4</b></div> <div><span>deine Armee daneben</span><b>+4</b></div> <div class="sum"><span>Verteidigung</span><b>14</b></div> </div> <p>Das sieht solide aus – <b>6</b> stehen ohne den Kauf schon da.</p> <p><b>Und jetzt die Gegenrechnung.</b> Griechenland hat gerade <b>5</b> Machtwert – bei Bots ist das ihre Gesamtbevölkerung. Mit einer zweiten Armee, für die es jede Runde würfelt, stünde der Angriff bei <b>10</b>. Das reicht gegen 14 noch nicht.</p> <p><b>Aber der Bot steht nicht still.</b> Er würfelt jede Runde für <i>jede</i> seiner 3 Städte auf Wachstum und einmal aufs Siedeln. Läuft das gut, wächst seine Bevölkerung – und damit sein Machtwert – schon im nächsten Zug so:</p> <div class="tut-calc"> <div><span>Machtwert jetzt</span><b>5</b></div> <div><span>3 Städte wachsen je 1</span><b>+3</b></div> <div><span>eine neue Stadt gegründet</span><b>+1</b></div> <div class="sum"><span>Machtwert dann</span><b>9</b></div> <div><span>× 2 Armeen</span><b>18</b></div> </div> <div class="tut-key"><b>Merke</b> 18 gegen 14: deine vier Münzen wären verbrannt und die Stadt eine Runde später trotzdem weg. Gegen einen Gegner, der jede Runde wächst, ist reine Verteidigung ein Wettrennen, das du verlierst – seine Zahlen steigen von allein, deine nur, wenn du zahlst. <b>Kauf hier nichts.</b> Der nächste Schritt zeigt den billigeren Weg.</div>':
     '<p>Power is the attack value of <i>every</i> one of your armies and counts towards the defence of your adjacent cities. Thanks to ironworking one point costs <b>4 instead of 5 coins</b>; you have 16. The catch: at the start of every turn your power <b>halves</b> (rounded up).</p> <p><b>The obvious calculation.</b> Buy 4 power and your besieged city stands at:</p> <div class="tut-calc"> <div><span>population of the city</span><b>1</b></div> <div><span>city walls</span><b>+5</b></div> <div><span>castles (virtual army = your power value)</span><b>+4</b></div> <div><span>your army beside it</span><b>+4</b></div> <div class="sum"><span>defence</span><b>14</b></div> </div> <p>That looks solid – <b>6</b> are already there without the purchase.</p> <p><b>And now the counter-calculation.</b> Greece currently has power <b>5</b> – for bots that is their total population. With a second army, which it rolls for every round, the attack would stand at <b>10</b>. That is not yet enough against 14.</p> <p><b>But the bot does not stand still.</b> Every round it rolls for growth in <i>each</i> of its 3 cities and once for settling. If that goes well, its population – and with it its power value – grows like this as early as next turn:</p> <div class="tut-calc"> <div><span>power value now</span><b>5</b></div> <div><span>3 cities each grow by 1</span><b>+3</b></div> <div><span>one new city founded</span><b>+1</b></div> <div class="sum"><span>power value then</span><b>9</b></div> <div><span>× 2 armies</span><b>18</b></div> </div> <div class="tut-key"><b>Remember</b> 18 against 14: your four coins would be burnt and the city gone a round later anyway. Against an opponent who grows every round, pure defence is a race you lose – their numbers rise by themselves, yours only when you pay. <b>Buy nothing here.</b> The next step shows the cheaper way.</div>',
-  '<p>Mit dem <b>Rad</b> kannst du Felder pflastern. Eine Straße kostet <b>1 Münze</b> und halbiert dort die Bewegungskosten – aber der eigentliche Gewinn ist ein anderer:</p> <div class="tut-key"><b>Handelsrouten</b> Jede deiner Städte außer der Hauptstadt, die über einen <b>durchgehenden Weg</b> mit ihr verbunden ist, bringt jede Runde <b>+1 Wissenschaft, +1 Nahrung und +1 Münze</b>. Liegt auf der ganzen Strecke <b>Eisenbahn</b>, sind es <b>+2</b>. Gemischt zählt der kleinere Wert – ein einziges Straßenfeld drückt die Strecke von +2 auf +1.</div> <p>Du hast <b>4 Münzen</b> und brauchst genau <b>4</b> davon: die vier golden umrandeten Felder hängen alle drei Nebenstädte an die Hauptstadt.</p> <p>Das bringt <b>+3</b> auf jeden der drei Erträge – jede Runde, dauerhaft, für einmalig 4 Münzen. Im Forschungsbogen taucht dafür die Zeile <b>Handelsrouten</b> auf.</p>':
-    '<p>With the <b>wheel</b> you can pave tiles. A road costs <b>1 coin</b> and halves the movement cost there – but the real gain is a different one:</p> <div class="tut-key"><b>Trade routes</b> Every city of yours except the capital that is connected to it by an <b>unbroken road</b> brings <b>+1 science, +1 food and +1 coin</b> every round. If the whole route is <b>railway</b>, it is <b>+2</b>. Mixed routes count as the lower value – a single road tile pushes the route from +2 down to +1.</div> <p>You have <b>4 coins</b> and need exactly <b>4</b> of them: the four gold-outlined tiles connect all three secondary cities to the capital.</p> <p>That brings <b>+3</b> on each of the three yields – every round, permanently, for a one-off 4 coins. The line <b>trade routes</b> shows up for it in the research sheet.</p>',
+  '<p>Mit dem <b>Rad</b> kannst du auf Feldern Straßen bauen. Eine Straße kostet <b>1 Münze</b> und halbiert dort die Bewegungskosten – aber der eigentliche Gewinn ist ein anderer:</p> <div class="tut-key"><b>Handelsrouten</b> Jede deiner Städte außer der Hauptstadt, die über einen <b>durchgehenden Weg</b> mit ihr verbunden ist, bringt jede Runde <b>+1 Wissenschaft, +1 Nahrung und +1 Münze</b>. Liegt auf der ganzen Strecke <b>Eisenbahn</b>, sind es <b>+2</b>. Gemischt zählt der kleinere Wert – ein einziges Straßenfeld drückt die Strecke von +2 auf +1.</div> <p>Du hast <b>4 Münzen</b> und brauchst genau <b>4</b> davon: die vier golden umrandeten Felder hängen alle drei Nebenstädte an die Hauptstadt.</p> <p>Das bringt <b>+3</b> auf jeden der drei Erträge – jede Runde, dauerhaft, für einmalig 4 Münzen. Im Forschungsbogen taucht dafür die Zeile <b>Handelsrouten</b> auf.</p>':
+    '<p>With the <b>wheel</b> you can build roads on tiles. A road costs <b>1 coin</b> and halves the movement cost there – but the real gain is a different one:</p> <div class="tut-key"><b>Trade routes</b> Every city of yours apart from the capital that is connected to it by an <b>unbroken path</b> brings <b>+1 science, +1 food and +1 coin</b> every round. If the whole stretch is <b>railway</b>, it is <b>+2</b>. Mixed stretches count the lower value – a single road tile drops the route from +2 to +1.</div> <p>You have <b>4 coins</b> and need exactly <b>4</b>: the four gold-rimmed tiles hang all three secondary cities off the capital.</p> <p>That gives <b>+3</b> on each of the three yields – every round, permanently, for a one-off 4 coins. The yield sheet gains a <b>Trade routes</b> line for it.</p>',
   '<p>Mit dem Erforschen der Schrift hat sich das Mittelalter dieser Kategorie geöffnet. Deshalb steht jetzt <b>Papier</b> im Bogen. Es kostet 6 Wissenschaft.</p> <p><b>Warum Papier?</b> Es gibt <b>+1 Wissenschaft auf jedem Grasland</b>. Du kontrollierst 5 Grasland-Felder, das sind 5 Wissenschaft mehr in <i>jeder</i> Runde für einmalig 6. Nach zwei Runden hat es sich mehrfach bezahlt.</p>':
     '<p>Researching writing opened up the Middle Ages of this category. That is why <b>paper</b> now appears in the sheet. It costs 6 science.</p> <p><b>Why paper?</b> It gives <b>+1 science on every grassland</b>. You control 5 grassland tiles, so that is 5 more science in <i>every</i> round for a one-off 6. After two rounds it has paid for itself several times over.</p>',
   '<p>Oben rechts in der Kopfzeile stehen 🔬 Wissenschaft, 🌾 Nahrung, 🪙 Münzen und ⚔︎ Macht. So setzen sie sich in diesem Zug zusammen:</p> <table class="tut-tab"> <tr><th align="left">Quelle</th><th>🔬</th><th>🌾</th><th>🪙</th></tr> <tr><td>4 × Grasland</td><td>·</td><td>4</td><td>·</td></tr><tr><td>1 × Wald</td><td>·</td><td>1</td><td>1</td></tr><tr><td>1 × Fluss</td><td>·</td><td>1</td><td>1</td></tr> <tr><td>1 Bevölkerung</td><td>1</td><td>-1</td><td>1</td></tr> <tr class="sum"><td>Summe</td><td>1</td><td>5</td><td>3</td></tr> </table> <div class="tut-key"><b>Merke</b> Ressourcen <b>verfallen am Zugende</b>. Nur Macht bleibt liegen. Gib also alles aus. Münzen können <b>2:1</b> als Nahrung oder Wissenschaft verwendet werden.</div>':
@@ -1056,10 +1058,10 @@ const UI_EN = {
     'Research: paper',
   'Forschen: Wissenschaftliche Methode':
     'Research: scientific method',
-  'Kaufe <b>Rad</b>.':
-    'Buy the <b>wheel</b>.',
-  'Kaufe <b>Wissenschaftliche Methode</b>.':
-    'Buy the <b>scientific method</b>.',
+  'Forsche <b>Rad</b>.':
+    'Research the <b>wheel</b>.',
+  'Forsche <b>Wissenschaftliche Methode</b>.':
+    'Research the <b>scientific method</b>.',
   'Rechne nach, bevor du kaufst':
     'Do the maths before you buy',
 
@@ -1069,14 +1071,14 @@ const UI_EN = {
 
 
   /* --- Tutorial: kurze Fassung und die Frage davor */
-  '<p>Vier Reiche führen ihre Zivilisation von der Antike in die Moderne. Du spielst <b>Russland</b> (grün), drei Bots auf „David" spielen mit. Gezogen wird <b>Russland → Griechenland → England → Wikinger</b>.</p><p>Jedes Reich hat eine <b>Zivilisationsfähigkeit</b>, die im Aufbau wählbar ist – Russland etwa +1 Nahrung im Wald. Das Tutorial hält dich auf einem festen Ablauf; „Tutorial beenden" gibt jederzeit alles frei.</p>':
-    '<p>Four empires lead their civilisation from Antiquity into the Modern Age. You play <b>Russia</b> (green), three bots on “David” play along. Turn order is <b>Russia → Greece → England → Vikings</b>.</p><p>Every empire has a <b>civilisation ability</b> you can choose in setup – Russia for instance gets +1 food in forest. The tutorial keeps you on a fixed path; “End tutorial” releases everything at any time.</p>',
-  '<p>Eine Stadt erntet die <b>sechs Felder um sich herum</b>, das Feld unter ihr bringt nichts. Deshalb sind viele Städte stärker als große.</p><div class="tut-key"><b>Merke</b> Wissenschaft, Nahrung und Münzen <b>verfallen am Zugende</b> – nur Macht bleibt liegen. Gib also jede Runde alles aus. Münzen zählen <b>2:1</b> als Nahrung oder Wissenschaft.</div>':
-    '<p>A city harvests the <b>six tiles around it</b>, the tile underneath yields nothing. That is why many cities beat large ones.</p><div class="tut-key"><b>Remember</b> Science, food and coins <b>expire at the end of your turn</b> – only power carries over. So spend everything every round. Coins count <b>2:1</b> as food or science.</div>',
-  '<p>Gründen kostet <b>Basiskosten + Distanz</b> zur Hauptstadt: hier 1 + 3 = 4 Nahrung. Die Basiskosten steigen mit jeder Stadt (1/3/6/10), der Ertrag bleibt.</p>':
-    '<p>Founding costs <b>base cost + distance</b> to the capital: 1 + 3 = 4 food here. The base cost rises with every city (1/3/6/10), the yield stays.</p>',
-  '<p>Der Technologiebaum ist <b>zufällig</b>: jede Technologie steht in einer Partie nur mit 50 % Wahrscheinlichkeit zur Verfügung, ausgewürfelt beim ersten Blick ins Feld. Planen kannst du also nur grob.</p><p>Eine Technologie wirkt auf <i>jedes</i> passende Feld – Schrift gibt jeder Stadt +1 Wissenschaft.</p>':
-    '<p>The technology tree is <b>random</b>: in any given game each technology is only available with a 50 % chance, rolled the first time you look at its field. So you can only plan roughly.</p><p>A technology acts on <i>every</i> matching tile – writing gives every city +1 science.</p>',
+  '<p>Vier Reiche führen ihre Zivilisation von der Antike in die Moderne. Du spielst <b>Russland</b> (grün), die anderen drei Reiche werden von Bots gespielt. Gezogen wird <b>Russland → Griechenland → England → Wikinger</b>.</p><p>Jedes Reich hat eine <b>Zivilisationsfähigkeit</b>.</p>':
+    '<p>Four empires lead their civilisation from antiquity into the modern age. You play <b>Russia</b> (green), the other three empires are played by bots. Turn order is <b>Russia → Greece → England → Vikings</b>.</p><p>Every empire has a <b>civilisation ability</b>.</p>',
+  '<p>In deinem Zug kannst du <b>frei so viele Aktionen</b> ausführen, wie du bezahlen kannst – in beliebiger Reihenfolge und beliebig oft. Möglich sind:</p><ul class="tut-list"><li><b>Stadt gründen</b> (Nahrung)</li><li><b>Bevölkerung wachsen</b> lassen (Nahrung und Münzen)</li><li><b>Technologie forschen</b> (Wissenschaft)</li><li><b>Armee bauen</b> und <b>Armeen bewegen</b> (Münzen)</li><li><b>Macht kaufen</b> (Münzen)</li><li><b>Straßen bauen</b> (Münzen)</li></ul><p>Bezahlt wird aus Wissenschaft, Nahrung und Münzen. Die bringen dir deine Städte: eine Stadt erntet die <b>sechs Felder um sich herum</b>, das Feld unter ihr bringt nichts. Deshalb sind viele Städte stärker als große.</p><div class="tut-key"><b>Merke</b> Wissenschaft, Nahrung und Münzen <b>verfallen am Zugende</b> – nur Macht bleibt liegen. Gib also jede Runde alles aus. Münzen zählen <b>2:1</b> als Nahrung oder Wissenschaft.</div>':
+    '<p>On your turn you may take <b>as many actions as you like</b>, as long as you can pay for them – in any order and any number of times. Available actions:</p><ul class="tut-list"><li><b>Found a city</b> (food)</li><li><b>Grow population</b> (food and coins)</li><li><b>Research a technology</b> (science)</li><li><b>Build an army</b> and <b>move armies</b> (coins)</li><li><b>Buy power</b> (coins)</li><li><b>Build roads</b> (coins)</li></ul><p>You pay with science, food and coins, and those come from your cities: a city harvests the <b>six tiles around it</b>, the tile beneath it yields nothing. That is why many cities beat big ones.</p><div class="tut-key"><b>Remember</b> Science, food and coins <b>expire at the end of your turn</b> – only power carries over. So spend everything every round. Coins count <b>2:1</b> as food or science.</div>',
+  '<p>Gründen kostet <b>Basiskosten + Distanz</b> zur Hauptstadt: hier 1 + 3 = 4 Nahrung. Die Basiskosten steigen 1/3/6/10/…</p>':
+    '<p>Founding costs <b>base cost + distance</b> to your capital: here 1 + 3 = 4 food. The base cost rises 1/3/6/10/…</p>',
+  '<p>Der Technologiebaum ist <b>zufällig</b>: jede Technologie steht in einer Partie nur mit 50 % Wahrscheinlichkeit zur Verfügung. Ausgewürfelt wird immer beim Erreichen eines neuen Zeitalters. Planen kannst du also nur grob.</p>':
+    '<p>The technology tree is <b>random</b>: in any one game each technology is only available with 50 % probability. The roll happens whenever you reach a new age. So you can only plan roughly.</p>',
   '<p>Wachsen kostet je vorhandener Bevölkerung 1 Nahrung und 1 Münze. Kleine Städte wachsen also billiger als große.</p>':
     '<p>Growing costs 1 food and 1 coin per existing population. Small cities therefore grow more cheaply than large ones.</p>',
   '<p>Was jetzt übrig ist, verfällt. Danach ziehen die drei Bots.</p>':
@@ -1087,30 +1089,30 @@ const UI_EN = {
     '<p>Paper gives <b>+1 science per grassland</b>. Terrain bonuses like this act on all cities at once – which is why they pay off again with every new city.</p>',
   '<p>Dritte Stadt: 3 Basiskosten + 3 Distanz = 6 Nahrung.</p>':
     '<p>Third city: 3 base cost + 3 distance = 6 food.</p>',
-  '<p>Beide Städte wachsen – die jüngere billiger.</p><div class="tut-key"><b>Merke</b> Jede Bevölkerung isst dauerhaft 1 Nahrung. Die Nahrungsproduktion darf nie negativ werden: ist die Grenze erreicht, ist Wachstum gesperrt (verhungern kann niemand). Landwirtschaft, Kunstdünger und Bewässerung heben die Grenze.</div>':
-    '<p>Both cities grow – the younger one more cheaply.</p><div class="tut-key"><b>Remember</b> Every population permanently eats 1 food. Food production must never go negative: once the limit is reached, growth is blocked (nobody starves). Agriculture, fertiliser and irrigation raise the limit.</div>',
+  '<p>Beide Städte wachsen – die jüngere billiger.</p><div class="tut-key"><b>Merke</b> Jede Bevölkerung isst dauerhaft 1 Nahrung. Die Nahrungsproduktion darf nie negativ werden: ist die Grenze erreicht, ist Wachstum gesperrt.</div>':
+    '<p>Both cities grow – the younger one more cheaply.</p><div class="tut-key"><b>Remember</b> Every point of population permanently eats 1 food. Your food production must never go negative: once the limit is reached, growth is blocked.</div>',
   '<p>Eine Armee kostet 5 Münzen, je weitere 5 mehr. Sie erscheint <i>in</i> der Stadt und muss sie im selben Zug verlassen.</p>':
     '<p>An army costs 5 coins, every further one 5 more. It appears <i>inside</i> the city and has to leave it in the same turn.</p>',
-  '<p>Armeen ziehen 3 Felder, nicht über Wasser und nicht auf Städte.</p>':
-    '<p>Armies move 3 tiles, not across water and not onto cities.</p>',
+  '<p>Armeen ziehen 3 Felder, nicht über Meer und nicht auf Städte.</p><p><b>So bewegst du:</b> Deine Armee steht noch <i>in</i> der Stadt. Stadt antippen → <b>Armee hier bewegen</b> → dann das goldene Zielfeld antippen. Steht die Armee im freien Feld, heißt der Knopf <b>Diese Armee bewegen</b>.</p>':
+    '<p>Armies move 3 tiles, never across sea and never onto cities.</p><p><b>How to move:</b> Your army is still <i>inside</i> the city. Tap the city → <b>Move army here</b> → then tap the golden target tile. Once the army stands on open ground, the button reads <b>Move this army</b>.</p>',
   '<p>Zug beenden – die Bots ziehen.</p>':
     '<p>End the turn – the bots move.</p>',
   '<p>Die wissenschaftliche Methode senkt jede weitere Technologie um 2/4/6/8 (je Zeitalter) – nie unter 0. Sie bezahlt sich hier sofort.</p>':
     '<p>The scientific method lowers every further technology by 2/4/6/8 (by age) – never below 0. It pays for itself right here.</p>',
-  '<p>Beide kosten jetzt <b>0</b>. Was nichts kostet, nimmt man mit: jede Technologie schaltet außerdem das nächste Zeitalter ihres Feldes auf.</p>':
-    '<p>Both cost <b>0</b> now. Take what is free: every technology also opens up the next age of its field.</p>',
-  '<p>Griechenland greift deine Stadt an. So rechnet der Kampf:</p><p><b>Angriff</b> = Machtwert je angreifender Armee (Bots: ihre Gesamtbevölkerung), hier <b>5</b>. <b>Verteidigung</b> = 1 je Bevölkerung der Stadt plus der Machtwert benachbarter eigener Armeen, hier <b>1</b>.</p><div class="tut-key"><b>Merke</b> Wer <b>zwei Züge in Folge</b> stärker ist, nimmt die Stadt. Nach dem ersten Treffer steht „Zug 1/2" im Protokoll – das ist genau eine Runde Vorwarnung.</div>':
-    '<p>Greece is attacking your city. This is how combat is calculated:</p><p><b>Attack</b> = power value per attacking army (for bots that is their total population), here <b>5</b>. <b>Defence</b> = 1 per city population plus the power value of your adjacent armies, here <b>1</b>.</p><div class="tut-key"><b>Remember</b> Whoever is stronger <b>two turns in a row</b> takes the city. After the first hit the log says “turn 1/2” – that is exactly one round of warning.</div>',
+  '<p><b>Fischerei</b> und <b>Eisenverarbeitung</b> kosten jetzt <b>0</b>. Was nichts kostet, nimmt man mit: jede Technologie schaltet außerdem das nächste Zeitalter ihres Feldes auf.</p>':
+    '<p><b>Fishing</b> and <b>ironworking</b> now cost <b>0</b>. Take whatever is free: every technology also unlocks the next age of its field.</p>',
+  '<p>Griechenland hat deine Stadt angegriffen. So funktioniert der Kampf:</p><p>Immer <b>am Ende des Zuges</b> führen alle eigenen Armeen automatisch Angriffe durch. Sie greifen Städte an, die auf benachbarten Feldern liegen. Wenn der Angriff in <b>zwei aufeinanderfolgenden Zügen des Angreifers</b> erfolgreich ist, wird die Stadt erobert. Dazu muss der <b>Angriffswert höher sein als der Verteidigungswert</b>.</p><p>Der <b>Angriffswert</b> auf eine Stadt ist der Machtwert aller sie angreifenden Armeen, zusammengerechnet. Der <b>Verteidigungswert</b> ist die Stadtbevölkerung plus der Machtwert aller verteidigenden Armeen.</p>':
+    '<p>Greece has attacked your city. This is how combat works:</p><p><b>At the end of every turn</b> all of your own armies attack automatically. They attack cities on adjacent tiles. If the attack succeeds in <b>two consecutive turns of the attacker</b>, the city is captured. For that the <b>attack value must be higher than the defence value</b>.</p><p>The <b>attack value</b> against a city is the combined power of all armies attacking it. The <b>defence value</b> is the city population plus the power of all defending armies.</p>',
   '<p><b>Stadtmauern</b> geben jeder Stadt +5 Verteidigung, <b>Burgenbau</b> stellt eine unbewegliche Armee hinein, die deinen Machtwert auf die Stadt legt.</p>':
     '<p><b>City walls</b> give every city +5 defence, <b>castles</b> put an immobile army into it that projects your power value onto the city.</p>',
-  '<p>Reine Verteidigung ist ein Rennen, das du verlierst: der Machtwert der Bots ist ihre Bevölkerung und wächst jede Runde von selbst.</p><p>Billiger ist der Gegenangriff. Bots verteidigen <b>ihre eigene Hauptstadt zuerst</b> – noch vor dem Abschluss einer eigenen Belagerung. Belagerungsmaschinen (+5 gegen Städte), 3 Macht und deine Armee daneben genügen, um sie zurückzurufen.</p>':
-    '<p>Pure defence is a race you lose: a bot’s power value is its population and grows every round by itself.</p><p>The counter-attack is cheaper. Bots defend <b>their own capital first</b> – even before finishing a siege of their own. Siege engines (+5 against cities), 3 power and your army next to it are enough to call them back.</p>',
+  '<p>Um die griechische Hauptstadt zu bedrohen, musst du ihren <b>Verteidigungswert von 3</b> überbieten. Dafür dienen die folgenden drei Schritte:</p> <div class="tut-calc"> <div><span><b>Belagerungsmaschinen</b> forschen (+5 Angriff gegen Städte)</span><b>2 🔬</b></div> <div><span><b>3 Macht</b> kaufen (statt 4)</span><b>12 🪙</b></div> <div><span>Armee auf das <b>goldene Feld</b> daneben ziehen</span><b>3 Bewegung</b></div> </div> <p>Danach greift deine Armee mit <b>8 statt 3</b> an – mehr als die 3, die dort stehen.</p><p>Ein Gegenangriff auf die <b>Hauptstadt</b> ist dabei besonders lohnend: wer eine gegnerische Hauptstadt erobert, <b>gewinnt das Spiel sofort</b>. Genau deshalb ziehen Bots ihre Armeen zur eigenen Hauptstadt zurück, statt deine Stadt zu Ende zu belagern.</p>':
+    '<p>To threaten the Greek capital you have to beat its <b>defence value of 3</b>. These three steps do it:</p> <div class="tut-calc"> <div><span>research <b>siege engines</b> (+5 attack against cities)</span><b>2 🔬</b></div> <div><span>buy <b>3 power</b> (instead of 4)</span><b>12 🪙</b></div> <div><span>move your army onto the <b>golden tile</b> beside it</span><b>3 movement</b></div> </div> <p>After that your army attacks with <b>8 instead of 3</b> – more than the 3 standing there.</p><p>A counter-attack on the <b>capital</b> is especially worthwhile: capturing an enemy capital <b>wins the game immediately</b>. That is exactly why bots pull their armies back to their own capital instead of finishing the siege of your city.</p>',
   '<p>Übrige Wissenschaft verfällt – das Rad kostet genau 1 und erlaubt Straßen.</p>':
     '<p>Leftover science expires – the wheel costs exactly 1 and allows roads.</p>',
   '<p>Vierte Stadt: 6 + 3 = 9 Nahrung. Teuer, aber die einzige Ausgabe, die sich dauerhaft verzinst.</p>':
     '<p>Fourth city: 6 + 3 = 9 food. Expensive, but the only spending that keeps paying interest.</p>',
-  '<p>Eine Straße kostet 1 Münze. Der eigentliche Gewinn sind <b>Handelsrouten</b>: jede Stadt, die über einen durchgehenden Weg an der Hauptstadt hängt, bringt <b>+1 auf alle drei Erträge</b> – über durchgehende Eisenbahn +2.</p>':
-    '<p>A road costs 1 coin. The real gain are <b>trade routes</b>: every city connected to the capital by an unbroken road brings <b>+1 on all three yields</b> – via an unbroken railway +2.</p>',
+  '<p>Eine Straße kostet 1 Münze. Der eigentliche Gewinn sind <b>Handelsrouten</b>: jede Stadt, die über einen durchgehenden Weg an der Hauptstadt hängt, bringt <b>+1 auf alle drei Erträge</b> – über durchgehende Eisenbahn +2.</p><p>Straßen und Eisenbahn <b>senken außerdem die Bewegungskosten</b> auf diesen Feldern, deine Armeen kommen darüber also weiter.</p>':
+    '<p>A road costs 1 coin. The real gain are <b>trade routes</b>: every city connected to the capital by an unbroken path brings <b>+1 to all three yields</b> – over unbroken railway +2.</p><p>Roads and railways also <b>lower the movement cost</b> on those tiles, so your armies get further across them.</p>',
   '<p>Beende den Zug: die Griechen rufen ihre Armeen zur eigenen Hauptstadt zurück, die Belagerung läuft ins Leere.</p>':
     '<p>End the turn: the Greeks call their armies back to their own capital and the siege comes to nothing.</p>',
   '<p><b>Militärsieg</b> – eine gegnerische Hauptstadt erobern. Er ist der einzige Sieg, der <b>sofort</b> endet.</p><p><b>Wirtschaftssieg</b> – mehr als zwei Drittel der Weltbevölkerung (im Duell 3/4). Der Stand steht oben in der Kopfzeile.</p><p><b>Forschungssieg</b> – die <b>Singularität</b>: 100 Wissenschaft und in jedem der vier Felder mindestens eine Technologie der Moderne.</p><div class="tut-key"><b>Merke</b> Außer dem Militärsieg endet keiner sofort: Wer eine Bedingung erfüllt, <b>meldet den Sieg an</b>, die Runde wird zu Ende gespielt. Erfüllen mehrere in derselben Runde eine Bedingung, entscheiden <b>Punkte: Bevölkerung + Weltwunder + Technologien</b>. Bei Gleichstand gewinnt der Mensch vor dem Bot. Ein angemeldeter Sieg bleibt gültig, auch wenn die Bedingung später wieder wegfällt.</div>':

@@ -956,7 +956,7 @@ function gameOver() {
         <td>${x.techs}</td><td>${x.total}</td></tr>`).join('') + '</table>' +
       `<p class="sub">${o.score.map(x => `${civOf(S.players[x.pi]).n}: ${x.how}`).join(' · ')}</p>` +
       (o.tiebreak === 'mensch'
-        ? `<p class="sub">${T('Gleichstand nach Punkten – bei Gleichstand geht der Sieg an den Menschen.')}</p>`
+        ? `<p class="sub">${T('Melden Mensch und Bot in derselben Runde einen Sieg an, gewinnt der Mensch – auch mit weniger Punkten.')}</p>`
         : '');
   }
   /* Ein Tipp fürs nächste Mal, gewonnen oder verloren. Gelost wird EINMAL je Partie und
@@ -1528,6 +1528,11 @@ function placeYield(plan, seat, st) {
   const shown = shape.slots.map((_, i) => i)
     .filter(i => !isSeatSlot(plan, i) || i === seat.slot);
   const map = tileMap(plan, { show: shown, seat, o: st.o, cell: st.cell, caps: [seat.idx] });
+  /* `tileMap` führt die Hauptstädte nach PLATZ (`capitals[seat.idx]`), die Wegwerf-Partie
+     hier hat aber nur einen Spieler – und der sitzt zwangsläufig auf Platz 0. Ohne dieses
+     Umlegen fand jeder Platz außer dem ersten seine Hauptstadt nicht und bekam gar keine
+     Ertragsübersicht (gemeldet für den zweiten Menschen im Plättchenmodus). */
+  map.capitals = map.capitals[seat.idx] ? [map.capitals[seat.idx]] : [];
   const pl = st.cfg.players[seat.idx];   // st ist placeState, trägt die Aufstellung
   const T0 = newGame({ seed: 1, map, players: [{ civ: pl.civ, kind: 'human', ability: pl.ability }] });
   if (!T0.cities.length) return '';

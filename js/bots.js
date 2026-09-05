@@ -322,8 +322,8 @@ function botMoveArmy(S, pi, army) {
   const reach = reachable(army.r, army.c, army.mp,
     (r, c) => botCanEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
-  // Zielfelder: nur solche, auf denen die Armee auch anhalten darf (kein Wasser ohne
-  // Panzerschiff/Luftwaffe). Wasser bleibt als Durchgangsfeld erlaubt.
+  // Zielfelder: nur solche, auf denen die Armee auch anhalten darf (kein Meer ohne
+  // Panzerschiff/Luftwaffe). Meer bleibt als Durchgangsfeld erlaubt.
   const tiles = botOutOfCity(S, pi,
     [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c)));
   if (!tiles.length) return;
@@ -407,7 +407,7 @@ function botMoveArmy(S, pi, army) {
     const enemyCities = S.cities.filter(x => x.owner !== pi);
     if (enemyCities.length) {
       // Distanz über tatsächlich passierbares Gelände (nicht Luftlinie): der Bot kann
-      // ohne die passende Technologie nicht über Wasser, muss also außenherum.
+      // ohne die passende Technologie nicht über Meer, muss also außenherum.
       const passable = (r, c) => {
         const t = terrainAt(S, r, c);
         if (!t) return false;

@@ -736,7 +736,7 @@ function moveAllowance(S, pi) {
   // Militärlogistik (Erweiterung): jedes eigene Weltwunder gibt +1 Bewegungsweite
   return base + (has(p, 'militaerlogistik') ? wondersOf(S, pi).length : 0);
 }
-// Darf das Feld auf dem Weg durchquert werden? Navigation/Panzerschiff/Luftwaffe erlauben Wasser.
+// Darf das Feld auf dem Weg durchquert werden? Navigation/Panzerschiff/Luftwaffe erlauben Meer.
 function canPass(S, pi, r, c) {
   const p = S.players[pi];
   const t = terrainAt(S, r, c);
@@ -748,7 +748,7 @@ function canPass(S, pi, r, c) {
   if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
   return true;
 }
-// Darf die Armee auf diesem Feld anhalten? Auf Wasser nur mit Panzerschiff oder Luftwaffe,
+// Darf die Armee auf diesem Feld anhalten? Auf Meer nur mit Panzerschiff oder Luftwaffe,
 // NICHT mit bloßer Navigation (die erlaubt nur das Durchqueren).
 function canStop(S, pi, r, c) {
   if (!canPass(S, pi, r, c)) return false;
@@ -833,7 +833,7 @@ function armyReach(S, army) {
   const raw = reachable(army.r, army.c, army.mp,
     (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
-  // Felder, auf denen die Armee nicht anhalten darf (Wasser ohne Panzerschiff/Luftwaffe),
+  // Felder, auf denen die Armee nicht anhalten darf (Meer ohne Panzerschiff/Luftwaffe),
   // sind zwar durchquerbar, aber keine gültigen Zielfelder.
   const out = new Map();
   for (const [k, v] of raw) {
@@ -976,7 +976,7 @@ function growFree(S, pi, city, n, why) {
   else log(S, 'info', T('%s: kostenloses Wachstum (%s) nicht möglich – Nahrungsgrenze.', civOf(S.players[pi]).n, why));
   return done;
 }
-/* Darf der Siedlerweg über dieses Feld laufen? Land immer; Wasser nur mit Navigation,
+/* Darf der Siedlerweg über dieses Feld laufen? Land immer; Meer nur mit Navigation,
    Panzerschiff oder Luftwaffe; Vulkane nie; Felder mit gegnerischen Armeen nie
    (Regelheft: „Von gegnerischen Armeen besetzte Felder … zählen als unpassierbar"). */
 function foundPassable(S, pi, r, c) {
@@ -1474,31 +1474,39 @@ function resolveClaims(S) {
     S.claims = []; S.endRound = null;
     return false;
   }
-  // Punkte absteigend; bei gleicher Punktzahl stehen Menschen vor Bots.
+  // Punkte absteigend; bei gleicher Punktzahl stehen Menschen vor Bots. Die Tafel am
+  // Spielende zeigt ALLE Ansprüche, auch die, die gleich ausgeschlossen werden.
   const rang = c => isHumanPlayer(S.players[c.pi]) ? 0 : 1;
   const scored = live.map(c => ({ ...c, ...victoryScore(S, c.pi) }))
     .sort((a, b) => b.total - a.total || rang(a) - rang(b));
-  const best = scored[0].total;
-  const gleich = scored.filter(x => x.total === best);
-  // Gleichstand: gewinnt ein Mensch mit, gewinnen nur die Menschen. Ein Bot soll einem
-  // Menschen den Sieg nicht wegnehmen, wenn beide gleich weit gekommen sind.
-  const mitMensch = gleich.some(x => isHumanPlayer(S.players[x.pi]));
-  const winners = gleich.filter(x => !mitMensch || isHumanPlayer(S.players[x.pi]));
-  const menschRegel = mitMensch && winners.length < gleich.length;
+  /* Menschen zuerst, und zwar unabhängig von den Punkten: hat ein Mensch einen Sieg
+     angemeldet, gewinnt ein Mensch – auch mit weniger Punkten. Der Punktvergleich
+     entscheidet dann nur noch unter den Menschen. Bis v59 galt das nur bei
+     Punktgleichstand, sodass ein Bot dem Menschen den Sieg noch wegrechnen konnte,
+     obwohl beide es in derselben Runde geschafft hatten. Ohne menschlichen Anspruch
+     zählen die Punkte wie gehabt. */
+  const menschen = scored.filter(x => isHumanPlayer(S.players[x.pi]));
+  const feld = menschen.length ? menschen : scored;
+  const best = feld[0].total;
+  const winners = feld.filter(x => x.total === best);
+  /* Vermerkt wird die Regel nur, wenn sie wirklich etwas geändert hat – wenn also ein
+     Bot mit seinen Punkten gewonnen hätte oder mitgewonnen hätte. */
+  const menschRegel = menschen.length > 0 &&
+    scored.some(x => !isHumanPlayer(S.players[x.pi]) && x.total >= best);
   const namen = winners.map(x => civOf(S.players[x.pi]).n).join(T(' und '));
   const punkte = scored.map(x => `${civOf(S.players[x.pi]).n} ${x.total}`).join(', ');
   S.over = {
     winner: winners[0].pi, winners: winners.map(x => x.pi),
     how: scored.length > 1
       ? `${winners[0].how} · Punktvergleich am Rundenende: ${punkte}` +
-        (menschRegel ? T(' · Gleichstand, Mensch vor Bot') : '')
+        (menschRegel ? T(' · Mensch vor Bot') : '')
       : winners[0].how,
     score: scored, shared: winners.length > 1, tiebreak: menschRegel ? 'mensch' : null,
     round: S.round,
   };
   log(S, 'head', scored.length > 1
     ? `Rundenende: ${namen} gewinnt nach Punkten (${punkte})` +
-      (menschRegel ? T(' – bei Gleichstand geht der Sieg an den Menschen.') : '.')
+      (menschRegel ? T(' – bei mehreren Ansprüchen geht der Sieg an den Menschen.') : '.')
     : `Rundenende: ${namen} gewinnt. ${winners[0].how}`);
   return true;
 }
