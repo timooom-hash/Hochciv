@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 2.9., `sw.js` v59)
+# Hochzeivilization — Projekt-Übergabe (Stand 5.9., `sw.js` v60)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -30,18 +30,18 @@ und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1176 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1178 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 50 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 373 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 376 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 267 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1560 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1568 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 518 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1900 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
-| `js/tutorial.js` | 673 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4018 | **1172 Assertions**, `node test.js` |
+| `js/ui.js` | 1905 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/tutorial.js` | 682 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
+| `test.js` | 4066 | **1179 Assertions**, `node test.js` |
 | `smoke.js` | 2134 | **104 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
@@ -73,6 +73,10 @@ Gedächtnis rekonstruieren.
   Singularität 100, Keramik und Theologie in der Techliste, Verbundwerkstoffe = kostenloses
   Wachstum, Sklaverei ab Moderne obsolet (im Bogen durchgestrichen), Siegschwellen stapeln
   nicht, Bots forschen zweimal. Griechenland hat **keinen** Würfelbonus.
+- **Tutorial in zwei Fassungen:** die kurze filtert `kurz: false` weg und ersetzt Texte
+  über `kurz: () => …`. Seit v60 darf ein Schritt über **`tKurz`** auch einen eigenen Titel
+  für die kurze Fassung tragen (genutzt in 2/24: lang „Woher deine Ressourcen kommen",
+  kurz „Aktionen"). Ohne `tKurz` gilt ein gemeinsamer Titel.
 - **Zivilisationsfähigkeiten:** je Reich drei zur Wahl (Grund + zwei Alternativen aus dem
   Civs-Bogen), im Aufbau umschaltbar. **Bots erhalten keinerlei Fähigkeit.** Wird das Reich
   ausgelost, steht auch die Fähigkeit auf *Zufall* – die frühere Option „Grundfähigkeit"
@@ -172,7 +176,7 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1172 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1179 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (104 Schritte), inklusive
@@ -276,6 +280,15 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   `p.freeArmyCity` beim Koloss). Ein Parameter am Aufruf reicht nicht: er wirkt nur beim
   ersten Mal. Und: Tests für ortsabhängige Wirkungen dürfen **nicht** in der Hauptstadt
   bauen, sonst sind sie blind (genau das verdeckte den Koloss-Fehler).
+- **`tileMap` zählt Hauptstädte nach PLATZ, nicht nach Spieler** (`capitals[seat.idx]`),
+  weil auf Plättchenkarten dieselbe Zivilisation zweimal sitzen darf. Wer damit eine Partie
+  mit weniger Spielern baut (z. B. die Wegwerf-Partie der Ertragsvorschau), muss die
+  Indizes umlegen — `capitalSpot` liest `caps[p.slot]`, und Platz 0 ist dann der einzige,
+  der zufällig stimmt. Genau das verdeckte den Fehler bis zum zweiten Menschen.
+- **Effekttexte, die mit der Bevölkerung skalieren, müssen das sagen.** `cityPopYield` wird
+  mit der Einwohnerzahl multipliziert; „Stadt: +1 Wissenschaft" war um den Faktor der
+  Bevölkerung falsch. Seit v60 heißt es „Je Bevölkerung: …" (Schrift, Universitätswesen,
+  Fließband, Robotik, Maschinengewehr).
 - **`S.recipe` ist die rohe Aufbauwahl, nicht die aufgelöste.** Wer dort das aufgelöste
   `players` ablegt, macht „Nochmal spielen" zu „genau dasselbe nochmal". Die Regeln lesen
   das Rezept nie; es gehört der Oberfläche.
@@ -423,6 +436,13 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
   gefunden): siehe „Bekannte Fragilitäten", `resolveRandom` zieht nur aus dem Freien.
 
 **Regeln**
+- **Der Mensch gewann nur bei Punktgleichstand** (v60). Melden Mensch und Bot in derselben
+  Runde einen Sieg an, gewinnt jetzt immer der Mensch – auch mit weniger Punkten. Der
+  Punktvergleich entscheidet nur noch unter den Menschen; unter Bots wie bisher. Der alte
+  Test hielt ausdrücklich das Gegenteil fest.
+- **Im Plättchenmodus sah jeder Platz außer dem ersten keine Erträge** (v60). `tileMap`
+  führt Hauptstädte nach Platz (`capitals[seat.idx]`), die Vorschau rechnet aber auf einer
+  Partie mit einem Spieler auf Platz 0. `placeYield` legt die Hauptstadt jetzt vorher um.
 - **Der Koloss stellte seine Armeen in der Hauptstadt** statt in der Stadt, die ihn gebaut
   hat (v58). `spawnFreeArmies` kannte den Bauort nicht und nahm `capitalOf`. Der Ort steht
   jetzt als Stadt-Id in `p.freeArmyCity` — nötig, weil die zweite Armee in der

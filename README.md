@@ -53,9 +53,11 @@ derselben Runde eine Bedingung, entscheiden am Rundenende Punkte:
 
 > Punkte = Bevölkerung + Anzahl Weltwunder + Anzahl Technologien
 
-Ein Anspruch bleibt gültig, auch wenn die Bedingung später wieder wegfällt. Bei
-**Gleichstand gewinnt der Mensch** vor dem Bot; mehrere Menschen gleichauf teilen den
-Sieg. Das Spielende zeigt dann die Punktetafel.
+Ein Anspruch bleibt gültig, auch wenn die Bedingung später wieder wegfällt. Melden
+**Mensch und Bot** in derselben Runde einen Sieg an, **gewinnt der Mensch** – auch mit
+weniger Punkten; der Punktvergleich entscheidet dann nur noch unter den Menschen, und
+mehrere Menschen gleichauf teilen den Sieg. Das Spielende zeigt die Punktetafel mit allen
+Ansprüchen, auch den ausgeschlossenen.
 
 Unter dem Ergebnis steht immer ein **Spieltipp** aus der Tippsammlung – gewonnen wie
 verloren. Gezogen wird einer je Partie, er wechselt also nicht, wenn man das Fenster

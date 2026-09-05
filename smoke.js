@@ -1542,11 +1542,11 @@ step('Spielende: Punktetafel und Mensch vor Bot', () => {
   let guard = 0;
   while (!G('S').over && guard++ < 8) G('endTurn')(S);
   if (!S.over) throw new Error('das Spiel endet nicht am Rundenende');
-  if (S.over.winner !== mensch) throw new Error('bei Gleichstand gewinnt nicht der Mensch');
+  if (S.over.winner !== mensch) throw new Error('der Mensch gewinnt nicht');
   G('gameOver')();
   const txt = $('ov-body').textContent;
   if (!/Punkte/.test(txt)) throw new Error('keine Punktetafel im Spielende');
-  if (!/Gleichstand/.test(txt)) throw new Error('die Gleichstandsregel wird nicht erklärt');
+  if (!/Mensch/.test(txt)) throw new Error('die Menschenregel wird nicht erklärt');
   const zeilen = $('ov-body').querySelectorAll('table tr').length;
   if (zeilen !== 3) throw new Error('Punktetafel hat ' + zeilen + ' Zeilen statt 3 (Kopf + 2)');
   console.log('       Punktetafel mit 2 Ansprüchen, Sieg an den Menschen');

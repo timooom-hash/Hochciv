@@ -2227,3 +2227,84 @@ Das gibt es seit der Vereinheitlichung nicht mehr – `smoke.js` prüft sogar, d
 `setup-rules` **nicht** existiert. Der Abschnitt ist ersatzlos gestrichen; im Code war
 ohnehin nichts davon übrig. Was die frühere v2 ausmachte, steht als Erklärung weiter in
 `js/data.js` über `SINGULARITY_BASE` und in dieser Datei bei der Vereinheitlichung.
+
+## Zwei Fehler, eine Umbenennung, ein überarbeitetes Kurztutorial (v60)
+
+### Fehler: im Plättchenmodus sah der zweite Mensch keine Erträge
+
+Gemeldet für zwei menschliche Spieler: in der Legephase zeigte die Ertragsübersicht der
+gewählten Hauptstadt nichts an – aber nur beim zweiten Menschen.
+
+`tileMap` führt die Hauptstädte **nach Platz** (`capitals[seat.idx]`), weil auf
+Plättchenkarten dieselbe Zivilisation zweimal sitzen darf. Die Vorschau rechnet dagegen auf
+einer Wegwerf-Partie mit **einem einzigen** Spieler, und der sitzt zwangsläufig auf Platz 0.
+Für Platz 0 stimmte das zufällig; jeder weitere Platz suchte seine Hauptstadt an Index 0,
+fand `undefined`, bekam keine Stadt und damit keine Zahl. Mit einem Menschen fällt das nicht
+auf, weil der meist auf Platz 0 sitzt – deshalb kam es erst zu zweit heraus. Nachgestellt:
+
+    seat.idx=0: capitals = [{civ:'griechenland',…}]   → Ertrag {sci:1,food:2,coins:4}
+    seat.idx=1: capitals = [null,{civ:'england',…}]   → keine Ertragsübersicht
+
+`placeYield` legt die Hauptstadt des Platzes jetzt auf Index 0, bevor es die Wegwerf-Partie
+baut. Kein Eingriff in `tileMap`: dessen Zählung nach Platz ist überall sonst richtig.
+
+### Fehler: der Mensch gewann nur bei Punktgleichstand
+
+Melden Mensch und Bot in derselben Runde einen Sieg an, sollte immer der Mensch gewinnen.
+Tatsächlich entschieden zuerst die Punkte, und die Menschenregel griff nur, wenn es
+**genau gleich** stand – ein Bot mit einem Punkt mehr rechnete dem Menschen den Sieg weg.
+Auffällig wurde es im Tutorial.
+
+`resolveClaims` sortiert weiter alle Ansprüche nach Punkten (die Tafel am Spielende zeigt
+sie unverändert **alle**, auch die gleich ausgeschlossenen), wählt die Gewinner aber nur
+noch aus den Menschen, sobald einer einen Anspruch hat. Unter Bots entscheiden die Punkte
+wie bisher; ein untergegangenes Menschenreich verdrängt niemanden, weil sein Anspruch schon
+vorher verfällt. Der Vermerk `tiebreak: 'mensch'` erscheint nur, wenn die Regel wirklich
+etwas geändert hat, also ein Bot sonst gewonnen oder mitgewonnen hätte.
+
+Der Wortlaut musste mit: „Gleichstand, Mensch vor Bot" wurde zu „Mensch vor Bot", und die
+Erklärung am Spielende heißt jetzt „Melden Mensch und Bot in derselben Runde einen Sieg an,
+gewinnt der Mensch – auch mit weniger Punkten." Der alte Test hielt ausdrücklich das
+**Gegenteil** fest („die Menschenregel greift nur bei Gleichstand, nicht gegen mehr
+Punkte"); er ist jetzt der Test der neuen Regel, mit zwei Grenzfällen daneben.
+
+### Bevölkerung heißt Bevölkerung
+
+`cityPopYield` wird mit der Einwohnerzahl multipliziert. „Stadt: +1 Wissenschaft" war damit
+nicht bloß unscharf, sondern um den Faktor der Bevölkerung falsch: eine Stadt mit
+Bevölkerung 5 bekommt durch Schrift +5. Betroffen waren Schrift, Universitätswesen,
+Fließband und Robotik (jetzt „Je Bevölkerung: …") sowie Maschinengewehr, dessen
+„+2 Verteidigung/Größe" dasselbe meinte („Städte: +2 Verteidigung je Bevölkerung").
+
+Mitgezogen, weil es dieselbe Sache anders nannte als der Knopf im Spiel: Keramik und
+Dampfmaschine sprachen von „erweitern" und „Stadterweiterung", während die Aktion
+**Bevölkerung wachsen** heißt; Gentechnik und Massenmedien wollten „Stadt füttern", während
+das Nahrungsblatt „Die Bevölkerung isst" schreibt. Alle vier heißen jetzt nach der
+Bevölkerung.
+
+### Das kurze Tutorial
+
+Durchgang durch alle 24 Schritte der kurzen Fassung, nach Vorgaben des Autors. Der Kern:
+weniger Beispiel, mehr Regel. 1/24 nennt die Zivilisationsfähigkeiten nur noch, ohne
+Beispiel und ohne Hinweis auf das Tutorial selbst. 2/24 erklärt zuerst, **was man tun
+kann** – frei so viele Aktionen, wie man bezahlen kann, mit Liste – und danach, woher das
+Geld dafür kommt. 16/24 erklärt den Kampf von Grund auf statt an der Beispielrechnung
+(Zeitpunkt, Nachbarschaft, zwei Züge, Angriffs- und Verteidigungswert); 18/24 übernimmt
+umgekehrt die Beispielrechnung aus der langen Fassung und sagt dazu, **warum** die
+Hauptstadt das Ziel ist: wer sie nimmt, gewinnt sofort.
+
+Nachgeprüft, bevor der Text geschrieben wurde: `attackStacks`/`defenseStacks` stehen beide
+auf `true`, die Machtwerte mehrerer Armeen addieren sich also wirklich – die neue Formel in
+16/24 gibt `attackValue`/`defenseValue` korrekt wieder.
+
+Zwei Wortfelder wurden im ganzen Spiel geradegezogen: **Meer statt Wasser** (das einzige
+Nicht-Land-Gelände heißt „Meer"; Fluss ist Land, „Wasser" gab es als Begriff gar nicht) –
+auch in den Technologien Navigation und Panzerschiff und in den Codekommentaren. Und
+**forschen statt kaufen** in allen Forschungsaufgaben; gekauft werden weiter Macht,
+Armeen und Straßen.
+
+**Neu am Mechanismus:** ein Schritt darf über `tKurz` einen eigenen Titel für die kurze
+Fassung tragen. Nötig für 2/24: die lange Fassung ist dort weiter die Ressourcentabelle
+(„Woher deine Ressourcen kommen"), die kurze heißt „Aktionen". Ohne `tKurz` gilt weiter ein
+gemeinsamer Titel – das bleibt der Normalfall, und `node test.js` verlangt auch für `tKurz`
+eine englische Fassung.

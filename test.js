@@ -948,7 +948,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 
 /* Tech-Labels und Sortierung nach Kosten */
 {
-  eq(TECH_BY_KEY.keramik.e, 'Städte 2× pro Runde erweitern', 'Keramik hat ein eigenständiges Label');
+  eq(TECH_BY_KEY.keramik.e, 'Bevölkerung 2× pro Runde wachsen lassen', 'Keramik hat ein eigenständiges Label');
   eq(TECH_BY_KEY.verbundwerkstoffe.e, '1× zusätzliches, kostenloses Wachstum pro Stadt', 'Verbundwerkstoffe zeigt das Gratis-Wachstum');
   const prod = techsIn(1, 0).map(t => t.c);
   eq(prod, prod.slice().sort((a, b) => a - b), 'Techs sind nach Kosten sortiert');
@@ -3505,7 +3505,7 @@ function tutRun() {
     eq(S.over.shared, true, 'bei Gleichstand gewinnen beide');
     eq(S.over.winners.slice().sort(), [0, 1], 'und zwar genau diese beiden');
   }
-  // --- Gleichstand zwischen Mensch und Bot: der Mensch gewinnt
+  // --- Mensch und Bot melden beide an: der Mensch gewinnt
   {
     const S = newGame({
       seed: 77, wonders: true, startPlayer: 0,
@@ -3522,12 +3522,15 @@ function tutRun() {
     eq([0, 1, 2].map(i => victoryScore(S, i).total), [4, 4, 4], 'drei Reiche gleichauf');
     for (let i = 0; i < 4; i++) endTurn(S);
     eq(!!S.over, true, 'die Runde endet');
-    eq(S.over.winners, [1], 'bei Gleichstand gewinnt der Mensch allein');
+    eq(S.over.winners, [1], 'bei gleichen Punkten gewinnt der Mensch allein');
     eq(S.over.tiebreak, 'mensch', 'und das steht auch im Ergebnis');
     eq(S.players[S.over.winner].kind, 'human', 'der Sieger ist kein Bot');
     eq(/Mensch vor Bot/.test(S.over.how), true, 'der Ergebnistext nennt die Regel');
   }
-  // --- Der Bot gewinnt trotzdem, wenn er mehr Punkte hat
+  /* --- Der Mensch gewinnt auch gegen MEHR Punkte eines Bots.
+     Bis v59 entschieden erst die Punkte und der Mensch bekam nur den Gleichstand –
+     ein Bot konnte dem Menschen den Sieg also wegrechnen, obwohl beide es in derselben
+     Runde geschafft hatten. Gemeldet als Fehler, auch aus dem Tutorial. */
   {
     const S = newGame({
       seed: 77, wonders: true, startPlayer: 0,
@@ -3541,11 +3544,55 @@ function tutRun() {
     S.cities.forEach(c => { c.pop = 2; });
     claimVictory(S, 0, 'Forschungssieg (Singularität)');
     claimVictory(S, 1, 'Wirtschaftssieg (Test)');
-    S.players[0].techs = { rad: true, schrift: true, bronze: true };       // ein Punkt mehr
+    S.players[0].techs = { rad: true, schrift: true, bronze: true, mathematik: true };
     S.players[1].techs = { rad: true, schrift: true };
+    eq(victoryScore(S, 0).total > victoryScore(S, 1).total, true, 'der Bot hat mehr Punkte');
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq(S.over.winners, [1], 'der Mensch gewinnt trotz weniger Punkte');
+    eq(S.over.tiebreak, 'mensch', 'und die Regel steht im Ergebnis');
+    eq(S.over.score.length, 2, 'die Punktetafel nennt weiter beide Ansprüche');
+    eq(S.over.score[0].pi, 0, 'und zeigt den Bot mit seinen höheren Punkten oben');
+    eq(/Mensch vor Bot/.test(S.over.how), true, 'der Ergebnistext nennt die Regel');
+  }
+  // --- Ohne menschlichen Anspruch entscheiden weiter nur die Punkte
+  {
+    const S = newGame({
+      seed: 77, wonders: true, startPlayer: 0,
+      players: [
+        { civ: 'russland', kind: 'bot', diff: 'david' },
+        { civ: 'griechenland', kind: 'human' },
+        { civ: 'england', kind: 'bot', diff: 'david' },
+        { civ: 'wikinger', kind: 'human' },
+      ],
+    });
+    S.cities.forEach(c => { c.pop = 2; });
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    claimVictory(S, 2, 'Kultursieg (Weltwunder der Stufe 3)');
+    S.players[0].techs = { rad: true, schrift: true, bronze: true };       // ein Punkt mehr
+    S.players[2].techs = { rad: true, schrift: true };
     for (let i = 0; i < 4; i++) endTurn(S);
     eq([S.over.winner, S.over.tiebreak], [0, null],
-      'die Menschenregel greift nur bei Gleichstand, nicht gegen mehr Punkte');
+      'unter Bots gewinnen weiter die Punkte, ohne Menschenvermerk');
+  }
+  // --- Der Mensch gewinnt nicht, wenn sein Anspruch verfällt (Reich untergegangen)
+  {
+    const S = newGame({
+      seed: 77, wonders: true, startPlayer: 0,
+      players: [
+        { civ: 'russland', kind: 'bot', diff: 'david' },
+        { civ: 'griechenland', kind: 'human' },
+        { civ: 'england', kind: 'bot', diff: 'david' },
+        { civ: 'wikinger', kind: 'human' },
+      ],
+    });
+    S.cities.forEach(c => { c.pop = 2; });
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    claimVictory(S, 1, 'Wirtschaftssieg (Test)');
+    S.cities = S.cities.filter(c => c.owner !== 1);      // der Mensch hat keine Stadt mehr
+    S.players[1].dead = true;
+    for (let i = 0; i < 4; i++) endTurn(S);
+    eq([S.over.winner, S.over.tiebreak], [0, null],
+      'ein untergegangener Mensch verdrängt den Bot nicht');
   }
   // --- Zwei Menschen gleichauf: gemeinsamer Sieg, Bots bleiben draußen
   {
@@ -3753,7 +3800,7 @@ function tutRun() {
 
   // Umschalten und zurück
   setLang('en', { quiet: true });
-  eq([TECH_BY_KEY.schrift.n, TECH_BY_KEY.schrift.e], ['Writing', 'City: +1 science'],
+  eq([TECH_BY_KEY.schrift.n, TECH_BY_KEY.schrift.e], ['Writing', 'Per population: +1 science'],
     'Technologien wechseln Name und Wirkung');
   eq(TERRAIN.G.name, 'Grassland', 'Gelände wechselt');
   eq([CIVS[0].n, CIVS[0].abilities[0].n], ['Greece', 'Cheap research'], 'Zivilisation und Fähigkeit wechseln');
@@ -3835,6 +3882,7 @@ function tutRun() {
   const fehlt = [];
   TUT_STEPS.forEach((st, i) => {
     if (st.t && st.t !== 'Hochzeivilization' && T(st.t) === st.t) fehlt.push(`${i + 1} Titel`);
+    if (st.tKurz && T(st.tKurz) === st.tKurz) fehlt.push(`${i + 1} Kurztitel`);
     if (st.task && T(st.task) === st.task) fehlt.push(`${i + 1} Aufgabe`);
   });
   eq(fehlt, [], 'alle 29 Tutorialschritte haben Titel und Aufgabe auf Englisch');
@@ -3955,7 +4003,7 @@ function tutRun() {
   // Die Schlüsselpraktiken müssen in der kurzen Fassung vorkommen
   const text = kurz.map(st => laenge(st.kurz || st.html) && (typeof (st.kurz || st.html) === 'function'
     ? (st.kurz || st.html)() : (st.kurz || st.html))).join(' ');
-  [['verfallen', 'Ressourcen verfallen'], ['zwei Züge in Folge', 'Kampfsystem'],
+  [['verfallen', 'Ressourcen verfallen'], ['aufeinanderfolgenden Zügen', 'Kampfsystem'],
    ['zufällig', 'Zufall im Technologiebaum'], ['Zivilisationsfähigkeit', 'Reichsfähigkeiten'],
    ['Militärsieg', 'Siegwege'], ['Punkte', 'Punktvergleich am Rundenende']]
     .forEach(([wort, was]) => eq(text.includes(wort), true, `die kurze Fassung erklärt ${was}`));
