@@ -411,6 +411,10 @@ html.w-side .tut-scroll{min-height:0}
 .tut-calc>div>b{font-family:var(--mono);white-space:nowrap}
 .tut-calc>div.sum{border-top:1px solid var(--rule);margin-top:3px;padding-top:4px;
   font-weight:600}
+/* Aufzählung im Tutorial (die möglichen Aktionen). Enger als eine Standardliste, damit
+   sechs Punkte auf dem Telefon nicht das halbe Panel füllen. */
+.tut-list{margin:6px 0 8px;padding-left:20px;font-size:13px;line-height:1.55}
+.tut-list li{margin:1px 0}
 .tut-key{background:#f2e5cf;border:1px solid var(--rule);border-radius:9px;padding:9px 11px;
   margin:10px 0 2px;font-size:13px;line-height:1.45}
 .tut-key>b:first-child{font-family:var(--serif);display:block;font-size:12px;letter-spacing:.04em;
