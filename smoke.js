@@ -113,7 +113,7 @@ step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
     const barOn = ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].filter(id => !$(id).disabled);
     const extra = barOn.filter(id => !al.bar.includes(id));
     if (extra.length) problems.push((i + 1) + ' „' + t + '": Leiste offen: ' + extra);
-    const S = G('S'), ru = G('RU')();
+    const S = G('S');
     const spots = S.cities.map(c => [c.r, c.c])
       .concat(G('within')(G('tutCap')().r, G('tutCap')().c, 2)
         .filter(([r, c]) => G('isLand')(S, r, c) && !G('cityAt')(S, r, c)).slice(0, 3));
@@ -449,7 +449,7 @@ step('Armee bauen, in der Stadt anwählen und bewegen', () => {
   const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Armee hier bewegen/.test(x.textContent));
   if (!b) throw new Error('Armee auf dem Stadtfeld nicht anwählbar');
   b.onclick();
-  const ziel = G('neighbors')(cap.r, cap.c).find(([r, c]) => G('canEnter')(S, pi, r, c));
+  const ziel = G('neighbors')(cap.r, cap.c).find(([r, c]) => G('canPass')(S, pi, r, c));
   G('tapHex')(ziel[0], ziel[1]);
   if (army.r === cap.r && army.c === cap.c) throw new Error('Armee hat sich nicht bewegt');
   console.log('       Armee von ' + cap.r + '/' + cap.c + ' nach ' + army.r + '/' + army.c);
@@ -543,7 +543,7 @@ step('Internet: Gratiskopie im Technologiebogen', () => {
 step('Sklaverei- und Kolonialismus-Buttons erscheinen', () => {
   const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
   // Sklaverei ist ab der Moderne obsolet – für diesen Test die Moderne-Techs entfernen
-  const modern = G('TECHS_ACTIVE').filter(t => t.age === 3 && S.players[pi].techs[t.k]).map(t => t.k);
+  const modern = G('TECHS').filter(t => t.age === 3 && S.players[pi].techs[t.k]).map(t => t.k);
   modern.forEach(k => delete S.players[pi].techs[k]);
   S.players[pi].techs.sklaverei = true; S.players[pi].techs.kolonialismus = true;
   cap.pop = 3; S.players[pi].res.coins = 30;
@@ -810,7 +810,7 @@ step('Bürgerkrieg: Armee-Knopf ist mit Nahrung + Münzen bedienbar (gemeldeter 
 });
 step('Nahrungsfenster geht zu Zugbeginn von selbst auf', () => {
   frischesSpiel();
-  const S = G('S'), pi = S.cur, p = G('P')(S);
+  const S = G('S'), p = G('P')(S);
   p.techs.gentechnik = true;
   // Ausgangslage selbst herstellen: popFood hängt am Startspieler und war in etwa
   // einem von fünfzehn Läufen 0 (dann gibt es korrekterweise nichts zu entscheiden).
@@ -1300,7 +1300,6 @@ step('Technologiebogen unterscheidet bezahlbar von zu teuer (Punkt 4)', () => {
     + ' · zu teuer voll deckend, nicht verfügbar bei ' + opac('.tech.locked'));
 });
 step('Protokoll: Würfe hängen eingeklappt an der Aktionszeile (Punkt 6)', () => {
-  const S = G('S');
   const log = [
     { c: 'head', m: 'Runde 1 — England (Bot)' },
     { c: 'roll', m: '🎲 5 — Wachstum (4+)' },
@@ -1562,7 +1561,7 @@ step('Spielende zeigt immer einen Tipp aus der Sammlung', () => {
   // Ein Tipp je Partie, nicht je Aufruf: gameOver() kommt aus mehreren Wegen
   const nochmal = (G('gameOver')(), $('ov-body').querySelector('.tip').textContent);
   if (nochmal !== tip.textContent) throw new Error('der Tipp wechselt bei jedem Aufruf');
-  console.log('       „' + text.slice(0, 52) + '…\" · bleibt über mehrere Aufrufe gleich');
+  console.log('       „' + text.slice(0, 52) + '…“ · bleibt über mehrere Aufrufe gleich');
   G('closeModal')();
 });
 step('Solo: „Nochmal spielen" startet dieselbe Aufstellung mit ausgelostem Reich', () => {
@@ -1572,7 +1571,7 @@ step('Solo: „Nochmal spielen" startet dieselbe Aufstellung mit ausgelostem Rei
   if (G('humanSeats')(alt).length !== 1) throw new Error('kein Solospiel');
   if (!alt.recipe) throw new Error('kein Rezept im Spielstand');
   G('gameOver')();
-  if (!$('go-again')) throw new Error('kein „Nochmal spielen\"-Knopf');
+  if (!$('go-again')) throw new Error('kein „Nochmal spielen“-Knopf');
   if (!$('go-again').classList.contains('primary'))
     throw new Error('der Knopf ist nicht hervorgehoben');
   if (!$('go-menu')) throw new Error('kein Weg zurück ins Menü');
@@ -2127,6 +2126,16 @@ step('Karteneditor zeigt Felder außerhalb der Karte', () => {
   G('edTap')(0, 0);
   if (G('__get')('editMap').rows[0][0] !== 'G') throw new Error('X lässt sich nicht zurücknehmen');
   G('show')('screen-menu');
+});
+
+/* CIV_KEYS ist eine gemeinsame Liste, kein frisches Array je Aufruf. Der Aufbau
+   schreibt an mehreren Stellen in Schlüssellisten (Doppelungen auflösen, Auslosung) –
+   wer dort die gemeinsame Liste nimmt statt einer Kopie, verbiegt sie für die ganze
+   Sitzung. Dieser Schritt kommt zuletzt, nachdem der Aufbau vielfach gelaufen ist. */
+step('CIV_KEYS ist nach dem ganzen Durchlauf unverändert', () => {
+  const ist = G('CIV_KEYS'), soll = G('CIVS').map(c => c.k);
+  if (ist.join(',') !== soll.join(','))
+    throw new Error('CIV_KEYS wurde verändert: ' + ist.join(',') + ' statt ' + soll.join(','));
 });
 
 console.log(errors.length ? '\n' + errors.length + ' Fehler' : '\nOberfläche läuft fehlerfrei durch');

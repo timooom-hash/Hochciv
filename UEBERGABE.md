@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 5.9., `sw.js` v60)
+# Hochzeivilization — Projekt-Übergabe (Stand 7.9., `sw.js` v61)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -30,23 +30,23 @@ und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1178 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1172 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
-| `js/civs.js` | 50 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 376 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
+| `js/data.js` | 375 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
-| `js/tiles.js` | 267 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1568 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
+| `js/engine.js` | 1565 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 518 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 480 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1905 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
-| `js/tutorial.js` | 682 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4066 | **1179 Assertions**, `node test.js` |
-| `smoke.js` | 2134 | **104 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `js/bots.js` | 479 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/ui.js` | 1888 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
+| `test.js` | 4080 | **1181 Assertions**, `node test.js` |
+| `smoke.js` | 2143 | **105 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
-| `tools_civs.js` | 78 | `data/civs.json` → `js/civs.js` |
+| `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -176,10 +176,10 @@ Gedächtnis rekonstruieren.
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1179 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1181 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (104 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (105 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -280,6 +280,11 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   `p.freeArmyCity` beim Koloss). Ein Parameter am Aufruf reicht nicht: er wirkt nur beim
   ersten Mal. Und: Tests für ortsabhängige Wirkungen dürfen **nicht** in der Hauptstadt
   bauen, sonst sind sie blind (genau das verdeckte den Koloss-Fehler).
+- **`CIV_KEYS` (js/civs.js) ist EINE Liste, kein frisches Array je Aufruf.** Der Aufbau
+  schreibt an mehreren Stellen in Schlüssellisten (Doppelungen auflösen, Auslosung); wer
+  dort die gemeinsame Liste nimmt statt `CIV_KEYS.slice()`, verbiegt sie für die ganze
+  Sitzung. `renderSlots` kopiert deshalb. Ein Smoke-Schritt prüft am Ende, dass die Liste
+  unverändert ist — er fängt ein `sort()`/`push()`, aber nicht jede denkbare Zuweisung.
 - **`tileMap` zählt Hauptstädte nach PLATZ, nicht nach Spieler** (`capitals[seat.idx]`),
   weil auf Plättchenkarten dieselbe Zivilisation zweimal sitzen darf. Wer damit eine Partie
   mit weniger Spielern baut (z. B. die Wegwerf-Partie der Ertragsvorschau), muss die
@@ -342,6 +347,39 @@ gegen 0-Kosten-Sonderfälle (Reich ohne Stadt).
   nichts, weil sie beim Zusammenlegen selten auf anderes Meer treffen. Erst ab etwa einem
   Viertel Meeranteil entstehen zusammenhängende Flächen (Schwellenverhalten, Zahlen in
   `ANNAHMEN.md`). Der Test misst die größte Meeresfläche über feste Startwerte mit.
+
+### Aufräumen ohne Verhaltensänderung (v61)
+
+Kein Regel- oder Oberflächenverhalten geändert; abgesichert über `test.js`, `smoke.js` und
+einen Elementvergleich der gezeichneten Karte (826 SVG-Elemente, Attribut für Attribut
+gegen die Fassung davor — identisch).
+
+- **Alt-Namen entfallen.** `canEnter` und `botCanEnter` waren reine Weiterleitungen auf
+  `canPass`, `feed()` eine auf `coverPop`, `TECHS_ACTIVE` eine auf `TECHS`. Wer in
+  `ANNAHMEN.md` über `feed()` stolpert: dort steht die Geschichte, gemeint ist `coverPop`.
+- **Toter Code weg:** `TRI_ROW_START`, `planDone` (tiles.js), `langName` (i18n.js),
+  `feedSheet` (ui.js), `tutGainText` (tutorial.js), ungenutzte lokale Variablen.
+- **Doppelte Schlüssel in `UI_EN`** (`'Münzen'`, `'Welt'`, `'Zug beenden'`). Die Werte waren
+  gleich, der spätere Eintrag gewann still — ein Objektliteral verschluckt die Doppelung
+  ohne Meldung. **Neuer Test:** er liest den QUELLTEXT von `js/i18n.js`, denn im fertigen
+  Objekt ist die Doppelung schon weg.
+- **Verdopplungen zusammengefasst:** vier wortgleiche Overlay-Blöcke in `drawMap` →
+  `markHexes(liste, art)`; fünfmal dieselbe Handler-Zeile in `openTile` → `act(fn)`;
+  siebenmal `CIVS.map(c => c.k)` → `CIV_KEYS` (kommt jetzt aus `tools_civs.js` mit).
+- **Kommentare:** ein doppelt eingefügter Querformat-Block, drei übereinanderliegende
+  Blöcke über `ownerMark` (zwei überholt). Leere `catch (e) { }` nennen jetzt ihren Grund.
+
+**Bewusst NICHT angefasst** — das sind Entscheidungen, keine Aufräumarbeit:
+
+- `BOT_RESEARCH_TWICE`, `SLAVERY_OBSOLETE_IN_MODERN` und `COMBAT.attackStacks` /
+  `COMBAT.defenseStacks` haben je genau einen erreichbaren Wert; der andere Zweig ist
+  toter, ungetesteter Code. Sie sind aber der benannte Merkposten für eine
+  Regelauslegung, und `COMBAT` sitzt mitten in der Kampfrechnung. Wer sie auflösen will,
+  entscheidet damit, dass die Auslegung endgültig ist.
+- Einige Sätze stehen ohne `T()` im Code (`'Nur in eigenem oder neutralem Gebiet.'`,
+  `'Schon vorhanden.'`, `'gratis'`, `'Internet · Gratiskopie'`, `'Bewegung '` in `mp()`).
+  `missingStrings()` sieht sie deshalb nie. Das zu beheben ändert die englische Ausgabe —
+  Fehlerbehebung, nicht Aufräumen. Ebenso schreibt `mp()` das Dezimalkomma fest.
 
 ## Vollständige Bug-Historie (alle behoben — nicht versehentlich rückgängig machen)
 

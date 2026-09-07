@@ -465,7 +465,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   // Gibt es gar keinen anderen Halteplatz, darf sie bleiben
   {
     const S = flach();
-    const hs = stadt(S, 0, 5, 5, 3, true);
+    stadt(S, 0, 5, 5, 3, true);
     stadt(S, 0, 8, 8, 2, false);
     eq(botOutOfCity(S, 0, [[5, 5], [5, 6]]), [[5, 6]], 'das Stadtfeld fällt weg');
     eq(botOutOfCity(S, 0, [[5, 5]]), [[5, 5]], 'als einzige Option bleibt es erhalten');
@@ -855,13 +855,13 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const ns = neighbors(cap.r, cap.c).filter(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
   S.armies.push({ id: 1, owner: 0, r: ns[0][0], c: ns[0][1], mp: 3, born: 0 });
   S.armies.push({ id: 2, owner: 0, r: ns[1][0], c: ns[1][1], mp: 3, born: 0 });
-  eq(canEnter(S, 0, ns[1][0], ns[1][1]), false, 'Armee darf nicht auf ein Feld mit anderer Armee');
-  eq(canEnter(S, 0, cap.r, cap.c), false, 'Armee darf nicht auf die eigene Stadt');
+  eq(canPass(S, 0, ns[1][0], ns[1][1]), false, 'Armee darf nicht auf ein Feld mit anderer Armee');
+  eq(canPass(S, 0, cap.r, cap.c), false, 'Armee darf nicht auf die eigene Stadt');
   // frisch gebaute Armee darf ihre Heimatstadt verlassen
   S.players[0].res.coins = 50;
   eq(buildArmy(S, 0, cap), null, 'Armee bauen klappt');
   const fresh = S.armies[S.armies.length - 1];
-  const out = neighbors(cap.r, cap.c).find(([r, c]) => canEnter(S, 0, r, c));
+  const out = neighbors(cap.r, cap.c).find(([r, c]) => canPass(S, 0, r, c));
   eq(moveArmy(S, fresh, out[0], out[1]), null, 'frische Armee kann aus der Stadt herausziehen');
 }
 
@@ -1098,7 +1098,7 @@ const setEvent = (S, k) => {
   // Voll decken ergibt genau die Bruttoproduktion aus dem Land
   const brutto = b.total[1] + Math.max(0, -b.pop.y[1]);
   let guard = 0;
-  while (coverPop(S, 0, 'sci', 99) === null && guard++ < 20) { }
+  while (coverPop(S, 0, 'sci', 99) === null && guard++ < 20) { /* volldecken */ }
   if (p.popCovered === p.popFood)
     eq(p.res.food, brutto, 'voll gedeckt bleibt genau die Produktion aus dem Land übrig');
   eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
@@ -1372,7 +1372,7 @@ const setEvent = (S, k) => {
   eq(room > 0, true, 'es ist noch Nahrungsspielraum vorhanden');
   const done = growFree(S, 0, c, room + 5, 'Test');
   eq(done, room, 'kostenloses Wachstum stoppt genau an der Nahrungsgrenze');
-  eq(income(S, 0).food >= 0, true 	, 'die Produktion bleibt nicht negativ');
+  eq(income(S, 0).food >= 0, true, 'die Produktion bleibt nicht negativ');
 }
 
 /* ============================================ Gründen neben gegnerischen Armeen */
@@ -1558,7 +1558,6 @@ const setEvent = (S, k) => {
   eq(S.startIdx, 1, 'der Startspieler ist gemerkt');
   eq(S.cur, 1, 'Griechenland beginnt');
   eq(S.round, 1, 'Runde 1');
-  const ev1 = S.event.k;
   eq(S.event.round, 1, 'das Ereignis gehört zu Runde 1');
   // eine volle Umdrehung: erst zurück beim Startspieler beginnt Runde 2
   const seen = [];
@@ -1648,7 +1647,7 @@ const setEvent = (S, k) => {
   const dist = settleDistances(S, 0, cap.r, cap.c);
   const best = dist.get(key(spots[0][0], spots[0][1]));
   eq(spots.every(([r, c]) => dist.get(key(r, c)) === best), true, 'alle Ziele sind gleich nah');
-  const closer = [...dist].filter(([k, d]) => d < best).map(([k]) => unkey(k));
+  const closer = [...dist].filter(([, d]) => d < best).map(([k]) => unkey(k));
   eq(closer.every(([r, c]) => !settleable(S, 0, r, c)), true, 'kein näheres Feld ist siedelbar');
   eq(spots.every(([r, c]) => settleable(S, 0, r, c)), true, 'die Ziele sind tatsächlich siedelbar');
   // Erreichbarkeit zählt: ohne Navigation kein Ziel jenseits des Wassers
@@ -1934,7 +1933,7 @@ const duellKarte = (civA, civB, seed) => {
       const pi = S.cur;
       if (S.players[pi].kind === 'bot') { botTurn(S, pi); if (S.over) break; endTurn(S); continue; }
       // einfache menschliche Züge
-      feedSources(S, pi).forEach(x => feed(S, pi, x.kind, x.have));
+      feedSources(S, pi).forEach(x => coverPop(S, pi, x.kind, x.have));
       citiesOf(S, pi).forEach(c => growCity(S, pi, c));
       researchable(S, pi).sort((x, y) => techCost(S, pi, x) - techCost(S, pi, y))
         .forEach(t => { if (available(S, pi, 'sci') >= techCost(S, pi, t)) doResearch(S, pi, t.k); });
@@ -3018,7 +3017,7 @@ function tutRun() {
       if (S.players[pi].kind === 'bot') { botTurn(S, pi); if (S.over) break; endTurn(S); continue; }
       if (S.event && S.event.k && S.event.round === S.round) events++;
       // füttern, wachsen, forschen, Wunder bauen
-      feedSources(S, pi).forEach(x => feed(S, pi, x.kind, x.have));
+      feedSources(S, pi).forEach(x => coverPop(S, pi, x.kind, x.have));
       for (const city of citiesOf(S, pi))
         for (const w of availableWonders(S))
           if (!buildWonder(S, pi, city, w.k)) { built++; break; }
@@ -3380,7 +3379,7 @@ function tutRun() {
     const plan = tilePlan(['russland', 'england'], 4711);
     const seat = plan.seats[0];
     const ok = placeOptions(plan, seat, 0);
-    const nass = ok.findIndex((v, i) => !v);
+    const nass = ok.findIndex(v => !v);
     eq(placeSeat(plan, seat, 0, nass) !== null, true, 'gesperrtes Feld wird abgelehnt');
     eq(placeSeat(plan, seat, 3, ok.indexOf(true)) !== null, true, 'es gibt nur drei Lagen');
     eq(placeSeat(plan, seat, 2, ok.indexOf(true)), null, 'erlaubtes Feld wird angenommen');
@@ -3819,6 +3818,21 @@ function tutRun() {
   eq(T('Neues Spiel'), 'New game', 'Oberflächensatz wird übersetzt');
   eq(T('Runde %s · Bevölkerung %s/%s (%s %)', 3, 4, 12, 33),
     'Round 3 · Population 4/12 (33 %)', 'Platzhalter werden der Reihe nach ersetzt');
+  /* Kein Schlüssel darf zweimal in UI_EN stehen. Ein Objektliteral verschluckt die
+     Doppelung stillschweigend – der spätere Eintrag gewinnt, der frühere verschwindet
+     ohne jede Meldung. Solange beide dieselbe Übersetzung tragen, fällt das nie auf;
+     ändert jemand nur eine der beiden, wirkt die Änderung scheinbar nicht. Gefunden
+     wurde das bei 'Münzen', 'Welt' und 'Zug beenden'. Geprüft wird deshalb der
+     QUELLTEXT, nicht das fertige Objekt: im Objekt ist die Doppelung schon weg. */
+  {
+    const quelle = fs.readFileSync(__dirname + '/js/i18n.js', 'utf8');
+    const anfang = quelle.indexOf('const UI_EN = {');
+    const tabelle = quelle.slice(anfang, quelle.indexOf('\nconst MISSING', anfang));
+    const schluessel = [...tabelle.matchAll(/^  '((?:[^'\\]|\\.)*)':/gm)].map(m => m[1]);
+    const doppelt = schluessel.filter((k, i) => schluessel.indexOf(k) !== i);
+    eq(anfang > 0 && schluessel.length > 400, true, `UI_EN gefunden (${schluessel.length} Einträge)`);
+    eq(doppelt, [], 'kein Schlüssel steht zweimal in UI_EN');
+  }
   clearMissing();
   eq(T('Ein Satz, den es nicht gibt'), 'Ein Satz, den es nicht gibt',
     'ohne Übersetzung bleibt der deutsche Satz stehen');

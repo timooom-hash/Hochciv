@@ -65,6 +65,10 @@ civs.forEach(c => {
 zeilen.push('];');
 zeilen.push('const CIV_BY_KEY = {};');
 zeilen.push('CIVS.forEach(c => { CIV_BY_KEY[c.k] = c; });');
+zeilen.push('/* Alle Schlüssel in Anzeigereihenfolge. Der Aufbau braucht sie an mehreren');
+zeilen.push('   Stellen (Vorauswahl, Auslosung, Tausch beim „Nochmal spielen"). Wer die Liste');
+zeilen.push('   verändern will, nimmt eine Kopie: CIV_KEYS.slice(). */');
+zeilen.push('const CIV_KEYS = CIVS.map(c => c.k);');
 zeilen.push('/* Zugreihenfolge (Feld `order` in der JSON) – nicht die Reihenfolge oben,');
 zeilen.push('   die ist die Anzeigereihenfolge im Aufbau und im Regelbogen. */');
 zeilen.push(`const ORDER = ${j(zugfolge.map(c => c.k))};`);
