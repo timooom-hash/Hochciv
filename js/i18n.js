@@ -284,7 +284,7 @@ function applyDataLang() {
   // Spieltipps: reine Anzeigetexte, Zuordnung über die Position in der Liste
   D.tips.forEach((n, i) => { if (n) TIPS[i] = n; });
   // Plättchennamen: Schlüssel ist der deutsche Name, deshalb über den Vorrat gehen
-  TILE_POOL.forEach((t, i) => {
+  TILE_POOL.forEach(t => {
     if (!t.de) t.de = t.n;
     t.n = LANG === 'de' ? t.de : (DATA_EN.tile[t.de] || t.de);
   });
@@ -496,7 +496,6 @@ const UI_EN = {
   'Massenmedien nicht erforscht.': 'Mass media not researched.',
   'Militärsieg (Hauptstadt von %s erobert)': 'Military victory (captured the capital of %s)',
   'Mindestens 3 Felder Abstand zu allen Städten.': 'At least 3 tiles away from every city.',
-  'Münzen': 'Coins',
   'Nahrungsdefizit von %s': 'Food deficit of %s',
   'Nahrungsproduktion würde negativ – Gentechnik oder Massenmedien nötig.': 'Food production would go negative – genetic engineering or mass media needed.',
   'Neue Städte wachsen erst nächste Runde.': 'New cities only grow from next round.',
@@ -779,8 +778,6 @@ const UI_EN = {
     'Available, level %s',
   'Weiter':
     'Continue',
-  'Welt':
-    'World',
   'Wunder':
     'Wonders',
   'Zielfeld antippen':
@@ -969,8 +966,6 @@ const UI_EN = {
     'Where your resources come from',
   'Zieh die Armee auf das <b>goldene Feld</b>.':
     'Move the army onto the <b>golden tile</b>.',
-  'Zug beenden':
-    'End turn',
   'Zug beenden – und der Rückzug':
     'Ending the turn – and the retreat',
   'Zwei Technologien für null':
@@ -1159,19 +1154,18 @@ function T(de, ...args) {
 }
 const missingStrings = () => [...MISSING];
 const clearMissing = () => MISSING.clear();
-const langName = k => (LANGS.find(l => l.k === k) || LANGS[0]).n;
 
 function setLang(k, opts) {
   if (!LANGS.some(l => l.k === k)) return LANG;
   LANG = k;
   applyDataLang();
   if (!(opts && opts.quiet)) {
-    try { localStorage.setItem(LANG_KEY, k); } catch (e) { /* privater Modus */ }
+    try { localStorage.setItem(LANG_KEY, k); } catch { /* privater Modus */ }
   }
   return LANG;
 }
 function initLang() {
   let k = 'de';
-  try { k = localStorage.getItem(LANG_KEY) || 'de'; } catch (e) { /* egal */ }
+  try { k = localStorage.getItem(LANG_KEY) || 'de'; } catch { /* egal */ }
   setLang(LANGS.some(l => l.k === k) ? k : 'de', { quiet: true });
 }

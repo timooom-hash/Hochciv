@@ -42,6 +42,10 @@ const CIVS = [
 ];
 const CIV_BY_KEY = {};
 CIVS.forEach(c => { CIV_BY_KEY[c.k] = c; });
+/* Alle Schlüssel in Anzeigereihenfolge. Der Aufbau braucht sie an mehreren
+   Stellen (Vorauswahl, Auslosung, Tausch beim „Nochmal spielen"). Wer die Liste
+   verändern will, nimmt eine Kopie: CIV_KEYS.slice(). */
+const CIV_KEYS = CIVS.map(c => c.k);
 /* Zugreihenfolge (Feld `order` in der JSON) – nicht die Reihenfolge oben,
    die ist die Anzeigereihenfolge im Aufbau und im Regelbogen. */
 const ORDER = ["russland","griechenland","england","wikinger"];

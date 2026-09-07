@@ -25,8 +25,6 @@ const TRI_IJK = [];
 for (let k = 0; k <= 4; k++) for (let p = 0; p <= 4 - k; p++) TRI_IJK.push([p, 4 - k - p, k]);
 const TRI_INDEX = {};
 TRI_IJK.forEach((t, n) => { TRI_INDEX[t.join(',')] = n; });
-// Zeilenanfang im Plättchentext: Zeile 0 hat 5 Felder, Zeile 4 eines
-const TRI_ROW_START = [0, 5, 9, 12, 14];
 
 /* Drehung um 120°: (i, j, k) → (j, k, i). TRI_ROT[o][n] sagt, welches Feld des
    Plättchentextes auf Feld n liegt, wenn das Plättchen o-mal gedreht wird. */
@@ -209,7 +207,6 @@ function botPlaceSeat(plan, seat, rnd) {
   const list = mid.length ? mid : ok.map((v, i) => v ? i : -1).filter(i => i >= 0);
   return placeSeat(plan, seat, o, list[Math.floor(rnd() * list.length)]);
 }
-const planDone = plan => plan.seats.every(s => s.cell != null);
 
 /* ---------------------------------------------------------------- Karte bauen
    `show` bestimmt, welche Plätze schon zu sehen sind (Standard: die offenen und alle

@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v60';
+const APP_VERSION = 'v61';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -127,13 +127,12 @@ const UN_FRAC = 1 / 2;             // mit Vereinte Nationen
 const BOT_RESEARCH_TWICE = true;
 const SLAVERY_OBSOLETE_IN_MODERN = true;
 
-const TECHS_ACTIVE = TECHS;
 const TECH_BY_KEY = {};
-TECHS_ACTIVE.forEach(t => { TECH_BY_KEY[t.k] = t; });
+TECHS.forEach(t => { TECH_BY_KEY[t.k] = t; });
 /* Technologien mit `wo: true` gehören zur Weltwunder-Erweiterung und existieren nur in
    einer Partie mit Weltwundern. Ohne Spielstand (z. B. in Tabellen) zählt die Grundliste. */
 function techActive(S, t) { return !t.wo || !!(S && S.wo); }
-function techPool(S) { return TECHS_ACTIVE.filter(t => techActive(S, t)); }
+function techPool(S) { return TECHS.filter(t => techActive(S, t)); }
 const SINGULARITY = {
   k: 'singularitaet', n: 'Singularität', c: SINGULARITY_BASE,
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',

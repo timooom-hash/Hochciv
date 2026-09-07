@@ -17,8 +17,7 @@ function settleable(S, pi, r, c) {
   if (enemyArmyAdjacent(S, pi, r, c)) return false;               // nicht neben fremden Armeen
   return !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3);
 }
-// Bots bewegen sich nach genau denselben Regeln wie Menschen.
-function botCanEnter(S, pi, r, c) { return canEnter(S, pi, r, c); }
+// Bots bewegen sich nach genau denselben Regeln wie Menschen: überall canPass (engine.js).
 
 function botTurn(S, pi) {
   const p = S.players[pi];
@@ -84,7 +83,7 @@ function settleDistances(S, pi, fromR, fromC) {
       for (const [nr, nc] of neighbors(r, c)) {
         const k = key(nr, nc);
         if (dist.has(k)) continue;
-        if (!botCanEnter(S, pi, nr, nc)) continue;
+        if (!canPass(S, pi, nr, nc)) continue;
         dist.set(k, d + 1);
         next.push([nr, nc]);
       }
@@ -142,7 +141,7 @@ function botSettle(S, pi, capital) {
       continue;
     }
     if (prev && prev[0] === nr && prev[1] === nc) continue;   // Schritt 7: nie direkt zurück
-    if (!botCanEnter(S, pi, nr, nc)) continue;
+    if (!canPass(S, pi, nr, nc)) continue;
     prev = [r, c]; r = nr; c = nc;
   }
   log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`);
@@ -178,7 +177,7 @@ function botOutOfCity(S, pi, tiles) {
    genau richtig steht, ihren Platz und verschlechtert die Lage. */
 function botReach(S, pi, army) {
   const reach = reachable(army.r, army.c, army.mp,
-    (r, c) => botCanEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
+    (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   const tiles = botOutOfCity(S, pi,
     [...reach.keys()].map(unkey).filter(([r, c]) => canStop(S, pi, r, c)));
@@ -320,7 +319,7 @@ function botPlanArmies(S, pi) {
 function botMoveArmy(S, pi, army) {
   const p = S.players[pi];
   const reach = reachable(army.r, army.c, army.mp,
-    (r, c) => botCanEnter(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
+    (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   // Zielfelder: nur solche, auf denen die Armee auch anhalten darf (kein Meer ohne
   // Panzerschiff/Luftwaffe). Meer bleibt als Durchgangsfeld erlaubt.

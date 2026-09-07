@@ -79,7 +79,7 @@ function tutStrikeSpot() {
   const rng = attackRange(S, ru);
   const mp = moveAllowance(S, ru);
   const reach = reachable(army.r, army.c, mp,
-    (r, c) => canEnter(S, ru, r, c) ? (zocStop(S, ru, r, c) ? 'stop' : true) : false,
+    (r, c) => canPass(S, ru, r, c) ? (zocStop(S, ru, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   const ok = ([r, c]) => reach.has(key(r, c)) && canStop(S, ru, r, c) && !cityAt(S, r, c)
     && hexDistance(r, c, gcap.r, gcap.c) <= rng;
@@ -101,10 +101,6 @@ function tutNeighbourText(r, c) {
     .map(([t, n]) => `${n} × ${TERRAIN[t].name}`).join(', ');
 }
 function tutGain(r, c) { return settleGain(S, RU(), r, c); }
-function tutGainText(r, c) {
-  const g = tutGain(r, c);
-  return `+${g.sci} 🔬, ${g.food >= 0 ? '+' : ''}${g.food} 🌾, +${g.coins} 🪙`;
-}
 /* Der Wunschplatz aus der Beispielpartie – falls ihn ein Bot vorher besiedelt hat, das
    beste erreichbare und bezahlbare Feld in der Nähe (deterministisch sortiert). */
 function tutSpot(pref) {
@@ -558,7 +554,7 @@ function tutGateTechs() {
 function tutHighlight() {
   const st = tutStep();
   if (!st || !st.hl) return null;
-  try { return st.hl().filter(Boolean); } catch (e) { return null; }
+  try { return st.hl().filter(Boolean); } catch { return null; }
 }
 function tutDone() {
   const st = tutStep();

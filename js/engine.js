@@ -485,7 +485,8 @@ function settleGain(S, pi, r, c) {
 
 /* ------------------------------------------------------------ Umrechnungskurse */
 /* Umrechnungskurse. Gentechnik und Massenmedien sind ausdrücklich KEIN allgemeiner
-   Umtausch – sie füttern nur Städte (siehe feed()) und stehen deshalb hier nicht.
+   Umtausch – sie decken nur die Bevölkerungskosten (siehe coverPop) und stehen deshalb
+   hier nicht.
    opts.foodOk: Bürgerkrieg erlaubt in dieser Runde, Armeen/Macht mit Nahrung zu zahlen. */
 function rates(S, pi, opts) {
   const p = S.players[pi];
@@ -498,7 +499,7 @@ function rates(S, pi, opts) {
   const sciToCoins = has(p, 'alchemie') ? 1 : Infinity;
   // Wissenschaft → Nahrung geht nur über die Münzen: mit Alchemie kostet 1 Nahrung also
   // sciToCoins × coinsToFood Wissenschaft (ohne Gilden 2, mit Gilden oder England 1).
-  // Gentechnik steht bewusst nicht hier – sie füttert nur Städte (siehe feed()).
+  // Gentechnik steht bewusst nicht hier – sie deckt nur die Bevölkerungskosten (coverPop).
   const sciToFood = sciToCoins === Infinity ? Infinity : sciToCoins * coinsToFood;
   return { coinsToFood, coinsToSci: has(p, 'computertechnik') ? 1 : 2, sciToCoins, sciToFood, foodToCoins };
 }
@@ -657,8 +658,6 @@ function uncoverPop(S, pi, kind, amount) {
   p.popCoveredBy[kind] -= amount;
   return null;
 }
-/* Alt-Name, damit gespeicherte Abläufe und Tests weiterlaufen. */
-function feed(S, pi, kind, amount) { return coverPop(S, pi, kind, amount); }
 /* Nahrungseinkommen ohne die Wirkungen des laufenden Ereignisses und ohne den
    Taj-Mahal-Rundenbonus – also der Wert, der auch nach dieser Runde noch gilt.
    Die Nahrungsgrenze muss darauf beruhen: eine Dürre dauert eine Runde, die Stadt
@@ -757,8 +756,6 @@ function canStop(S, pi, r, c) {
     return false;
   return true;
 }
-// Rückwärtskompatibel: canEnter = durchqueren erlaubt.
-function canEnter(S, pi, r, c) { return canPass(S, pi, r, c); }
 /* Kontrollzone (Schießpulver): wer ein Feld neben einer feindlichen Armee betritt, hält an */
 function zocStop(S, pi, r, c) {
   if (has(S.players[pi], 'luftwaffe')) return false;        // Luftwaffe ignoriert Kontrollzonen

@@ -56,10 +56,6 @@ function setBarHeight() {
 /* Querformat. Eine echte Sperre gibt es nur, wo screen.orientation.lock existiert
    (installiertes Android/Chrome); iOS kennt sie nicht – weder über die API noch über
    das Manifest. Dort bleibt nur, die App im Hochformat selbst zu drehen (html.turn,
-   siehe style.css). Abschalten lässt sich das im Spielmenü (☰); die Wahl wird gemerkt. */
-/* Querformat. Eine echte Sperre gibt es nur, wo screen.orientation.lock existiert
-   (installiertes Android/Chrome); iOS kennt sie nicht – weder über die API noch über
-   das Manifest. Dort bleibt nur, die App im Hochformat selbst zu drehen (html.turn,
    siehe style.css). Abschalten lässt sich das im Spielmenü (☰); die Wahl wird gemerkt.
 
    Gedreht wird NUR der Spielbildschirm. Menü, Aufbau, Editor und die Regelseite haben
@@ -80,7 +76,7 @@ function applyTurn() {
       if (on) so.lock('landscape').catch(() => { });
       else if (typeof so.unlock === 'function') so.unlock();
     }
-  } catch (e) { }
+  } catch { /* Browser ohne screen.orientation – dann bleibt es bei html.turn */ }
   syncLayout();
 }
 function turning() {
@@ -112,8 +108,9 @@ function initOrientation() {
   window.addEventListener('orientationchange', syncLayout);
 }
 
-function store(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
-function load(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+// localStorage kann fehlen oder sperren (privater Modus) – dann wird eben nichts gemerkt.
+function store(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* nicht speicherbar */ } }
+function load(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } }
 function saveGame() { if (S) store('hochciv.save', S); }
 
 /* ------------------------------------------------------------------ Kartenzeichnung */
@@ -196,6 +193,21 @@ function drawMap(svg, map, opts) {
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   const pts = hexPath(HEX);
 
+  /* Feldmarkierungen. Immer dasselbe Sechseck, nur andere Füllung und Kante:
+     erreichbare Felder, die goldene Tutorial-Hervorhebung, der Rahmen der Legephase
+     und die Auswahl. Vier Stellen zeichneten das vorher wortgleich selbst. */
+  const OVERLAY = {
+    reach: { fill: 'rgba(255,255,255,.42)', stroke: '#2a2721', 'stroke-width': 2, 'stroke-dasharray': '5 4' },
+    tut: { fill: 'rgba(255,214,102,.30)', stroke: '#b8860b', 'stroke-width': 3.4, 'stroke-linejoin': 'round' },
+    frame: { fill: 'none', stroke: '#b8860b', 'stroke-width': 3, 'stroke-linejoin': 'round' },
+    sel: { fill: 'none', stroke: '#9d3b2f', 'stroke-width': 4 },
+  };
+  const markHexes = (list, art) => (list || []).forEach(([r, c]) => {
+    const [x, y] = hexCenter(r, c, HEX);
+    world.appendChild(svgEl('polygon', Object.assign(
+      { points: pts, transform: `translate(${x},${y})`, 'pointer-events': 'none' }, OVERLAY[art])));
+  });
+
   // 1 Gelände. „Kein Feld" (X) gehört nicht zur Karte: es wird nicht gezeichnet und
   // ist nicht antippbar – so entsteht die Form einer Plättchenkarte. Nur der Editor
   // zeigt es blass, sonst ließe sich ein versehentlich gesetztes X nicht zurücknehmen.
@@ -250,21 +262,9 @@ function drawMap(svg, map, opts) {
       }
     });
     // 4 Overlay (erreichbare Felder)
-    (opts.highlight || []).forEach(([r, c]) => {
-      const [x, y] = hexCenter(r, c, HEX);
-      world.appendChild(svgEl('polygon', {
-        points: pts, transform: `translate(${x},${y})`, fill: 'rgba(255,255,255,.42)',
-        stroke: '#2a2721', 'stroke-width': 2, 'stroke-dasharray': '5 4', 'pointer-events': 'none'
-      }));
-    });
+    markHexes(opts.highlight, 'reach');
     // 4b Tutorial-Hervorhebung: goldener Rahmen um die Felder, um die es gerade geht
-    (opts.tutHl || []).forEach(([r, c]) => {
-      const [x, y] = hexCenter(r, c, HEX);
-      world.appendChild(svgEl('polygon', {
-        points: pts, transform: `translate(${x},${y})`, fill: 'rgba(255,214,102,.30)',
-        stroke: '#b8860b', 'stroke-width': 3.4, 'stroke-linejoin': 'round', 'pointer-events': 'none'
-      }));
-    });
+    markHexes(opts.tutHl, 'tut');
     // 5 Armeen
     S2.armies.forEach(a => {
       const [x, y] = hexCenter(a.r, a.c, HEX);
@@ -302,20 +302,8 @@ function drawMap(svg, map, opts) {
   } else if (map.capitals) {
     // Ohne Spielstand: Legephase. Erlaubte Felder werden genauso markiert wie im Spiel
     // die erreichbaren, nur eben vor den Hauptstädten gezeichnet.
-    (opts.highlight || []).forEach(([r, c]) => {
-      const [x, y] = hexCenter(r, c, HEX);
-      world.appendChild(svgEl('polygon', {
-        points: pts, transform: `translate(${x},${y})`, fill: 'rgba(255,255,255,.42)',
-        stroke: '#2a2721', 'stroke-width': 2, 'stroke-dasharray': '5 4', 'pointer-events': 'none'
-      }));
-    });
-    (opts.frame || []).forEach(([r, c]) => {
-      const [x, y] = hexCenter(r, c, HEX);
-      world.appendChild(svgEl('polygon', {
-        points: pts, transform: `translate(${x},${y})`, fill: 'none',
-        stroke: '#b8860b', 'stroke-width': 3, 'stroke-linejoin': 'round', 'pointer-events': 'none'
-      }));
-    });
+    markHexes(opts.highlight, 'reach');
+    markHexes(opts.frame, 'frame');
     const capList = Array.isArray(map.capitals)
       ? map.capitals.filter(Boolean).map(e => [e.civ, [e.r, e.c]])
       : Object.keys(map.capitals).map(k => [k, map.capitals[k]]);
@@ -330,13 +318,7 @@ function drawMap(svg, map, opts) {
   }
   if (opts.state) orphanMarks(world, opts.state);
   // 7 Auswahl
-  if (opts.sel) {
-    const [x, y] = hexCenter(opts.sel[0], opts.sel[1], HEX);
-    world.appendChild(svgEl('polygon', {
-      points: pts, transform: `translate(${x},${y})`, fill: 'none', stroke: '#9d3b2f',
-      'stroke-width': 4, 'pointer-events': 'none'
-    }));
-  }
+  if (opts.sel) markHexes([opts.sel], 'sel');
   return world;
 }
 
@@ -412,7 +394,7 @@ function tapHex(r, c) {
   }
   ui.sel = [r, c]; redraw(); openTile(r, c);
 }
-function mp(a) { return 'Bewegung ' + String(a.mp).replace('.', ',') ; }
+function mp(a) { return 'Bewegung ' + String(a.mp).replace('.', ','); }
 const Y_ICON = ['🔬', '🌾', '🪙'];
 const fmtY = y => y.map((n, i) => n + Y_ICON[i]).join(' ');
 const fmtGain = g => [g.sci, g.food, g.coins]
@@ -449,6 +431,15 @@ function openTile(r, c) {
       `<span class="cost">${cost || ''}</span></button>`);
     handlers.push([id, fn]);
   };
+  /* Fast jede Aktion im Aktionsblatt endet gleich: Fehler melden oder neu zeichnen,
+     danach dasselbe Feld wieder öffnen – dann stehen die Preise und Zustände frisch
+     im Blatt (nach dem Straßenbau kostet der Ausbau weniger, nach dem Wachsen ist die
+     Stadt größer). Die Zeile stand vorher fünfmal wortgleich da. */
+  const act = fn => () => {
+    const e = fn();
+    if (e) toast(e); else redraw();
+    openTile(r, c);
+  };
   let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">${T('Feld %s/%s · Ertrag', r, c)} `
     + fmtY(tileYieldAt(S, pi, r, c)) + '</p>' + settleFact(r, c);
 
@@ -462,11 +453,11 @@ function openTile(r, c) {
     if (city.owner === pi) {
       if (freeGrowthAvailable(S, pi, city))
         btn('Kostenlos wachsen', T('auf %s · Verbundwerkstoffe', city.pop + 1), T('gratis'),
-          () => { const e = growCity(S, pi, city, 'free'); e ? toast(e) : redraw(); openTile(r, c); });
+          act(() => growCity(S, pi, city, 'free')));
       const pc = growPrice(S, pi, city);
       const perr = canGrowPaid(S, pi, city);
       btn('Bevölkerung wachsen', perr || T('auf %s', city.pop + 1), `${pc.food}🌾 ${pc.coins}🪙`,
-        () => { const e = growCity(S, pi, city, 'paid'); e ? toast(e) : redraw(); openTile(r, c); }, !!perr);
+        act(() => growCity(S, pi, city, 'paid')), !!perr);
       if (S.wo) {
         const wcost = wonderCost(S, pi);
         const full = wondersInCity(S, city).length >= 2;
@@ -481,11 +472,11 @@ function openTile(r, c) {
       const civil = payOpts(S, pi).foodOk;
       btn('Armee bauen', civil ? T('Bürgerkrieg: auch mit Nahrung zahlbar')
         : T('muss die Stadt noch verlassen'), `${ac}🪙`,
-        () => { const e = buildArmy(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
+        act(() => buildArmy(S, pi, city)),
         available(S, pi, 'coins', payOpts(S, pi)) < ac || !!armyAt(S, r, c));
       if (slaveryUsable(p))
         btn('Bevölkerung opfern', city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+10🪙',
-          () => { const e = sacrifice(S, pi, city); e ? toast(e) : redraw(); openTile(r, c); },
+          act(() => sacrifice(S, pi, city)),
           city.pop < 2 || city.sacrificed === S.round);
       if (army && army.owner === pi)          // Armee steht in der Stadt und muss heraus
         btn('Armee hier bewegen', army.born === S.round ? T('muss die Stadt noch verlassen')
@@ -511,7 +502,7 @@ function openTile(r, c) {
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
       btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, '5🪙',
-        () => { const e = buyTile(S, pi, r, c); e ? toast(e) : redraw(); openTile(r, c); }, owned);
+        act(() => buyTile(S, pi, r, c)), owned);
     }
   }
   if (has(p, 'atomwaffen')) {
@@ -522,8 +513,8 @@ function openTile(r, c) {
         : p.nuked ? T('diese Runde schon eingesetzt')
           : T('zerstört alle Armeen hier und ringsum, auch eigene'), '☢︎',
       () => {
-        const e = nuke(S, S.cur, r, c);
-        toast(e || T('Atomschlag ausgeführt')); redraw(); openTile(r, c);
+        toast(nuke(S, S.cur, r, c) || T('Atomschlag ausgeführt'));
+        redraw(); openTile(r, c);
       }, p.nuked || banned);
   }
   // Die Stufen kommen aus roadTargets, nicht aus einer eigenen Rechnung – sonst weicht
@@ -555,7 +546,7 @@ function doRoad(r, c, ziel) {
   const target = ziel || roadTarget(S, S.cur, r, c);
   if (!target) return toast(T('Hier lässt sich nichts weiter bauen.'));
   const e = buildRoad(S, S.cur, r, c, target);
-  e ? toast(e) : toast(target === 2 ? T('Eisenbahn gebaut') : T('Straße gebaut'));
+  toast(e || (target === 2 ? T('Eisenbahn gebaut') : T('Straße gebaut')));
   redraw();
   openTile(r, c);
 }
@@ -582,21 +573,15 @@ function armySheet() {
   });
 }
 
-/* Kleine Symbolmarker: welche Reiche diese Technologie schon haben.
-   Eigenes Reich mit Ring hervorgehoben, damit man sich sofort verortet. */
 /* Wie viele Menschen spielen mit? Nur dann lohnt die Anzeige, wer eine Technologie
    erforschen KÖNNTE – Bots kennen keine Verfügbarkeiten, sie würfeln frei aus dem Pool. */
 function humanCount(S) { return S.players.filter(p => p.kind === 'human' && !p.dead).length; }
-/* Marken an einer Technologiekachel.
-   Gefüllt = hat sie bereits. Blass und umkringelt = kann sie erforschen (nur andere
-   MENSCHEN, nur im Mehrpersonenspiel). Beides klar zu unterscheiden, weil es zwei sehr
-   verschiedene Dinge sind: erledigte Tatsache gegen bloße Möglichkeit. */
-/* Marken an einer Technologiekachel: wer sie hat, wer sie erforschen könnte.
-   Die beiden Zustände waren kaum zu unterscheiden (gleiches Symbol, gleiche Farbe, nur
-   Ring gestrichelt statt durchgezogen). Jetzt ist „hat sie" eine **ausgefüllte** Marke in
-   der Reichsfarbe mit hellem Symbol, „könnte sie" eine **leere** Marke mit farbigem
-   Symbol auf Papier und einem kleinen Fragezeichen. Voll gegen leer trägt auch bei 16 px
-   und in Graustufen. */
+/* Marken an einer Technologiekachel: wer sie hat, wer sie erforschen könnte – zwei sehr
+   verschiedene Dinge (erledigte Tatsache gegen bloße Möglichkeit), die vorher kaum zu
+   unterscheiden waren (gleiches Symbol, gleiche Farbe, nur der Ring gestrichelt statt
+   durchgezogen). Jetzt ist „hat sie" eine **ausgefüllte** Marke in der Reichsfarbe mit
+   hellem Symbol, „könnte sie" eine **leere** Marke mit farbigem Symbol auf Papier und
+   einem kleinen Fragezeichen. Voll gegen leer trägt auch bei 16 px und in Graustufen. */
 function ownerMark(civ, art, self) {
   const hat = art === 'hat';
   const stil = hat
@@ -721,7 +706,7 @@ function techModal() {
       if (o.freeOk)
         buttons.push(`<button class="tech avail afford" data-copy="${o.tech.k}" data-mode="free">
           <span class="c">gratis</span><b>${o.tech.n}</b>
-          <span class="eff">Internet · Gratiskopie${o.paidCoins != null ? '' : ''}</span>
+          <span class="eff">Internet · Gratiskopie</span>
           ${ownerMarks(S, o.tech.k, pi)}</button>`);
       grid += buttons.join('');
     });
@@ -767,7 +752,9 @@ function powerSheet() {
   if (maxN <= 0) h += `<p class="sub">${T('Nicht genug Münzen.')}</p>`;
   sheet(h);
   $('sheet-body').querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
-    const e = buyPower(S, S.cur, +b.dataset.n); e ? toast(e) : null; redraw(); powerSheet();
+    const e = buyPower(S, S.cur, +b.dataset.n);
+    if (e) toast(e);
+    redraw(); powerSheet();
   });
 }
 /* Protokollzeilen als HTML. Die Würfe, die zu einer Aktion geführt haben, hängen als
@@ -910,8 +897,7 @@ function rematch(harder) {
        ist das genau das eigene alte – man bekäme jedes Mal dasselbe. Deshalb wird hier
        wirklich getauscht: gezogen wird aus allen vier, und wer das gezogene Reich hatte,
        übernimmt das alte des Menschen. Die Reiche bleiben damit paarweise verschieden. */
-    const alle = CIVS.map(c => c.k);
-    const gezogen = alle[Math.floor(Math.random() * alle.length)];
+    const gezogen = CIV_KEYS[Math.floor(Math.random() * CIV_KEYS.length)];
     const vorher = p.civ;
     const halter = rec.players.find((q, j) => j !== i && q.civ === gezogen);
     if (halter) halter.civ = vorher;
@@ -994,7 +980,7 @@ function gameOver() {
 function confetti(farbe) {
   try {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  } catch (e) { }
+  } catch { /* Browser ohne matchMedia – dann gibt es Schnipsel */ }
   const alt = $('confetti'); if (alt) alt.remove();
   const box = document.createElement('div');
   box.id = 'confetti';
@@ -1020,7 +1006,7 @@ function curEvent() {
 }
 /* „Welt": Ereignis dieser Runde, Weltwunder, Barbaren – alles auf einen Blick. */
 function worldModal() {
-  const pi = S.cur, p = P(S);
+  const pi = S.cur;
   // Wer ist wer: Reich, Farbe und Fähigkeit. Bei ausgelosten Fähigkeiten ist das die
   // Stelle, an der man in Ruhe nachliest, was man (und die anderen) bekommen hat.
   let h = `<p class="sub">${T('Die Reiche')}</p><div class="civ-list">` +
@@ -1105,7 +1091,6 @@ function wonderSheet(city) {
    Kein Umtausch: gedeckt wird höchstens, was die Bevölkerung tatsächlich isst. */
 function foodSheet() {
   const pi = S.cur, p = ensureFoodState(S, pi);
-  const b = incomeBreakdown(S, pi);
   const isst = p.popFood || 0, gedeckt = p.popCovered || 0;
   const land = (p.foodRaw || 0) + isst;              // Produktion ohne die Bevölkerung
   const offen = Math.max(0, isst - gedeckt);
@@ -1159,8 +1144,6 @@ function foodSheet() {
     redraw(); foodSheet();
   });
 }
-/* Alt-Name für Tests und ältere Aufrufe. */
-function feedSheet() { return foodSheet(); }
 /* Auswahl kostenloser Technologien (Bibliothek, Oxford, Griechenland) */
 function freePickModal() {
   // Die Singularität ist über Oxford kostenlos wählbar und beendet das Spiel sofort.
@@ -1314,11 +1297,11 @@ function renderSlots() {
     kind: x.querySelector('[data-kind].on').dataset.kind,
     abil: x.querySelector('[data-abil]').value,
   }));
-  const chosen = (frei || n < 4) ? pickChoice(n) : CIVS.map(c => c.k);
+  const chosen = (frei || n < 4) ? pickChoice(n) : CIV_KEYS.slice();
   // Feste Karte: Doppelungen auflösen, sonst säßen zwei Reiche auf einem Startstern
   if (!frei) for (let i = 0; i < n; i++)
     if (chosen.indexOf(chosen[i]) !== i)
-      chosen[i] = pickCivs[i] = CIVS.map(c => c.k).find(k => !chosen.slice(0, n).includes(k));
+      chosen[i] = pickCivs[i] = CIV_KEYS.find(k => !chosen.slice(0, n).includes(k));
   list.innerHTML = '';
   chosen.forEach((civKey, i) => {
     const zufall = civKey === 'zufall';
@@ -1377,7 +1360,7 @@ function renderSlots() {
       // auf eine freie um. Auf der Plättchenkarte darf sie doppelt vorkommen.
       if (!freieCivWahl()) for (let j = 0; j < n; j++) {
         if (j === i || pickCivs[j] !== pick.value) continue;
-        pickCivs[j] = CIVS.map(c => c.k).find(k => !pickCivs.slice(0, n).includes(k));
+        pickCivs[j] = CIV_KEYS.find(k => !pickCivs.slice(0, n).includes(k));
       }
       renderSlots();          // Mensch/Bot und Fähigkeit bleiben dabei erhalten
     };
@@ -1428,7 +1411,7 @@ function nameDoubles(players) {
   // zweiter Durchgang: die Doppelgänger nehmen eine freie Zivilisationsfarbe
   players.forEach(p => {
     if (p.colorOf) return;
-    const frei = CIVS.map(c => c.k).find(k => !belegt.has(k));
+    const frei = CIV_KEYS.find(k => !belegt.has(k));
     belegt.add(frei); p.colorOf = frei;
   });
   const lauf = {};
@@ -1450,9 +1433,9 @@ function resolveRandom(players, frei) {
   const pick = list => list[Math.floor(Math.random() * list.length)];
   players.forEach((p, i) => {
     if (p.civ !== 'zufall') return;
-    const pool = CIVS.map(c => c.k).filter(k => frei ||
+    const pool = CIV_KEYS.filter(k => frei ||
       !players.some((q, j) => j !== i && q.civ === k));
-    p.civ = pick(pool.length ? pool : CIVS.map(c => c.k));
+    p.civ = pick(pool.length ? pool : CIV_KEYS);
     p.randomCiv = true;
   });
   players.forEach(p => {
@@ -1766,7 +1749,7 @@ function boot() {
   $('m-continue').onclick = () => { endTutorialPanel(); S = load('hochciv.save'); startGameScreen(); };
   $('m-load').onclick = () => upload(txt => {
     try { endTutorialPanel(); S = JSON.parse(txt); saveGame(); startGameScreen(); toast(T('Spielstand geladen')); }
-    catch (e) { toast(T('Datei nicht lesbar')); }
+    catch { toast(T('Datei nicht lesbar')); }
   });
   document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => show('screen-menu'));
   $('ov-close').onclick = closeModal;
