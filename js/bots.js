@@ -19,6 +19,16 @@ function settleable(S, pi, r, c) {
 }
 // Bots bewegen sich nach genau denselben Regeln wie Menschen: überall canPass (engine.js).
 
+/* Der Bot-Siedler zieht nach den Bewegungsregeln (canPass) – zusätzlich sperrt ihn
+   gegnerisches Territorium. Das ist eine Siedelregel und gilt für Bots wie für Menschen,
+   sonst wäre die neue Sperre ein einseitiger Nachteil des Menschen (v63). Die Luftwaffe
+   hebt beides auf. `fremd` wird einmal je Suche berechnet und mitgegeben, nicht je Feld. */
+function botSettlerPass(S, pi, r, c, fremd) {
+  if (!canPass(S, pi, r, c)) return false;
+  if (has(S.players[pi], 'luftwaffe')) return true;
+  return !(fremd || foreignTerritory(S, pi)).has(key(r, c));
+}
+
 function botTurn(S, pi) {
   const p = S.players[pi];
   const capital = capitalOf(S, pi) || citiesOf(S, pi)[0];
@@ -73,7 +83,8 @@ function botTurn(S, pi) {
    nur mit passender Technologie, und trifft er auf eine eigene Stadt, beginnt er wieder
    beim Zug zum nächstgelegenen siedelbaren Feld. */
 function settleDistances(S, pi, fromR, fromC) {
-  // Geländedistanz vom Startfeld aus, mit den Bewegungsregeln des Bots
+  // Geländedistanz vom Startfeld aus, mit den Wegregeln des Siedlers
+  const fremd = foreignTerritory(S, pi);
   const dist = new Map([[key(fromR, fromC), 0]]);
   let front = [[fromR, fromC]];
   while (front.length) {
@@ -83,7 +94,7 @@ function settleDistances(S, pi, fromR, fromC) {
       for (const [nr, nc] of neighbors(r, c)) {
         const k = key(nr, nc);
         if (dist.has(k)) continue;
-        if (!canPass(S, pi, nr, nc)) continue;
+        if (!botSettlerPass(S, pi, nr, nc, fremd)) continue;
         dist.set(k, d + 1);
         next.push([nr, nc]);
       }
@@ -106,6 +117,7 @@ function nearestSettleSpots(S, pi, capital) {
 }
 function botSettle(S, pi, capital) {
   const p = S.players[pi];
+  const fremd = foreignTerritory(S, pi);      // ändert sich während der Wanderung nicht
   let r = capital.r, c = capital.c, prev = null;
   // Schritte 2–3: zum nächstgelegenen siedelbaren Feld, Gleichstände auswürfeln
   const goToNearest = () => {
@@ -141,7 +153,7 @@ function botSettle(S, pi, capital) {
       continue;
     }
     if (prev && prev[0] === nr && prev[1] === nc) continue;   // Schritt 7: nie direkt zurück
-    if (!canPass(S, pi, nr, nc)) continue;
+    if (!botSettlerPass(S, pi, nr, nc, fremd)) continue;
     prev = [r, c]; r = nr; c = nc;
   }
   log(S, 'info', `${civOf(p).n}: Siedler findet keinen Platz.`);

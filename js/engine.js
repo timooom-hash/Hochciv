@@ -735,23 +735,36 @@ function moveAllowance(S, pi) {
   // Militärlogistik (Erweiterung): jedes eigene Weltwunder gibt +1 Bewegungsweite
   return base + (has(p, 'militaerlogistik') ? wondersOf(S, pi).length : 0);
 }
-// Darf das Feld auf dem Weg durchquert werden? Navigation/Panzerschiff/Luftwaffe erlauben Meer.
+/* Darf das Feld auf dem Weg DURCHQUERT werden? Meer nur mit Navigation, Panzerschiff
+   oder Luftwaffe; Kartenlöcher nie.
+   Die Luftwaffe überfliegt Vulkane, gegnerische Armeen und gegnerische Städte – sie darf
+   dort aber nicht anhalten, das trennt canStop. Eigene Städte und eigene Armeen sperren
+   weiter für jeden: Armeen sind nicht stapelbar, und in die eigene Stadt zieht keine
+   Armee hinein (dort blockierte sie den Bauplatz). */
 function canPass(S, pi, r, c) {
   const p = S.players[pi];
   const t = terrainAt(S, r, c);
-  if (!t) return false;
-  if (cityAt(S, r, c)) return false;            // Städte blockieren
-  if (armyAt(S, r, c)) return false;            // nicht auf andere Armeen (nicht stapelbar)
-  if (TERRAIN[t].block) return false;           // Vulkan: unpassierbar, auch für die Luftwaffe
-  if (has(p, 'luftwaffe')) return true;         // Luftwaffe ignoriert Gelände
+  if (!t || isOff(t)) return false;             // außerhalb der Karte
+  const flieger = has(p, 'luftwaffe');
+  const stadt = cityAt(S, r, c);
+  if (stadt && !(flieger && stadt.owner !== pi)) return false;
+  const armee = armyAt(S, r, c);
+  if (armee && !(flieger && armee.owner !== pi)) return false;
+  if (TERRAIN[t].block && !flieger) return false;   // Vulkan
+  if (flieger) return true;                         // Gelände ist der Luftwaffe gleich
   if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
   return true;
 }
-// Darf die Armee auf diesem Feld anhalten? Auf Meer nur mit Panzerschiff oder Luftwaffe,
-// NICHT mit bloßer Navigation (die erlaubt nur das Durchqueren).
+/* Darf die Armee auf diesem Feld ANHALTEN? Auf Meer nur mit Panzerschiff oder Luftwaffe,
+   NICHT mit bloßer Navigation (die erlaubt nur das Durchqueren). Und alles, was allein
+   die Luftwaffe passieren lässt – Vulkane, gegnerische Armeen, gegnerische Städte –, ist
+   ein Überflug und kein Landeplatz. */
 function canStop(S, pi, r, c) {
   if (!canPass(S, pi, r, c)) return false;
   const t = terrainAt(S, r, c);
+  if (TERRAIN[t].block) return false;               // Vulkan: nur überfliegen
+  if (cityAt(S, r, c)) return false;                // fremde Stadt: nur überfliegen
+  if (armyAt(S, r, c)) return false;                // fremde Armee: nur überfliegen
   if (!TERRAIN[t].land && !(has(S.players[pi], 'panzerschiff') || has(S.players[pi], 'luftwaffe')))
     return false;
   return true;
@@ -973,23 +986,74 @@ function growFree(S, pi, city, n, why) {
   else log(S, 'info', T('%s: kostenloses Wachstum (%s) nicht möglich – Nahrungsgrenze.', civOf(S.players[pi]).n, why));
   return done;
 }
-/* Darf der Siedlerweg über dieses Feld laufen? Land immer; Meer nur mit Navigation,
-   Panzerschiff oder Luftwaffe; Vulkane nie; Felder mit gegnerischen Armeen nie
-   (Regelheft: „Von gegnerischen Armeen besetzte Felder … zählen als unpassierbar"). */
-function foundPassable(S, pi, r, c) {
+/* Gegnerisches Territorium: alle beherrschten Felder ANDERER, noch lebender Reiche –
+   Stadtumland und per Kolonialismus gekaufte Felder, so wie controlledTiles es überall
+   im Spiel versteht (Stadtfelder selbst gehören dort nicht dazu, die prüft
+   foundPassable eigens). Ein Feld, das auch im eigenen Gebiet liegt, sperrt nicht:
+   das eigene Herrschaftsrecht gilt vor dem fremden.
+   Wird EINMAL je Wegsuche berechnet und mitgegeben – je Feld wäre es zu teuer. */
+function foreignTerritory(S, pi) {
+  const fremd = new Set();
+  S.players.forEach((_, i) => {
+    if (i === pi || S.players[i].dead) return;
+    controlledTiles(S, i).forEach(k => fremd.add(k));
+  });
+  controlledTiles(S, pi).forEach(k => fremd.delete(k));
+  return fremd;
+}
+/* Darf der Siedlerweg über dieses Feld laufen?
+   Land immer; Meer nur mit Navigation, Panzerschiff oder Luftwaffe; Kartenlöcher nie.
+   Gesperrt sind Vulkane, Felder mit gegnerischen Armeen, gegnerische Städte und
+   gegnerisches Territorium (Regelheft: „Von gegnerischen Armeen besetzte Felder und
+   gegnerische Territorien … zählen als unpassierbar").
+   Die Luftwaffe überfliegt all das – für den Siedler ist ein Überflug ein Weg, anders
+   als bei der Armee gibt es hier kein „anhalten".
+
+   `opts.fremd` ist das vorberechnete gegnerische Gebiet; fehlt es, wird es hier
+   ermittelt (reicht für Einzelabfragen, für eine Wegsuche wäre es zu teuer).
+   `opts.frei` lässt eine Sorte Hindernis versuchsweise durch ('wasser' oder 'gebiet') –
+   damit findet foundBlockReason heraus, woran ein Weg scheitert, ohne die Regel ein
+   zweites Mal aufzuschreiben. */
+function foundPassable(S, pi, r, c, opts) {
   const p = S.players[pi];
+  const frei = (opts || {}).frei;
   const t = terrainAt(S, r, c);
-  if (!t || TERRAIN[t].block) return false;
-  if (!TERRAIN[t].land && !(has(p, 'navigation') || has(p, 'panzerschiff') || has(p, 'luftwaffe'))) return false;
+  if (!t || isOff(t)) return false;                 // außerhalb der Karte
+  if (has(p, 'luftwaffe')) return true;             // fliegt über Gelände, Armeen und Grenzen
+  if (!TERRAIN[t].land && frei !== 'wasser'
+    && !(has(p, 'navigation') || has(p, 'panzerschiff'))) return false;
+  if (TERRAIN[t].block) return false;               // Vulkan
   const a = armyAt(S, r, c);
   if (a && a.owner !== pi) return false;
+  const stadt = cityAt(S, r, c);
+  if (stadt && stadt.owner !== pi) return false;
+  if (frei !== 'gebiet') {
+    const fremd = (opts || {}).fremd || foreignTerritory(S, pi);
+    if (fremd.has(key(r, c))) return false;
+  }
   return true;
 }
 /* Distanz zur Hauptstadt in passierbaren Feldern, oder null, wenn es keinen Weg gibt. */
 function foundDistance(S, pi, r, c) {
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
   if (!cap) return 0;
-  return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc));
+  const fremd = foreignTerritory(S, pi);
+  return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd }));
+}
+/* Warum gibt es keinen Weg? Nur für die Meldung, und die soll stimmen: „dafür fehlt
+   Navigation" ist falsch, wenn ein Vulkan im Weg liegt, und „das Gelände sperrt" ist
+   falsch, wenn es die Grenze des Nachbarn ist. Ermittelt wird das, indem die Wegsuche je
+   einmal mit einer erlassenen Hindernissorte wiederholt wird: hilft das Erlassen, lag es
+   daran. Läuft nur, wenn schon feststeht, dass es keinen Weg gibt – also selten. */
+function foundBlockReason(S, pi, r, c) {
+  const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
+  if (!cap) return 'gelaende';
+  const fremd = foreignTerritory(S, pi);
+  const gehtOhne = frei =>
+    pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd, frei })) != null;
+  if (gehtOhne('wasser')) return 'wasser';
+  if (gehtOhne('gebiet')) return 'gebiet';
+  return 'gelaende';
 }
 /* Eine Stadt kostet Stadtkosten + Distanzkosten. Zwei Vergünstigungen greifen daran an:
    Englands „Kolonisten" streicht die Stadtkosten, Kartografie die Distanzkosten. Hat man
@@ -1029,8 +1093,12 @@ function canFound(S, pi, r, c) {
   if (enemyArmyAdjacent(S, pi, r, c)) return T('Nicht direkt neben einer gegnerischen Armee.');
   // Es muss einen Weg über passierbare Felder von der Hauptstadt aus geben – auch mit
   // Kartografie, die nur die Distanzkosten erlässt, nicht die Erreichbarkeit.
-  if (foundDistance(S, pi, r, c) == null)
-    return T('Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.');
+  if (foundDistance(S, pi, r, c) == null) {
+    const grund = foundBlockReason(S, pi, r, c);
+    if (grund === 'wasser') return T('Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.');
+    if (grund === 'gebiet') return T('Kein Weg dorthin – gegnerisches Gebiet sperrt ihn.');
+    return T('Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.');
+  }
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return T('Mindestens 3 Felder Abstand zu allen Städten.');
   const cost = foundCost(S, pi, r, c);
   if (available(S, pi, 'food') < cost) return T('Zu wenig Nahrung (%s nötig).', cost);

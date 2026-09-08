@@ -489,6 +489,10 @@ const UI_EN = {
   'Kein Feld.': 'No tile.',
   'Kein Reich mit Sieganspruch ist noch im Spiel – es geht weiter.': 'No empire with a victory claim is left in the game – play continues.',
   'Kein bezahlter Kopierweg erforscht.': 'No paid way of copying researched.',
+  'Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.':
+    'No route there – terrain or enemy armies block it.',
+  'Kein Weg dorthin – gegnerisches Gebiet sperrt ihn.':
+    'No route there – enemy territory blocks it.',
   'Kein kostenloses Wachstum verfügbar.': 'No free growth available.',
   'Kolonialismus nicht erforscht.': 'Colonialism not researched.',
   'Kultursieg (Weltwunder der Stufe 3)': 'Cultural victory (level 3 wonder)',
