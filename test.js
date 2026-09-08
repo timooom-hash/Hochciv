@@ -266,8 +266,9 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     const S = newGame({
       players: [{ civ: 'russland', kind: 'bot' }, { civ: 'england', kind: 'human' }], seed: 7,
     });
-    const g = S.map.grid || S.map;
-    for (let r = 0; r < g.length; r++) for (let c = 0; c < g[r].length; c++) g[r][c] = 'G';
+    // S.map.rows ist eine Liste von ZEICHENKETTEN, kein zweidimensionales Feld:
+    // die frühere Schleife über g[r][c] lief ins Leere und ließ die Karte, wie sie war.
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
     S.cities.length = 0; S.armies.length = 0; S.sieges = {};
     return S;
   };
@@ -1483,6 +1484,205 @@ const setEvent = (S, k) => {
   eq(foundPassable(A, 0, path[0], path[1]), true, 'freies Landfeld ist passierbar');
   A.armies.push({ id: 810, owner: 1, r: path[0], c: path[1], mp: 0, born: 0 });
   eq(foundPassable(A, 0, path[0], path[1]), false, 'Feld mit gegnerischer Armee nicht');
+}
+
+/* ================= Was sperrt den Siedlerweg – und was die Luftwaffe überfliegt
+   Gebaut wird eine flache Graslandkarte, Hauptstadt 5/5, Ziel 5/9, und quer dazwischen
+   eine Sperrmauer über die ganze Kartenhöhe (Spalte 7). Regelstand ab v63:
+
+   • gegnerische Armeen, gegnerische Städte UND gegnerisches Territorium sperren
+     (Regelheft: „besetzte Felder und gegnerische Territorien … zählen als unpassierbar\"),
+   • Vulkane sperren,
+   • Wasser sperrt ohne Navigation/Panzerschiff/Luftwaffe,
+   • die LUFTWAFFE überfliegt all das — Gelände, Grenzen, Armeen, Städte,
+   • Kartenlöcher (X) sperren immer, auch mit Luftwaffe: sie sind kein Gelände, sondern
+     das Draußen der Karte,
+   • eigene Armeen und eigene Städte sperren den eigenen Siedler nie.                    */
+{
+  const flacheKarte = () => {
+    const S = mk('england');
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));   // alles Grasland
+    S.cities.length = 0; S.armies.length = 0; S.sieges = {}; S.bought = {};
+    S.cities.push({ id: S.nextId++, owner: 0, r: 5, c: 5, pop: 3, cap: true, grown: 0, born: -1 });
+    S.players[0].res = { sci: 0, food: 999, coins: 0 };
+    return S;
+  };
+  const SP = 7, ZR = 5, ZC = 9;
+  const setT = (S, r, c, t) => { S.map.rows[r] = S.map.rows[r].slice(0, c) + t + S.map.rows[r].slice(c + 1); };
+  // Mauer einer Sorte über die ganze Kartenhöhe, dazu die gewünschten Technologien
+  const mitMauer = (sorte, techs = []) => {
+    const S = flacheKarte();
+    techs.forEach(t => { S.players[0].techs[t] = true; });
+    for (let r = 0; r < S.map.rows.length; r++) {
+      if (sorte === 'V' || sorte === 'M' || sorte === 'X') setT(S, r, SP, sorte);
+      else if (sorte === 'feindarmee') S.armies.push({ id: S.nextId++, owner: 1, r, c: SP, mp: 0, born: -1 });
+      else if (sorte === 'eigenarmee') S.armies.push({ id: S.nextId++, owner: 0, r, c: SP, mp: 0, born: -1 });
+      else if (sorte === 'feindgebiet') S.bought[1] = (S.bought[1] || []).concat([key(r, SP)]);
+    }
+    return S;
+  };
+  const weg = S => foundDistance(S, 0, ZR, ZC);
+
+  eq(weg(flacheKarte()), 4, 'ohne Mauer führt ein Weg von 4 Feldern zum Ziel');
+  eq(canFound(flacheKarte(), 0, ZR, ZC), null, 'und gegründet werden darf dort');
+
+  // --- was sperrt
+  eq(weg(mitMauer('V')), null, 'eine Vulkanmauer sperrt den Weg');
+  eq(weg(mitMauer('X')), null, 'ein Kartenloch sperrt den Weg');
+  eq(weg(mitMauer('M')), null, 'eine Meeresmauer sperrt ohne Schiffstechnik');
+  eq(weg(mitMauer('feindarmee')), null, 'gegnerische Armeen sperren den Weg');
+  eq(weg(mitMauer('feindgebiet')), null, 'gegnerisches Territorium sperrt den Weg');
+  eq(foundCost(mitMauer('feindgebiet'), 0, ZR, ZC), Infinity, 'ohne Weg nicht bezahlbar, sondern unmöglich');
+  eq(typeof canFound(mitMauer('feindgebiet'), 0, ZR, ZC), 'string', 'und nicht gründbar');
+
+  // --- was nicht sperrt: das Eigene
+  eq(weg(mitMauer('eigenarmee')), 4, 'eigene Armeen sperren den eigenen Siedler nicht');
+  eq(canFound(mitMauer('eigenarmee'), 0, ZR, ZC), null, 'dahinter darf gegründet werden');
+  {
+    // eine eigene Stadt in der Lücke einer Vulkanmauer: der Siedler geht hindurch
+    const S = flacheKarte();
+    for (let r = 0; r < S.map.rows.length; r++) if (r !== ZR) setT(S, r, SP, 'V');
+    S.cities.push({ id: S.nextId++, owner: 0, r: ZR, c: SP, pop: 2, cap: false, grown: 0, born: -1 });
+    eq(foundDistance(S, 0, ZR, 11) != null, true, 'durch die eigene Stadt führt ein Weg');
+  }
+  {
+    // dieselbe Lücke, aber eine FREMDE Stadt: gesperrt – mit Luftwaffe überflogen
+    const bauen = () => {
+      const S = flacheKarte();
+      for (let r = 0; r < S.map.rows.length; r++) if (r !== ZR) setT(S, r, SP, 'V');
+      S.cities.push({ id: S.nextId++, owner: 1, r: ZR, c: SP, pop: 2, cap: true, grown: 0, born: -1 });
+      return S;
+    };
+    eq(foundDistance(bauen(), 0, ZR, 11), null, 'eine fremde Stadt sperrt die Lücke');
+    const L = bauen(); L.players[0].techs.luftwaffe = true;
+    eq(foundDistance(L, 0, ZR, 11) != null, true, 'die Luftwaffe fliegt über die fremde Stadt');
+  }
+  {
+    // Ein Feld, das BEIDEN gehört, sperrt nicht: das eigene Recht gilt vor dem fremden.
+    const S = mitMauer('feindgebiet');
+    S.bought[0] = S.map.rows.map((_, r) => key(r, SP));
+    eq(weg(S), 4, 'eigenes Gebiet hebt die fremde Sperre auf');
+    eq(foreignTerritory(S, 0).size, 0, 'dann ist kein Feld mehr fremdes Gebiet');
+  }
+
+  // --- Wasser ist eine Frage der Technik
+  eq(weg(mitMauer('M', ['navigation'])), 4, 'Navigation führt über das Wasser');
+  eq(weg(mitMauer('M', ['panzerschiff'])), 4, 'Panzerschiff auch');
+  eq(weg(mitMauer('M', ['luftwaffe'])), 4, 'Luftwaffe auch');
+
+  // --- die Luftwaffe überfliegt alles außer dem Draußen der Karte
+  eq(weg(mitMauer('V', ['luftwaffe'])), 4, 'die Luftwaffe fliegt über einen Vulkan');
+  eq(weg(mitMauer('feindarmee', ['luftwaffe'])), 4, 'und über gegnerische Armeen');
+  eq(weg(mitMauer('feindgebiet', ['luftwaffe'])), 4, 'und über gegnerisches Gebiet');
+  eq(canFound(mitMauer('feindgebiet', ['luftwaffe']), 0, ZR, ZC), null, 'dahinter darf sie gründen');
+  eq(weg(mitMauer('X', ['luftwaffe'])), null, 'aber nicht über ein Kartenloch');
+
+  /* Die Meldung muss den richtigen Grund nennen: „dafür fehlt Navigation\" ist falsch,
+     wenn ein Vulkan im Weg liegt, und „das Gelände sperrt\" ist falsch, wenn es die
+     Grenze des Nachbarn ist. */
+  eq(canFound(mitMauer('M'), 0, ZR, ZC), 'Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.',
+    'bei Wasser nennt die Meldung die fehlende Technik');
+  eq(canFound(mitMauer('V'), 0, ZR, ZC), 'Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.',
+    'bei einem Vulkan nennt sie das Gelände');
+  eq(canFound(mitMauer('feindarmee'), 0, ZR, ZC), 'Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.',
+    'bei gegnerischen Armeen auch');
+  eq(canFound(mitMauer('feindgebiet'), 0, ZR, ZC), 'Kein Weg dorthin – gegnerisches Gebiet sperrt ihn.',
+    'bei gegnerischem Gebiet nennt sie die Grenze');
+  eq([foundBlockReason(mitMauer('M'), 0, ZR, ZC), foundBlockReason(mitMauer('V'), 0, ZR, ZC),
+      foundBlockReason(mitMauer('feindgebiet'), 0, ZR, ZC)],
+    ['wasser', 'gelaende', 'gebiet'], 'die drei Gründe sind einzeln ablesbar');
+
+  /* OFFEN (bewusst nicht mitgeändert): gesperrt ist der WEG. Auf einem einzelnen
+     fremden Feld, das man von außen erreicht, darf weiter gegründet werden – pathSteps
+     prüft das Zielfeld nie, und canFound hat dafür keine eigene Regel. Praktisch nur
+     bei per Kolonialismus gekauften Feldern möglich: das Umland fremder Städte liegt
+     ohnehin näher als drei Felder an einer Stadt. Wer das auch sperren will, sagt es. */
+  {
+    const S = flacheKarte();
+    S.bought[1] = [key(ZR, ZC)];
+    eq(canFound(S, 0, ZR, ZC), null, 'auf einem fremden Einzelfeld darf noch gegründet werden');
+  }
+
+  /* Der Bot-Siedler steht unter derselben Sperre. Sonst wäre die Regel ein einseitiger
+     Nachteil des Menschen: der Bot zöge weiter quer durch fremdes Land. Geprüft an der
+     Wegsuche, mit der der Bot sein Ziel wählt (settleDistances → botSettlerPass). */
+  {
+    const S = mitMauer('feindgebiet');
+    eq(settleDistances(S, 0, 5, 5).has(key(ZR, 8)), false,
+      'der Bot-Siedler kommt nicht durch gegnerisches Gebiet');
+    eq(botSettlerPass(S, 0, ZR, SP), false, 'das Mauerfeld ist für ihn gesperrt');
+    const L = mitMauer('feindgebiet', ['luftwaffe']);
+    eq(settleDistances(L, 0, 5, 5).has(key(ZR, 8)), true,
+      'mit Luftwaffe kommt er hindurch');
+    // eigene Armeen sperren den Bot-Siedler weiter (unveränderte Bewegungsregel)
+    eq(botSettlerPass(mitMauer('eigenarmee'), 0, ZR, SP), false,
+      'eigene Armeen sperren den Bot-Siedler wie bisher');
+  }
+}
+
+/* ================= Luftwaffe bei der Armeebewegung: überfliegen, nicht landen
+   Ab v63 überfliegt die Luftwaffe Vulkane, gegnerische Armeen und gegnerische Städte.
+   Anhalten darf sie dort nicht – ein Überflug ist kein Landeplatz. Eigene Armeen und
+   eigene Städte sperren weiter für jeden (Armeen stapeln nicht, und in der eigenen
+   Stadt blockierte die Armee den Bauplatz).                                            */
+{
+  const bau = (techs = []) => {
+    const S = mk('england', techs);
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.cities.length = 0; S.armies.length = 0; S.sieges = {}; S.bought = {};
+    S.cities.push({ id: S.nextId++, owner: 0, r: 5, c: 5, pop: 3, cap: true, grown: 0, born: -1 });
+    return S;
+  };
+  const setT = (S, r, c, t) => { S.map.rows[r] = S.map.rows[r].slice(0, c) + t + S.map.rows[r].slice(c + 1); };
+  const paare = (S) => [canPass(S, 0, 5, 7), canStop(S, 0, 5, 7)];
+
+  // Vulkan
+  { const S = bau(); setT(S, 5, 7, 'V');
+    eq(paare(S), [false, false], 'ohne Luftwaffe ist ein Vulkan gesperrt'); }
+  { const S = bau(['luftwaffe']); setT(S, 5, 7, 'V');
+    eq(paare(S), [true, false], 'mit Luftwaffe überfliegbar, aber kein Halteplatz'); }
+  // gegnerische Armee
+  { const S = bau(); S.armies.push({ id: 1, owner: 1, r: 5, c: 7, mp: 0, born: -1 });
+    eq(paare(S), [false, false], 'ohne Luftwaffe sperrt eine gegnerische Armee'); }
+  { const S = bau(['luftwaffe']); S.armies.push({ id: 1, owner: 1, r: 5, c: 7, mp: 0, born: -1 });
+    eq(paare(S), [true, false], 'mit Luftwaffe überfliegbar, aber kein Halteplatz'); }
+  // gegnerische Stadt
+  { const S = bau(); S.cities.push({ id: 9, owner: 1, r: 5, c: 7, pop: 2, cap: true, grown: 0, born: -1 });
+    eq(paare(S), [false, false], 'ohne Luftwaffe sperrt eine gegnerische Stadt'); }
+  { const S = bau(['luftwaffe']); S.cities.push({ id: 9, owner: 1, r: 5, c: 7, pop: 2, cap: true, grown: 0, born: -1 });
+    eq(paare(S), [true, false], 'mit Luftwaffe überfliegbar, aber kein Halteplatz'); }
+  // das Eigene bleibt gesperrt, auch mit Luftwaffe
+  { const S = bau(['luftwaffe']); S.armies.push({ id: 1, owner: 0, r: 5, c: 7, mp: 0, born: -1 });
+    eq(paare(S), [false, false], 'eigene Armeen stapeln auch mit Luftwaffe nicht'); }
+  { const S = bau(['luftwaffe']); S.cities.push({ id: 9, owner: 0, r: 5, c: 7, pop: 2, cap: false, grown: 0, born: -1 });
+    eq(paare(S), [false, false], 'in die eigene Stadt zieht auch die Luftwaffe nicht'); }
+  // Kartenloch
+  { const S = bau(['luftwaffe']); setT(S, 5, 7, 'X');
+    eq(paare(S), [false, false], 'ein Kartenloch bleibt auch für die Luftwaffe draußen'); }
+
+  /* Zusammengesetzt: eine Mauer aus gegnerischen Armeen über die ganze Kartenhöhe.
+     Ohne Luftwaffe kommt niemand hindurch; mit Luftwaffe steht das Feld DAHINTER als
+     Ziel bereit, die Mauerfelder selbst aber nicht. */
+  const mauerspiel = techs => {
+    const S = bau(techs);
+    for (let r = 0; r < S.map.rows.length; r++)
+      S.armies.push({ id: S.nextId++, owner: 1, r, c: 7, mp: 0, born: -1 });
+    const armee = { id: S.nextId++, owner: 0, r: 5, c: 6, mp: moveAllowance(S, 0), born: -1 };
+    S.armies.push(armee);
+    return { S, armee, reach: armyReach(S, armee) };
+  };
+  {
+    const { reach } = mauerspiel();
+    eq(reach.has(key(5, 8)), false, 'ohne Luftwaffe ist hinter der Mauer nichts erreichbar');
+  }
+  {
+    const { S, armee, reach } = mauerspiel(['luftwaffe']);
+    eq(reach.has(key(5, 8)), true, 'mit Luftwaffe ist das Feld hinter der Mauer erreichbar');
+    eq(reach.has(key(5, 7)), false, 'das Mauerfeld selbst ist kein Ziel');
+    eq(typeof moveArmy(S, armee, 5, 7), 'string', 'darauf ziehen wird abgelehnt');
+    eq(moveArmy(S, armee, 5, 8), null, 'darüber hinweg ziehen ist erlaubt');
+    eq([armee.r, armee.c], [5, 8], 'die Armee steht hinter der Mauer');
+  }
 }
 
 /* ============================== Oxford kann die Singularität erforschen */

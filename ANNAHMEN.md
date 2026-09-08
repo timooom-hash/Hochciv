@@ -35,6 +35,14 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
 - Armeen sind **nicht stapelbar**: kein Feld trägt zwei Armeen. Sie dürfen auf **keine Stadt**
   ziehen, auch nicht auf eine eigene. Eine frisch gebaute Armee steht im Zug ihrer Entstehung
   auf dem Stadtfeld und muss es im selben Zug verlassen.
+- **Die Luftwaffe überfliegt, was andere sperrt (v63, Anweisung des Autors):** Vulkane,
+  Felder mit gegnerischen Armeen und gegnerische Städte darf sie **durchqueren**, aber nicht
+  als Zugziel wählen — ein Überflug ist kein Landeplatz. Getrennt in `canPass` (durchqueren)
+  und `canStop` (anhalten); `armyReach` filtert die Ziele bereits über `canStop`, deshalb
+  greift die Trennung überall gleich, auch bei den Bots.
+  **Gesperrt bleiben auch für sie:** eigene Armeen (nicht stapelbar), eigene Städte (dort
+  blockierte die Armee den Bauplatz) und Kartenlöcher (X) — die sind kein Gelände, sondern
+  das Draußen der Karte.
 - Reichweite: 3 Felder, mit Panzerschiff 6, mit Luftwaffe faktisch unbegrenzt (Wert 9, ignoriert
   Gelände). Ein durch Forschung gewonnener Reichweitensprung wirkt **sofort im selben Zug** –
   die Erhöhung wird der Restbewegung der eigenen Armeen gutgeschrieben.
@@ -229,9 +237,29 @@ mindestens 3 Felder Abstand zu jeder Stadt):
   wich die Rechnung auf die Luftlinie aus, wodurch man als England ohne Navigation auf einer
   Insel siedeln konnte (behoben 17.8.). Kartografie erlässt nur die Distanzkosten, nicht die
   Erreichbarkeit.
-  **Nicht umgesetzt, weil es eine echte Regeländerung wäre:** Das Regelheft zählt auch
-  „gegnerische Territorien" als unpassierbar und verbietet das Gründen daneben. Das würde die
-  Ausbreitung zwischen zwei Reichen stark einschränken – sag Bescheid, wenn es rein soll.
+  **Gegnerisches Territorium sperrt den Weg (v63, Anweisung des Autors).** Damit ist die
+  Regelheft-Klausel umgesetzt: als unpassierbar zählen jetzt Felder mit gegnerischen Armeen,
+  **gegnerische Städte** und **gegnerisches Territorium** — Stadtumland und per Kolonialismus
+  gekaufte Felder anderer, noch lebender Reiche, so wie `controlledTiles` Herrschaft überall
+  im Spiel versteht (`foreignTerritory`). Ein Feld, das auch im eigenen Gebiet liegt, sperrt
+  nicht: das eigene Herrschaftsrecht gilt vor dem fremden. Berechnet wird das Gebiet **einmal
+  je Wegsuche**, nicht je Feld — je Feld war es zu teuer.
+  Es gilt für **Bots genauso** (`botSettlerPass`), sonst wäre die Sperre ein einseitiger
+  Nachteil des Menschen: der Bot-Siedler zöge weiter quer durch fremdes Land.
+  **Die Luftwaffe überfliegt all das (v63):** Gelände, Vulkane, gegnerische Armeen,
+  gegnerische Städte und Grenzen. Für den Siedler ist ein Überflug ein Weg — anders als bei
+  der Armee gibt es hier kein „anhalten". Nur Kartenlöcher (X) bleiben gesperrt.
+  Die Meldung nennt den Grund getrennt (`foundBlockReason`: `wasser` / `gebiet` / `gelaende`),
+  weil „dafür fehlt Navigation" bei einer Grenze oder einem Vulkan schlicht falsch wäre.
+  Alles davon steht in `test.js`, Abschnitt „Was sperrt den Siedlerweg".
+  **Zwei Dinge sind dabei bewusst NICHT mitgeändert worden:**
+  · Die zweite Hälfte der Klausel — „**neben** gegnerischen Territorien darf nicht gegründet
+    werden" — ist weiter nicht umgesetzt. Verlangt war die Unpassierbarkeit, und das
+    Nachbarschaftsverbot würde die Ausbreitung noch deutlich stärker einengen.
+  · Gesperrt ist der **Weg**, nicht das Zielfeld. Auf einem einzelnen fremden Feld, das man
+    von außen erreicht, darf weiter gegründet werden (`pathSteps` prüft das Zielfeld nie,
+    und `canFound` hat dafür keine eigene Regel). Praktisch nur bei gekauften Feldern
+    möglich: das Umland fremder Städte liegt ohnehin näher als drei Felder an einer Stadt.
 - **Nicht direkt neben einer gegnerischen Armee.** Gilt für Menschen (`canFound`) und Bots
   (`settleable`) gleichermaßen; eigene Armeen stören nicht, zwei Felder Abstand genügt.
 - **Ausweichen des Bot-Siedlers** (Fehlerbehebung 17.8.): Zeigt die gewürfelte Richtung ins

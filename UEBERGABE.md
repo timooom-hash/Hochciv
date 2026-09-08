@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 7.9., `sw.js` v61)
+# Hochzeivilization — Projekt-Übergabe (Stand 8.9., `sw.js` v63)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -30,18 +30,18 @@ und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1172 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1176 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 375 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1565 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1633 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 518 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 479 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/bots.js` | 491 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1888 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4080 | **1181 Assertions**, `node test.js` |
+| `test.js` | 4280 | **1230 Assertions**, `node test.js` |
 | `smoke.js` | 2143 | **105 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
@@ -174,9 +174,31 @@ Gedächtnis rekonstruieren.
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
+### Grenzen sperren, die Luftwaffe fliegt darüber (v63)
+
+Auf Anweisung des Autors geändert, mit 27 neuen Assertions festgeschrieben (`test.js`,
+Abschnitte „Was sperrt den Siedlerweg" und „Luftwaffe bei der Armeebewegung").
+
+**Siedeln.** Unpassierbar sind jetzt zusätzlich **gegnerisches Territorium**
+(`foreignTerritory`: Stadtumland und gekaufte Felder anderer, noch lebender Reiche) und
+**gegnerische Städte** — vorher sperrten nur gegnerische Armeen, Vulkane und Wasser ohne
+Technik. Ein Feld, das auch im eigenen Gebiet liegt, sperrt nicht. Gilt für Bots genauso
+(`botSettlerPass` in `bots.js`), sonst wäre die Sperre ein einseitiger Nachteil des
+Menschen. Die Meldung nennt den Grund getrennt: Wasser, Gebiet oder Gelände.
+
+**Luftwaffe.** Sie überfliegt Vulkane, gegnerische Armeen, gegnerische Städte und Grenzen —
+beim Siedeln als vollwertiger Weg, bei der Armee **nur als Durchflug**: anhalten darf sie
+dort nicht. Dafür ist `canPass` (durchqueren) von `canStop` (anhalten) getrennt; `armyReach`
+filtert Ziele über `canStop`, also greift die Trennung auch bei den Bots. Gesperrt bleiben
+für alle: eigene Armeen, eigene Städte und Kartenlöcher (X).
+
+**Aufwand:** keiner, der auffällt. `test.js` 12,2 s → 12,9 s, `smoke.js` 45,0 s → 46,9 s.
+Das gegnerische Gebiet wird einmal je Wegsuche berechnet, nicht je Feld; die
+Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keinen Weg gibt.
+
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1181 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1230 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (105 Schritte), inklusive
@@ -390,6 +412,16 @@ wirkt sofort · England kann Nahrung für Forschung ausgeben · Internet-Gratisk
 Navigation-Armeen halten nicht auf Wasser · v2-Tech-Labels · leeres Bot-Fenster (Log-Kappung).
 
 Aus diesem Chat:
+- **Falsche Meldung beim Siedeln (v62):** War kein Weg zum Zielfeld frei, hieß es immer
+  „Nicht erreichbar — dafür fehlt Navigation oder Panzerschiff". Bei einer Vulkanmauer,
+  einem Kartenloch oder gegnerischen Armeen ist das schlicht falsch: dagegen hilft keine
+  Schiffstechnik. `foundBlockReason` unterscheidet die Fälle jetzt (sucht einen Weg, der
+  Wasser erlauben würde — gibt es ihn, lag es am Wasser). Die Regeln sind unverändert.
+- **`flach()` in `test.js` zog die Karte nie glatt (v62):** `S.map.rows` ist eine Liste von
+  Zeichenketten, die Schleife über `g[r][c]` lief ins Leere. Die 14 Prüfungen der
+  Bot-Armeeprioritäten liefen also auf der erzeugten Karte, obwohl ihr Kommentar
+  ausdrücklich eine glattgezogene verlangt („damit nicht das Gelände das Ergebnis
+  bestimmt"). Behoben; alle Prüfungen bleiben grün.
 - Gentechnik/Massenmedien waren allgemeine Umtauschkurse — sind jetzt reines Füttern.
 - **Alchemie** erlaubte keine Wissenschaft → Nahrung; jetzt transitiv über Münzen (2:1, mit
   Gilden 1:1).
@@ -516,9 +548,11 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
 2. **Wikinger „Beutezüge"** funktioniert, zahlt aber selten: der Ertrag ist Angriffswert minus
    Verteidigungswert, und ein Mensch überbietet Bots (Machtwert = Gesamtbevölkerung) selten.
    Gemessen: mit Macht 30 über 20 Partien 1809 Beute, mit normal gekaufter Macht 0.
-3. **Regelheft-Klausel nicht umgesetzt:** „gegnerische Territorien zählen als unpassierbar,
-   neben ihnen darf nicht gegründet werden". Würde die Ausbreitung stark einschränken —
-   Entscheidung des Autors steht aus.
+3. **Regelheft-Klausel, zweite Hälfte:** „gegnerische Territorien zählen als unpassierbar"
+   ist in v63 umgesetzt (siehe unten). Offen bleibt „**neben** ihnen darf nicht gegründet
+   werden" — das war nicht verlangt und würde die Ausbreitung noch deutlich stärker
+   einengen. Ebenso offen: gesperrt ist der Weg, nicht das Zielfeld — auf einem von außen
+   erreichbaren gekauften Fremdfeld darf weiter gegründet werden.
 4. **Bot-Siedler** scheitert in späten Runden weiter gelegentlich, obwohl Platz da ist
    (Zufallslauf auf gefüllter Karte).
 5. **Plättchenkarten sind enger als die festen Karten:** 45 Felder je Reich (2 Spieler),
