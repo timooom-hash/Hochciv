@@ -84,7 +84,7 @@ const DATA_EN = {
     elektrizitaet: ['Electricity', 'Forest: +1 science'],
     biologie: ['Biology', 'Grassland: +1 science'],
     computertechnik: ['Computing', '1:1 coins → science'],
-    gentechnik: ['Genetic engineering', 'Use science to feed the population'],
+    gentechnik: ['Genetic engineering', 'One food per four science; also feeds 1:1'],
     raumfahrt: ['Spaceflight', 'One free technology with every wonder built'],
     ki: ['Artificial intelligence', 'Forest: +1 science'],
     landwirtschaft: ['Agriculture', 'Grassland: +1 food'],
@@ -133,7 +133,7 @@ const DATA_EN = {
     spionage: ['Espionage', 'Copy a tech (1× its cost in coins)'],
     militaergericht: ['Military tribunal', 'No population lost when conquering'],
     kolonialismus: ['Colonialism', 'Buy a tile for 5 coins'],
-    massenmedien: ['Mass media', 'Use coins to feed the population'],
+    massenmedien: ['Mass media', 'One coin feeds three population'],
     un: ['United Nations', '>1/2 of the population to win'],
     oekologie: ['Ecology', 'Cities: +1 food per 2 population (rounded down)'],
     internet: ['Internet', 'Copy 1 tech per round'],
@@ -332,8 +332,6 @@ const UI_EN = {
   'Schwierigkeit (alle Bots)': 'Difficulty (all bots)',
   'Startspieler*in': 'Starting player',
   'Spiel beginnen': 'Start game',
-  'Wer zuletzt ein Weltwunder gebaut hat, beginnt. Ansonsten: die erste menschliche Zivilisation in der Liste.':
-    'Whoever built a wonder most recently begins. Otherwise: the first human civilisation in the list.',
   '1 gegen 1: immer die Plättchenkarte aus sechs Dreiecken, dafür Wirtschaftssieg erst über 3/4 der Weltbevölkerung (mit Theologie 7/10, mit Vereinten Nationen 2/3).':
     '1 vs 1: always the tile map of six triangles, but an economic victory needs more than 3/4 of the world population (7/10 with Theology, 2/3 with the United Nations).',
   'Plättchenkarte: die offenen Dreiecke liegen gleich, das eigene legt jede*r selbst – Lage wählen, Hauptstadt setzen, verdeckt.':
@@ -350,7 +348,6 @@ const UI_EN = {
   'Zivilisation und Fähigkeit werden beim Spielstart ausgelost.':
     'Civilisation and ability are drawn when the game starts.',
   'Wird beim Spielstart ausgelost.': 'Drawn when the game starts.',
-  'Rasterkarte (12 × 8)': 'Grid map (12 × 8)',
   'Eigene Karte': 'Custom map',
   'Mindestens eine menschliche Zivilisation.': 'At least one human civilisation.',
 
@@ -364,6 +361,7 @@ const UI_EN = {
   'Münzen': 'Coins',
   'Macht': 'Power',
   'Forschen': 'Research',
+  'Forschung': 'Research',
   'Armeen': 'Armies',
   'Welt': 'World',
   'Protokoll': 'Log',
@@ -456,6 +454,7 @@ const UI_EN = {
   'Beutezüge des letzten Zuges: je %s Wissenschaft, Nahrung und Münzen.': 'Raids from the last turn: %s science, food and coins each.',
   'Beutezüge zu Zugende': 'Raids at the end of the turn',
   'Das Spiel endet am Ende dieser Runde (Runde %s).': 'The game ends at the end of this round (round %s).',
+  'Diese Quelle ernährt die Bevölkerung nicht.': 'This source does not feed the population.',
   'Die Bevölkerung ist schon vollständig versorgt.': 'The population is already fully fed.',
   'Die große Bibliothek': 'The Great Library',
   'Die letzte Bevölkerung darf nicht geopfert werden.': 'The last population cannot be sacrificed.',
@@ -483,6 +482,7 @@ const UI_EN = {
   'Feld nicht erreichbar.': 'Tile not reachable.',
   'Forschungssieg (Singularität)': 'Research victory (Singularity)',
   'Fremde Stadt.': 'Not your city.',
+  'Gentechnik': 'Genetic engineering',
   'Gentechnik nicht erforscht.': 'Genetic engineering not researched.',
   'Hängende Gärten': 'Hanging Gardens',
   'Kampf um %ss Stadt: Angriff %s > Verteidigung %s (Zug %s/2).': "Battle for %s's city: attack %s > defence %s (turn %s/2).",
@@ -509,6 +509,7 @@ const UI_EN = {
   'Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.': 'Not reachable – navigation or an ironclad is missing.',
   'Nicht genug Wissenschaft.': 'Not enough science.',
   'Nicht möglich.': 'Not possible.',
+  'Nichts abzugeben.': 'Nothing to give.',
   'Nichts zurückzunehmen.': 'Nothing to take back.',
   'Nur herrenlose Felder können gekauft werden.': 'Only unowned tiles can be bought.',
   'Nur in eigener Stadt.': 'Only in your own city.',
@@ -531,6 +532,7 @@ const UI_EN = {
   'Vulkanausbruch: Feld (1–%s)': 'Volcanic eruption: tile (1–%s)',
   'Vulkanausbruch: Stadt': 'Volcanic eruption: city',
   'Weltwunder bauen': 'Build wonder',
+  'Weltwunder im Stapel': 'World wonders in the pool',
   'Wer bis dahin ebenfalls eine Siegbedingung erfüllt, kommt in den Punktvergleich.': 'Anyone who also meets a victory condition by then joins the points comparison.',
   'Wirtschaftssieg (%s von %s Weltbevölkerung, Schwelle %s)': 'Economic victory (%s of %s world population, threshold %s)',
   'Wissenschaft': 'Science',
@@ -550,7 +552,12 @@ const UI_EN = {
   'keine verfügbar → eine auswürfeln (1–%s)': 'none available → roll one (1–%s)',
   'schließt die Belagerung ab': 'completes the siege',
   'stürmt die belagerte Hauptstadt': 'storms the besieged capital',
-  'versorgen die Bevölkerung – Nahrung %s': 'feed the population – food %s',
+  '%s · Forschung vor dem Legen': '%s · research before placing',
+  '%s: verfügbar (vor dem Legen ausgewürfelt):': '%s: available (rolled before placing):',
+  'Vor dem Legen ausgewürfelt – im Spiel steht genau das hier.':
+    'Rolled before placing – the game will show exactly this.',
+  '%s: %s %s versorgen %s Bevölkerung – Nahrung %s':
+    '%s: %s %s feed %s population – food %s',
 
 
   /* --- Blätter, Fenster und Meldungen der Oberfläche */
@@ -592,6 +599,7 @@ const UI_EN = {
     '<p class="sub" style="margin-top:10px">Cover from other sources – at most %s, so only the actual cost.</p>',
   '<p class="sub">%s <b>%s</b> ist dran. Das eigene Startplättchen sehen die anderen erst nach dem Aufdecken – jetzt also Gerät übergeben.</p> <button class="btn primary wide" id="pl-gate">Plättchen ansehen</button>':
     '<p class="sub">%s <b>%s</b> is up. The others only see your starting tile after the reveal – so hand the device over now.</p> <button class="btn primary wide" id="pl-gate">Look at the tile</button>',
+  'Alle Plättchen liegen schon.': 'All tiles are already placed.',
   'Alle Plättchen liegen offen. %s Reiche, %s Dreiecke.':
     'All tiles are face up. %s empires, %s triangles.',
   'Andere Reiche':
@@ -732,6 +740,10 @@ const UI_EN = {
     'Food deficit %s – food stays at 0.',
   'Nicht genug Münzen.':
     'Not enough coins.',
+  '1 %s deckt %s':
+    '1 %s covers %s',
+  'Münze':
+    'coin',
   'Nichts einzusetzen.':
     'Nothing to use.',
   'Noch %s kostenlose Technologie(n).':
@@ -857,8 +869,8 @@ const UI_EN = {
     'All technologies',
   'Alt. %s':
     'Alt. %s',
-  'Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik (Wissenschaft) und Massenmedien (Münzen) heben die Grenze auf: zu Zugbeginn lässt sich damit bestreiten, was die Bevölkerung isst – höchstens diese Kosten, also kein allgemeiner Umtausch.':
-    'Food production must not go negative: growth is blocked as soon as income would fall below 0 – measured on the permanent value, an event of this round does not count. Genetic engineering (science) and mass media (coins) lift that limit: at the start of your turn they can cover what the population eats – at most that cost, so no general exchange.',
+  'Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik und Massenmedien heben die Grenze auf: zu Zugbeginn ernährt jede Münze drei Bevölkerung, jede Wissenschaft eine – höchstens bis zur Höhe dessen, was die Bevölkerung isst, also kein allgemeiner Umtausch. Gentechnik bringt zusätzlich Nahrung ins Einkommen: je vier Wissenschaft eine.':
+    'Food production must not go negative: growth is blocked as soon as income would fall below 0 – measured on the permanent value, an event of this round does not count. Genetic engineering and mass media lift that limit: at the start of your turn each coin feeds three population and each science one – at most up to what the population eats, so no general exchange. Genetic engineering also adds food to your income: one food per four science.',
   'Einkommen aus allen Feldern rund um deine Städte plus Bevölkerung.':
     'Income from all tiles around your cities plus population.',
   'Ereignisse (Erweiterung)':
@@ -904,8 +916,6 @@ const UI_EN = {
     '<p>Left over: 0 🔬, 0 🌾, 2 🪙 – that expires. Then come combat and the victory check, then the bots.</p>',
   'Beende den Zug und klick dich durch die Bot-Fenster.':
     'End the turn and click through the bot windows.',
-  'Deine Hauptstadt und ihre Felder':
-    'Your capital and its tiles',
   'Der Gegenangriff als Verteidigung':
     'The counter-attack as defence',
   'Der Rest der Wissenschaft: Rad':
@@ -920,8 +930,6 @@ const UI_EN = {
     'The third city',
   'Die erste Armee':
     'The first army',
-  'Die erste Technologie':
-    'The first technology',
   'Die vierte Stadt':
     'The fourth city',
   'Die zweite Stadt':
@@ -962,8 +970,6 @@ const UI_EN = {
     'Tutorial: available technologies of Antiquity fixed – ',
   'Was die Bots getan haben':
     'What the bots did',
-  'Willkommen':
-    'Welcome',
   'Aktionen':
     'Actions',
   'Woher deine Ressourcen kommen':
@@ -987,8 +993,6 @@ const UI_EN = {
   /* --- Tutorial: die langen Erklärtexte */
   '<p><b>Fischerei</b> (Meer +1 Nahrung) und <b>Eisenverarbeitung</b> (Macht kostet 4 statt 5 Münzen) kosten jetzt beide <b>0 Wissenschaft</b> – der Rabatt frisst ihren Preis komplett auf.</p> <p><b>Warum diese zwei?</b> Fischerei macht deine Meeresfelder nutzbar, und Eisenverarbeitung senkt dauerhaft den Machtpreis – gleich brauchst du Macht. Gratis mitnehmen ist immer richtig; jede Technologie öffnet außerdem Zeitalter.</p> <p><b>So forschst du:</b> <b>Forschen</b> → beide Kacheln antippen, der Bogen bleibt offen.</p>':
     '<p><b>Fishing</b> (sea +1 food) and <b>ironworking</b> (power costs 4 instead of 5 coins) now both cost <b>0 science</b> – the discount eats their price entirely.</p> <p><b>Why these two?</b> Fishing makes your sea tiles usable, and ironworking permanently lowers the price of power – which you are about to need. Taking something for free is always right; and every technology opens up ages.</p> <p><b>How to research:</b> <b>Research</b> → tap both tiles, the sheet stays open.</p>',
-  '<p><b>Forschungssieg</b> – erforsche die <b>Singularität</b>: 100 Wissenschaft, mit Wissenschaftlicher Methode 90. Sie verlangt mindestens eine Technologie der <b>Moderne in jedem der vier Felder</b>. Für ein Reich, das früh auf Multiplikatoren gesetzt hat, ist das oft der kürzeste Weg.</p> <p><b>Wirtschaftssieg</b> – wenn du am Zugende über zwei Drittel der Weltbevölkerung hast, gewinnst du. Oben links neben dem Rundenzähler siehst du immer den aktuellen Bevölkerungsstand: gerade 7 von 33. Um hier eine realistische Chance zu haben, brauchst du meistens vier bis sechs Städte sowie einige der Technologien <b>Keramik</b>, <b>Verbundwerkstoffe</b>, <b>Theologie</b> oder <b>Vereinte Nationen</b>.</p> <p><b>Militärsieg</b> – erobere eine gegnerische Hauptstadt: zwei Züge in Folge stärker sein. Das ist der Weg, auf dem Bots für den menschlichen Spieler meist sehr bedrohlich sind.</p>':
-    '<p><b>Research victory</b> – research the <b>Singularity</b>: 100 science, 90 with the scientific method. It requires at least one <b>Modern Age technology in each of the four fields</b>. For an empire that went for multipliers early, this is often the shortest road.</p> <p><b>Economic victory</b> – if you hold more than two thirds of the world population at the end of your turn, you win. Top left, next to the round counter, you can always see the current population: right now 7 of 33. To have a realistic chance here you usually need four to six cities plus some of the technologies <b>pottery</b>, <b>composites</b>, <b>theology</b> or <b>United Nations</b>.</p> <p><b>Military victory</b> – capture an enemy capital: be stronger two turns in a row. This is the road on which bots are usually most dangerous to a human player.</p>',
   '<p><b>Ressourcen liegen lassen.</b> Wissenschaft, Nahrung und Münzen verfallen am Zugende. Wer 3 Münzen übrig hat, hätte sie in 1 Nahrung oder 1 Wissenschaft tauschen können – jede Runde ein kleiner Verlust, der sich summiert.</p> <p><b>Zu früh Macht kaufen.</b> Sie halbiert sich zu Beginn jedes Zuges. Kaufe sie in dem Zug, in dem du angreifst oder verteidigst, und dann in einem Rutsch.</p> <p><b>Wachsen ohne Nahrung.</b> Jede Bevölkerung isst dauerhaft 1 Nahrung. Ohne Landwirtschaft, Kunstdünger, Bewässerung oder Ökologie steht das Wachstum nach wenigen Punkten still.</p> <div class="tut-key"><b>Und die Faustregel</b> Am stärksten ist die <b>Kombination</b>: die wichtigsten Multiplikatoren – Schrift, Landwirtschaft, Papier, Wissenschaftliche Methode – <b>zusammen mit vielen Städten</b>. Jede Technologie wirkt auf jedes Feld und jede Bevölkerung, die du besitzt; jede neue Stadt vervielfacht rückwirkend alles, was du schon erforscht hast. Militär nur so viel, wie du zum Überleben brauchst.</div>':
     '<p><b>Leaving resources lying around.</b> Science, food and coins expire at the end of your turn. Anyone left with 3 coins could have traded them for 1 food or 1 science – a small loss every round that adds up.</p> <p><b>Buying power too early.</b> It halves at the start of every turn. Buy it in the turn in which you attack or defend, and then all at once.</p> <p><b>Growing without food.</b> Every population permanently eats 1 food. Without agriculture, fertiliser, irrigation or ecology, growth stalls after a few points.</p> <div class="tut-key"><b>And the rule of thumb</b> Strongest is the <b>combination</b>: the important multipliers – writing, agriculture, paper, scientific method – <b>together with many cities</b>. Every technology acts on every tile and every population you own; every new city retroactively multiplies everything you have already researched. Military only as much as you need to survive.</div>',
   '<p><b>Stadtmauern</b> (3 Wissenschaft) geben <b>jeder</b> deiner Städte +5 Verteidigung. <b>Burgenbau</b> (3) stellt in jede Stadt eine unbewegliche, virtuelle Armee: sie <b>projiziert deinen Machtwert auf die Stadt</b> – erst dadurch hilft gekaufte Macht auch der Verteidigung. Du hast 9 Wissenschaft.</p> <p>Verteidigung jetzt <b>1</b>, Angriff <b>5</b>. Mauern allein bringen dich auf 6 – der Bot wächst aber weiter. Deshalb kommt im nächsten Schritt noch Macht dazu.</p> <p><b>Warum beides?</b> Mauern wirken in allen Städten gleichzeitig, kosten einmalig und schrumpfen nicht. Burgenbau macht deine Macht verteidigungswirksam, ohne dass eine echte Armee neben der Stadt stehen muss – und die virtuelle Armee zählt nicht für die Kosten weiterer Armeen.</p>':
@@ -1035,8 +1039,8 @@ const UI_EN = {
     '<p>Researching writing opened up the Middle Ages of this category. That is why <b>paper</b> now appears in the sheet. It costs 6 science.</p> <p><b>Why paper?</b> It gives <b>+1 science on every grassland</b>. You control 5 grassland tiles, so that is 5 more science in <i>every</i> round for a one-off 6. After two rounds it has paid for itself several times over.</p>',
   '<p>Oben rechts in der Kopfzeile stehen 🔬 Wissenschaft, 🌾 Nahrung, 🪙 Münzen und ⚔︎ Macht. So setzen sie sich in diesem Zug zusammen:</p> <table class="tut-tab"> <tr><th align="left">Quelle</th><th>🔬</th><th>🌾</th><th>🪙</th></tr> <tr><td>4 × Grasland</td><td>·</td><td>4</td><td>·</td></tr><tr><td>1 × Wald</td><td>·</td><td>1</td><td>1</td></tr><tr><td>1 × Fluss</td><td>·</td><td>1</td><td>1</td></tr> <tr><td>1 Bevölkerung</td><td>1</td><td>-1</td><td>1</td></tr> <tr class="sum"><td>Summe</td><td>1</td><td>5</td><td>3</td></tr> </table> <div class="tut-key"><b>Merke</b> Ressourcen <b>verfallen am Zugende</b>. Nur Macht bleibt liegen. Gib also alles aus. Münzen können <b>2:1</b> als Nahrung oder Wissenschaft verwendet werden.</div>':
     '<p>At the top right of the header you see 🔬 science, 🌾 food, 🪙 coins and ⚔︎ power. This is how they add up this turn:</p> <table class="tut-tab"> <tr><th align="left">Source</th><th>🔬</th><th>🌾</th><th>🪙</th></tr> <tr><td>4 × grassland</td><td>·</td><td>4</td><td>·</td></tr><tr><td>1 × forest</td><td>·</td><td>1</td><td>1</td></tr><tr><td>1 × river</td><td>·</td><td>1</td><td>1</td></tr> <tr><td>1 population</td><td>1</td><td>-1</td><td>1</td></tr> <tr class="sum"><td>Total</td><td>1</td><td>5</td><td>3</td></tr> </table> <div class="tut-key"><b>Remember</b> Resources <b>expire at the end of the turn</b>. Only power carries over. So spend everything. Coins can be used <b>2:1</b> as food or science.</div>',
-  '<p>Weil jeder Bevölkerungspunkt dauerhaft 1 Nahrung verbraucht, darf deine <b>Nahrungsproduktion nie negativ</b> werden. Ist die Grenze erreicht, wird Wachstum gesperrt – verhungern tut aber niemand.</p> <p>Du produzierst gerade <b>19 Nahrung</b> über den Verbrauch hinaus. Deine Städte können zusammen also noch <b>19×</b> wachsen, bevor die Grenze greift – egal, wie du die Schritte auf die Städte verteilst.</p> <p>Dagegen hilft mehr Ertrag: <b>Landwirtschaft</b> auf Grasland, <b>Kunstdünger</b> im Wald, <b>Bewässerung</b> im Gebirge, <b>Ökologie</b>. Oder <b>Gentechnik</b> und <b>Massenmedien</b>: mit ihnen lässt sich zu Zugbeginn ein Teil dessen, was die Bevölkerung isst, aus Wissenschaft bzw. Münzen bestreiten – dann wird der 🌾-Knopf oben anklickbar.</p>':
-    '<p>Because every point of population permanently consumes 1 food, your <b>food production must never go negative</b>. Once the limit is reached, growth is blocked – but nobody starves.</p> <p>You are currently producing <b>19 food</b> beyond consumption. So your cities can grow <b>19×</b> in total before the limit bites – no matter how you spread the steps across the cities.</p> <p>More yield helps against that: <b>agriculture</b> on grassland, <b>fertiliser</b> in forest, <b>irrigation</b> in mountains, <b>ecology</b>. Or <b>genetic engineering</b> and <b>mass media</b>: with them, part of what the population eats can be covered from science or coins at the start of your turn – then the 🌾 button at the top becomes clickable.</p>',
+  '<p>Weil jeder Bevölkerungspunkt dauerhaft 1 Nahrung verbraucht, darf deine <b>Nahrungsproduktion nie negativ</b> werden. Ist die Grenze erreicht, wird Wachstum gesperrt – verhungern tut aber niemand.</p> <p>Du produzierst gerade <b>19 Nahrung</b> über den Verbrauch hinaus. Deine Städte können zusammen also noch <b>19×</b> wachsen, bevor die Grenze greift – egal, wie du die Schritte auf die Städte verteilst.</p> <p>Dagegen hilft mehr Ertrag: <b>Landwirtschaft</b> auf Grasland, <b>Kunstdünger</b> im Wald, <b>Bewässerung</b> im Gebirge, <b>Ökologie</b>. Oder <b>Gentechnik</b> und <b>Massenmedien</b>: damit ernährt zu Zugbeginn jede Münze drei Bevölkerung und jede Wissenschaft eine – dann wird der 🌾-Knopf oben anklickbar. <b>Gentechnik</b> bringt dir obendrein für je vier Wissenschaft eine Nahrung ins Einkommen.</p>':
+    '<p>Because every point of population permanently consumes 1 food, your <b>food production must never go negative</b>. Once the limit is reached, growth is blocked – but nobody starves.</p> <p>You are currently producing <b>19 food</b> beyond consumption. So your cities can grow <b>19×</b> in total before the limit bites – no matter how you spread the steps across the cities.</p> <p>More yield helps against that: <b>agriculture</b> on grassland, <b>fertiliser</b> in forest, <b>irrigation</b> in mountains, <b>ecology</b>. Or <b>genetic engineering</b> and <b>mass media</b>: with them, each coin feeds three population and each science one at the start of your turn – then the 🌾 button at the top becomes clickable. <b>Genetic engineering</b> also adds one food per four science to your income.</p>',
   '<p>Übrig ist 1 Wissenschaft – genau der Preis für <b>Rad</b> (1). Ungenutzte Wissenschaft verfällt zum Zugende, also raus damit.</p> <p><b>Warum Rad?</b> Es erlaubt <b>Straßen</b>. Die halbieren nicht nur die Bewegungskosten – sie verbinden auch deine Städte zu <b>Handelsrouten</b>, und die bringen jede Runde etwas ein. Gleich baust du die erste.</p> <div class="tut-key"><b>Merke</b> Wissenschaft, Nahrung und Münzen sind <b>Rundeneinkommen</b>, kein Vorrat: Was du am Zugende übrig hast, ist verloren. Plane deine Käufe so, dass am Ende möglichst wenig liegen bleibt.</div>':
     '<p>1 science is left – exactly the price of the <b>wheel</b> (1). Unused science expires at the end of the turn, so out with it.</p> <p><b>Why the wheel?</b> It allows <b>roads</b>. Those not only halve movement costs – they also connect your cities into <b>trade routes</b>, and those pay you something every round. You will build the first one in a moment.</p> <div class="tut-key"><b>Remember</b> Science, food and coins are <b>round income</b>, not a stock: whatever is left at the end of your turn is lost. Plan your purchases so that as little as possible stays behind.</div>',
   '<p>Übrig sind 0 🔬, 0 🌾, 2 🪙. Damit kannst du aktuell nichts anfangen, der Rest verfällt. Das ist normal in Runde 1.</p> <p>Danach ziehen die drei Bots.</p> <p><b>So beendest du:</b> unten rechts auf <b>Zug beenden</b>, dann im Bot-Fenster jeweils auf <b>Weiter</b>.</p>':
@@ -1108,8 +1112,6 @@ const UI_EN = {
     '<p>To threaten the Greek capital you have to beat its <b>defence value of 3</b>. These three steps do it:</p> <div class="tut-calc"> <div><span>research <b>siege engines</b> (+5 attack against cities)</span><b>2 🔬</b></div> <div><span>buy <b>3 power</b> (instead of 4)</span><b>12 🪙</b></div> <div><span>move your army onto the <b>golden tile</b> beside it</span><b>3 movement</b></div> </div> <p>After that your army attacks with <b>8 instead of 3</b> – more than the 3 standing there.</p><p>A counter-attack on the <b>capital</b> is especially worthwhile: capturing an enemy capital <b>wins the game immediately</b>. That is exactly why bots pull their armies back to their own capital instead of finishing the siege of your city.</p>',
   '<p>Übrige Wissenschaft verfällt – das Rad kostet genau 1 und erlaubt Straßen.</p>':
     '<p>Leftover science expires – the wheel costs exactly 1 and allows roads.</p>',
-  '<p>Vierte Stadt: 6 + 3 = 9 Nahrung. Teuer, aber die einzige Ausgabe, die sich dauerhaft verzinst.</p>':
-    '<p>Fourth city: 6 + 3 = 9 food. Expensive, but the only spending that keeps paying interest.</p>',
   '<p>Eine Straße kostet 1 Münze. Der eigentliche Gewinn sind <b>Handelsrouten</b>: jede Stadt, die über einen durchgehenden Weg an der Hauptstadt hängt, bringt <b>+1 auf alle drei Erträge</b> – über durchgehende Eisenbahn +2.</p><p>Straßen und Eisenbahn <b>senken außerdem die Bewegungskosten</b> auf diesen Feldern, deine Armeen kommen darüber also weiter.</p>':
     '<p>A road costs 1 coin. The real gain are <b>trade routes</b>: every city connected to the capital by an unbroken path brings <b>+1 to all three yields</b> – over unbroken railway +2.</p><p>Roads and railways also <b>lower the movement cost</b> on those tiles, so your armies get further across them.</p>',
   '<p>Beende den Zug: die Griechen rufen ihre Armeen zur eigenen Hauptstadt zurück, die Belagerung läuft ins Leere.</p>':

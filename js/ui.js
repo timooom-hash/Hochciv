@@ -635,6 +635,47 @@ function yieldOverview(S, pi) {
   return h;
 }
 /* ------------------------------------------------------------------ Technologien */
+/* Der Technologiebogen selbst: vier Felder × vier Zeitalter und darunter die
+   Singularität. Zweimal gebraucht – im Spiel mit Knöpfen (techModal) und in der
+   Legephase als reine Ansicht (placeTechView). `opts.plain` lässt die Kostenampel
+   (bezahlbar / zu teuer) weg und macht jede Kachel unantastbar: vor dem ersten Zug gibt
+   es noch nichts zu kaufen, und eine Kachel, die sich drücken ließe, aber nichts tut,
+   wäre schlimmer als gar keine. */
+function techBoardHTML(S, pi, opts) {
+  const plain = !!(opts || {}).plain, p = S.players[pi];
+  let grid = '<div class="techgrid">';
+  for (let a = 0; a < 4; a++) {
+    grid += `<div class="age-label">${AGES[a]}</div>`;
+    for (let f = 0; f < 4; f++) {
+      grid += `<div class="techcol">${a === 0 ? `<h4>${FIELDS[f]}</h4>` : ''}`;
+      for (const t of techsIn(f, a, S)) {
+        const owned = has(p, t.k), avail = p.avail[t.k] && !owned;
+        const cost = techCost(S, pi, t);
+        const can = !plain && avail && available(S, pi, 'sci') >= cost;
+        // Sklaverei wird mit der ersten Technologie der Moderne obsolet – im Bogen sichtbar.
+        const dead = t.k === 'sklaverei' && owned && !slaveryUsable(p);
+        const eff = dead ? T('obsolet – seit der Moderne nicht mehr nutzbar') : techEffect(t, S);
+        // Verfügbar zerfällt in zwei Zustände: bezahlbar (afford) und zu teuer (costly).
+        // Rein grafisch – der Kostenwert steht ohnehin schon in der Kachel.
+        const state = owned ? 'owned'
+          : avail ? (plain ? 'avail' : can ? 'avail afford' : 'avail costly') : 'locked';
+        grid += `<button class="tech ${state}${dead ? ' obsolete' : ''}"
+          ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : cost}</span>
+          <b>${t.n}</b><span class="eff">${eff}</span>${ownerMarks(S, t.k, pi)}</button>`;
+      }
+      grid += '</div>';
+    }
+  }
+  grid += '</div>';
+  const sing = singularityReady(p), sc = techCost(S, pi, SINGULARITY);
+  const singCan = !plain && sing && available(S, pi, 'sci') >= sc && !p.techs.singularitaet;
+  const singState = p.techs.singularitaet ? 'owned'
+    : sing ? (plain ? 'avail' : singCan ? 'avail afford' : 'avail costly') : 'locked';
+  grid += `<button class="tech ${singState}" style="margin-top:10px"
+      ${singCan ? 'data-tech="singularitaet"' : 'disabled'}>
+      <span class="c">${sc}</span><b>${SINGULARITY.n}</b><span class="eff">${SINGULARITY.e}</span></button>`;
+  return grid;
+}
 function techModal() {
   const pi = S.cur, p = P(S);
   // Nur die kleine Legende mit zwei Beispielmarken – der erklärende Absatz darüber ist
@@ -647,36 +688,7 @@ function techModal() {
         ? `${ownerMark(civOf(bsp), 'kann', false)} <span>${T('könnte sie erforschen')}</span>` : ''}
        </p>`
     : '';
-  grid += '<div class="techgrid">';
-  for (let a = 0; a < 4; a++) {
-    grid += `<div class="age-label">${AGES[a]}</div>`;
-    for (let f = 0; f < 4; f++) {
-      grid += `<div class="techcol">${a === 0 ? `<h4>${FIELDS[f]}</h4>` : ''}`;
-      for (const t of techsIn(f, a, S)) {
-        const owned = has(p, t.k), avail = p.avail[t.k] && !owned;
-        const cost = techCost(S, pi, t);
-        const can = avail && available(S, pi, 'sci') >= cost;
-        // Sklaverei wird mit der ersten Technologie der Moderne obsolet – im Bogen sichtbar.
-        const dead = t.k === 'sklaverei' && owned && !slaveryUsable(p);
-        const eff = dead ? T('obsolet – seit der Moderne nicht mehr nutzbar') : techEffect(t, S);
-        // Verfügbar zerfällt in zwei Zustände: bezahlbar (afford) und zu teuer (costly).
-        // Rein grafisch – der Kostenwert steht ohnehin schon in der Kachel.
-        const state = owned ? 'owned' : avail ? (can ? 'avail afford' : 'avail costly') : 'locked';
-        grid += `<button class="tech ${state}${dead ? ' obsolete' : ''}"
-          ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : cost}</span>
-          <b>${t.n}</b><span class="eff">${eff}</span>${ownerMarks(S, t.k, pi)}</button>`;
-      }
-      grid += '</div>';
-    }
-  }
-  grid += '</div>';
-  const sing = singularityReady(p), sc = techCost(S, pi, SINGULARITY);
-  const singCan = sing && available(S, pi, 'sci') >= sc && !p.techs.singularitaet;
-  const singState = p.techs.singularitaet ? 'owned'
-    : sing ? (singCan ? 'avail afford' : 'avail costly') : 'locked';
-  grid += `<button class="tech ${singState}" style="margin-top:10px"
-      ${singCan ? 'data-tech="singularitaet"' : 'disabled'}>
-      <span class="c">${sc}</span><b>${SINGULARITY.n}</b><span class="eff">${SINGULARITY.e}</span></button>`;
+  grid += techBoardHTML(S, pi);
   // Griechenland "Freie Forschung": eine verfügbare Tech bis Industrialisierung gratis
   const ft = freeTechOptions(S, pi);
   if (ft.length) {
@@ -1117,20 +1129,27 @@ function foodSheet() {
   h += T('<p class="sub" style="margin-top:10px">Aus anderen Quellen bestreiten – höchstens %s, also nur die tatsächlichen Kosten.</p>', isst);
   src.forEach(x => {
     const have = p.res[x.kind];
-    const steps = [...new Set([1, 5, Math.min(offen, have)])]
-      .filter(n => n > 0 && n <= Math.min(offen, have)).sort((a, c) => a - c);
-    const schon = (p.popCoveredBy && p.popCoveredBy[x.kind]) || 0;
+    /* Eine Einheit deckt x.rate (Massenmedien: eine Münze fünf). Angeboten werden eine
+       Einheit und die Zahl, die alles Offene deckt – mehr als nötig lässt coverPop
+       ohnehin nicht zu. Die letzte Einheit darf dabei teilweise verfallen, deshalb
+       steht auf dem Knopf, was sie WIRKLICH deckt, nicht Anzahl × Kurs. */
+    const noetig = Math.min(have, Math.ceil(offen / x.rate));
+    const steps = [...new Set([1, noetig])].filter(n => n > 0 && n <= noetig).sort((a, c) => a - c);
+    const deckung = n => Math.min(n * x.rate, offen);
+    const gesetzt = (p.popSpent && p.popSpent[x.kind]) || 0;
     h += `<p class="sub" style="margin-top:8px">${T('%s: %s übrig', x.n, have)}${
-      schon ? ' · ' + T('%s eingesetzt', schon) : ''}</p>`;
-    if (!steps.length && !schon) { h += `<p class="hint">${T('Nichts einzusetzen.')}</p>`; return; }
+      x.rate > 1 ? ' · ' + T('1 %s deckt %s', x.n1 || x.n, x.rate) : ''}${
+      gesetzt ? ' · ' + T('%s eingesetzt', gesetzt) : ''}</p>`;
+    if (!steps.length && !gesetzt) { h += `<p class="hint">${T('Nichts einzusetzen.')}</p>`; return; }
     steps.forEach(n => {
       h += `<button class="opt" data-k="${x.kind}" data-n="${n}"><span>${T('%s %s einsetzen', n, x.n)}${
-        n === offen ? `<small>${T('deckt alles, was die Bevölkerung isst')}</small>` : ''}</span>
-        <span class="cost">+${n}🌾</span></button>`;
+        deckung(n) === offen ? `<small>${T('deckt alles, was die Bevölkerung isst')}</small>` : ''}</span>
+        <span class="cost">+${deckung(n)}🌾</span></button>`;
     });
-    if (schon)
-      h += `<button class="opt ghost" data-back="${x.kind}" data-n="${schon}">
-        <span>${T('%s %s zurücknehmen', schon, x.n)}</span><span class="cost">−${schon}🌾</span></button>`;
+    if (gesetzt)
+      h += `<button class="opt ghost" data-back="${x.kind}" data-n="${gesetzt}">
+        <span>${T('%s %s zurücknehmen', gesetzt, x.n)}</span>
+        <span class="cost">−${(p.popCoveredBy && p.popCoveredBy[x.kind]) || 0}🌾</span></button>`;
   });
   sheet(h);
   $('sheet-body').querySelectorAll('[data-k]').forEach(b2 => b2.onclick = () => {
@@ -1491,8 +1510,14 @@ function startPlacement(cfg) {
   const seed = Math.floor(Math.random() * 2 ** 31);
   const plan = tilePlan(cfg.players.map(p => p.civ), seed);
   if (!plan) return toast(T('Für diese Spielerzahl gibt es keine Plättchenkarte.'));
+  /* Erst würfeln, dann legen (v66): Was jedes Reich zu Beginn erforschen kann und welche
+     Wunder im Stapel liegen, hängt nicht an der Karte – also steht es schon fest, bevor
+     das erste Plättchen liegt, und jeder darf es beim Legen ansehen. Der Seed der Partie
+     wird hier festgelegt, damit Vorabwurf und echte Partie derselbe Wurf sind. */
+  cfg = Object.assign({}, cfg, { seed });
+  const setup = rollSetup(cfg);
   const rnd = mapRng(seed + 12345);
-  placeState = { cfg, plan, rnd, queue: [], at: 0, o: 0, cell: null, done: false };
+  placeState = { cfg, plan, rnd, setup, queue: [], at: 0, o: 0, cell: null, done: false };
   plan.seats.forEach(seat => {
     const pl = cfg.players[seat.idx];        // nach Platz, nicht nach Zivilisation
     if (pl && pl.kind === 'bot') botPlaceSeat(plan, seat, rnd);
@@ -1572,6 +1597,9 @@ function drawPlace() {
   }
   drawMap($('pl-map'), map, opts);
   const note = $('pl-note');
+  // Beschriftung kommt aus index.html und wird von applyStaticLang übersetzt – hier
+  // steht nur, wann der Knopf überhaupt etwas zu zeigen hat.
+  $('pl-tech').hidden = st.done;
   if (st.done) {
     note.innerHTML = T('Alle Plättchen liegen offen. %s Reiche, %s Dreiecke.',
       plan.n, shape.slots.length);
@@ -1591,6 +1619,37 @@ function drawPlace() {
     $('pl-rot').hidden = false;
     $('pl-ok').textContent = T('Fertig');
   }
+}
+/* Forschungsseite in der Legephase (v66). Gezeigt wird genau der Bogen aus dem Spiel,
+   nur ohne Knöpfe: was dieser Platz zu Beginn erforschen könnte, ausgewürfelt VOR dem
+   Legen – damit man die Hauptstadt mit dieser Kenntnis wählt.
+   Gerechnet wird auf einer Wegwerf-Partie mit genau diesen Verfügbarkeiten, damit Liste,
+   Kosten und Wunderstapel aus der Regelmaschine kommen und nicht hier nachgebaut werden.
+   Fremde Verfügbarkeiten stehen nicht darin: im Hotseat wird verdeckt gelegt. */
+function placeTechView() {
+  const st = placeState, seat = placeSeatNow();
+  if (!st) return;
+  if (!seat) return toast(T('Alle Plättchen liegen schon.'));
+  const pl = st.cfg.players[seat.idx] || {};
+  const V = newGame({
+    seed: 1, map: DEFAULT_MAP, wonders: st.cfg.wonders,
+    players: [{ civ: seat.civ, kind: 'human', ability: pl.ability }],
+    avail: [st.setup.avail[seat.idx]], wpool: st.setup.wpool,
+  });
+  const civ = seatCiv(seat);
+  let h = `<p class="sub">${T('Vor dem Legen ausgewürfelt – im Spiel steht genau das hier.')}</p>`;
+  h += techBoardHTML(V, 0, { plain: true });
+  if (st.cfg.wonders) {
+    h += `<p class="sub" style="margin-top:14px">${T('Weltwunder im Stapel')}</p>`;
+    [1, 2].forEach(lvl => {
+      const pool = poolOf(V, lvl);
+      if (!pool.length) return;
+      h += pool.map(k => WONDER_BY_KEY[k]).map(w => `<button class="tech avail" disabled>
+        <b>${w.n}</b><span class="eff">${T('Stufe %s', w.lvl)} · ${w.e}</span></button>`).join('');
+    });
+  }
+  modal(T('%s · Forschung vor dem Legen', civ.n), h);
+  $('overlay').classList.add('wide');
 }
 function plTap(r, c) {
   const st = placeState, seat = placeSeatNow();
@@ -1631,7 +1690,9 @@ function placeReveal() {
 }
 function placeGo() {
   const st = placeState;
-  const cfg = Object.assign({}, st.cfg, { map: tileMap(st.plan) });
+  const cfg = Object.assign({}, st.cfg, {
+    map: tileMap(st.plan), avail: st.setup.avail, wpool: st.setup.wpool,
+  });
   placeState = null;
   S = newGame(cfg);
   startGameScreen();
@@ -1818,6 +1879,7 @@ function boot() {
   attachTaps($('map'), tapHex);
   attachTaps($('ed-map'), edTap);
   attachTaps($('pl-map'), plTap);
+  $('pl-tech').onclick = placeTechView;
   $('pl-rot').onclick = placeRotate;
   $('pl-ok').onclick = placeConfirm;
   initOrientation();
@@ -1843,7 +1905,7 @@ function rulesModal() {
         victoryLabels(!!(S && S.duel)).theologie)}</li>
     </ol>
     <p class="sub">${T('Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen. 2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.')}</p>
-    <p class="sub">${T('Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik (Wissenschaft) und Massenmedien (Münzen) heben die Grenze auf: zu Zugbeginn lässt sich damit bestreiten, was die Bevölkerung isst – höchstens diese Kosten, also kein allgemeiner Umtausch.')}</p>
+    <p class="sub">${T('Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik und Massenmedien heben die Grenze auf: zu Zugbeginn ernährt jede Münze drei Bevölkerung, jede Wissenschaft eine – höchstens bis zur Höhe dessen, was die Bevölkerung isst, also kein allgemeiner Umtausch. Gentechnik bringt zusätzlich Nahrung ins Einkommen: je vier Wissenschaft eine.')}</p>
     <p class="sub">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße.')}</p>
     <p class="sub">${T('Geländeerträge je Feld')}</p>
     <table style="width:100%;font-size:13px;border-collapse:collapse">

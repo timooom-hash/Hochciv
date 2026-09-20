@@ -247,7 +247,6 @@ function threateningArmies(S, pi, city) {
   return out;
 }
 function botPlanArmies(S, pi) {
-  const p = S.players[pi];
   const rng = attackRange(S, pi);
   const offen = () => armiesOf(S, pi).filter(a => a.mp > 0 && !a.botDone);
   const belege = a => { a.botDone = true; };

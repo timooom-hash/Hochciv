@@ -146,9 +146,19 @@ function newGame(cfg) {
     ` · ${S.map.name}` +
     (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : ''));
 
-  // Aufbau 3: Starttechnologien der Antike auswürfeln
+  /* Aufbau 3: Starttechnologien der Antike auswürfeln. Im Plättchenmodus ist das schon
+     VOR der Legephase geschehen (rollSetup) – dann wird das Ergebnis übernommen, sonst
+     stünde in der Partie etwas anderes, als beim Legen zu sehen war. `cfg.avail` liegt
+     nach PLATZ (Reihenfolge des Aufbaus), nicht nach Zugfolge. */
   S.players.forEach((p, i) => {
-    for (let f = 0; f < 4; f++) rollAvailability(S, i, f, 0);
+    const vorab = cfg.avail && cfg.avail[p.slot];
+    if (vorab) {
+      p.avail = Object.assign({}, vorab);
+      log(S, 'info', T('%s: verfügbar (vor dem Legen ausgewürfelt):', civOf(p).n) + ' ' +
+        (TECHS.filter(t => p.avail[t.k]).map(t => t.n).join(', ') || '—'));
+    } else {
+      for (let f = 0; f < 4; f++) rollAvailability(S, i, f, 0);
+    }
   });
   // Aufbau 5: Hauptstädte setzen
   S.players.forEach((p, i) => {
@@ -162,7 +172,7 @@ function newGame(cfg) {
     if (p.civ === 'wikinger' && isAbil(p, 'basis'))
       S.armies.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], mp: 0, born: S.round });
   });
-  if (S.wo) initWonderPools(S);
+  if (S.wo) initWonderPools(S, cfg.wpool);
   S.startIdx = startIdx;      // Rundenwechsel und Ereignis hängen am Startspieler
   S.cur = startIdx;
   startRound(S);          // Ereignis der ersten Runde
@@ -201,6 +211,20 @@ function rollAvailability(S, pi, field, age) {
   }
   log(S, 'info', T('%s: verfügbar in %s (%s):', civOf(p).n, FIELDS[field], AGES[age]) +
     (list.filter(t => p.avail[t.k]).map(t => t.n).join(', ') || '—'));
+}
+/* Aufbau 3 und die Wunderstapel VORZIEHEN (v66).
+   Was am Anfang verfügbar ist, hängt allein an den Würfeln, nicht an der Karte. Im
+   Plättchenmodus wird deshalb zuerst gewürfelt und erst danach gelegt: wer weiß, was er
+   erforschen könnte und welche Wunder im Stapel liegen, wählt seine Hauptstadt anders.
+   Gewürfelt wird in einer Wegwerf-Partie auf der Standardkarte – die echte Karte gibt es
+   ja noch nicht, und für diese Würfe spielt sie keine Rolle. Das Ergebnis geht als
+   cfg.avail / cfg.wpool in die echte Partie, damit dort nicht neu gewürfelt wird.
+   Zurück kommt es NACH PLATZ, in der Reihenfolge von cfg.players. */
+function rollSetup(cfg) {
+  const probe = newGame(Object.assign({}, cfg, { map: cfg.map || DEFAULT_MAP }));
+  const avail = [];
+  probe.players.forEach(p => { avail[p.slot] = Object.assign({}, p.avail); });
+  return { avail, wpool: probe.wo ? JSON.parse(JSON.stringify(probe.wpool)) : null };
 }
 function singularityReady(p) {
   return FIELDS.every((_, f) => TECHS.some(t => t.f === f && t.age === 3 && p.techs[t.k]));
@@ -458,6 +482,20 @@ function incomeBreakdown(S, pi) {
   if (evActive(S, pi, 'hungersnot')) total[1] = 0;        // keine Nahrung produziert
   if (evActive(S, pi, 'wirtschaftskrise')) total[2] = 0;  // keine Münzen produziert
   if (p.doubleIncome === S.round) for (let i = 0; i < 3; i++) total[i] *= 2;   // Taj Mahal
+  /* Gentechnik, zweite Wirkung (v64): aus gewonnener Forschung wird Nahrung – je GENE_SCI_PER_FOOD
+     Wissenschaft eine Nahrung, abgerundet. Gerechnet wird auf die Wissenschaft, die
+     tatsächlich in dieser Runde anfällt, also nach Ereignissen und nach der Verdopplung
+     durch den Tadsch Mahal. Bei Hungersnot („keine Nahrung produziert") bleibt auch
+     dieser Posten aus – sonst käme mitten in der Hungersnot Nahrung aus dem Labor.
+     Die Zeile wird nachträglich in `extra` gehängt und von Hand aufaddiert, weil sie
+     auf der fertigen Wissenschaftssumme steht; Übersicht und Summe bleiben so gleich. */
+  if (has(p, 'gentechnik') && !evActive(S, pi, 'hungersnot')) {
+    const gen = Math.floor(total[0] / GENE_SCI_PER_FOOD);
+    if (gen > 0) {
+      extra.push({ name: T('Gentechnik'), glyph: '🧬', y: [0, gen, 0] });
+      total[1] += gen;
+    }
+  }
   // Vorschau, kein Einkommen: was die Armeen bei jetziger Stellung zu Zugende erbeuten
   const preview = [];
   const raid = raidYield(S, pi);
@@ -486,7 +524,8 @@ function settleGain(S, pi, r, c) {
 /* ------------------------------------------------------------ Umrechnungskurse */
 /* Umrechnungskurse. Gentechnik und Massenmedien sind ausdrücklich KEIN allgemeiner
    Umtausch – sie decken nur die Bevölkerungskosten (siehe coverPop) und stehen deshalb
-   hier nicht.
+   hier nicht. Der Nahrungsposten der Gentechnik ist erst recht kein Kurs: er fällt zu
+   Zugbeginn von selbst an (siehe incomeBreakdown).
    opts.foodOk: Bürgerkrieg erlaubt in dieser Runde, Armeen/Macht mit Nahrung zu zahlen. */
 function rates(S, pi, opts) {
   const p = S.players[pi];
@@ -499,7 +538,7 @@ function rates(S, pi, opts) {
   const sciToCoins = has(p, 'alchemie') ? 1 : Infinity;
   // Wissenschaft → Nahrung geht nur über die Münzen: mit Alchemie kostet 1 Nahrung also
   // sciToCoins × coinsToFood Wissenschaft (ohne Gilden 2, mit Gilden oder England 1).
-  // Gentechnik steht bewusst nicht hier – sie deckt nur die Bevölkerungskosten (coverPop).
+  // Gentechnik steht bewusst nicht hier – sie füttert nur und bringt Nahrung im Einkommen.
   const sciToFood = sciToCoins === Infinity ? Infinity : sciToCoins * coinsToFood;
   return { coinsToFood, coinsToSci: has(p, 'computertechnik') ? 1 : 2, sciToCoins, sciToFood, foodToCoins };
 }
@@ -564,21 +603,30 @@ function affordAll(S, pi, cost, opts) {
 
 /* --------------------------------------------- Nahrungsgrenze und Städte füttern
    Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald
-   das Einkommen dadurch unter 0 fiele. Gentechnik (aus Wissenschaft) und Massenmedien
-   (aus Münzen) heben diese Grenze auf.
+   das Einkommen dadurch unter 0 fiele. **Massenmedien** hebt diese Grenze auf – es ist
+   seit v64 die einzige Technologie, die füttert.
 
    Was die Bevölkerung isst, ist dann zu Zugbeginn KEIN fester Abzug mehr, sondern ein
-   Posten, den man wahlweise aus Nahrung, Wissenschaft oder Münzen bestreitet. Gedeckt
-   wird höchstens, was die Bevölkerung tatsächlich isst (popFoodCost) – es ist also kein
-   Umtausch, sondern eine Verschiebung innerhalb des Rundeneinkommens. Weil jeder
-   Bevölkerungspunkt +1 Wissenschaft und +1 Münze einbringt und 1 Nahrung isst, lässt
-   sich das im Zweifel immer decken; genau deshalb darf man mit diesen Techs auch in
-   rechnerisch negative Nahrung hineinwachsen oder siedeln. */
+   Posten, den man wahlweise aus Nahrung oder Münzen bestreitet. Gedeckt wird höchstens,
+   was die Bevölkerung tatsächlich isst (popFoodCost) – es ist also kein Umtausch,
+   sondern eine Verschiebung innerhalb des Rundeneinkommens.
+
+   **Gentechnik kann seit v65 beides** (Anweisung des Autors): sie füttert weiter aus
+   Wissenschaft, unverändert im Kurs 1:1, UND bringt zu Zugbeginn Nahrung aus der
+   gewonnenen Forschung ins Einkommen (incomeBreakdown). Die beiden Wirkungen stehen
+   nebeneinander und rechnen nicht gegeneinander: der Einkommensposten hängt an der
+   Wissenschaft, die diese Runde ANFÄLLT, das Füttern an der, die noch DA ist. Wer die
+   Wissenschaft verfüttert, verkleinert also den Nahrungsposten nicht nachträglich. */
 function canFeed(p) { return has(p, 'gentechnik') || has(p, 'massenmedien'); }
+/* Was eine Einheit einer Quelle an Bevölkerungskosten deckt: Massenmedien fünf (v64),
+   Gentechnik eine. */
+const FEED_RATE = { coins: FEED_COIN_RATE, sci: 1 };
 function feedSources(S, pi) {
   const p = S.players[pi], out = [];
-  if (has(p, 'massenmedien')) out.push({ kind: 'coins', n: T('Münzen'), have: p.res.coins });
-  if (has(p, 'gentechnik')) out.push({ kind: 'sci', n: T('Wissenschaft'), have: p.res.sci });
+  if (has(p, 'massenmedien'))
+    out.push({ kind: 'coins', n: T('Münzen'), n1: T('Münze'), have: p.res.coins, rate: FEED_RATE.coins });
+  if (has(p, 'gentechnik'))
+    out.push({ kind: 'sci', n: T('Wissenschaft'), n1: T('Wissenschaft'), have: p.res.sci, rate: FEED_RATE.sci });
   return out;
 }
 /* Wie viel Nahrung die Bevölkerung diese Runde isst – als positive Zahl.
@@ -604,33 +652,45 @@ function ensureFoodState(S, pi) {
   if (p.popFood == null) p.popFood = popFoodCost(S, pi);
   if (p.popCovered == null) p.popCovered = 0;
   if (!p.popCoveredBy) p.popCoveredBy = { sci: 0, coins: 0 };
+  /* popCoveredBy zählt die gedeckten KOSTEN je Quelle, popSpent die dafür eingesetzten
+     EINHEITEN. Bis v63 war beides dasselbe (Kurs 1:1); ein Spielstand von damals bekommt
+     die Einheiten deshalb aus der Deckung. */
+  if (!p.popSpent) p.popSpent = Object.assign({ sci: 0, coins: 0 }, p.popCoveredBy);
   if (p.popDefPart == null) p.popDefPart = 0;
   return p;
 }
-/* Deckt `amount` der Bevölkerungskosten aus Wissenschaft oder Münzen.
-   Obergrenzen: der noch ungedeckte Teil der Kosten und der eigene Vorrat.
-   Verbucht wird inkrementell, NICHT durch Neuberechnung aus dem Rohsaldo: sonst
-   käme Nahrung zurück, die in dieser Runde schon ausgegeben wurde.
+/* Setzt `einheiten` der Quelle ein, um Bevölkerungskosten zu decken. Eine Münze deckt
+   FEED_COIN_RATE davon (Massenmedien, v64: fünf).
+   Obergrenzen: der noch ungedeckte Teil der Kosten und der eigene Vorrat. Mehr Einheiten
+   als nötig lassen sich nicht einsetzen; die LETZTE darf dabei teilweise verfallen – bei
+   drei offenen Kosten kostet es trotzdem eine ganze Münze. Verschenkt wird dabei nichts,
+   was es sonst gäbe: gedeckt wird ohnehin nie mehr, als die Bevölkerung isst.
+   Verbucht wird inkrementell, NICHT durch Neuberechnung aus dem Rohsaldo: sonst käme
+   Nahrung zurück, die in dieser Runde schon ausgegeben wurde.
    Der Teil, der ein offenes Defizit tilgt, wird nicht zu nutzbarer Nahrung – nur der
    Rest. Sonst entstünde aus dem Decken mehr Nahrung, als die Bevölkerung isst. */
-function coverPop(S, pi, kind, amount) {
+function coverPop(S, pi, kind, einheiten) {
   const p = ensureFoodState(S, pi);
-  if (kind === 'sci' && !has(p, 'gentechnik')) return T('Gentechnik nicht erforscht.');
-  if (kind === 'coins' && !has(p, 'massenmedien')) return T('Massenmedien nicht erforscht.');
+  const quelle = feedSources(S, pi).find(x => x.kind === kind);
+  if (!quelle) return kind === 'coins' ? T('Massenmedien nicht erforscht.')
+    : kind === 'sci' ? T('Gentechnik nicht erforscht.')
+      : T('Diese Quelle ernährt die Bevölkerung nicht.');
   const open = popOpen(p);
   if (open <= 0) return T('Die Bevölkerung ist schon vollständig versorgt.');
-  amount = Math.min(Math.floor(amount), p.res[kind], open);
-  if (amount <= 0) return 'Nichts abzugeben.';
-  const deckt = Math.min(amount, p.foodDeficit || 0);
-  p.res[kind] -= amount;
+  const rate = quelle.rate;
+  einheiten = Math.min(Math.floor(einheiten), p.res[kind], Math.ceil(open / rate));
+  if (einheiten <= 0) return T('Nichts abzugeben.');
+  const deckung = Math.min(einheiten * rate, open);
+  const deckt = Math.min(deckung, p.foodDeficit || 0);
+  p.res[kind] -= einheiten;
   p.foodDeficit = (p.foodDeficit || 0) - deckt;
-  p.res.food += amount - deckt;
-  p.popCovered = (p.popCovered || 0) + amount;
-  p.popCoveredBy = p.popCoveredBy || { sci: 0, coins: 0 };
-  p.popCoveredBy[kind] = (p.popCoveredBy[kind] || 0) + amount;
+  p.res.food += deckung - deckt;
+  p.popCovered = (p.popCovered || 0) + deckung;
+  p.popCoveredBy[kind] = (p.popCoveredBy[kind] || 0) + deckung;
+  p.popSpent[kind] = (p.popSpent[kind] || 0) + einheiten;
   p.popDefPart = (p.popDefPart || 0) + deckt;      // wie viel davon ins Defizit floss
-  log(S, 'act', `${civOf(p).n}: ${amount} ${kind === 'sci' ? T('Wissenschaft') : T('Münzen')} ` +
-    T('versorgen die Bevölkerung – Nahrung %s', p.res.food) +
+  log(S, 'act', T('%s: %s %s versorgen %s Bevölkerung – Nahrung %s',
+    civOf(p).n, einheiten, quelle.n, deckung, p.res.food) +
     (p.foodDeficit ? ' ' + T('(%s offen)', p.foodDeficit) : '') + '.');
   return null;
 }
@@ -639,23 +699,31 @@ function coverPop(S, pi, kind, amount) {
    Zurückgegeben wird nur, was noch da ist: wurde die so gewonnene Nahrung schon
    ausgegeben, wird abgelehnt. Sonst ließe sich Nahrung ausgeben, die Deckung
    zurücknehmen und die Wissenschaft behalten – das Defizit selbst kostet ja nichts. */
-function uncoverPop(S, pi, kind, amount) {
+function uncoverPop(S, pi, kind, einheiten) {
   const p = ensureFoodState(S, pi);
-  const back = (p.popCoveredBy && p.popCoveredBy[kind]) || 0;
-  amount = Math.min(Math.floor(amount), back);
-  if (amount <= 0) return T('Nichts zurückzunehmen.');
-  // LIFO: beim Decken wurde erst das Defizit getilgt, dann Vorrat aufgebaut – also
-  // zuerst den Vorrat wieder abbauen, sonst stünden Nahrung und Defizit gleichzeitig da.
+  const rate = FEED_RATE[kind] || 1;
+  const gesetzt = (p.popSpent && p.popSpent[kind]) || 0;
+  einheiten = Math.min(Math.floor(einheiten), gesetzt);
+  if (einheiten <= 0) return T('Nichts zurückzunehmen.');
+  /* Wie viel Deckung fällt weg? LIFO, und die zuletzt eingesetzte Einheit war die,
+     die eventuell nur teilweise zählte: was bleibt, ist höchstens das, was die übrigen
+     Einheiten voll tragen können. */
+  const deckung = (p.popCoveredBy && p.popCoveredBy[kind]) || 0;
+  const bleibt = Math.min((gesetzt - einheiten) * rate, deckung);
+  const zurueck = deckung - bleibt;
+  // Beim Decken wurde erst das Defizit getilgt, dann Vorrat aufgebaut – also zuerst den
+  // Vorrat wieder abbauen, sonst stünden Nahrung und Defizit gleichzeitig da.
   const vorratsAnteil = (p.popCovered || 0) - (p.popDefPart || 0);
-  const ausVorrat = Math.min(amount, vorratsAnteil);
-  const ausDefizit = amount - ausVorrat;
+  const ausVorrat = Math.min(zurueck, vorratsAnteil);
+  const ausDefizit = zurueck - ausVorrat;
   if (ausVorrat > p.res.food) return T('Diese Nahrung ist schon ausgegeben.');
   p.res.food -= ausVorrat;
   p.foodDeficit = (p.foodDeficit || 0) + ausDefizit;
   p.popDefPart = (p.popDefPart || 0) - ausDefizit;
-  p.res[kind] += amount;
-  p.popCovered -= amount;
-  p.popCoveredBy[kind] -= amount;
+  p.res[kind] += einheiten;
+  p.popCovered -= zurueck;
+  p.popCoveredBy[kind] = bleibt;
+  p.popSpent[kind] = gesetzt - einheiten;
   return null;
 }
 /* Nahrungseinkommen ohne die Wirkungen des laufenden Ereignisses und ohne den
@@ -692,6 +760,8 @@ function beginTurn(S) {
   // sich nutzbare Nahrung und Defizit. popFood ist der Teil davon, den die Bevölkerung
   // isst – er lässt sich mit Gentechnik/Massenmedien aus Wissenschaft oder Münzen
   // bestreiten (coverPop), was Nahrung freimacht, ohne mehr zu erzeugen als sie isst.
+  // Die Nahrung, die Gentechnik ZUSÄTZLICH aus der Forschung zieht, steckt dagegen schon
+  // im Einkommen (incomeBreakdown) und ist ganz normale Nahrung.
   const inc = income(S, S.cur);
   p.res = { sci: inc.sci, food: Math.max(0, inc.food), coins: inc.coins };
   p.foodRaw = inc.food;

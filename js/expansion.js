@@ -252,9 +252,15 @@ function availableWonders(S) {
   for (const lvl of [1, 2, 3]) for (const k of poolOf(S, lvl)) out.push(WONDER_BY_KEY[k]);
   return out;
 }
-function initWonderPools(S) {
-  S.wpool = { 1: [], 2: [], 3: WONDERS_IN(3).map(w => w.k) };   // alle drei Stufe-3-Wunder
-  refillPool(S, 1); refillPool(S, 2);
+/* `vorab` kommt aus dem Plättchenmodus: dort werden die Stapel schon vor der Legephase
+   gezogen, damit man beim Legen sieht, welche Wunder überhaupt zu haben sind. Dann wird
+   das Ergebnis übernommen statt neu gezogen – sonst stünde im Spiel etwas anderes. */
+function initWonderPools(S, vorab) {
+  if (vorab) S.wpool = JSON.parse(JSON.stringify(vorab));
+  else {
+    S.wpool = { 1: [], 2: [], 3: WONDERS_IN(3).map(w => w.k) };   // alle drei Stufe-3-Wunder
+    refillPool(S, 1); refillPool(S, 2);
+  }
   log(S, 'info', T('Verfügbare Weltwunder: ') +
     [1, 2].map(l => `Stufe ${l}: ` + poolOf(S, l).map(k => WONDER_BY_KEY[k].n).join(', ')).join(' · '));
 }

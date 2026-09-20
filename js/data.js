@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v63';
+const APP_VERSION = 'v67';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -52,7 +52,7 @@ const TECHS = [
   { k: 'elektrizitaet', n: 'Elektrizität', f: 0, c: 13, e: 'Wald: +1 Wissenschaft' },
   { k: 'biologie', n: 'Biologie', f: 0, c: 15, e: 'Grasland: +1 Wissenschaft' },
   { k: 'computertechnik', n: 'Computertechnik', f: 0, c: 17, e: '1:1 Münzen → Wissenschaft' },
-  { k: 'gentechnik', n: 'Gentechnik', f: 0, c: 18, e: 'Wissenschaft nutzen um die Bevölkerung zu füttern' },
+  { k: 'gentechnik', n: 'Gentechnik', f: 0, c: 18, e: 'Je vier Wissenschaft eine Nahrung; füttert auch 1:1' },
   { k: 'raumfahrt', n: 'Raumfahrt', f: 0, c: 19, wo: true, e: 'Bei jedem Wunderbau eine Technologie gratis' },
   { k: 'ki', n: 'Künstliche Intelligenz', f: 0, c: 20, e: 'Wald: +1 Wissenschaft' },
   // Produktion
@@ -104,7 +104,7 @@ const TECHS = [
   { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
   { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 13, e: 'Kein Bevölkerungsverlust beim Erobern' },
   { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 5 Münzen Feld kaufen' },
-  { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Münzen nutzen um die Bevölkerung zu füttern' },
+  { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Eine Münze ernährt drei Bevölkerung' },
   { k: 'un', n: 'Vereinte Nationen', f: 3, c: 17, e: '>1/2 der Bevölkerung zum Sieg' },
   { k: 'oekologie', n: 'Ökologie', f: 3, c: 18, e: 'Städte: +1 Nahrung / 2 Bevölkerung (abrunden)' },
   { k: 'internet', n: 'Internet', f: 3, c: 19, e: '1 Tech/Runde kopieren' },
@@ -121,6 +121,12 @@ const SINGULARITY_BASE = 100;
 const KREML_SURCHARGE = 50;        // Weltwunder "Der Kreml": Singularität teurer, für alle
 // Englands „Seemacht": Zuschlag je Stadt am Meer auf jeden der drei Erträge (v53: 1)
 const SEA_CITY_BONUS = 1;
+/* Massenmedien: eine Münze deckt so viele Bevölkerungskosten (v64: 5, v66: 3). Bleibt
+   reines Füttern – gedeckt wird nie mehr, als die Bevölkerung tatsächlich isst (coverPop). */
+const FEED_COIN_RATE = 3;
+/* Gentechnik: so viel Wissenschaft aus dem Rundeneinkommen ergibt zu Zugbeginn eine
+   Nahrung, abgerundet (v64: 2, v66: 4). Kommt zum Füttern 1:1 hinzu, ersetzt es nicht. */
+const GENE_SCI_PER_FOOD = 4;
 const VICTORY_FRAC = 2 / 3;        // Standard-Siegschwelle
 const THEOLOGY_FRAC = 3 / 5;       // mit Theologie
 const UN_FRAC = 1 / 2;             // mit Vereinte Nationen
