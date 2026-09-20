@@ -494,7 +494,8 @@ step('Nahrungsfenster: Bevölkerungskosten aus Münzen bestreiten', () => {
   p.techs.massenmedien = true;
   // Lage von Hand stellen: Saldo −3, Bevölkerung isst 5
   p.res.coins = 12; p.res.food = 0; p.foodDeficit = 3; p.foodRaw = -3;
-  p.popFood = 5; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  p.popFood = 5; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 };
+  p.popSpent = { sci: 0, coins: 0 }; p.popDefPart = 0;
   $('hud-feed').onclick();
   const txt = $('sheet-body').textContent;
   if (!/Das Land produziert/.test(txt)) throw new Error('keine Produktionszeile');
@@ -506,15 +507,57 @@ step('Nahrungsfenster: Bevölkerungskosten aus Münzen bestreiten', () => {
   if (p.popCovered !== 5) throw new Error('nicht voll gedeckt: ' + p.popCovered);
   if (p.foodDeficit !== 0) throw new Error('Defizit nicht gedeckt');
   if (p.res.food !== 2) throw new Error('falsche Nahrung: ' + p.res.food + ' statt 2');
-  if (p.res.coins !== 7) throw new Error('falscher Münzabzug: ' + p.res.coins);
+  // eine Münze deckt drei (v66) – fünf offene Kosten brauchen also zwei Münzen
+  if (p.res.coins !== 10) throw new Error('falscher Münzabzug: ' + p.res.coins);
   // Zurücknehmen muss angeboten werden und wirken
   const zurueck = $('sheet-body').querySelector('[data-back]');
   if (!zurueck) throw new Error('kein Rücknahmeknopf');
   zurueck.onclick();
   if (p.popCovered !== 0 || p.res.coins !== 12)
     throw new Error('Rücknahme unvollständig: ' + p.popCovered + '/' + p.res.coins);
-  console.log('       Land 2, isst 5 → voll gedeckt: 2 Nahrung, 7 Münzen; Rücknahme klappt');
+  console.log('       Land 2, isst 5 → voll gedeckt für 2 Münzen: 2 Nahrung, 10 Münzen; Rücknahme klappt');
   G('closeSheet')();
+});
+step('Gentechnik: Nahrung im Einkommen UND Füttern 1:1 im Blatt', () => {
+  const S = G('S'), p = G('P')(S);
+  if (p.kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  const hatteMM = !!p.techs.massenmedien, hatteGT = !!p.techs.gentechnik;
+  /* Ereignisse für die Messung stummschalten: läuft gerade eine Hungersnot, produziert
+     niemand Nahrung – dann wäre auch der Gentechnik-Posten korrekt 0 und der Vergleich
+     unten schlüge grundlos an. Genau daran lag ein sporadischer Fehlschlag. */
+  const stumm = S.evMuted;
+  S.evMuted = true;
+  const cap = G('capitalOf')(S, S.cur), popVorher = cap ? cap.pop : null;
+  if (cap) cap.pop = Math.max(cap.pop, 12);   // genug Wissenschaft, damit der Posten greift
+  delete p.techs.massenmedien;
+  p.techs.gentechnik = true;
+  const mit = G('income')(S, S.cur).food;
+  delete p.techs.gentechnik;
+  const basis = G('income')(S, S.cur).food, wiss = G('income')(S, S.cur).sci;
+  p.techs.gentechnik = true;
+  const je = G('GENE_SCI_PER_FOOD');
+  if (cap) cap.pop = popVorher;
+  S.evMuted = stumm;
+  const ohne = mit;
+  if (mit - basis !== Math.floor(wiss / je))
+    throw new Error('Einkommensposten falsch: ' + (mit - basis) + ' statt ' + Math.floor(wiss / je));
+  if (mit - basis < 1) throw new Error('Posten bleibt 0, die Probe sagt dann nichts');
+  // und daneben steht die Wissenschaft weiter als Futterquelle im Blatt
+  p.res.sci = 20; p.res.food = 0; p.foodDeficit = 0; p.foodRaw = 0;
+  p.popFood = 4; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 };
+  p.popSpent = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  G('foodSheet')();
+  const b = [...$('sheet-body').querySelectorAll('[data-k="sci"]')];
+  if (!b.length) throw new Error('Wissenschaft wird nicht als Quelle angeboten');
+  b.sort((x, y) => +y.dataset.n - +x.dataset.n)[0].onclick();
+  if (p.popCovered !== 4) throw new Error('nicht voll gedeckt: ' + p.popCovered);
+  if (p.res.sci !== 16) throw new Error('kein 1:1-Abzug: ' + p.res.sci + ' statt 16');
+  G('closeSheet')();
+  // Lage hinterlassen, wie sie war – die folgenden Schritte rechnen damit weiter
+  if (hatteMM) p.techs.massenmedien = true;
+  if (!hatteGT) delete p.techs.gentechnik;
+  console.log('       Einkommen +' + (ohne - basis) + ' 🌾 aus ' + wiss +
+    ' Wissenschaft · und 4 Kosten für 4 Wissenschaft gedeckt');
 });
 step('Sklaverei wird im Techbogen als obsolet markiert', () => {
   const S = G('S'), pi = S.cur;
@@ -811,10 +854,12 @@ step('Bürgerkrieg: Armee-Knopf ist mit Nahrung + Münzen bedienbar (gemeldeter 
 step('Nahrungsfenster geht zu Zugbeginn von selbst auf', () => {
   frischesSpiel();
   const S = G('S'), p = G('P')(S);
-  p.techs.gentechnik = true;
+  p.techs.massenmedien = true;          // seit v64 die einzige Futtertechnologie
+  p.res.coins = Math.max(p.res.coins, 5);
   // Ausgangslage selbst herstellen: popFood hängt am Startspieler und war in etwa
   // einem von fünfzehn Läufen 0 (dann gibt es korrekterweise nichts zu entscheiden).
-  p.popFood = 3; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  p.popFood = 3; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 };
+  p.popSpent = { sci: 0, coins: 0 }; p.popDefPart = 0;
   G('closeSheet')();
   if ($('sheet').classList.contains('open')) throw new Error('Blatt war schon offen');
   G('humanTurnStart')();
@@ -840,28 +885,30 @@ step('Nahrungsfenster geht zu Zugbeginn von selbst auf', () => {
 step('Nahrungsfenster deckt nur die echten Kosten, kein Umtausch', () => {
   frischesSpiel();
   const S = G('S'), pi = S.cur, p = G('P')(S);
-  p.techs.gentechnik = true;
+  p.techs.massenmedien = true;
   // Saldo +4, Bevölkerung isst 2: es gibt kein Defizit, aber etwas zu verschieben
-  p.res = { sci: 50, food: 4, coins: 0 };
+  p.res = { sci: 0, food: 4, coins: 50 };
   p.foodRaw = 4; p.foodDeficit = 0;
-  p.popFood = 2; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  p.popFood = 2; p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 };
+  p.popSpent = { sci: 0, coins: 0 }; p.popDefPart = 0;
   G('foodSheet')();
   const n = [...$('sheet-body').querySelectorAll('[data-k]')].map(b => +b.dataset.n);
   if (!n.length) throw new Error('nichts angeboten, obwohl Kosten offen sind');
-  if (Math.max(...n) > 2)
-    throw new Error('mehr angeboten als die Bevölkerung isst: ' + n.join(','));
+  // Eine Münze deckt fünf, offen sind zwei – mehr als eine Münze darf nicht angeboten werden
+  if (Math.max(...n) > 1)
+    throw new Error('mehr Münzen angeboten als nötig: ' + n.join(','));
   [...$('sheet-body').querySelectorAll('[data-k]')]
     .sort((x, y) => +y.dataset.n - +x.dataset.n)[0].onclick();
   if (p.res.food !== 6) throw new Error('Nahrung falsch: ' + p.res.food + ' statt 6');
-  if (p.res.sci !== 48) throw new Error('Wissenschaft falsch: ' + p.res.sci);
+  if (p.res.coins !== 49) throw new Error('Münzen falsch: ' + p.res.coins);
   // Jetzt ist alles gedeckt – kein weiterer Umtausch möglich
   if ($('sheet-body').querySelectorAll('[data-k]').length)
     throw new Error('bietet weiteren Umtausch an, obwohl die Kosten gedeckt sind');
-  if (G('coverPop')(S, pi, 'sci', 10) === null)
+  if (G('coverPop')(S, pi, 'coins', 10) === null)
     throw new Error('coverPop lässt über die Kosten hinaus decken');
   if (p.res.food !== 6) throw new Error('doch mehr Nahrung entstanden');
   G('closeSheet')();
-  console.log('       50 Wissenschaft, Kosten 2 → genau 2 einsetzbar, Nahrung 4→6');
+  console.log('       50 Münzen, Kosten 2 → genau 1 Münze einsetzbar, Nahrung 4→6');
 });
 step('Oxford + Singularität zeigt den Siegbildschirm (gemeldeter Fehler)', () => {
   frischesSpiel();
@@ -1391,6 +1438,8 @@ step('Blatt endet über der Aktionsleiste (Punkt 3, gemessen)', () => {
 });
 
 /* ============================================ Plättchenkarte: Startdreiecke legen */
+// Was in der Legephase zu sehen war – nach dem Spielstart wird es gegengeprüft
+let merkAvail = null, merkSlot = 0;
 const legeHelfer = {
   rcs: () => G('slotRC')(G('placeState').plan, G('placeSeatNow')().slot),
   frei: () => G('placeOptions')(G('placeState').plan, G('placeSeatNow')(), G('placeState').o),
@@ -1422,6 +1471,28 @@ step('Verdeckt: sichtbar sind nur die offenen Plättchen und das eigene', () => 
   if (hl !== erlaubt) throw new Error(`${hl} Markierungen, aber ${erlaubt} erlaubte Felder`);
   if (erlaubt < 5) throw new Error('kaum ein Feld erlaubt: ' + erlaubt);
   console.log('       ' + felder + ' Felder sichtbar, ' + hl + ' erlaubte Hauptstadtfelder');
+});
+/* Erst würfeln, dann legen (v66): Der Technologiebogen steht schon in der Legephase
+   offen, und was dort steht, muss später im Spiel genauso dastehen. */
+step('Legephase: Forschungsseite ist schon zu sehen', () => {
+  const st = G('placeState'), seat = G('placeSeatNow')();
+  if (!st.setup || !st.setup.avail) throw new Error('nichts vorab ausgewürfelt');
+  const meine = st.setup.avail[seat.idx];
+  const anzahl = G('TECHS').filter(t => meine[t.k]).length;
+  if (!anzahl) throw new Error('kein einziges Feld verfügbar – das kann nicht sein');
+  $('pl-tech').onclick();
+  if (!$('overlay').classList.contains('show')) throw new Error('Forschungsseite geht nicht auf');
+  const kacheln = $('ov-body').querySelectorAll('.tech.avail');
+  const wunder = st.cfg.wonders ? $('ov-body').querySelectorAll('.tech.avail').length - anzahl : 0;
+  if (kacheln.length - wunder !== anzahl)
+    throw new Error(kacheln.length - wunder + ' verfügbare Kacheln statt ' + anzahl);
+  if ($('ov-body').querySelector('[data-tech]'))
+    throw new Error('in der Legephase lässt sich geforscht werden');
+  G('closeModal')();
+  // merken, um es nach dem Spielstart gegenzuprüfen
+  merkAvail = meine; merkSlot = seat.idx;
+  console.log('       ' + anzahl + ' verfügbare Technologien vor dem Legen'
+    + (st.cfg.wonders ? ', dazu die Wunderstapel' : ''));
 });
 step('Legephase: kein Plättchenname, dafür Fähigkeit und Ertragsübersicht', () => {
   const seat = G('placeSeatNow')();
@@ -1509,6 +1580,19 @@ step('Aufdecken zeigt alle Plättchen, dann startet das Spiel', () => {
   const S = G('S');
   if (!$('screen-game').classList.contains('show')) throw new Error('Spiel startet nicht');
   if (!S.duel) throw new Error('Duellregeln nicht übernommen');
+  /* Die Partie muss genau die Verfügbarkeiten tragen, die in der Legephase zu sehen
+     waren. Achtung zur Aussagekraft: Vorabwurf und Partie laufen auf DEMSELBEN Seed,
+     also käme heute auch ohne die Übergabe (cfg.avail) dasselbe heraus – diese Probe
+     schlägt erst an, wenn sich die Würfelreihenfolge vor Aufbau 3 ändert. Dass die
+     Übergabe wirklich greift, prüft test.js mit einer Vorgabe, die kein Würfel ergäbe. */
+  const gesehen = merkAvail;
+  if (gesehen) {
+    const p0 = S.players.find(p => p.slot === merkSlot);
+    const jetzt = G('TECHS').filter(t => p0.avail[t.k]).map(t => t.k).sort().join(',');
+    const vorher = G('TECHS').filter(t => gesehen[t.k]).map(t => t.k).sort().join(',');
+    if (jetzt !== vorher)
+      throw new Error('im Spiel steht etwas anderes als beim Legen:\n  ' + vorher + '\n  ' + jetzt);
+  }
   if (S.cities.length !== 2) throw new Error('nicht zwei Hauptstädte');
   const [a, b] = S.cities;
   if (G('hexDistance')(a.r, a.c, b.r, b.c) < 3) throw new Error('Hauptstädte zu nah beieinander');

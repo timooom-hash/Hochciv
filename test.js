@@ -1010,77 +1010,173 @@ const setEvent = (S, k) => {
   eq(rates(G, 0).coinsToFood, 1, 'Gilden bleibt ein echter 1:1-Kurs');
 }
 
-/* Bevölkerungskosten aus Wissenschaft/Münzen decken (coverPop).
-   Kein Umtausch: gedeckt wird höchstens, was die Bevölkerung tatsächlich isst. Der
-   Anteil, der ein offenes Defizit tilgt, wird NICHT zu nutzbarer Nahrung – sonst
-   entstünde aus dem Decken mehr Nahrung, als verbraucht wird. */
+/* Bevölkerungskosten aus Münzen decken (coverPop, Massenmedien).
+   Seit v64 ernährt EINE Münze FEED_COIN_RATE Bevölkerung. Kein Umtausch: gedeckt wird
+   höchstens, was die Bevölkerung tatsächlich isst. Der Anteil, der ein offenes Defizit
+   tilgt, wird NICHT zu nutzbarer Nahrung – sonst entstünde aus dem Decken mehr Nahrung,
+   als verbraucht wird. */
 {
+  eq(FEED_COIN_RATE, 3, 'eine Münze ernährt drei');
   const S = mk('griechenland', ['massenmedien']);
   const p = S.players[0];
   // Lage von Hand stellen: Produktion 2, Bevölkerung isst 5, also Saldo −3
-  p.res = { sci: 0, food: 0, coins: 9 }; p.foodDeficit = 3; p.popFood = 5;
-  p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 }; p.popDefPart = 0;
-  eq(coverPop(S, 0, 'coins', 3), null, 'drei Münzen decken das Defizit');
-  eq([p.foodDeficit, p.res.food, p.res.coins], [0, 0, 6],
-    'das Defizit ist weg, aber es entsteht noch keine nutzbare Nahrung');
-  eq(coverPop(S, 0, 'coins', 5), null, 'weiter decken bis zur Höhe der Kosten');
-  eq([p.res.food, p.res.coins, p.popCovered], [2, 4, 5],
-    'die restlichen 2 werden echte Nahrung, insgesamt 5 gedeckt');
+  const stellen = () => {
+    p.res = { sci: 0, food: 0, coins: 9 }; p.foodDeficit = 3; p.popFood = 5;
+    p.popCovered = 0; p.popCoveredBy = { sci: 0, coins: 0 };
+    p.popSpent = { sci: 0, coins: 0 }; p.popDefPart = 0;
+  };
+  stellen();
+  eq(coverPop(S, 0, 'coins', 1), null, 'eine Münze deckt drei der fünf Kosten');
+  eq([p.foodDeficit, p.res.food, p.res.coins], [0, 0, 8],
+    'die drei tilgen genau das Defizit, nutzbare Nahrung entsteht dabei nicht');
+  eq([p.popCovered, p.popSpent.coins], [3, 1], 'drei gedeckt für eine Münze');
+  eq(coverPop(S, 0, 'coins', 1), null, 'die zweite Münze deckt die restlichen zwei');
+  eq([p.popCovered, p.res.food, p.res.coins], [5, 2, 7],
+    'zusammen fünf gedeckt, die zweite Münze verfällt zum Teil');
   eq(typeof coverPop(S, 0, 'coins', 1), 'string', 'mehr als die Bevölkerung isst geht nicht');
-  eq(typeof coverPop(S, 0, 'sci', 1), 'string', 'ohne Gentechnik nicht mit Wissenschaft');
+  eq(typeof coverPop(S, 0, 'sci', 1), 'string', 'ohne Gentechnik ernährt Wissenschaft niemanden');
   // Gegenprobe: nie mehr Nahrung als Produktion + gedeckte Kosten
-  eq(p.res.food, (p.foodDeficit === 0 ? -3 : 0) + p.popCovered, 'Saldo geht auf: −3 + 5 = 2');
+  eq(p.res.food, -3 + p.popCovered, 'Saldo geht auf: −3 + 5 = 2');
 
-  // Zurücknehmen: LIFO, und nur solange die Nahrung noch da ist
-  eq(uncoverPop(S, 0, 'coins', 2), null, 'zwei zurücknehmen klappt');
-  eq([p.res.food, p.res.coins, p.foodDeficit], [0, 6, 0],
-    'zuerst geht der Vorratsanteil zurück – kein Vorrat UND Defizit gleichzeitig');
-  eq(uncoverPop(S, 0, 'coins', 3), null, 'auch der Defizitanteil lässt sich zurückgeben');
-  eq([p.res.food, p.res.coins, p.foodDeficit], [0, 9, 3], 'Ausgangslage wieder hergestellt');
+  // Zurücknehmen: zuerst der Vorratsanteil, dann der Defizitanteil
+  eq(uncoverPop(S, 0, 'coins', 2), null, 'beide Münzen lassen sich zurücknehmen');
+  eq([p.res.food, p.res.coins, p.foodDeficit, p.popCovered], [0, 9, 3, 0],
+    'Ausgangslage wieder hergestellt');
   eq(typeof uncoverPop(S, 0, 'coins', 1), 'string', 'nichts mehr zurückzunehmen');
 
   // Kein Schlupfloch: gedeckte Nahrung ausgeben und dann die Deckung zurückholen
-  eq(coverPop(S, 0, 'coins', 5), null, 'noch einmal voll decken');
+  eq(coverPop(S, 0, 'coins', 2), null, 'noch einmal voll decken');
   eq(p.res.food, 2, 'zwei nutzbare Nahrung');
   p.res.food = 0;                                   // ausgegeben (z. B. Wachstum)
-  eq(typeof uncoverPop(S, 0, 'coins', 5), 'string',
+  eq(typeof uncoverPop(S, 0, 'coins', 2), 'string',
     'ausgegebene Nahrung lässt sich nicht zurücktauschen');
 
-  // Ohne die Techs bleibt alles wie zuvor
+  /* Die letzte Münze darf teilweise verfallen: sind nur noch 3 Kosten offen, kostet es
+     trotzdem eine ganze Münze – und deckt eben nur 3. Verschenkt ist dabei nichts, was
+     es sonst gäbe: mehr als die Bevölkerung isst, deckt ohnehin niemand. */
+  stellen();
+  p.foodDeficit = 0; p.popFood = 2;
+  eq(coverPop(S, 0, 'coins', 1), null, 'eine Münze für zwei offene Kosten');
+  eq([p.popCovered, p.res.coins, p.res.food], [2, 8, 2], 'gedeckt werden 2, bezahlt eine ganze Münze');
+
+  /* Mehrere Münzen, und mehr als nötig lässt sich nicht einsetzen. */
+  stellen();
+  p.foodDeficit = 0; p.popFood = 12;
+  eq(coverPop(S, 0, 'coins', 2), null, 'zwei Münzen decken sechs');
+  eq([p.popCovered, p.res.coins, p.res.food], [6, 7, 6], 'sechs gedeckt, zwei Münzen weg');
+  eq(coverPop(S, 0, 'coins', 9), null, 'für die letzten sechs genügen zwei Münzen');
+  eq([p.popCovered, p.res.coins, p.popSpent.coins], [12, 5, 4],
+    'nur die nötigen Münzen werden eingesetzt, nicht alle neun');
+  // Rücknahme einzeln: die zuletzt gesetzte Münze fällt zuerst weg
+  eq(uncoverPop(S, 0, 'coins', 1), null, 'eine Münze zurück');
+  eq([p.popCovered, p.res.coins, p.popSpent.coins], [9, 6, 3],
+    'genau die 3 der letzten Münze fallen weg');
+
+  // Ohne die Tech bleibt alles wie zuvor
   const N = mk('griechenland');
   const q = N.players[0];
   q.res = { sci: 9, food: 0, coins: 9 }; q.foodDeficit = 3; q.popFood = 5;
-  q.popCovered = 0; q.popCoveredBy = { sci: 0, coins: 0 }; q.popDefPart = 0;
-  eq(typeof coverPop(N, 0, 'sci', 1), 'string', 'ohne Gentechnik keine Deckung');
-  eq(typeof coverPop(N, 0, 'coins', 1), 'string', 'ohne Massenmedien auch nicht');
+  q.popCovered = 0; q.popCoveredBy = { sci: 0, coins: 0 };
+  q.popSpent = { sci: 0, coins: 0 }; q.popDefPart = 0;
+  eq(typeof coverPop(N, 0, 'coins', 1), 'string', 'ohne Massenmedien keine Deckung');
   eq([q.res.sci, q.res.coins, q.foodDeficit], [9, 9, 3], 'und nichts wird abgebucht');
+  eq(canFeed(N.players[0]), false, 'und die Nahrungsgrenze gilt');
 
   // Und der allgemeine Umtauschweg bleibt zu
-  const T = mk('griechenland', ['gentechnik']);
-  T.players[0].res = { sci: 10, food: 0, coins: 0 };
-  eq(rates(T, 0).sciToFood, Infinity, 'Gentechnik ist kein Wissenschaft→Nahrung-Kurs');
-  eq(available(T, 0, 'food'), 0, 'zehn Wissenschaft ergeben ohne Alchemie null Nahrung');
+  const U = mk('griechenland', ['massenmedien']);
+  U.players[0].res = { sci: 10, food: 0, coins: 0 };
+  eq(rates(U, 0).sciToFood, Infinity, 'kein Wissenschaft→Nahrung-Kurs');
+}
+
+/* Gentechnik (v64): kein Füttern mehr, sondern Nahrung im Einkommen – je zwei
+   Wissenschaft eine, abgerundet, zu Zugbeginn. */
+{
+  eq(GENE_SCI_PER_FOOD, 4, 'je vier Wissenschaft eine Nahrung');
+  const ohne = mk('griechenland');
+  const mit = mk('griechenland', ['gentechnik']);
+  // genug Bevölkerung, damit überhaupt Wissenschaft anfällt
+  [ohne, mit].forEach(X => { capitalOf(X, 0).pop = 8; });
+  const a = incomeBreakdown(ohne, 0), b = incomeBreakdown(mit, 0);
+  eq(b.total[0] >= 4, true, 'es fällt genug Wissenschaft an');
+  eq(a.total[0], b.total[0], 'an der Wissenschaft ändert Gentechnik nichts');
+  eq(b.total[1] - a.total[1], Math.floor(b.total[0] / GENE_SCI_PER_FOOD),
+    'die Nahrung steigt um ein Viertel der Wissenschaft, abgerundet');
+  const zeile = b.extra.find(e => e.name === 'Gentechnik');
+  eq(zeile && zeile.y, [0, Math.floor(b.total[0] / GENE_SCI_PER_FOOD), 0],
+    'und steht als eigene Zeile in der Übersicht');
+  // Die Summe der Übersicht muss die angezeigten Zeilen tragen, sonst laufen sie auseinander
+  const summe = [0, 1, 2].map(i =>
+    b.rows.reduce((n, r) => n + r.y[i], 0) + b.extra.reduce((n, e) => n + e.y[i], 0) + b.pop.y[i]);
+  eq(summe, b.total, 'Zeilen und Summe gehen auf');
+  // Zu Zugbeginn landet die Nahrung im Vorrat
+  beginTurn(mit);
+  eq(mit.players[0].res.food, Math.max(0, income(mit, 0).food), 'zu Zugbeginn ist sie im Vorrat');
+
+  /* Das Füttern bleibt daneben bestehen, unverändert im Kurs 1:1 (v65). Beide Wirkungen
+     rechnen NICHT gegeneinander: der Einkommensposten hängt an der Wissenschaft, die
+     diese Runde anfällt, das Füttern an der, die noch da ist. */
+  const q = feedSources(mit, 0).find(x => x.kind === 'sci');
+  eq(!!q && q.rate, 1, 'Gentechnik füttert weiter, und zwar 1:1');
+  eq(canFeed(mit.players[0]), true, 'und hebt die Nahrungsgrenze weiter auf');
+  eq(rates(mit, 0).sciToFood, Infinity, 'ein Umtauschkurs ist es trotzdem nicht');
+  {
+    const Z = mk('griechenland', ['gentechnik']);
+    capitalOf(Z, 0).pop = 8;
+    beginTurn(Z);
+    const z = Z.players[0];
+    // Lage von Hand glätten: kein Defizit, damit sich das 1:1 sauber ablesen lässt
+    z.res.food = 5; z.foodRaw = 5; z.foodDeficit = 0;
+    z.popFood = 4; z.popCovered = 0; z.popCoveredBy = { sci: 0, coins: 0 };
+    z.popSpent = { sci: 0, coins: 0 }; z.popDefPart = 0;
+    const wiss = z.res.sci;
+    eq(coverPop(Z, 0, 'sci', 3), null, 'drei Wissenschaft decken drei Bevölkerung');
+    eq([z.res.sci, z.res.food], [wiss - 3, 8], 'eins zu eins – drei rein, drei Nahrung raus');
+    const vorher = income(Z, 0).food;
+    eq(coverPop(Z, 0, 'sci', 1), null, 'noch eine Wissenschaft verfüttern');
+    eq(income(Z, 0).food, vorher,
+      'das Nahrungseinkommen bleibt gleich – der Posten hängt am Anfall, nicht am Vorrat');
+  }
+
+  // Hungersnot: „keine Nahrung produziert" gilt auch fürs Labor
+  const H = mk('griechenland', ['gentechnik']);
+  capitalOf(H, 0).pop = 8;
+  setEvent(H, 'hungersnot');
+  const h = incomeBreakdown(H, 0);
+  eq(h.total[1], 0, 'bei Hungersnot bleibt auch die Gentechnik-Nahrung aus');
+  eq(h.extra.some(e => e.name === 'Gentechnik'), false, 'und die Zeile fehlt');
 }
 
 /* Alte Spielstände kennen die neuen Felder nicht – sie müssen nachgezogen werden,
    sonst fällt die Nahrungsrechnung stumm aus. */
 {
-  const S = mk('griechenland', ['gentechnik']);
+  const S = mk('griechenland', ['massenmedien']);
   const p = S.players[0];
   // Zustand wie aus einer älteren Fassung: nur res und foodDeficit
-  p.res = { sci: 6, food: 0, coins: 0 }; p.foodDeficit = 2;
+  p.res = { sci: 6, food: 0, coins: 4 }; p.foodDeficit = 2;
   delete p.foodRaw; delete p.popFood; delete p.popCovered;
-  delete p.popCoveredBy; delete p.popDefPart;
+  delete p.popCoveredBy; delete p.popSpent; delete p.popDefPart;
   ensureFoodState(S, 0);
   eq(p.foodRaw, -2, 'foodRaw wird aus Vorrat minus Defizit rekonstruiert');
   eq(p.popFood, popFoodCost(S, 0), 'popFood wird aus dem Einkommen nachgerechnet');
   eq(p.popCovered, 0, 'noch nichts gedeckt');
-  eq(coverPop(S, 0, 'sci', 1), null, 'und Decken funktioniert danach');
+  eq(p.popSpent, { sci: 0, coins: 0 }, 'und noch nichts eingesetzt');
+  eq(coverPop(S, 0, 'coins', 1), null, 'und Decken funktioniert danach');
+  /* Ein Spielstand aus v63 trägt Deckung aus Wissenschaft, damals im Kurs 1:1. Die
+     eingesetzten Einheiten sind dort gleich der Deckung – genau so werden sie ergänzt,
+     damit sich die alte Deckung noch zurücknehmen lässt. */
+  const alt = mk('griechenland', ['massenmedien']).players[0];
+  alt.res = { sci: 5, food: 4, coins: 0 };
+  alt.foodRaw = 4; alt.foodDeficit = 0; alt.popFood = 3; alt.popCovered = 1;
+  alt.popCoveredBy = { sci: 1, coins: 0 }; alt.popDefPart = 0;
+  ensureFoodState({ players: [alt] }, 0);
+  eq(alt.popSpent, { sci: 1, coins: 0 }, 'aus 1:1 wird eine eingesetzte Einheit');
+  eq(uncoverPop({ players: [alt] }, 0, 'sci', 1), null, 'und sie lässt sich zurücknehmen');
+  eq([alt.res.sci, alt.res.food, alt.popCovered], [6, 3, 0], 'die alte Deckung geht sauber zurück');
   // Ein vollständiger Zustand wird nicht angetastet
-  const q = mk('griechenland', ['gentechnik']).players[0];
+  const q = mk('griechenland', ['massenmedien']).players[0];
   q.res = { sci: 5, food: 4, coins: 0 };
   q.foodRaw = 4; q.foodDeficit = 0; q.popFood = 3; q.popCovered = 1;
-  q.popCoveredBy = { sci: 1, coins: 0 }; q.popDefPart = 0;
+  q.popCoveredBy = { sci: 1, coins: 0 }; q.popSpent = { sci: 1, coins: 0 }; q.popDefPart = 0;
   const vorher = JSON.stringify(q);
   ensureFoodState({ players: [q] }, 0);
   eq(JSON.stringify(q), vorher, 'ein vollständiger Zustand bleibt unverändert');
@@ -1088,7 +1184,7 @@ const setEvent = (S, k) => {
 
 /* popFood kommt aus der Bevölkerungszeile des Einkommens und passt zum Saldo. */
 {
-  const S = mk('griechenland', ['gentechnik']);
+  const S = mk('griechenland', ['massenmedien']);
   const c = capitalOf(S, 0); c.pop = 7;
   beginTurn(S);
   const p = S.players[0], b = incomeBreakdown(S, 0);
@@ -1098,11 +1194,50 @@ const setEvent = (S, k) => {
   eq(p.foodDeficit, Math.max(0, -p.foodRaw), 'das Defizit ist der abgeschnittene Teil');
   // Voll decken ergibt genau die Bruttoproduktion aus dem Land
   const brutto = b.total[1] + Math.max(0, -b.pop.y[1]);
+  p.res.coins += 99;
   let guard = 0;
-  while (coverPop(S, 0, 'sci', 99) === null && guard++ < 20) { /* volldecken */ }
+  while (coverPop(S, 0, 'coins', 99) === null && guard++ < 20) { /* volldecken */ }
   if (p.popCovered === p.popFood)
     eq(p.res.food, brutto, 'voll gedeckt bleibt genau die Produktion aus dem Land übrig');
   eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
+}
+
+/* ================= Erst würfeln, dann legen (Plättchenmodus)
+   Was am Anfang verfügbar ist, hängt allein an den Würfeln – nicht an der Karte. Deshalb
+   lässt es sich vor die Legephase ziehen: `rollSetup` würfelt in einer Wegwerf-Partie,
+   das Ergebnis geht als cfg.avail / cfg.wpool in die echte Partie. Geprüft wird das
+   Entscheidende: die Partie NIMMT, was sie bekommt, statt neu zu würfeln.              */
+{
+  const auf = [{ civ: 'england', kind: 'human' }, { civ: 'russland', kind: 'human' },
+    { civ: 'griechenland', kind: 'bot' }];
+  const cfg = { seed: 4242, wonders: true, players: auf };
+
+  // 1. Vorgabe wird übernommen – auch eine, die kein Würfel je ergeben hätte
+  const vorgabe = [{ schrift: true }, { rad: true, mathematik: true }, {}];
+  const V = newGame(Object.assign({}, cfg, { avail: vorgabe, wpool: { 1: ['mauer'], 2: [], 3: [] } }));
+  const nach = {};
+  V.players.forEach(p => { nach[p.slot] = TECHS.filter(t => p.avail[t.k]).map(t => t.k).sort(); });
+  eq(nach[0], ['schrift'], 'Platz 0 bekommt genau seine Vorgabe');
+  eq(nach[1], ['mathematik', 'rad'], 'Platz 1 auch');
+  eq(nach[2], [], 'und ein leerer Platz bleibt leer – es wird NICHT nachgewürfelt');
+  eq(V.wpool[1], ['mauer'], 'und der Wunderstapel wird ebenfalls übernommen');
+
+  // 2. Ohne Vorgabe wird wie bisher gewürfelt, und jeder hat etwas
+  const N = newGame(cfg);
+  N.players.forEach(p =>
+    eq(TECHS.some(t => p.avail[t.k]), true, `${civOf(p).n} hat etwas Verfügbares`));
+
+  /* 3. rollSetup liefert die Verfügbarkeiten NACH PLATZ, und zwar dieselben, die die
+     Partie mit demselben Seed auch selbst würfeln würde – der Vorabwurf ist derselbe
+     Wurf, nicht ein zweiter. Genau deshalb sieht man in der Legephase, was später gilt. */
+  const setup = rollSetup(cfg);
+  eq(setup.avail.length, 3, 'für jeden Platz eine Liste');
+  N.players.forEach(p =>
+    eq(TECHS.filter(t => setup.avail[p.slot][t.k]).map(t => t.k).sort(),
+      TECHS.filter(t => p.avail[t.k]).map(t => t.k).sort(),
+      `Vorabwurf und Partie stimmen überein (${civOf(p).n})`));
+  eq(setup.wpool[1], N.wpool[1], 'auch die Wunderstapel');
+  eq(rollSetup({ seed: 4242, players: auf }).wpool, null, 'ohne Wunder kein Stapel');
 }
 
 /* Wegebau: welche Stufe ist als Nächstes dran?
@@ -4032,6 +4167,30 @@ function tutRun() {
     const doppelt = schluessel.filter((k, i) => schluessel.indexOf(k) !== i);
     eq(anfang > 0 && schluessel.length > 400, true, `UI_EN gefunden (${schluessel.length} Einträge)`);
     eq(doppelt, [], 'kein Schlüssel steht zweimal in UI_EN');
+  }
+  /* Ratsche gegen verwaiste Übersetzungen: ein Schlüssel, dessen deutscher Satz
+     nirgends mehr im Quelltext steht, wird nie nachgeschlagen – er sieht nur so aus,
+     als wäre er in Gebrauch, und führt beim nächsten Umbau in die Irre. Gefunden wurden
+     so sieben Leichen (eine Rasterkarte, die es nicht mehr gibt, und alte Tutorialtitel).
+     Verglichen wird mit normalisierten Leerzeichen, weil Sätze im Markup umbrochen sind.
+     Die Grenze sind die zwei Flaggen-Schlüssel: sie stehen in der Zeile der
+     Symbol-Identitäten (🔬🌾🪙 …), die Fehlmeldungen von T() abfängt – `langRow` nimmt
+     die Flaggen direkt aus LANGS, ohne T(). Die Zahl darf sinken, nicht steigen. */
+  {
+    const norm = x => x.replace(/\s+/g, ' ');
+    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ui', 'tutorial']
+      .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8'))
+      .concat(fs.readFileSync(__dirname + '/index.html', 'utf8')).join('\n');
+    const heu = norm(quellen);
+    const roh = fs.readFileSync(__dirname + '/js/i18n.js', 'utf8');
+    const ab = roh.indexOf('const UI_EN = {');
+    const tabelle = roh.slice(ab, roh.indexOf('\nconst MISSING', ab));
+    const schluessel = [...tabelle.matchAll(/(?:^  |, )'((?:[^'\\]|\\.)*)':/gm)].map(m => m[1]);
+    const waisen = schluessel.filter(k => {
+      const de = norm(k.replace(/\\'/g, "'").replace(/\\\\/g, '\\')).trim();
+      return de && !heu.includes(de);
+    });
+    eq(waisen.length <= 2, true, `höchstens 2 verwaiste Schlüssel (sind: ${waisen.join(' | ') || '—'})`);
   }
   clearMissing();
   eq(T('Ein Satz, den es nicht gibt'), 'Ein Satz, den es nicht gibt',

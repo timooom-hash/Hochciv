@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 8.9., `sw.js` v63)
+# Hochzeivilization — Projekt-Übergabe (Stand 19.9., `sw.js` v67)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -30,19 +30,19 @@ und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1176 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1178 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 375 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 381 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1633 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
-| `js/expansion.js` | 518 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 491 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1888 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/engine.js` | 1703 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
+| `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/ui.js` | 1950 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4280 | **1230 Assertions**, `node test.js` |
-| `smoke.js` | 2143 | **105 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 4439 | **1271 Assertions**, `node test.js` |
+| `smoke.js` | 2227 | **107 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -174,6 +174,64 @@ Gedächtnis rekonstruieren.
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
+### Aufräumen nach den Regeländerungen (v67)
+
+Kein Verhalten geändert, abgesichert über `test.js` und `smoke.js`.
+
+- **Sieben verwaiste Übersetzungen entfernt.** Ihr deutscher Satz stand nirgends mehr im
+  Quelltext, sie wurden also nie nachgeschlagen: eine Rasterkarte, die es seit v50 nicht
+  mehr gibt, ein gestrichener Aufbau-Hinweis, drei alte Tutorialtitel und zwei alte
+  Tutorialabsätze. Gefunden über einen Mitschrieb aller `T()`-Anfragen während eines
+  vollen `smoke.js`-Laufs, gegengeprüft gegen den Quelltext.
+- **Neue Ratsche in `test.js`:** höchstens zwei verwaiste Schlüssel. Die zwei sind die
+  Flaggen in der Zeile der Symbol-Identitäten (🔬🌾🪙 …), die Fehlmeldungen von `T()`
+  abfängt — `langRow` nimmt die Flaggen direkt aus `LANGS`, ohne `T()`. Die Zahl darf
+  sinken, nicht steigen.
+- Unbenutzte lokale Variable in `botPlanArmies` entfernt.
+
+### Plättchenmodus: erst würfeln, dann legen (v66)
+
+Auf Anweisung des Autors. Verfügbare Technologien und Wunderstapel werden **vor** der
+Legephase ausgewürfelt (`rollSetup` in `engine.js`), damit jeder sein Startplättchen mit
+dieser Kenntnis legt. In der Legephase zeigt der Knopf **Forschung** denselben
+Technologiebogen wie im Spiel, nur ohne Knöpfe (`techBoardHTML(..., { plain: true })` –
+aus `techModal` herausgelöst, beide benutzen jetzt dieselbe Funktion), dazu die
+Wunderstapel der Stufen 1 und 2.
+
+Das Ergebnis geht als `cfg.avail` (nach PLATZ) und `cfg.wpool` in `newGame`, das es
+übernimmt statt neu zu würfeln. `initWonderPools(S, vorab)` nimmt dafür einen zweiten
+Parameter. Nur der Plättchenmodus geht diesen Weg; feste Karten haben keine Legephase.
+
+Beschriftet werden die Knöpfe der Legephase nicht eigens: `applyStaticLang()` übersetzt
+den Text aus `index.html` beim Sprachwechsel mit. (In v66 stand hier zunächst, `pl-rot`
+bliebe auf Englisch deutsch — das war falsch, gemessen an einer Probe mit `switchLang`;
+die dafür eingebauten `textContent`-Zeilen sind wieder raus.)
+
+### Gentechnik und Massenmedien neu (v64/v65/v66)
+
+Auf Anweisung des Autors geändert, mit Tests festgeschrieben.
+
+**Massenmedien:** eine Münze ernährt jetzt **drei** Bevölkerung statt einer (v64: fünf)
+(`FEED_COIN_RATE` in `data.js`). Es bleibt reines Füttern – gedeckt wird nie mehr, als die
+Bevölkerung tatsächlich isst, und es ist weiter kein Kurs in `rates()`. Die letzte Münze
+darf teilweise verfallen (3 offene Kosten kosten auch eine ganze Münze); mehr Münzen als
+nötig lässt `coverPop` nicht zu. Dafür trägt der Spielstand jetzt zwei Zahlen je Quelle:
+`popCoveredBy` = gedeckte Kosten, `popSpent` = eingesetzte Einheiten. Ein Spielstand aus
+v63 bekommt `popSpent` aus `popCoveredBy` (damals Kurs 1:1) und lässt sich normal
+zurücknehmen.
+
+**Gentechnik kann beides** (v65): sie **füttert weiter aus Wissenschaft, unverändert 1:1**,
+und bringt zu Zugbeginn **zusätzlich je vier Wissenschaft eine Nahrung** ins Einkommen
+(`GENE_SCI_PER_FOOD`), als eigene Zeile in `incomeBreakdown`. `canFeed` prüft also weiter
+beide Techs, die Nahrungsgrenze hebt Gentechnik nach wie vor auf.
+Die Wirkungen rechnen nicht gegeneinander: der Einkommensposten hängt an der Wissenschaft,
+die anfällt, das Füttern an der, die noch da ist — Verfüttern verkleinert den Posten nicht
+nachträglich. In v64 war das Füttern kurzzeitig weg; seit v65 steht beides nebeneinander.
+
+**Mitgezogen:** Techtexte (deutsch und englisch), der Absatz im Regelbogen, der
+Tutorialschritt zur Nahrungsgrenze, das Nahrungsblatt (es zeigt jetzt den Kurs und auf dem
+Knopf, was die Münzen **wirklich** decken) und die Zugbeginn-Meldung.
+
 ### Grenzen sperren, die Luftwaffe fliegt darüber (v63)
 
 Auf Anweisung des Autors geändert, mit 27 neuen Assertions festgeschrieben (`test.js`,
@@ -198,10 +256,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1230 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1271 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (105 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (107 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.

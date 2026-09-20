@@ -213,17 +213,58 @@ Grenze ist das **Einkommen** (Geländenahrung − Bevölkerung), nicht der Vorra
   Münzen 1:1) kostet 1 Nahrung 2 Wissenschaft, mit Gilden oder als England 1 Wissenschaft.
   Vorher war dieser Weg gar nicht möglich – ein Fehler, der beim Bezahlen von Wachstum und
   Stadtgründungen auffiel (behoben 17.8.).
-- **Gentechnik** (aus Wissenschaft) und **Massenmedien** (aus Münzen) heben die Grenze auf.
-  Beide sind ausdrücklich **kein allgemeiner Umtauschkurs**: sie stehen nicht in `rates()`,
-  man kann mit ihnen also nichts kaufen. Sie füttern nur, 1:1, über den Knopf am
-  Nahrungszähler; der Spieler wählt zu Zugbeginn, aus welchem Vorrat – auch ohne Defizit,
-  wenn er einfach mehr Nahrung möchte.
+- **Massenmedien** hebt die Grenze auf und ist seit v64 die **einzige** Technologie, die
+  füttert. Sie ist ausdrücklich **kein allgemeiner Umtauschkurs**: sie steht nicht in
+  `rates()`, man kann mit ihr also nichts kaufen. Sie füttert nur, über den Knopf am
+  Nahrungszähler, und zwar **im Kurs 1 Münze : 3 Bevölkerung** (`FEED_COIN_RATE`;
+  v64 zunächst 1:5, v66 auf 1:3 gesetzt, beides auf Anweisung des Autors; ursprünglich
+  1:1). Der Spieler wählt zu Zugbeginn, wie viele Münzen – auch ohne Defizit, wenn er
+  einfach mehr Nahrung möchte.
+  **Die letzte Münze darf teilweise verfallen:** sind nur noch 2 Kosten offen, kostet es
+  trotzdem eine ganze Münze und deckt eben nur 2. Anders ginge es nicht auf, solange Münzen
+  ganzzahlig sind – und verschenkt ist dabei nichts, was es sonst gäbe: mehr als die
+  Bevölkerung isst, deckt ohnehin niemand. Mehr Münzen als nötig lässt `coverPop` nicht zu.
+- **Gentechnik kann seit v65 beides** (Anweisung des Autors):
+  · Sie **füttert weiter aus Wissenschaft, unverändert 1:1** – wie Massenmedien über den
+    Knopf am Nahrungszähler, höchstens bis zur Höhe dessen, was die Bevölkerung isst,
+    und ebenfalls kein Kurs in `rates()`. Sie hebt die Nahrungsgrenze also weiter auf.
+  · Sie bringt **zusätzlich je `GENE_SCI_PER_FOOD` (v64: 2, v66: 4) Wissenschaft eine Nahrung ins
+    Einkommen**, abgerundet, zu Zugbeginn – gerechnet auf die Wissenschaft, die in dieser
+    Runde tatsächlich anfällt, also nach Ereignissen und nach der Verdopplung durch den
+    Tadsch Mahal. Eigene Zeile in `incomeBreakdown`.
+  **Die beiden Wirkungen rechnen nicht gegeneinander:** der Einkommensposten hängt an der
+  Wissenschaft, die ANFÄLLT, das Füttern an der, die noch DA ist. Wer seine Wissenschaft
+  verfüttert, verkleinert den Nahrungsposten nicht nachträglich. Beides ist geprüft.
+  **Bei Hungersnot bleibt der Einkommensposten aus** („keine Nahrung produziert") – sonst
+  käme mitten in der Hungersnot Nahrung aus dem Labor. Das Füttern bleibt möglich, es
+  verschiebt ja nur, was ohnehin da ist.
 - Offene Frage, bewusst so umgesetzt: wer eine der beiden Techs hat, darf beliebig weit über
   die Grenze wachsen, und ein **nicht gefüttertes** Defizit kostet nichts (Nahrung steht dann
   bei 0). Die Techs heben die Mechanik damit eher auf, als sie in einen Handel zu verwandeln.
   Sollte die Grenze wirklich beißen, wäre die Regel „Wachstum nur so weit, wie der Spieler
   diese Runde auch füttern kann" oder „ungedecktes Defizit kostet Bevölkerung" – beides ist
   eine Zeile in `growthBlocked()` bzw. `beginTurn()`.
+
+## 10c. Plättchenmodus: erst würfeln, dann legen (v66)
+
+Auf Anweisung des Autors. Welche Technologien am Anfang **verfügbar** sind und welche
+**Weltwunder** im Stapel liegen, hängt allein an den Würfeln – nicht an der Karte. Beides
+wird deshalb im Plättchenmodus **vor** der Legephase ausgewürfelt (`rollSetup`), damit
+jeder sein Startplättchen mit dieser Kenntnis legt: wer Fischerei und Navigation ziehen
+kann, setzt die Hauptstadt anders als jemand mit Bewässerung.
+
+- Gewürfelt wird in einer **Wegwerf-Partie auf der Standardkarte** – die echte Karte gibt
+  es zu dem Zeitpunkt noch nicht, und für diese Würfe spielt sie keine Rolle.
+- Das Ergebnis geht als `cfg.avail` (nach PLATZ, nicht nach Zugfolge) und `cfg.wpool` in
+  die echte Partie. `newGame` **übernimmt** es, statt neu zu würfeln. Heute käme ohne die
+  Übergabe dasselbe heraus, weil beide denselben Seed benutzen und Aufbau 3 die ersten
+  Würfe sind; die Übergabe macht das unabhängig von der Würfelreihenfolge.
+- In der Legephase zeigt der Knopf **Forschung** denselben Technologiebogen wie im Spiel,
+  nur ohne Knöpfe und ohne Kostenampel: vor dem ersten Zug gibt es nichts zu kaufen.
+- **Fremde Verfügbarkeiten stehen nicht darin.** Im Hotseat wird verdeckt gelegt; jeder
+  sieht nur den eigenen Bogen. Die Wunderstapel sind dagegen für alle gleich.
+- Nur der Plättchenmodus geht diesen Weg. Auf festen Karten gibt es keine Legephase, dort
+  bleibt alles wie bisher.
 
 ## 10b. Stadtgründung
 
