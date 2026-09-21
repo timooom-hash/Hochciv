@@ -840,12 +840,19 @@ function canStop(S, pi, r, c) {
   return true;
 }
 /* Kontrollzone (Schießpulver): wer ein Feld neben einer feindlichen Armee betritt, hält an */
+/* Kontrollzone (Schießpulver): gegnerische Armeen halten an, sobald sie ein Feld in
+   Reichweite einer deiner Armeen betreten – 1 Ring, mit Raketentechnik 2.
+   Mit BURGENBAU steht in jeder Stadt eine unbewegliche Armee (ANNAHMEN 1). Sie hält
+   genauso Wache wie eine echte: verteidigen und flankieren tat sie schon immer, nur die
+   Kontrollzone fehlte hier, weil nur `S.armies` durchsucht wurde. Folge (v68 behoben):
+   eine Mauer aus Armee – Burgstadt – Armee hatte an der Stadt ein Loch, und gegnerische
+   Armeen schlüpften an ihr in einem Zug vorbei. */
 function zocStop(S, pi, r, c) {
   if (has(S.players[pi], 'luftwaffe')) return false;        // Luftwaffe ignoriert Kontrollzonen
-  return S.armies.some(a => {
-    if (a.owner === pi || !has(S.players[a.owner], 'schiesspulver')) return false;
-    return hexDistance(a.r, a.c, r, c) <= projectRange(S, a.owner);  // mit Raketentechnik zwei Ringe
-  });
+  const wache = (oi, wr, wc) => oi !== pi && has(S.players[oi], 'schiesspulver')
+    && hexDistance(wr, wc, r, c) <= projectRange(S, oi);   // mit Raketentechnik zwei Ringe
+  return S.armies.some(a => wache(a.owner, a.r, a.c))
+    || S.cities.some(ct => has(S.players[ct.owner], 'burgenbau') && wache(ct.owner, ct.r, ct.c));
 }
 /* Ein Stadtfeld zählt selbst als Straße bzw. Eisenbahn, sobald mindestens ein
    angrenzendes Feld die jeweilige Stufe hat – Wege enden also nicht am Stadtrand. */
