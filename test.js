@@ -779,6 +779,62 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(zocStop(S, 0, d1[0], d1[1]), false, 'Luftwaffe ignoriert Kontrollzonen');
 }
 
+/* ================= Burgstädte halten Wache (v68, gemeldeter Fehler)
+   Gemeldet aus einem 1-gegen-1: die Armeen des Bots liefen zwischen den eigenen Armeen
+   und Burgstädten hindurch. Ursache: Burgenbau stellt eine unbewegliche Armee in jede
+   Stadt (ANNAHMEN 1), aber zocStop durchsuchte nur echte Armeen – die Burg verteidigte
+   und flankierte, warf aber keine Kontrollzone. Eine Mauer Armee – Burgstadt – Armee
+   hatte an der Stadt ein Loch: der Bot kam in einem Zug auf VIER Felder dahinter.     */
+{
+  const bau = (techsMensch, mitArmeen) => {
+    const S = newGame({ seed: 3, duel: true,
+      players: [{ civ: 'england', kind: 'human' }, { civ: 'russland', kind: 'bot' }] });
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.cities.length = 0; S.armies.length = 0; S.sieges = {}; S.bought = {}; S.roads = {};
+    const m = S.players.findIndex(p => p.kind === 'human');
+    const b = S.players.findIndex(p => p.kind === 'bot');
+    techsMensch.forEach(t => { S.players[m].techs[t] = true; });
+    S.cities.push({ id: 900, owner: m, r: 5, c: 8, pop: 3, cap: true, grown: 0, born: -1 });
+    if (mitArmeen) {
+      S.armies.push({ id: 901, owner: m, r: 5, c: 5, mp: 0, born: -1 });
+      S.armies.push({ id: 902, owner: m, r: 5, c: 11, mp: 0, born: -1 });
+    }
+    const armee = { id: 950, owner: b, r: 3, c: 8, mp: 3, born: -1 };
+    S.armies.push(armee);
+    return { S, m, b, armee };
+  };
+  const ring1 = neighbors(5, 8);
+  const ring2 = within(5, 8, 2).filter(([r, c]) => hexDistance(5, 8, r, c) === 2);
+
+  { const { S, b } = bau(['schiesspulver', 'burgenbau']);
+    eq(ring1.every(([r, c]) => zocStop(S, b, r, c)), true,
+      'mit Schießpulver + Burgenbau wirft die Burgstadt eine Kontrollzone');
+    eq(ring2.some(([r, c]) => zocStop(S, b, r, c)), false, 'ohne Raketentechnik nur einen Ring'); }
+  { const { S, b } = bau(['schiesspulver', 'burgenbau', 'raketentechnik']);
+    eq(ring2.every(([r, c]) => zocStop(S, b, r, c)), true, 'mit Raketentechnik zwei Ringe'); }
+  { const { S, b } = bau(['schiesspulver']);
+    eq(ring1.some(([r, c]) => zocStop(S, b, r, c)), false,
+      'ohne Burgenbau ist die Stadt keine Armee – keine Kontrollzone'); }
+  { const { S, b } = bau(['burgenbau']);
+    eq(ring1.some(([r, c]) => zocStop(S, b, r, c)), false,
+      'ohne Schießpulver gibt es keine Kontrollzone, auch nicht von der Burg'); }
+  { const { S, b } = bau(['schiesspulver', 'burgenbau']);
+    S.players[b].techs.luftwaffe = true;
+    eq(ring1.some(([r, c]) => zocStop(S, b, r, c)), false, 'die Luftwaffe ignoriert auch die Burg'); }
+  { const { S, m } = bau(['schiesspulver', 'burgenbau']);
+    eq(ring1.some(([r, c]) => zocStop(S, m, r, c)), false, 'die eigene Burg hält die eigenen Armeen nicht auf'); }
+
+  // Der gemeldete Fall: Mauer aus Armee – Burgstadt – Armee, Bot-Armee davor
+  const hinter = map => [...map].map(t => Array.isArray(t) ? t : unkey(t)).filter(([r]) => r >= 6);
+  { const { S, armee } = bau(['schiesspulver', 'burgenbau'], true);
+    eq(hinter(armyReach(S, armee).keys()).length, 0, 'die Mauer hält: nichts dahinter ist erreichbar');
+    eq(hinter(botReach(S, armee.owner, armee).tiles).length, 0,
+      'und zwar auch auf dem Weg, den der Bot selbst rechnet (botReach)'); }
+  { const { S, armee } = bau(['schiesspulver'], true);
+    eq(hinter(armyReach(S, armee).keys()).length > 0, true,
+      'ohne Burgenbau bleibt das Loch an der Stadt – dort steht dann ja keine Armee'); }
+}
+
 /* Bot-Bewegung Priorität 4: bleibt im eigenen Reich, geht ans stadtnächste Randfeld */
 {
   const S = newGame({ players: [{ civ: 'russland', kind: 'bot', diff: 'prinz' }, { civ: 'england', kind: 'human' }], seed: 20 });

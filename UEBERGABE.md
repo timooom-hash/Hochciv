@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 19.9., `sw.js` v67)
+# Hochzeivilization — Projekt-Übergabe (Stand 21.9., `sw.js` v68)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,10 +10,31 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
+## Letzte Sitzung auf einen Blick (v61 → v68)
+
+Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
+
+| Fassung | Was | Art |
+|---|---|---|
+| v61 | Aufräumen ohne Verhaltensänderung: tote Funktionen, Alt-Namen (`canEnter`, `feed()`, `TECHS_ACTIVE`), doppelte `UI_EN`-Schlüssel, Verdopplungen in `drawMap`/`openTile` | Aufräumen |
+| v62 | Siedel-Meldung nannte immer „fehlt Navigation", auch bei Vulkan/Armee; `flach()` in `test.js` zog die Karte nie glatt | Fehler |
+| v63 | Gegnerisches Territorium und gegnerische Städte sperren den Siedlerweg (auch für Bots); die Luftwaffe überfliegt alles, landet aber nicht auf Vulkan/Armee/Stadt | Regel |
+| v64–v66 | Massenmedien: 1 Münze ernährt **3**; Gentechnik: füttert 1:1 **und** bringt je **4** Wissenschaft 1 Nahrung ins Einkommen | Regel |
+| v66 | Plättchenmodus: Starttechnologien und Wunderstapel werden **vor** der Legephase ausgewürfelt, Knopf „Forschung" zeigt den Bogen beim Legen | Regel + Oberfläche |
+| v67 | Sieben verwaiste Übersetzungen entfernt, Ratsche dagegen | Aufräumen |
+| v68 | **Burgstädte werfen mit Schießpulver eine Kontrollzone** – vorher schlüpften gegnerische Armeen an ihnen vorbei (gemeldet aus einem 1-gegen-1) | Fehler |
+
+Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
+der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?).
+
 ## Wo alles liegt
 
 - **Arbeitsverzeichnis:** ein eigener Ordner unter `/home/claude/` (bisher `hochciv/`,
-  zuletzt `proj/hochzeivilization/`) — **wird bei Container-Resets geleert.**
+  `proj/hochzeivilization/`, zuletzt `work/hochzeivilization/`) — **wird bei
+  Container-Resets geleert**, auch mitten in einer Sitzung zwischen zwei Nachrichten.
+  Vorhandensein mit `test -d <ordner>` prüfen, nicht mit `ls … | head && echo …`: die
+  Pipe endet erfolgreich, auch wenn `ls` scheitert – so wurde einmal ein fehlender Baum
+  als vorhanden gemeldet.
   Zu Beginn jeder Session wiederherstellen:
   `mkdir -p /home/claude/hochciv && cd /home/claude && unzip -o -q /mnt/user-data/uploads/hochzeivilization.zip -d /home/claude/unz && cp -r /home/claude/unz/hochzeivilization/. /home/claude/hochciv/`
   (oder aus `/mnt/user-data/outputs/hochzeivilization/`, falls noch vorhanden).
@@ -36,12 +57,12 @@ und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 | `js/data.js` | 381 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1703 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1710 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1950 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4439 | **1271 Assertions**, `node test.js` |
+| `test.js` | 4495 | **1281 Assertions**, `node test.js` |
 | `smoke.js` | 2227 | **107 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
@@ -256,7 +277,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1271 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1281 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (107 Schritte), inklusive
@@ -469,7 +490,15 @@ anwählbar · Bot-Armeen nutzen Geländedistanz · Angriffswerte addieren sich �
 wirkt sofort · England kann Nahrung für Forschung ausgeben · Internet-Gratiskopie ·
 Navigation-Armeen halten nicht auf Wasser · v2-Tech-Labels · leeres Bot-Fenster (Log-Kappung).
 
-Aus diesem Chat:
+Aus der Sitzung v61–v68:
+- **Burgstädte ohne Kontrollzone (v68, gemeldet aus einem 1-gegen-1):** Burgenbau stellt
+  eine unbewegliche Armee in jede Stadt; sie verteidigte und flankierte, aber `zocStop`
+  durchsuchte nur `S.armies`. Eine Mauer Armee – Burgstadt – Armee hatte deshalb an der
+  Stadt ein Loch: nachgestellt kam eine Bot-Armee mit 3 Bewegung in einem Zug auf **vier**
+  Felder hinter die Mauer; mit einer echten Armee an derselben Stelle auf keines.
+  `zocStop` zählt Burgstädte jetzt als Wache (Schießpulver nötig, Reichweite wie Armeen).
+  Bots rechnen über dasselbe `zocStop`, also greift es für beide Seiten. Zehn neue
+  Prüfungen, Gegenprobe mit dem alten Stand schlägt an („4 ≠ 0").
 - **Falsche Meldung beim Siedeln (v62):** War kein Weg zum Zielfeld frei, hieß es immer
   „Nicht erreichbar — dafür fehlt Navigation oder Panzerschiff". Bei einer Vulkanmauer,
   einem Kartenloch oder gegnerischen Armeen ist das schlicht falsch: dagegen hilft keine
@@ -480,6 +509,8 @@ Aus diesem Chat:
   Bot-Armeeprioritäten liefen also auf der erzeugten Karte, obwohl ihr Kommentar
   ausdrücklich eine glattgezogene verlangt („damit nicht das Gelände das Ergebnis
   bestimmt"). Behoben; alle Prüfungen bleiben grün.
+
+Aus der Sitzung bis v60:
 - Gentechnik/Massenmedien waren allgemeine Umtauschkurse — sind jetzt reines Füttern.
 - **Alchemie** erlaubte keine Wissenschaft → Nahrung; jetzt transitiv über Münzen (2:1, mit
   Gilden 1:1).
@@ -620,6 +651,21 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
 6. **Bots legen ihr Startdreieck ohne Plan:** Lage zufällig, Hauptstadt zufällig auf einem
    der drei mittigen Felder. Sie bewerten das Gelände nicht, ein Mensch wählt hier also
    besser. Absicht (die Vorgabe verlangt genau das), aber ein Balancepunkt.
+7. **Verteidigt die Burg auch Feldarmeen?** Seit v68 wirft sie eine Kontrollzone wie eine
+   echte Armee. `armyDefenseValue` (Verteidigung einer Armee im Feld, auch für die
+   Wikinger-Beute) zählt aber weiter nur echte Armeen in Reichweite. Das Regelheft sagt
+   nur „verteidigt die eigene Stadt". Eine Zeile, falls gewünscht.
+8. **Die Kontrollzone ist ein Halt, keine Mauer.** Wer ein Feld in Reichweite betritt,
+   bleibt stehen – im nächsten Zug darf er weiter. Eine Lücke von einem Feld in einer
+   sonst geschlossenen Reihe ist deshalb passierbar, kostet aber je Kontrollzonenfeld einen
+   ganzen Zug: vor der Reihe, in der Lücke, hinter der Reihe. Gemessen (ganze Zeile voller
+   Wachen, nur ein Feld frei, Armee mit 3 Bewegung drei Zeilen davor): **vier Züge** bis
+   jenseits der Reihe, ohne Reihe wären es zwei; mit Luftwaffe **einer**.
+   So steht es in ANNAHMEN 1 („halten an, sobald sie … betreten"). Wer eine echte Sperre
+   will, bräuchte etwa „in einer Kontrollzone beginnt der Zug mit nur einem Feld".
+   Ebenso Absicht: die **Luftwaffe** ignoriert Kontrollzonen und überfliegt seit v63
+   gegnerische Armeen und Städte. Zieht ein Bot spät im Spiel mit Luftwaffe durch eine
+   Mauer, ist das kein Fehler.
 
 ## Arbeitsweise, die der Autor schätzt
 

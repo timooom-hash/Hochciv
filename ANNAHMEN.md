@@ -21,6 +21,12 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
 - **Burgenbau** stellt eine virtuelle, unbewegliche Armee in die Stadt. Sie verteidigt die
   eigene Stadt und kann zum **Flankieren** genutzt werden (andere eigene Staedte liegen
   immer zu weit weg). Beim Flankieren zaehlt sie wie eine echte Armee auf dem Stadtfeld.
+  **Mit Schiesspulver wirft sie auch eine Kontrollzone** (v68, gemeldeter Fehler): eine
+  Armee ist eine Armee, auch wenn sie sich nicht bewegt – 1 Ring, mit Raketentechnik 2.
+  Vorher fehlte das, und eine Mauer aus Armee – Burgstadt – Armee hatte an der Stadt ein
+  Loch. **Nicht mitgeaendert:** ob die Burg auch eine eigene Feldarmee in Reichweite
+  mitverteidigt (`armyDefenseValue` zaehlt nur echte Armeen). Das Regelheft sagt nur
+  „verteidigt die eigene Stadt" – offene Auslegung, siehe Uebergabe.
 - **Taktik**: Flankieren von zwei beliebigen benachbarten Feldern; ohne Taktik muessen die
   zwei Felder gegenueberliegen (mit Raketentechnik auf Distanz 2 gegenueberliegend).
 - **Schiesspulver (Kontrollzone)**: gegnerische Armeen halten an, sobald sie ein Feld in
