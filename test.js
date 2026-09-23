@@ -1258,6 +1258,70 @@ const setEvent = (S, k) => {
   eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
 }
 
+/* Ökologie (v69, Anweisung des Autors): je zwei Bevölkerung einer Stadt +1 auf ALLE drei
+   Erträge statt nur +1 Nahrung, je Stadt abgerundet. Der Nahrungsanteil ist genau der
+   alte, Wissenschaft und Münzen kommen im selben Umfang dazu. Der Posten steht in der
+   Bevölkerungszeile – daran hängt, dass Bürokratie ihn in der Hauptstadt verdoppelt, die
+   Revolution ihn dort ausfallen lässt und popFoodCost wie bisher sinkt. */
+{
+  const ertrag = X => { const i = income(X, 0); return [i.sci, i.food, i.coins]; };
+  // Zwei gleiche Spiele, das zweite mit Ökologie; `richte` stellt beide gleich her
+  const plus = (techs, richte) => {
+    const A = mk('griechenland', techs), B = mk('griechenland', techs.concat('oekologie'));
+    richte(A); richte(B);
+    const a = ertrag(A);
+    return ertrag(B).map((n, i) => n - a[i]);
+  };
+  const hauptstadt = pop => X => { capitalOf(X, 0).pop = pop; };
+  eq(plus([], hauptstadt(1)), [0, 0, 0], 'Ökologie: Bevölkerung 1 bringt nichts (abgerundet)');
+  eq(plus([], hauptstadt(2)), [1, 1, 1], 'Ökologie: Bevölkerung 2 bringt +1 auf alle drei Erträge');
+  eq(plus([], hauptstadt(5)), [2, 2, 2], 'Ökologie: Bevölkerung 5 bringt +2 auf alle drei, abgerundet');
+
+  // Abgerundet wird je Stadt, nicht übers Reich: 5 + 3 Bevölkerung → 2 + 1, nicht 4
+  const zweiStaedte = X => {
+    const cap = capitalOf(X, 0); cap.pop = 5;
+    const spot = within(cap.r, cap.c, 7).find(([r, c]) => isLand(X, r, c) &&
+      hexDistance(cap.r, cap.c, r, c) >= 4 && !X.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
+    X.cities.push({ id: 901, owner: 0, r: spot[0], c: spot[1], pop: 3, cap: false, grown: 0, born: 0 });
+  };
+  eq(plus([], zweiStaedte), [3, 3, 3], 'Ökologie: je Stadt abgerundet – 5 + 3 Bevölkerung geben +3, nicht +4');
+  eq(plus(['buerokratie'], zweiStaedte), [5, 5, 5],
+    'Ökologie: Bürokratie verdoppelt den Hauptstadtanteil (2 × 2 + 1)');
+
+  // Nahrungsseite wie vor v69: der Posten senkt, was die Bevölkerung isst
+  {
+    const A = mk('griechenland'), B = mk('griechenland', ['oekologie']);
+    [A, B].forEach(hauptstadt(5));
+    eq([popFoodCost(A, 0), popFoodCost(B, 0)], [5, 3], 'Ökologie senkt die Bevölkerungskosten wie bisher (5 → 3)');
+    const a = incomeBreakdown(A, 0), b = incomeBreakdown(B, 0);
+    eq(b.pop.y.map((n, i) => n - a.pop.y[i]), [2, 2, 2], 'Ökologie steht in der Bevölkerungszeile');
+    const summe = [0, 1, 2].map(i =>
+      b.rows.reduce((n, r) => n + r.y[i], 0) + b.extra.reduce((n, e) => n + e.y[i], 0) + b.pop.y[i]);
+    eq(summe, b.total, 'Ökologie: Zeilen und Summe gehen auf');
+  }
+
+  // Ereignisse: Revolution legt die Hauptstadt still, Hungersnot und Wirtschaftskrise
+  // kappen je nur ihren Ertrag
+  const mitEreignis = k => X => { hauptstadt(5)(X); setEvent(X, k); };
+  eq(plus([], mitEreignis('revolution')), [0, 0, 0], 'Ökologie: bei Revolution bringt die Hauptstadt auch hier nichts');
+  eq(plus([], mitEreignis('hungersnot')), [2, 0, 2], 'Ökologie: Hungersnot kappt nur den Nahrungsanteil');
+  eq(plus([], mitEreignis('wirtschaftskrise')), [2, 2, 0], 'Ökologie: Wirtschaftskrise kappt nur den Münzanteil');
+
+  // Grundtechnologie – wirkt wie bisher auch für Bots
+  {
+    const S = mk('griechenland');
+    const bot = S.players.findIndex(p => p.kind === 'bot');
+    capitalOf(S, bot).pop = 6;
+    const a = income(S, bot);
+    S.players[bot].techs.oekologie = true;
+    const z = income(S, bot);
+    eq([z.sci - a.sci, z.food - a.food, z.coins - a.coins], [3, 3, 3], 'Ökologie wirkt auch für Bots');
+  }
+  // Anzeige und Rechnung sagen dasselbe, in beiden Sprachen
+  eq(/alle Erträge/.test(TECH_BY_KEY.oekologie.e), true, 'Ökologie: Techtext nennt alle Erträge');
+  eq(/all yields/.test(DATA_EN.tech.oekologie[1]), true, 'Ökologie: englischer Techtext ebenso');
+}
+
 /* ================= Erst würfeln, dann legen (Plättchenmodus)
    Was am Anfang verfügbar ist, hängt allein an den Würfeln – nicht an der Karte. Deshalb
    lässt es sich vor die Legephase ziehen: `rollSetup` würfelt in einer Wegwerf-Partie,

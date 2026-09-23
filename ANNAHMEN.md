@@ -88,6 +88,17 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
   einbringt: ihre Bevölkerung **und** ihre sechs Umlandfelder. Ein Feld, das gleichzeitig
   an eine zweite eigene Stadt grenzt, zählt als Hauptstadtumland und verdoppelt sich
   ebenfalls. Das Aktionsblatt zeigt bei diesen Feldern direkt den verdoppelten Ertrag.
+* **Ökologie** („Städte: +1 auf alle Erträge / 2 Bevölkerung (abrunden)\", seit v69 auf
+  Anweisung des Autors; vorher nur +1 Nahrung) gibt je Stadt ⌊Bevölkerung / 2⌋ auf
+  Wissenschaft, Nahrung **und** Münzen. Abgerundet wird **je Stadt**, nicht über das
+  ganze Reich: 5 + 3 Bevölkerung ergeben 2 + 1, nicht 4. Der Posten gehört zur
+  Bevölkerungszeile von `incomeBreakdown` – daraus folgt, genau wie vorher schon für den
+  Nahrungsanteil: Bürokratie verdoppelt ihn in der Hauptstadt, bei Revolution fällt er
+  dort aus, und sein Nahrungsanteil senkt `popFoodCost` (Füttern mit Gentechnik/
+  Massenmedien deckt also nur, was nach Ökologie noch gegessen wird). Hungersnot und
+  Wirtschaftskrise kappen wie sonst nur ihren eigenen Ertrag. Als Grundtechnologie wirkt
+  Ökologie auch für Bots. Neu als Folge: ihr Wissenschaftsanteil zählt beim
+  Nahrungsposten der Gentechnik mit (je vier Wissenschaft eine Nahrung).
 
 ## 5. Straßen und Eisenbahn
 

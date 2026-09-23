@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 21.9., `sw.js` v68)
+# Hochzeivilization — Projekt-Übergabe (Stand 23.9., `sw.js` v69)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzung auf einen Blick (v61 → v68)
+## Letzte Sitzungen auf einen Blick (v61 → v69)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -23,14 +23,16 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v66 | Plättchenmodus: Starttechnologien und Wunderstapel werden **vor** der Legephase ausgewürfelt, Knopf „Forschung" zeigt den Bogen beim Legen | Regel + Oberfläche |
 | v67 | Sieben verwaiste Übersetzungen entfernt, Ratsche dagegen | Aufräumen |
 | v68 | **Burgstädte werfen mit Schießpulver eine Kontrollzone** – vorher schlüpften gegnerische Armeen an ihnen vorbei (gemeldet aus einem 1-gegen-1) | Fehler |
+| v69 | **Ökologie** bringt je zwei Bevölkerung einer Stadt +1 auf **alle drei Erträge** statt nur +1 Nahrung | Regel |
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
-der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?).
+der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
+(Siedelvorschau bei Siedlertrecks).
 
 ## Wo alles liegt
 
 - **Arbeitsverzeichnis:** ein eigener Ordner unter `/home/claude/` (bisher `hochciv/`,
-  `proj/hochzeivilization/`, zuletzt `work/hochzeivilization/`) — **wird bei
+  `proj/hochzeivilization/`, `work/hochzeivilization/`, zuletzt `hochzeivilization/`) — **wird bei
   Container-Resets geleert**, auch mitten in einer Sitzung zwischen zwei Nachrichten.
   Vorhandensein mit `test -d <ordner>` prüfen, nicht mit `ls … | head && echo …`: die
   Pipe endet erfolgreich, auch wenn `ls` scheitert – so wurde einmal ein fehlender Baum
@@ -39,6 +41,8 @@ der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?).
   `mkdir -p /home/claude/hochciv && cd /home/claude && unzip -o -q /mnt/user-data/uploads/hochzeivilization.zip -d /home/claude/unz && cp -r /home/claude/unz/hochzeivilization/. /home/claude/hochciv/`
   (oder aus `/mnt/user-data/outputs/hochzeivilization/`, falls noch vorhanden).
   Danach `npm install jsdom --no-fund --no-audit` — für `smoke.js` und `check_single.js` nötig.
+  Am besten im **Elternordner** (`cd /home/claude`): Node findet es dort über die
+  Verzeichnissuche, und `node_modules` kann gar nicht erst ins Paket rutschen (so in v69).
 - **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (31 Dateien),
   `hochzeivilization.zip`, und `hochzeivilization-einzeldatei.html` — Letzteres ist, was der
   Autor tatsächlich aufs iPad lädt.
@@ -57,12 +61,12 @@ der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?).
 | `js/data.js` | 381 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1710 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1711 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1950 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4495 | **1281 Assertions**, `node test.js` |
+| `test.js` | 4559 | **1295 Assertions**, `node test.js` |
 | `smoke.js` | 2227 | **107 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
@@ -195,6 +199,27 @@ Gedächtnis rekonstruieren.
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
+### Ökologie: +1 auf alle Erträge (v69)
+
+Auf Anweisung des Autors. Vorher „Städte: +1 Nahrung / 2 Bevölkerung (abrunden)", jetzt
+„Städte: +1 auf alle Erträge / 2 Bevölkerung (abrunden)" – je Stadt ⌊Bevölkerung / 2⌋ auf
+Wissenschaft, Nahrung und Münzen. Geändert: eine Schleife in `incomeBreakdown`
+(`js/engine.js`), der Techtext in `js/data.js` und in `DATA_EN.tech` (`js/i18n.js`).
+
+**Bewusst gleich geblieben**, weil der Posten weiter in der Bevölkerungszeile steht:
+Abrunden je Stadt (5 + 3 → 2 + 1, nicht 4), Verdopplung durch Bürokratie in der
+Hauptstadt, Ausfall bei Revolution, und der Nahrungsanteil senkt `popFoodCost` wie bisher.
+Die Nahrungsspalte ist in jedem geprüften Fall Zahl für Zahl die alte (Messung alter gegen
+neuer Stand: Bevölkerung 1–8, zwei Städte, Bürokratie, Revolution, Hungersnot,
+Wirtschaftskrise, Bot). Bots bekommen Ökologie wie jede Grundtechnologie. Neu als Folge: der
+Wissenschaftsanteil zählt beim Nahrungsposten der Gentechnik mit.
+
+**Abgesichert:** 14 neue Prüfungen in `test.js` (Block „Ökologie (v69)" hinter der
+popFood-Prüfung). Gegenprobe mit dem alten Stand: 10 schlagen an, die übrigen vier halten
+fest, was gleich bleiben soll (Bevölkerung 1, `popFoodCost`, Zeilensumme, Revolution).
+Die zwei Tutorialstellen, die Ökologie als Nahrungstechnologie nennen, stimmen weiter und
+sind unverändert.
+
 ### Aufräumen nach den Regeländerungen (v67)
 
 Kein Verhalten geändert, abgesichert über `test.js` und `smoke.js`.
@@ -277,7 +302,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1281 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1295 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (107 Schritte), inklusive
@@ -666,6 +691,12 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Ebenso Absicht: die **Luftwaffe** ignoriert Kontrollzonen und überfliegt seit v63
    gegnerische Armeen und Städte. Zieht ein Bot spät im Spiel mit Luftwaffe durch eine
    Mauer, ist das kein Fehler.
+9. **„Ertrag beim Siedeln" rechnet immer mit Bevölkerung 1** – auch für Russland mit
+   *Siedlertrecks*, dessen Städte mit 2 Bevölkerung gegründet werden (`foundCity`).
+   Gemessen (Seed 7, erstes gründbares Feld): Vorschau 1🔬 −1🌾 5🪙, tatsächlich
+   2🔬 −2🌾 6🪙; mit Ökologie seit v69 tatsächlich 3🔬 −1🌾 7🪙. Vorbestehend, durch v69 nur
+   größer geworden. Behebung wäre eine Zeile in `settleGain` (Bevölkerung wie in
+   `foundCity`); das Tutorial spielt Russland mit Grundfähigkeit und wäre nicht betroffen.
 
 ## Arbeitsweise, die der Autor schätzt
 
