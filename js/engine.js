@@ -453,11 +453,12 @@ function incomeBreakdown(S, pi) {
     if (isAbil(p, 'kuestenstaedte') && cityAtSea(S, city)) sea++;
     if (revolution && city.cap) { pyy[1] += py[1] * city.pop; continue; }   // verbraucht nur Nahrung
     const mult = (city.cap && has(p, 'buerokratie')) ? 2 : 1;
-    let f = py[1] * city.pop;
-    if (has(p, 'oekologie')) f += Math.floor(city.pop / 2);
-    pyy[0] += py[0] * city.pop * mult;
-    pyy[1] += f * mult;
-    pyy[2] += py[2] * city.pop * mult;
+    /* Ökologie (v69, vorher nur Nahrung): je zwei Bevölkerung einer Stadt +1 auf alle drei
+       Erträge, je Stadt abgerundet. Bleibt Teil der Bevölkerungszeile – Bürokratie
+       verdoppelt ihn also in der Hauptstadt, die Revolution lässt ihn dort ausfallen, und
+       der Nahrungsanteil senkt weiter popFoodCost, genau wie vor v69. */
+    const eco = has(p, 'oekologie') ? Math.floor(city.pop / 2) : 0;
+    for (let i = 0; i < 3; i++) pyy[i] += (py[i] * city.pop + eco) * mult;
   }
   // Seemacht (v53): +1 je Küstenstadt auf alle drei Erträge, vorher +2
   if (sea) extra.push({

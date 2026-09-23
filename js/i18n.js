@@ -135,7 +135,7 @@ const DATA_EN = {
     kolonialismus: ['Colonialism', 'Buy a tile for 5 coins'],
     massenmedien: ['Mass media', 'One coin feeds three population'],
     un: ['United Nations', '>1/2 of the population to win'],
-    oekologie: ['Ecology', 'Cities: +1 food per 2 population (rounded down)'],
+    oekologie: ['Ecology', 'Cities: +1 to all yields per 2 population (rounded down)'],
     internet: ['Internet', 'Copy 1 tech per round'],
     singularitaet: ['Singularity', 'Requires at least one Modern Age technology in every field. You win the game.'],
   },
