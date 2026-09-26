@@ -925,6 +925,7 @@ function startFromRecipe(rec) {
     startPlayer: rec.start === 'zufall' ? Math.floor(Math.random() * players.length)
       : Math.min(players.length - 1, Math.max(0, +rec.start || 0)),
     events: rec.events, eventMode: rec.eventMode, wonders: rec.wonders,
+    altTree: !!rec.altTree,       // Rezepte vor v70 kennen ihn nicht: Standard
   };
   // Vom alten Spiel darf nichts stehen bleiben: gesperrtes Bot-Blatt, offenes Fenster,
   // die Schnipsel des letzten Sieges. endTutorialPanel setzt ui zurück, auch botLock.
@@ -1030,6 +1031,8 @@ function worldModal() {
         <span class="civ-a">${a ? `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`
         : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
     }).join('') + '</div>';
+  if (S.altTree)
+    h += `<p class="sub" style="margin-top:12px">${T('Alternativer Techtree')} · ${altTreeText()}</p>`;
   if (S.ev) {
     const ev = curEvent();
     h += ev
@@ -1245,6 +1248,21 @@ function applyModules() {
 }
 // Die Ereignisstärke gehört zu den Ereignissen und hängt an deren Häkchen.
 function evmodeRow() { $('setup-evmode-row').hidden = !$('setup-events').checked; }
+/* Alternativer Techtree (v70): ein Häkchen je Partie. Kein Modul – die Zeile steht immer im
+   Aufbau, ab Werk ohne Häkchen. Angehakt nennt der Hinweis darunter die geänderten Kosten.
+   Der Text kommt aus ALT_TECH_COSTS, damit Aufbau, Weltblatt und Regeln nicht veralten. */
+function altTreeText() {
+  return FIELDS.map((fn, f) => {
+    const liste = Object.keys(ALT_TECH_COSTS).map(k => TECH_BY_KEY[k]).filter(t => t.f === f)
+      .sort((a, b) => ALT_TECH_COSTS[a.k] - ALT_TECH_COSTS[b.k]);
+    return liste.length ? liste.map(t => `${t.n} ${ALT_TECH_COSTS[t.k]}`).join(', ') + ` (${fn})` : '';
+  }).filter(Boolean).join(' · ');
+}
+function altTreeRow() {
+  const an = $('setup-alttree').checked;
+  $('setup-alttree-hint').hidden = !an;
+  $('setup-alttree-hint').textContent = an ? T('Andere Kosten: %s', altTreeText()) : '';
+}
 
 /* ------------------------------------------------------------------ Aufbau */
 // 'vier' = alle vier Reiche, 'drei' = drei Reiche, 'duell' = 1 gegen 1
@@ -1289,6 +1307,8 @@ function setupScreen() {
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
     `<option value="${x.k}"${x.k === 'prinz' ? ' selected' : ''}>${x.n}</option>`).join('');
   $('setup-events').onchange = evmodeRow;
+  $('setup-alttree').onchange = altTreeRow;
+  altTreeRow();
   // Erweiterungsmodule: was in den Einstellungen aus ist, steht hier nicht zur Wahl
   applyModules();
   // Der gewählte Modus bleibt erhalten, wenn man den Aufbau erneut öffnet
@@ -1409,6 +1429,7 @@ function setupRecipe(mapPick, startWahl) {
     mode: setupMode, mapPick, start: startWahl,
     events: $('setup-events').checked, eventMode: $('setup-evmode').value,
     wonders: $('setup-wonders').checked,
+    altTree: $('setup-alttree').checked,
     players: setupConfig(),
   };
 }
@@ -1632,7 +1653,7 @@ function placeTechView() {
   if (!seat) return toast(T('Alle Plättchen liegen schon.'));
   const pl = st.cfg.players[seat.idx] || {};
   const V = newGame({
-    seed: 1, map: DEFAULT_MAP, wonders: st.cfg.wonders,
+    seed: 1, map: DEFAULT_MAP, wonders: st.cfg.wonders, altTree: st.cfg.altTree,
     players: [{ civ: seat.civ, kind: 'human', ability: pl.ability }],
     avail: [st.setup.avail[seat.idx]], wpool: st.setup.wpool,
   });
@@ -1830,7 +1851,7 @@ function boot() {
       startPlayer: startWahl === 'zufall'
         ? Math.floor(Math.random() * players.length) : +startWahl,
       events: recipe.events, eventMode: recipe.eventMode,
-      wonders: recipe.wonders,
+      wonders: recipe.wonders, altTree: recipe.altTree,
     };
     endTutorialPanel();
     // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.
@@ -1925,12 +1946,13 @@ function rulesModal() {
     <p style="font-size:13px;margin:4px 0">${T('Zu Rundenbeginn wird gewürfelt: Zeile, dann Spalte. Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.')}</p>
     <p class="sub">${T('Alle Technologien')}</p>
     <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
+    ${S && S.altTree ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt der alternative Techtree.')}</p>` : ''}
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);
         if (!list.length) return '';
         return `<p class="rule-age">${an}</p>` + list.map(t =>
-          `<div class="rule-tech"><span class="c">${t.c}</span><b>${t.n}</b><i>${techEffect(t, S)}</i></div>`).join('');
+          `<div class="rule-tech"><span class="c">${techBase(S, t)}</span><b>${t.n}</b><i>${techEffect(t, S)}</i></div>`).join('');
       }).join('')).join('')}
     <p class="rule-field">${T('Sieg')}</p>
     <div class="rule-tech"><span class="c">${SINGULARITY.c}</span><b>${SINGULARITY.n}</b>

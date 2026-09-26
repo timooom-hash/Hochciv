@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v69';
+const APP_VERSION = 'v70';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -143,9 +143,26 @@ const SINGULARITY = {
   k: 'singularitaet', n: 'Singularität', c: SINGULARITY_BASE,
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
 };
-// Techs je Feld und Zeitalter, nach Kosten sortiert (billigere zuerst)
+/* Alternativer Techtree (v70, Anweisung des Autors): im Aufbau je Partie zuschaltbar,
+   steht dann als S.altTree im Spielstand. Andere Grundkosten für sechs Technologien der
+   Antike – sie rücken damit auf der Leiter ihres Feldes um. Alles andere bleibt: Wirkung,
+   Feld und Zeitalter. Das Zeitalter kommt weiter aus den Standardkosten (t.age); ein Test
+   hält fest, dass keiner dieser Werte die Zeitaltergrenze überschreitet. */
+const ALT_TECH_COSTS = {
+  mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4,     // Forschung
+  bewaesserung: 1, landwirtschaft: 5,                           // Produktion
+};
+/* Grundkosten einer Technologie IN DIESER PARTIE, vor allen Vergünstigungen (Griechenland,
+   Wissenschaftliche Methode). Ohne Spielstand – Tabellen, Regelbogen aus dem Menü – die
+   Standardkosten. Wer irgendwo Kosten braucht, nimmt diese Funktion, nicht t.c. */
+function techBase(S, t) {
+  return S && S.altTree && ALT_TECH_COSTS[t.k] != null ? ALT_TECH_COSTS[t.k] : t.c;
+}
+// Techs je Feld und Zeitalter, nach den Kosten der Partie sortiert (billigere zuerst).
+// Das ist die Leiter im Technologiebogen; Würfe auf „die n-te Technologie" zählen ebenso.
 function techsIn(field, age, S) {
-  return techPool(S).filter(t => t.f === field && t.age === age).sort((a, b) => a.c - b.c);
+  return techPool(S).filter(t => t.f === field && t.age === age)
+    .sort((a, b) => techBase(S, a) - techBase(S, b));
 }
 
 /* ---------------------------------------------------------------- Zivilisationen */

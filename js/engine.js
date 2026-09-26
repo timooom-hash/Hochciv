@@ -131,6 +131,8 @@ function newGame(cfg) {
     // Erweiterungen: Ereignisse und Weltwunder werden im Aufbau zugeschaltet
     ev: cfg.events ? { mode: cfg.eventMode === 'easy' ? 'easy' : 'hard' } : null,
     wo: !!cfg.wonders,
+    // Alternativer Techtree (v70): andere Grundkosten, siehe ALT_TECH_COSTS / techBase
+    altTree: !!cfg.altTree,
     event: null, evNext: null, nukeBan: false,
     wonders: [], wpool: { 1: [], 2: [], 3: [] }, wgone: [],
     players: ordered.map(pc => ({
@@ -144,7 +146,8 @@ function newGame(cfg) {
   log(S, 'head', 'Neues Spiel — ' + (S.duel ? '1 gegen 1: ' : '') +
     S.players.map(p => civOf(p).n + (p.kind === 'bot' ? T(' (Bot)') : '')).join(', ') +
     ` · ${S.map.name}` +
-    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : ''));
+    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : '') +
+    (S.altTree ? T(' · Alternativer Techtree') : ''));
 
   /* Aufbau 3: Starttechnologien der Antike auswürfeln. Im Plättchenmodus ist das schon
      VOR der Legephase geschehen (rollSetup) – dann wird das Ergebnis übernommen, sonst
@@ -183,7 +186,7 @@ function newGame(cfg) {
 /* ------------------------------------------------------------ Technologien */
 function techCost(S, pi, tech) {
   const p = S.players[pi];
-  let c = tech.c;
+  let c = techBase(S, tech);          // Grundkosten dieser Partie (alternativer Techtree)
   const age = tech.k === 'singularitaet' ? 4 : tech.age;
   if (tech.k === 'singularitaet' && kremlBuilt(S)) c += KREML_SURCHARGE;
   if (p.civ === 'griechenland' && isAbil(p, 'basis')) c -= (age + 1);   // 1/2/3/4/5 je Zeitalter
@@ -1367,7 +1370,7 @@ function copyableTechs(S, pi) {
       // die eine Gratiskopie pro Runde (Internet).
       out.push({
         tech: t,
-        paidCoins: paidPossible ? rate * t.c : null,   // null = kein bezahlter Weg
+        paidCoins: paidPossible ? rate * techBase(S, t) : null,   // null = kein bezahlter Weg
         freeOk: freePossible,                          // true = Gratiskopie möglich
       });
     });
