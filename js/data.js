@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v70';
+const APP_VERSION = 'v72';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -96,14 +96,14 @@ const TECHS = [
   { k: 'wallfahrt', n: 'Wallfahrt', f: 3, c: 4, wo: true, e: 'Je eigenem Weltwunder +3 auf alle Erträge' },
   { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 10 Münzen · wird in der Moderne obsolet' },
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
-  { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (3× Kosten in Münzen)' },
+  { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (2× Kosten in Münzen)' },
   { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 8, e: 'Hauptstadt produziert doppelt' },
   { k: 'kartografie', n: 'Kartografie', f: 3, c: 9, e: 'Keine Distanzkosten beim Gründen' },
   { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>3/5 der Bevölkerung zum Sieg' },
   { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten = 2 × Anzahl' },
   { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
   { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 13, e: 'Kein Bevölkerungsverlust beim Erobern' },
-  { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 5 Münzen Feld kaufen' },
+  { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 3 Münzen Feld kaufen' },
   { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Eine Münze ernährt drei Bevölkerung' },
   { k: 'un', n: 'Vereinte Nationen', f: 3, c: 17, e: '>1/2 der Bevölkerung zum Sieg' },
   { k: 'oekologie', n: 'Ökologie', f: 3, c: 18, e: 'Städte: +1 auf alle Erträge / 2 Bevölkerung (abrunden)' },
@@ -152,6 +152,11 @@ const ALT_TECH_COSTS = {
   mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4,     // Forschung
   bewaesserung: 1, landwirtschaft: 5,                           // Produktion
 };
+/* Kolonialismus und Kundschafterei (v72, Anweisung des Autors; gilt in beiden Techtrees –
+   der alternative unterscheidet sich nur in den Forschungskosten). Die Techtexte in TECHS
+   und DATA_EN nennen dieselben Zahlen; ein Test hält beides zusammen. */
+const COLONY_COST = 3;       // Kolonialismus: Münzen je Feld (bis v71: 5)
+const SCOUTING_RATE = 2;     // Kundschafterei: × Grundkosten, in Münzen (bis v71: 3)
 /* Grundkosten einer Technologie IN DIESER PARTIE, vor allen Vergünstigungen (Griechenland,
    Wissenschaftliche Methode). Ohne Spielstand – Tabellen, Regelbogen aus dem Menü – die
    Standardkosten. Wer irgendwo Kosten braucht, nimmt diese Funktion, nicht t.c. */

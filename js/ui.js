@@ -501,7 +501,7 @@ function openTile(r, c) {
       () => { const e = foundCity(S, pi, r, c); e ? toast(e) : redraw(); closeSheet(); }, !!ferr);
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
-      btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, '5🪙',
+      btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, `${COLONY_COST}🪙`,
         act(() => buyTile(S, pi, r, c)), owned);
     }
   }

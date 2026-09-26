@@ -1333,19 +1333,22 @@ function buyTile(S, pi, r, c) {             // Kolonialismus
   if (cityAt(S, r, c)) return T('Dort steht eine Stadt.');
   if (S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))))
     return T('Nur herrenlose Felder können gekauft werden.');
-  if (!pay(S, pi, 'coins', 5)) return T('Zu wenig Münzen.');
+  const preis = COLONY_COST;
+  if (!pay(S, pi, 'coins', preis)) return T('Zu wenig Münzen.');
   (S.bought[pi] = S.bought[pi] || []).push(key(r, c));
-  log(S, 'act', T('%s: Feld %s/%s gekauft (5 Münzen).', civOf(p).n, r, c));
+  log(S, 'act', T('%s: Feld %s/%s gekauft (%s Münzen).', civOf(p).n, r, c, preis));
   return null;
 }
 /* Kopierbare Technologien anderer Reiche. Drei getrennte Wege:
    - Spionage: bezahlt, 1× Wissenschaftskosten in Münzen, kein Rundenlimit
-   - Kundschafterei: bezahlt, 3× Kosten in Münzen, kein Rundenlimit
+   - Kundschafterei: bezahlt, 2× Kosten in Münzen (SCOUTING_RATE, bis v71 3×), kein
+     Rundenlimit
    - Internet: 1× pro Runde kostenlos
-   Vergünstigungen (Wiss. Methode etc.) gelten beim Kopieren nicht. */
+   Vergünstigungen (Wiss. Methode etc.) gelten beim Kopieren nicht. Hat ein Reich beide
+   bezahlten Wege, gilt der günstigere – Spionage. */
 function copyRate(p) {
   if (has(p, 'spionage')) return 1;
-  if (has(p, 'kundschafterei')) return 3;
+  if (has(p, 'kundschafterei')) return SCOUTING_RATE;
   return null;
 }
 function internetAvailable(S, pi) {
