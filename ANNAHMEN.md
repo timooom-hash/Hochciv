@@ -127,6 +127,29 @@ ebenfalls verbunden.
   kostenlos. Wer einen bezahlten Weg **und** Internet hat, bekommt pro Technologie **beide**
   Optionen angeboten (bezahlt kopieren oder die eine Gratiskopie darauf verwenden). Beim
   Kopieren gelten keine Vergünstigungen (Wiss. Methode etc.), es zählen die Basiskosten.
+* **Alternativer Techtree** (v70, Anweisung des Autors): ein Häkchen im Aufbau, je Partie,
+  ab Werk aus. Es ist **kein Modul** – die Zeile steht immer im Aufbau, die Einstellungen
+  kennen sie nicht. Angehakt gelten andere Grundkosten (`ALT_TECH_COSTS` in `js/data.js`):
+  Forschung Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 (vorher 2/3/4/1),
+  Produktion Bewässerung 1, Landwirtschaft 5 (vorher 5/1). Ausgelegt so:
+  - **Nur die Kosten ändern sich.** Feld, Zeitalter und Wirkung bleiben. Das Zeitalter
+    kommt weiter aus den Standardkosten (`t.age`); alle sechs Werte liegen in der Antike,
+    ein Test hält fest, dass keiner die Zeitaltergrenze überschreitet. Wer später einen
+    Wert über eine Grenze legen will, muss das Zeitalter mitrechnen lassen.
+  - **Die Leitern ordnen sich nach den neuen Kosten** (`techsIn`): im Bogen, im
+    Regelbogen und im Bogen der Legephase. Damit folgen auch alle Würfe auf „die n-te
+    Technologie" der neuen Leiter – Verfügbarkeit, „keine verfügbar → eine auswürfeln"
+    und die Bot-Forschung. Derselbe Seed kann deshalb andere Starttechnologien ergeben.
+  - **Vergünstigungen setzen auf die neuen Grundkosten auf** (Griechenland −1 in der
+    Antike, Wissenschaftliche Methode −2): Schrift kostet Griechenland also 3.
+  - **Kopieren** zahlt die Basiskosten dieser Partie (Spionage: Schrift 4 Münzen).
+  - **Bots** spielen auf denselben Leitern. Das **Tutorial** läuft immer im Standard.
+  - „Nochmal spielen" übernimmt den Schalter (er steht im Rezept). Spielstände und
+    Rezepte aus v69 und früher kennen ihn nicht und laufen im Standard.
+  - Die Listen mit **Gratis-Technologien** (Freie Forschung, Rückschau, Bibliothek,
+    Oxford, Raumfahrt) zeigen keine Kosten und behalten ihre Reihenfolge aus `TECHS`.
+  - Sichtbar ist der Schalter im Aufbau (mit Hinweis auf die geänderten Kosten), im
+    Weltblatt, im Regelbogen und im Protokollkopf.
 
 ## 7. Bots
 

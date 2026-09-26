@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 23.9., `sw.js` v69)
+# Hochzeivilization — Projekt-Übergabe (Stand 26.9., `sw.js` v70)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v69)
+## Letzte Sitzungen auf einen Blick (v61 → v70)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -24,6 +24,7 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v67 | Sieben verwaiste Übersetzungen entfernt, Ratsche dagegen | Aufräumen |
 | v68 | **Burgstädte werfen mit Schießpulver eine Kontrollzone** – vorher schlüpften gegnerische Armeen an ihnen vorbei (gemeldet aus einem 1-gegen-1) | Fehler |
 | v69 | **Ökologie** bringt je zwei Bevölkerung einer Stadt +1 auf **alle drei Erträge** statt nur +1 Nahrung | Regel |
+| v70 | **Alternativer Techtree** als Häkchen im Aufbau: Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5; der Bogen ordnet die Leitern danach | Regel + Oberfläche |
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
@@ -55,19 +56,19 @@ der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), sei
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1178 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1182 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 381 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 398 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1711 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1714 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1950 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 1972 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4559 | **1295 Assertions**, `node test.js` |
-| `smoke.js` | 2227 | **107 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 4676 | **1322 Assertions**, `node test.js` |
+| `smoke.js` | 2355 | **114 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -199,6 +200,35 @@ Gedächtnis rekonstruieren.
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
+### Alternativer Techtree (v70)
+
+Auf Anweisung des Autors. Ein Häkchen **„Alternativer Techtree"** im Aufbau, je Partie, ab
+Werk aus – **kein Modul**, die Zeile steht immer da. Angehakt gelten andere Grundkosten:
+Forschung Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4; Produktion Bewässerung 1,
+Landwirtschaft 5. Alles in der Antike, Feld und Wirkung bleiben.
+
+**Wie es gebaut ist:** eine Tabelle `ALT_TECH_COSTS` und eine Funktion `techBase(S, t)` in
+`js/data.js` – die Grundkosten dieser Partie, vor Vergünstigungen. `techsIn` sortiert danach,
+`techCost` und das Kopieren rechnen damit, der Regelbogen zeigt sie. Der Schalter steht als
+`S.altTree` im Spielstand und als `altTree` im Rezept; beide Startwege (`setup-go` und
+`startFromRecipe`) geben ihn weiter, ebenso die Wegwerf-Partien der Legephase (`rollSetup`
+über die cfg, `placeTechView` ausdrücklich). Das Zeitalter kommt weiter aus den
+Standardkosten (`t.age`) – ein Test verbietet Werte jenseits der Zeitaltergrenze.
+
+**Folgen, die man kennen sollte:** Alle Würfe auf „die n-te Technologie einer Leiter"
+(Verfügbarkeit, Bot-Forschung) folgen der neuen Leiter; derselbe Seed kann also andere
+Starttechnologien ergeben. Griechenlands −1 und die Wissenschaftliche Methode setzen auf die
+neuen Kosten auf. Die Gratis-Listen (Freie Forschung, Rückschau, Bibliothek/Oxford/Raumfahrt)
+zeigen keine Kosten und bleiben in der Reihenfolge von `TECHS`. Tutorial immer Standard.
+
+**Abgesichert:** 26 Prüfungen in `test.js` (Block „Alternativer Techtree (v70)" vor „1 gegen
+1"), 7 Schritte in `smoke.js` (Aufbau, Englisch, Bogen, Regelbogen/Weltblatt/Protokoll,
+„Nochmal spielen", Legephase, zurück zum Standard). Gegenproben: je eine absichtlich kaputt
+gemachte Stelle (Sortierung, `techCost`, Kopierpreis, Schalter in `newGame`, Bogen der
+Legephase, Regelbogen, Rezept) schlägt jeweils an der vorgesehenen Stelle an. Im Standard
+sind Tutorial-Durchlauf und alle bisherigen Prüfungen unverändert grün. Sichtkontrolle in
+Chromium: Bogen und Aufbau wie gewollt.
+
 ### Ökologie: +1 auf alle Erträge (v69)
 
 Auf Anweisung des Autors. Vorher „Städte: +1 Nahrung / 2 Bevölkerung (abrunden)", jetzt
@@ -302,10 +332,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1295 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1322 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (107 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (114 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -406,6 +436,10 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   `p.freeArmyCity` beim Koloss). Ein Parameter am Aufruf reicht nicht: er wirkt nur beim
   ersten Mal. Und: Tests für ortsabhängige Wirkungen dürfen **nicht** in der Hauptstadt
   bauen, sonst sind sie blind (genau das verdeckte den Koloss-Fehler).
+- **Technologiekosten immer über `techBase(S, t)`, nie über `t.c`** (seit v70). `t.c` sind
+  die Standardkosten; im alternativen Techtree weichen sechs davon ab. Wer eine neue Stelle
+  baut, die Kosten zeigt, vergleicht oder sortiert, und dort `t.c` nimmt, zeigt im
+  alternativen Techtree falsche Zahlen – auffallen würde das nur dort.
 - **`CIV_KEYS` (js/civs.js) ist EINE Liste, kein frisches Array je Aufruf.** Der Aufbau
   schreibt an mehreren Stellen in Schlüssellisten (Doppelungen auflösen, Auslosung); wer
   dort die gemeinsame Liste nimmt statt `CIV_KEYS.slice()`, verbiegt sie für die ganze

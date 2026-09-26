@@ -2307,6 +2307,123 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(S.wgone.includes('stonehenge'), true, 'auch Stonehenge selbst');
 }
 
+/* ============================ Alternativer Techtree (v70, Anweisung des Autors)
+   Im Aufbau je Partie zuschaltbar. Andere Grundkosten für sechs Technologien der Antike:
+   Forschung Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 – Produktion
+   Bewässerung 1, Landwirtschaft 5. Sie rücken auf der Leiter ihres Feldes um, Feld,
+   Zeitalter und Wirkung bleiben. Ohne Häkchen muss alles genau wie vorher sein.       */
+{
+  const auf = civ => [{ civ, kind: 'human' }, { civ: 'wikinger', kind: 'bot' }];
+  const mkT = (civ, alt, techs = [], extra = {}) => {
+    const S = normalize(newGame(Object.assign({ players: auf(civ), seed: 7, altTree: alt }, extra)), civ);
+    techs.forEach(t => S.players[0].techs[t] = true);
+    return S;
+  };
+  const leiter = (S, f, a = 0) => techsIn(f, a, S).map(t => t.k);
+  const STD = mkT('england', false), ALT = mkT('england', true);
+
+  eq(ALT_TECH_COSTS, { mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4, bewaesserung: 1, landwirtschaft: 5 },
+    'Alternativer Techtree: die sechs Kosten der Vorgabe');
+  eq([STD.altTree, ALT.altTree], [false, true], 'Alternativer Techtree: der Schalter steht im Spielstand');
+  eq(newGame({ seed: 7, players: auf('england') }).altTree, false, 'ohne Angabe gilt der Standard');
+
+  // Die Leitern im Bogen folgen den Kosten der Partie
+  eq(leiter(STD, 0), ['schrift', 'mathematik', 'astronomie', 'philosophie'], 'Standard: Forschung/Antike wie bisher');
+  eq(leiter(STD, 1), ['landwirtschaft', 'fischerei', 'rad', 'keramik', 'bewaesserung'], 'Standard: Produktion/Antike wie bisher');
+  eq(leiter(ALT, 0), ['mathematik', 'astronomie', 'philosophie', 'schrift'],
+    'Alternativer Techtree: Forschung/Antike nach Kosten 1–4');
+  eq(leiter(ALT, 1), ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'],
+    'Alternativer Techtree: Produktion/Antike nach Kosten 1–5');
+  {
+    // Mit Wunder-Techs, damit wirklich jede Leiter drin ist
+    const [W0, W1] = [false, true].map(alt => mkT('england', alt, [], { wonders: true }));
+    const anders = [], ungeordnet = [];
+    for (let f = 0; f < 4; f++) for (let a = 0; a < 4; a++) {
+      if (!(a === 0 && f < 2) && leiter(W0, f, a).join() !== leiter(W1, f, a).join()) anders.push(`${f}/${a}`);
+      for (const X of [W0, W1]) {
+        const k = techsIn(f, a, X).map(t => techBase(X, t));
+        if (k.some((c, i) => i && c <= k[i - 1])) ungeordnet.push(`${X.altTree ? 'alt' : 'std'} ${f}/${a}`);
+      }
+    }
+    eq(anders, [], 'alle übrigen Leitern sind in beiden Techtrees gleich');
+    eq(ungeordnet, [], 'jede Leiter steigt streng in den Kosten – die Reihenfolge ist eindeutig');
+  }
+  eq(Object.keys(ALT_TECH_COSTS).filter(k => !TECH_BY_KEY[k]), [], 'jeder Schlüssel ist eine echte Technologie');
+  eq(Object.keys(ALT_TECH_COSTS).filter(k => ageOfCost(ALT_TECH_COSTS[k]) !== TECH_BY_KEY[k].age), [],
+    'kein alternativer Wert verlässt sein Zeitalter – t.age bleibt gültig');
+  eq(TECHS.filter(t => techBase(STD, t) !== t.c || techBase(null, t) !== t.c).map(t => t.k), [],
+    'Standard und Tabellen ohne Spielstand: Grundkosten wie bisher');
+
+  // Was der Spieler zahlt: Vergünstigungen setzen auf die neuen Grundkosten auf
+  const SECHS = ['schrift', 'mathematik', 'astronomie', 'philosophie', 'landwirtschaft', 'bewaesserung'];
+  const kosten = S => SECHS.map(k => techCost(S, 0, TECH_BY_KEY[k]));
+  eq(kosten(STD), [1, 2, 3, 4, 1, 5], 'Standard: Kosten 1/2/3/4 und 1/5');
+  eq(kosten(ALT), [4, 1, 2, 3, 5, 1], 'Alternativer Techtree: Kosten 4/1/2/3 und 5/1');
+  eq(kosten(mkT('griechenland', true)), [3, 0, 1, 2, 4, 0], 'Griechenland: in der Antike je 1 weniger, auf die neuen Kosten');
+  eq(kosten(mkT('england', true, ['wiss_methode'])), [2, 0, 0, 1, 3, 0],
+    'Wissenschaftliche Methode: −2 in der Antike, nie unter 0');
+  {
+    const S = mkT('england', true), p = S.players[0];
+    S.cur = 0;
+    p.res = { sci: 3, food: 0, coins: 0 };
+    eq(doResearch(S, 0, 'schrift'), T('Nicht genug Wissenschaft.'), 'Alternativer Techtree: Schrift ist mit 3 Wissenschaft zu teuer');
+    p.res = { sci: 4, food: 0, coins: 0 };
+    eq([doResearch(S, 0, 'schrift'), p.res.sci, !!p.techs.schrift], [null, 0, true],
+      'mit 4 Wissenschaft erforscht, die 4 sind verbraucht');
+    p.res = { sci: 1, food: 0, coins: 0 };
+    eq([doResearch(S, 0, 'mathematik'), p.res.sci], [null, 0], 'Mathematik kostet 1');
+  }
+
+  // Kopieren zahlt die Basiskosten der Partie
+  {
+    const preise = S => {
+      S.players[1].techs.schrift = true; S.players[1].techs.landwirtschaft = true; S.players[1].techs.mathematik = true;
+      return ['schrift', 'landwirtschaft', 'mathematik'].map(k => copyableTechs(S, 0).find(o => o.tech.k === k).paidCoins);
+    };
+    eq(preise(mkT('england', false, ['spionage'])), [1, 1, 2], 'Standard: Spionage kopiert zu 1/1/2 Münzen');
+    eq(preise(mkT('england', true, ['spionage'])), [4, 5, 1], 'Alternativer Techtree: Spionage kopiert zu 4/5/1 Münzen');
+    eq(preise(mkT('england', true, ['kundschafterei'])), [12, 15, 3], 'und Kundschafterei zum Dreifachen');
+  }
+
+  // Plättchenmodus: der Vorabwurf läuft im selben Techtree wie die Partie. Geprüft an
+  // einem Seed, bei dem die beiden Techtrees verschieden würfeln – sonst wäre es blind.
+  {
+    const zwei = [{ civ: 'england', kind: 'human' }, { civ: 'russland', kind: 'human' }];
+    const avail = (alt, seed) => newGame({ seed, altTree: alt, players: zwei }).players
+      .map(p => Object.keys(p.avail).filter(k => p.avail[k]).sort().join(',')).join(' | ');
+    let seed = 1;
+    while (seed < 200 && avail(false, seed) === avail(true, seed)) seed++;
+    eq(seed < 200, true, 'es gibt Würfe, die im alternativen Techtree anders ausfallen');
+    const vorab = rollSetup({ seed, altTree: true, players: zwei });
+    const X = newGame({ seed, altTree: true, players: zwei, avail: vorab.avail });
+    eq([X.altTree, X.players.map(p => Object.keys(p.avail).filter(k => p.avail[k]).sort().join(',')).join(' | ')],
+      [true, avail(true, seed)], 'Plättchenmodus: vorab gewürfelt wird im alternativen Techtree');
+  }
+
+  // Spielstände: alte ohne Schalter bleiben Standard, gespeicherte behalten ihn
+  {
+    const alt = mkT('england', false); delete alt.altTree;
+    eq(leiter(alt, 0)[0], 'schrift', 'Spielstände vor v70 laufen im Standard weiter');
+    const L = JSON.parse(JSON.stringify(ALT));
+    eq([L.altTree, leiter(L, 0)[0]], [true, 'mathematik'], 'gespeichert und geladen bleibt der alternative Techtree');
+  }
+
+  // Bots forschen auf denselben Leitern – zehn vollständige Partien ohne Ausnahme
+  {
+    let fertig = 0;
+    const fehler = [];
+    for (let seed = 1; seed <= 10; seed++) {
+      try {
+        const S = newGame({ seed, altTree: true, players: CIVS.map(c => ({ civ: c.k, kind: 'bot' })) });
+        let guard = 0;
+        while (!S.over && guard++ < 400) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+        if (S.over) fertig++;
+      } catch (e) { fehler.push(seed + ': ' + e.message); }
+    }
+    eq([fertig, fehler], [10, []], 'zehn Bot-Partien im alternativen Techtree laufen zu Ende');
+  }
+}
+
 /* ==================================================== 1 gegen 1 */
 /* Die eigene Duellkarte gibt es nicht mehr – im Duell wird immer die Plättchenkarte aus
    sechs Dreiecken gelegt. Geprüft wird sie im Plättchen-Abschnitt; hier bleiben die

@@ -2193,6 +2193,134 @@ step('Drei Reiche spielen auf der Plättchenkarte', () => {
     throw new Error('das große Dreieck hat nicht 135 Felder');
   console.log('       ' + S.map.name + ' · ' + S.map.rows.length + ' × ' + S.map.rows[0].length);
 });
+/* ============================================ Alternativer Techtree (v70)
+   Ein Häkchen im Aufbau. Angehakt rücken sechs Technologien der Antike auf ihrer Leiter
+   um – und genau so muss der Bogen sie zeigen: in Kostenreihenfolge, mit den neuen
+   Kosten. Das gilt auch für den Bogen der Legephase und den Regelbogen. Ohne Häkchen
+   bleibt alles wie gehabt. */
+// Spalten des Bogens: je Zeitalter vier (Forschung, Produktion, Militär, Spezial)
+const bogenSpalte = i => [...$('ov-body').querySelectorAll('.techgrid .techcol')[i].querySelectorAll('.tech')]
+  .map(b => [b.querySelector('b').textContent, b.querySelector('.c').textContent]);
+const techNamen = keys => keys.map(k => G('TECH_BY_KEY')[k].n).join(', ');
+const ALT_FO = ['mathematik', 'astronomie', 'philosophie', 'schrift'];
+const ALT_PR = ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'];
+const vierReiche = () => {
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+  [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+};
+step('Alternativer Techtree: Zeile im Aufbau, ab Werk ohne Häkchen', () => {
+  $('m-new').onclick();
+  vierReiche();
+  if ($('setup-alttree-row').hidden) throw new Error('die Zeile fehlt im Aufbau');
+  if ($('setup-alttree').checked) throw new Error('ab Werk angehakt');
+  if (!$('setup-alttree-hint').hidden) throw new Error('Hinweis ohne Häkchen sichtbar');
+  $('setup-alttree').checked = true; $('setup-alttree').onchange();
+  const hint = $('setup-alttree-hint');
+  if (hint.hidden) throw new Error('angehakt erscheint kein Hinweis');
+  for (const s of ['Mathematik 1', 'Astronomie 2', 'Philosophie 3', 'Schrift 4', 'Bewässerung 1', 'Landwirtschaft 5'])
+    if (!hint.textContent.includes(s)) throw new Error('Hinweis nennt nicht „' + s + '": ' + hint.textContent);
+  console.log('       ' + hint.textContent);
+});
+step('Alternativer Techtree: Zeile und Hinweis auf Englisch', () => {
+  G('switchLang')('en');                   // setupScreen läuft neu, der Hinweis mit
+  const zeile = $('setup-alttree-row').textContent.trim();
+  const hint = $('setup-alttree-hint').textContent;
+  const mathe = G('TECH_BY_KEY').mathematik.n;
+  G('switchLang')('de');
+  if (zeile !== 'Alternative tech tree') throw new Error('Zeile: ' + zeile);
+  if (!hint.startsWith('Different costs: ' + mathe + ' 1')) throw new Error('Hinweis: ' + hint);
+  if (!$('setup-alttree').checked) throw new Error('der Sprachwechsel nimmt das Häkchen weg');
+  console.log('       ' + zeile + ' · ' + hint);
+});
+step('Alternativer Techtree: der Bogen zeigt die Leitern nach den neuen Kosten', () => {
+  $('setup-go').onclick();
+  const S = G('S');
+  if (!S.altTree) throw new Error('der Schalter kommt nicht in der Partie an');
+  $('a-tech').onclick();
+  const fo = bogenSpalte(0), pr = bogenSpalte(1);
+  if (fo.map(x => x[0]).join(', ') !== techNamen(ALT_FO)) throw new Error('Forschung/Antike: ' + fo.map(x => x.join(' ')).join(', '));
+  if (pr.map(x => x[0]).join(', ') !== techNamen(ALT_PR)) throw new Error('Produktion/Antike: ' + pr.map(x => x.join(' ')).join(', '));
+  // Auf der Kachel steht, was die Regelmaschine verlangt – und es steigt die Leiter hinauf
+  const pi = S.cur;
+  const soll = G('techsIn')(0, 0, S).map(t => String(G('techCost')(S, pi, t))).join();
+  if (fo.map(x => x[1]).join() !== soll) throw new Error('Kachelkosten ' + fo.map(x => x[1]) + ' ≠ Rechnung ' + soll);
+  for (let s = 0; s < 16; s++) {
+    const k = bogenSpalte(s).map(x => +x[1]).filter(n => !isNaN(n));
+    if (k.some((n, i) => i && n < k[i - 1])) throw new Error('Spalte ' + s + ' fällt: ' + k.join(','));
+  }
+  G('closeModal')();
+  console.log('       Forschung: ' + fo.map(x => x.join(' ')).join(', '));
+  console.log('       Produktion: ' + pr.map(x => x.join(' ')).join(', '));
+});
+step('Alternativer Techtree: Regelbogen, Weltblatt und Protokoll nennen ihn', () => {
+  G('rulesModal')();
+  const zeilen = [...$('ov-body').querySelectorAll('.rule-tech')]
+    .map(d => [d.querySelector('b').textContent, d.querySelector('.c').textContent]);
+  const K = G('TECH_BY_KEY'), reihe = zeilen.map(z => z[0]);
+  const kosten = ['schrift', 'mathematik', 'landwirtschaft', 'bewaesserung']
+    .map(k => (zeilen.find(z => z[0] === K[k].n) || [])[1]).join();
+  if (kosten !== '4,1,5,1') throw new Error('Regelbogen zeigt ' + kosten);
+  if (reihe.indexOf(K.mathematik.n) > reihe.indexOf(K.schrift.n)) throw new Error('Regelbogen: Schrift vor Mathematik');
+  if (reihe.indexOf(K.bewaesserung.n) > reihe.indexOf(K.landwirtschaft.n)) throw new Error('Regelbogen: Landwirtschaft vor Bewässerung');
+  if (!/alternative Techtree/.test($('ov-body').textContent)) throw new Error('kein Hinweis im Regelbogen');
+  G('closeModal')();
+  $('a-info').onclick();
+  if (!/Alternativer Techtree · Mathematik 1/.test($('ov-body').textContent))
+    throw new Error('Weltblatt nennt den Techtree nicht');
+  G('closeModal')();
+  if (!/Alternativer Techtree/.test(G('S').log[0].m)) throw new Error('Protokollkopf: ' + G('S').log[0].m);
+  console.log('       Regelbogen Schrift/Mathematik/Landwirtschaft/Bewässerung: ' + kosten);
+});
+step('Alternativer Techtree: „Nochmal spielen" behält ihn, alte Rezepte nicht', () => {
+  const rec = G('S').recipe;
+  if (!rec || rec.altTree !== true) throw new Error('das Rezept kennt den Schalter nicht');
+  G('startFromRecipe')(rec);
+  if (!G('S').altTree) throw new Error('die neue Partie läuft im Standard');
+  const alt = JSON.parse(JSON.stringify(rec)); delete alt.altTree;       // Rezept aus v69
+  G('startFromRecipe')(alt);
+  if (G('S').altTree) throw new Error('ein altes Rezept schaltet den alternativen Techtree ein');
+});
+step('Alternativer Techtree: auch der Bogen in der Legephase – und die Partie danach', () => {
+  $('m-new').onclick();
+  if (!$('setup-alttree').checked) throw new Error('das Häkchen geht beim Wiederöffnen verloren');
+  $('setup-mode').querySelector('[data-mode=duell]').onclick();       // Duell: immer Plättchen
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+  $('setup-list').children[1].querySelector('[data-kind="bot"]').onclick();
+  $('setup-go').onclick();
+  if (!$('screen-place').classList.contains('show')) throw new Error('keine Legephase');
+  $('pl-tech').onclick();
+  const fo = bogenSpalte(0).map(x => x[0]).join(', ');
+  if (fo !== techNamen(ALT_FO)) throw new Error('Legephase: ' + fo);
+  G('closeModal')();
+  const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
+  const gut = frei.indexOf(true);
+  G('plTap')(rcs[gut][0], rcs[gut][1]);
+  G('placeConfirm')(); G('placeConfirm')();
+  if (!$('screen-game').classList.contains('show')) throw new Error('das Spiel beginnt nicht');
+  if (!G('S').altTree) throw new Error('nach dem Legen läuft die Partie im Standard');
+  console.log('       Legephase: ' + fo);
+});
+step('Alternativer Techtree: ohne Häkchen wieder der Standard', () => {
+  $('m-new').onclick();
+  $('setup-alttree').checked = false; $('setup-alttree').onchange();
+  if (!$('setup-alttree-hint').hidden) throw new Error('Hinweis bleibt nach dem Abhaken');
+  vierReiche();
+  $('setup-go').onclick();
+  if (G('S').altTree) throw new Error('die Partie läuft trotzdem im alternativen Techtree');
+  $('a-tech').onclick();
+  const fo = bogenSpalte(0).map(x => x[0]).join(', ');
+  const pr = bogenSpalte(1).map(x => x[0]).join(', ');
+  G('closeModal')();
+  if (fo !== techNamen(['schrift', 'mathematik', 'astronomie', 'philosophie'])) throw new Error('Forschung: ' + fo);
+  if (pr !== techNamen(['landwirtschaft', 'fischerei', 'rad', 'keramik', 'bewaesserung'])) throw new Error('Produktion: ' + pr);
+  G('rulesModal')();
+  if (/alternative Techtree/.test($('ov-body').textContent)) throw new Error('Regelbogen meldet ihn im Standard');
+  G('closeModal')();
+  console.log('       Forschung: ' + fo);
+});
+
 step('Karteneditor zeigt Felder außerhalb der Karte', () => {
   G('__set')('customMap', null);
   $('m-editor').onclick();

@@ -25,6 +25,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
 | Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
 | Einstellungen | Im Hauptmenü: die Erweiterungsmodule **Ereignisse** und **Weltwunder** zuschalten. Ab Werk sind beide aus und fehlen im Aufbau ganz; eingeschaltet steht dort wieder das Häkchen und entscheidet je Partie |
+| Alternativer Techtree | Häkchen im Aufbau, je Partie, ab Werk aus: andere Kosten in der Antike – Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5. Der Technologiebogen ordnet die Leitern nach diesen Kosten. Quelle: `ALT_TECH_COSTS` in `js/data.js` |
 | Spielart | „Vier Reiche“, „Drei Reiche“ oder „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) |
 | Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen. Bei ausgelostem Reich steht die Fähigkeit zwangsläufig ebenfalls auf Zufall |
 | Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
