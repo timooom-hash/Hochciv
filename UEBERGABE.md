@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 26.9., `sw.js` v70)
+# Hochzeivilization — Projekt-Übergabe (Stand 26.9., `sw.js` v72)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v70)
+## Letzte Sitzungen auf einen Blick (v61 → v72)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -25,10 +25,12 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v68 | **Burgstädte werfen mit Schießpulver eine Kontrollzone** – vorher schlüpften gegnerische Armeen an ihnen vorbei (gemeldet aus einem 1-gegen-1) | Fehler |
 | v69 | **Ökologie** bringt je zwei Bevölkerung einer Stadt +1 auf **alle drei Erträge** statt nur +1 Nahrung | Regel |
 | v70 | **Alternativer Techtree** als Häkchen im Aufbau: Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5; der Bogen ordnet die Leitern danach | Regel + Oberfläche |
+| v71 | Im alternativen Techtree zusätzlich: **Kolonialismus** 3 statt 5 Münzen je Feld, **Kundschafterei** 2× statt 3× der Grundkosten | Regel |
+| v72 | Kolonialismus 3 und Kundschafterei 2× gelten in **beiden** Techtrees; der alternative unterscheidet sich nur in den Forschungskosten (Klarstellung zu v71) | Regel |
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
-(Siedelvorschau bei Siedlertrecks).
+(Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei).
 
 ## Wo alles liegt
 
@@ -59,16 +61,16 @@ der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), sei
 | `js/i18n.js` | 1182 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 398 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 403 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1714 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1717 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1972 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4676 | **1322 Assertions**, `node test.js` |
-| `smoke.js` | 2355 | **114 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 4714 | **1332 Assertions**, `node test.js` |
+| `smoke.js` | 2399 | **115 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -199,6 +201,28 @@ Gedächtnis rekonstruieren.
   wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
+
+### Kolonialismus 3 Münzen, Kundschafterei 2× – in beiden Techtrees (v71 → v72)
+
+Auf Anweisung des Autors: Kolonialismus kauft ein Feld für **3** statt 5 Münzen,
+Kundschafterei kopiert zum **Doppelten** statt zum Dreifachen der Grundkosten. v71 hatte
+beides nur in den alternativen Techtree gelegt (die Anweisung nannte keinen Ort); der Autor
+hat klargestellt: **beide Techtrees, der alternative unterscheidet sich nur in den
+Forschungskosten.** v72 stellt das so her.
+
+**Wie es gebaut ist:** zwei Einzelwerte in `js/data.js`, `COLONY_COST = 3` und
+`SCOUTING_RATE = 2`. `buyTile` zahlt `COLONY_COST` und nennt den Preis im Protokoll,
+`copyRate(p)` liefert für Kundschafterei `SCOUTING_RATE`, der Kaufknopf im Feldblatt zeigt
+`COLONY_COST`. Die Techtexte stehen wieder fest in `TECHS` und `DATA_EN` (die v71-Sonderfälle
+in `techEffect` und ihre `UI_EN`-Schlüssel sind entfallen); ein Test hält Text und Wert
+zusammen, in beiden Sprachen. Kopiert wird zu den Grundkosten der Partie (`techBase`).
+
+**Abgesichert:** `test.js` prüft Feldpreis, Protokoll und „zu wenig Münzen" in beiden
+Techtrees, den Kopierfaktor im Standard (auch die älteren Prüfungen 2×5 und 2×1) und im
+alternativen Techtree (Schrift 8), Spionage vor Kundschafterei und die Texte beider
+Sprachen. `smoke.js` kauft in beiden Techtrees ein Feld über das Aktionsblatt („3🪙", 3
+Münzen abgebucht) und prüft, dass der Aufbauhinweis nur Kosten nennt. Gegenproben (alter
+deutscher bzw. englischer Text, fester Preis 5, fester Faktor 3) schlagen jeweils an.
 
 ### Alternativer Techtree (v70)
 
@@ -332,10 +356,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1322 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1332 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (114 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (115 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -731,6 +755,12 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    2🔬 −2🌾 6🪙; mit Ökologie seit v69 tatsächlich 3🔬 −1🌾 7🪙. Vorbestehend, durch v69 nur
    größer geworden. Behebung wäre eine Zeile in `settleGain` (Bevölkerung wie in
    `foundCity`); das Tutorial spielt Russland mit Grundfähigkeit und wäre nicht betroffen.
+10. **Spieltipp zur Kundschafterei** („im Allgemeinen nicht effizient") stimmt seit v72 nur
+   noch bedingt: 2× Grundkosten in Münzen sind beim Standardkurs (2 Münzen = 1 Wissenschaft)
+   genau die Forschungskosten ohne Vergünstigung. Teurer als Forschen ist Kopieren nur noch
+   mit Rabatt (Griechenland, Wiss. Methode) oder Computertechnik. Tipptext ist Sache des
+   Autors, nicht geändert. Außerdem: **Bots kaufen keine Felder und kopieren nie** – beide
+   Verbilligungen helfen nur Menschen (wie die Straßen, Punkt 0b).
 
 ## Arbeitsweise, die der Autor schätzt
 

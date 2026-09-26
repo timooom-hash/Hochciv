@@ -2202,6 +2202,34 @@ step('Drei Reiche spielen auf der Plättchenkarte', () => {
 const bogenSpalte = i => [...$('ov-body').querySelectorAll('.techgrid .techcol')[i].querySelectorAll('.tech')]
   .map(b => [b.querySelector('b').textContent, b.querySelector('.c').textContent]);
 const techNamen = keys => keys.map(k => G('TECH_BY_KEY')[k].n).join(', ');
+// Wirkungstext der Kachel einer Technologie im offenen Bogen
+const kachelText = k => {
+  const n = G('TECH_BY_KEY')[k].n;
+  const kachel = [...$('ov-body').querySelectorAll('.techgrid .tech')].find(b => b.querySelector('b').textContent === n);
+  return kachel ? kachel.querySelector('.eff').textContent : null;
+};
+/* Ein herrenloses Feld über das Aktionsblatt kaufen: der Mensch ist am Zug, hat
+   Kolonialismus und 10 Münzen. Zurück kommen Knopfpreis und abgebuchte Münzen; danach
+   ist die Ausgangslage wiederhergestellt. */
+const feldKaufen = () => {
+  const S = G('S'), pi = S.players.findIndex(q => q.kind === 'human'), p = S.players[pi];
+  S.cur = pi;                                   // der Mensch handelt, nicht ein Bot
+  const cap = G('capitalOf')(S, pi);
+  p.techs.kolonialismus = true; p.res.coins = 10;
+  const frei = G('within')(cap.r, cap.c, 6).find(([r, c]) => G('terrainAt')(S, r, c) && !G('cityAt')(S, r, c) &&
+    !G('armyAt')(S, r, c) && !S.players.some((_, i) => G('controlledTiles')(S, i).has(G('key')(r, c))));
+  if (!frei) throw new Error('kein herrenloses Feld gefunden');
+  G('tapHex')(frei[0], frei[1]);
+  const knopf = $('sheet-body').querySelector('.opt[data-label="Feld kaufen"]');
+  if (!knopf) throw new Error('kein Kaufknopf im Aktionsblatt');
+  const preis = knopf.querySelector('.cost').textContent;
+  knopf.onclick ? knopf.onclick() : knopf.click();
+  const bezahlt = 10 - p.res.coins;
+  if (!(S.bought[pi] || []).includes(G('key')(frei[0], frei[1]))) throw new Error('das Feld gehört danach nicht dem Reich');
+  G('closeSheet')();
+  delete p.techs.kolonialismus; S.bought[pi] = [];
+  return [preis, bezahlt];
+};
 const ALT_FO = ['mathematik', 'astronomie', 'philosophie', 'schrift'];
 const ALT_PR = ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'];
 const vierReiche = () => {
@@ -2221,6 +2249,8 @@ step('Alternativer Techtree: Zeile im Aufbau, ab Werk ohne Häkchen', () => {
   if (hint.hidden) throw new Error('angehakt erscheint kein Hinweis');
   for (const s of ['Mathematik 1', 'Astronomie 2', 'Philosophie 3', 'Schrift 4', 'Bewässerung 1', 'Landwirtschaft 5'])
     if (!hint.textContent.includes(s)) throw new Error('Hinweis nennt nicht „' + s + '": ' + hint.textContent);
+  // Der alternative Techtree unterscheidet sich nur in den Forschungskosten (v72)
+  if (/Kolonialismus|Kundschafterei/.test(hint.textContent)) throw new Error('Hinweis nennt mehr als Kosten: ' + hint.textContent);
   console.log('       ' + hint.textContent);
 });
 step('Alternativer Techtree: Zeile und Hinweis auf Englisch', () => {
@@ -2231,6 +2261,7 @@ step('Alternativer Techtree: Zeile und Hinweis auf Englisch', () => {
   G('switchLang')('de');
   if (zeile !== 'Alternative tech tree') throw new Error('Zeile: ' + zeile);
   if (!hint.startsWith('Different costs: ' + mathe + ' 1')) throw new Error('Hinweis: ' + hint);
+  if (/Colonialism|Scouting/.test(hint)) throw new Error('englischer Hinweis nennt mehr als Kosten: ' + hint);
   if (!$('setup-alttree').checked) throw new Error('der Sprachwechsel nimmt das Häkchen weg');
   console.log('       ' + zeile + ' · ' + hint);
 });
@@ -2250,9 +2281,17 @@ step('Alternativer Techtree: der Bogen zeigt die Leitern nach den neuen Kosten',
     const k = bogenSpalte(s).map(x => +x[1]).filter(n => !isNaN(n));
     if (k.some((n, i) => i && n < k[i - 1])) throw new Error('Spalte ' + s + ' fällt: ' + k.join(','));
   }
+  const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
+  if (ko !== 'Für 3 Münzen Feld kaufen') throw new Error('Kolonialismus-Kachel: ' + ko);
+  if (ku !== 'Tech kopieren (2× Kosten in Münzen)') throw new Error('Kundschafterei-Kachel: ' + ku);
   G('closeModal')();
   console.log('       Forschung: ' + fo.map(x => x.join(' ')).join(', '));
   console.log('       Produktion: ' + pr.map(x => x.join(' ')).join(', '));
+});
+step('Alternativer Techtree: Feld kaufen kostet im Aktionsblatt 3 Münzen', () => {
+  const [preis, bezahlt] = feldKaufen();
+  if (preis !== '3🪙' || bezahlt !== 3) throw new Error(`Knopf ${preis}, bezahlt ${bezahlt}`);
+  console.log('       Knopf ' + preis + ', abgebucht ' + bezahlt);
 });
 step('Alternativer Techtree: Regelbogen, Weltblatt und Protokoll nennen ihn', () => {
   G('rulesModal')();
@@ -2312,7 +2351,12 @@ step('Alternativer Techtree: ohne Häkchen wieder der Standard', () => {
   $('a-tech').onclick();
   const fo = bogenSpalte(0).map(x => x[0]).join(', ');
   const pr = bogenSpalte(1).map(x => x[0]).join(', ');
+  const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
   G('closeModal')();
+  if (ko !== 'Für 3 Münzen Feld kaufen' || ku !== 'Tech kopieren (2× Kosten in Münzen)')
+    throw new Error('Standard: ' + ko + ' · ' + ku);
+  const [preis, bezahlt] = feldKaufen();
+  if (preis !== '3🪙' || bezahlt !== 3) throw new Error(`Standard: Knopf ${preis}, bezahlt ${bezahlt}`);
   if (fo !== techNamen(['schrift', 'mathematik', 'astronomie', 'philosophie'])) throw new Error('Forschung: ' + fo);
   if (pr !== techNamen(['landwirtschaft', 'fischerei', 'rad', 'keramik', 'bewaesserung'])) throw new Error('Produktion: ' + pr);
   G('rulesModal')();

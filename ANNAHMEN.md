@@ -68,7 +68,7 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
 | Singularität | Kosten 25 (v2: 100), griechischer Rabatt −5, Wissenschaftliche Methode −10 | |
 | Armeekosten Wikinger | 5 × (Armeen inkl. neuer − 1), die erste Armee ist damit gratis | Mindestpreis 5 |
 | Sklaverei | höchstens **einmal pro Runde pro Stadt**; die Stadt darf davor wachsen | |
-| Kolonialismus | kauft nur **herrenlose** Felder (keine Stadt, keine Kontrolle) | |
+| Kolonialismus | kauft nur **herrenlose** Felder (keine Stadt, keine Kontrolle), **3 Münzen** je Feld (`COLONY_COST`, bis v71: 5) | |
 
 ## 4. Was ein Feld einbringt
 
@@ -123,7 +123,8 @@ ebenfalls verbunden.
 * Jeder Effekt wirkt **sofort nach dem Forschen** im selben Zug (z. B. senkt Kartografie
   die Gründungskosten unmittelbar). `test.js` prüft das.
 * Kopieren, drei **unabhängige** Wege: **Spionage** bezahlt (1× Basiskosten in Münzen, kein
-  Rundenlimit), **Kundschafterei** bezahlt (3× Basiskosten), **Internet** 1× pro Runde
+  Rundenlimit), **Kundschafterei** bezahlt (2× Basiskosten, `SCOUTING_RATE`; bis v71 3×),
+  **Internet** 1× pro Runde
   kostenlos. Wer einen bezahlten Weg **und** Internet hat, bekommt pro Technologie **beide**
   Optionen angeboten (bezahlt kopieren oder die eine Gratiskopie darauf verwenden). Beim
   Kopieren gelten keine Vergünstigungen (Wiss. Methode etc.), es zählen die Basiskosten.
@@ -146,6 +147,11 @@ ebenfalls verbunden.
   - **Bots** spielen auf denselben Leitern. Das **Tutorial** läuft immer im Standard.
   - „Nochmal spielen" übernimmt den Schalter (er steht im Rezept). Spielstände und
     Rezepte aus v69 und früher kennen ihn nicht und laufen im Standard.
+  - **Er unterscheidet sich nur in den Forschungskosten** (Klarstellung des Autors zu
+    v72). Kolonialismus 3 Münzen je Feld und Kundschafterei 2× gelten in **beiden**
+    Techtrees (Abschnitt 3 und oben); v71 hatte sie nur hier eingeordnet. Kopiert wird
+    zu den Grundkosten der Partie: Kundschafterei kopiert Schrift im Standard für 2, im
+    alternativen Techtree für 8 Münzen.
   - Die Listen mit **Gratis-Technologien** (Freie Forschung, Rückschau, Bibliothek,
     Oxford, Raumfahrt) zeigen keine Kosten und behalten ihre Reihenfolge aus `TECHS`.
   - Sichtbar ist der Schalter im Aufbau (mit Hinweis auf die geänderten Kosten), im

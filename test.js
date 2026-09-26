@@ -616,7 +616,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   S.players[0].techs.kundschafterei = true; S.players[0].techs.internet = true;
   S.players[0].res.coins = 50;
   const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
-  eq(sm.paidCoins, 15, 'Kundschafterei: 3× Basiskosten (3×5) in Münzen');
+  eq(sm.paidCoins, 10, 'Kundschafterei: 2× Basiskosten (2×5) in Münzen');
   eq(sm.freeOk, true, 'Internet-Gratiskopie steht trotz Kundschafterei zur Verfügung (Bugfix)');
   // Gratiskopie kostet keine Münzen und verbraucht das Rundenkontingent
   eq(copyTech(S, 0, 'stadtmauern', 'free'), null, 'gratis kopieren klappt');
@@ -625,7 +625,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   // eine zweite Kopie in derselben Runde geht nur noch bezahlt
   const tk = copyableTechs(S, 0).find(o => o.tech.k === 'taktik');
   eq(tk.freeOk, false, 'keine zweite Gratiskopie in derselben Runde');
-  eq(tk.paidCoins, 3, 'bezahlter Weg (3×1) bleibt');
+  eq(tk.paidCoins, 2, 'bezahlter Weg (2×1) bleibt');
 }
 
 /* Nur Spionage (ohne Internet): bezahlt, keine Gratiskopie */
@@ -2382,7 +2382,45 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     };
     eq(preise(mkT('england', false, ['spionage'])), [1, 1, 2], 'Standard: Spionage kopiert zu 1/1/2 Münzen');
     eq(preise(mkT('england', true, ['spionage'])), [4, 5, 1], 'Alternativer Techtree: Spionage kopiert zu 4/5/1 Münzen');
-    eq(preise(mkT('england', true, ['kundschafterei'])), [12, 15, 3], 'und Kundschafterei zum Dreifachen');
+    // v72: Kundschafterei kopiert in beiden Techtrees zum Doppelten der Grundkosten der Partie
+    eq(preise(mkT('england', false, ['kundschafterei'])), [2, 2, 4], 'Standard: Kundschafterei zum Doppelten');
+    eq(preise(mkT('england', true, ['kundschafterei'])), [8, 10, 2],
+      'Alternativer Techtree: Kundschafterei zum Doppelten der neuen Grundkosten');
+    eq(preise(mkT('england', true, ['kundschafterei', 'spionage'])), [4, 5, 1],
+      'mit beiden Wegen gilt der günstigere – Spionage');
+  }
+
+  /* v72 (Anweisung des Autors): Kolonialismus kauft ein Feld für 3 Münzen (vorher 5),
+     Kundschafterei kopiert zum Doppelten der Grundkosten (vorher zum Dreifachen) – in
+     BEIDEN Techtrees. Der alternative unterscheidet sich nur in den Forschungskosten
+     (v71 hatte die beiden Werte nur dort). */
+  {
+    eq([COLONY_COST, SCOUTING_RATE], [3, 2], 'Kolonialismus 3 Münzen je Feld, Kundschafterei 2×');
+    const kauf = (alt, muenzen) => {
+      const S = mkT('england', alt, ['kolonialismus']), p = S.players[0], cap = capitalOf(S, 0);
+      S.cur = 0; p.res = { sci: 0, food: 0, coins: muenzen };
+      const frei = within(cap.r, cap.c, 6).find(([r, c]) => terrainAt(S, r, c) && !cityAt(S, r, c) &&
+        !S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))));
+      const err = buyTile(S, 0, frei[0], frei[1]);
+      return [err, p.res.coins, (S.bought[0] || []).length, S.log[S.log.length - 1].m];
+    };
+    const std = kauf(false, 5);
+    eq(std.slice(0, 3), [null, 2, 1], 'Standard: das Feld kostet 3 Münzen');
+    eq(kauf(true, 5).slice(0, 3), [null, 2, 1], 'Alternativer Techtree: ebenfalls 3 Münzen');
+    eq(/\(3 Münzen\)/.test(std[3]), true, 'das Protokoll nennt den Preis');
+    eq(kauf(false, 2).slice(0, 3), [T('Zu wenig Münzen.'), 2, 0], 'mit 2 Münzen reicht es nicht');
+    // Die Techtexte nennen dieselben Zahlen wie die Regel – in beiden Sprachen, und der
+    // alternative Techtree zeigt dieselben Texte
+    const K = TECH_BY_KEY, A = { altTree: true };
+    const texte = X => [techEffect(K.kolonialismus, X), techEffect(K.kundschafterei, X)];
+    eq(texte(STD), [`Für ${COLONY_COST} Münzen Feld kaufen`, `Tech kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
+      'Techtexte nennen den Feldpreis und den Kopierfaktor der Regel');
+    eq(texte(A), texte(STD), 'der alternative Techtree zeigt dieselben Texte');
+    setLang('en', { quiet: true });
+    const en = [texte(null), texte(A)];
+    setLang('de', { quiet: true });
+    eq(en, [[`Buy a tile for ${COLONY_COST} coins`, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`],
+      [`Buy a tile for ${COLONY_COST} coins`, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
   }
 
   // Plättchenmodus: der Vorabwurf läuft im selben Techtree wie die Partie. Geprüft an
