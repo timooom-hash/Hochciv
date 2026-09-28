@@ -125,11 +125,9 @@ const TILE_SHAPES = {
     seatSets: [[1, 3, 6, 8]],
   },
 };
-/* Mindestabstand einer Hauptstadt zu jedem Feld der fremden Startplättchen. Die Regel
-   verlangt 3 Felder Abstand zwischen Städten – gesperrt sind also genau die Felder, die
-   einer fremden Hauptstadt zu nah kommen KÖNNTEN, egal wie der andere legt. Beide legen
-   verdeckt; ein Verstoß wäre hinterher nicht mehr zu heilen. */
-const PLACE_MIN_GAP = 3;
+/* Mindestabstand einer Hauptstadt zu jedem Feld der fremden Startplättchen – eine der
+   beiden Bedingungen in seatFreeCells. Bis v72 war es 3 und die einzige Bedingung. */
+const PLACE_MIN_GAP = 2;
 
 function slotCells(sl) {
   return TRI_IJK.map(([i, j, k]) => sl.t === 'A'
@@ -138,17 +136,47 @@ function slotCells(sl) {
 }
 const cubeDist = (a, b) =>
   Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+const CUBE_DIRS = [[1, -1, 0], [1, 0, -1], [0, 1, -1], [-1, 1, 0], [-1, 0, 1], [0, -1, 1]];
+const cubeNeighbors = c => CUBE_DIRS.map(d => [c[0] + d[0], c[1] + d[1], c[2] + d[2]]);
 // Würfel → Zeile/Spalte (odd-r). Die Formen sind so gelegt, dass die Verschiebung
 // der Zeilen gerade ist; sonst würde sich der Versatz der Zeilen umkehren.
 const cubeToRC = c => [c[2], c[0] + (c[2] - (c[2] & 1)) / 2];
 
 /* Auf welche Felder des eigenen Plättchens darf die Hauptstadt? Rein geometrisch –
-   das Gelände kommt in placeOptions dazu. */
+   das Gelände kommt in placeOptions dazu.
+   Gelegt wird verdeckt, die Regel muss also für JEDE Wahl der anderen halten; ein
+   Verstoß wäre hinterher nicht mehr zu heilen. Zwei Bedingungen (v73):
+   1. mindestens PLACE_MIN_GAP = 2 Felder Abstand zu jedem Feld eines fremden
+      Startplättchens. Dann liegt das Umland (die sechs Nachbarn) nie auf einem
+      Plättchen, das beim Legen noch verdeckt ist;
+   2. kein echtes Feld kann zugleich Umland dieser und einer möglichen fremden
+      Hauptstadt sein – „möglich" heißt: erfüllt dort Bedingung 1. Umland an Umland ist
+      erlaubt, geteiltes Umland nicht. Löcher und alles außerhalb der Form sind kein Feld
+      und zählen nicht: im 1 gegen 1 dürfen sich zwei Hauptstädte an der Mitte bis auf 2
+      nahe kommen, ihr einziges gemeinsames Nachbarfeld ist das Loch.
+   Bis v72 galten stattdessen 3 Felder Abstand zu jedem fremden Startplättchen. Jetzt
+   darf man eine Reihe näher an den Gegner (test.js rechnet es nach): 2 Reiche 15 statt
+   14 Felder (die Ecke am Loch), 3 Reiche unverändert alle 15, 4 Reiche 13 statt 11 –
+   die Reihe vor der Spitze wird frei. Gesperrt bleiben dort die Spitze und die Ecke
+   neben dem offenen Mittelplättchen: zwei Hauptstädte in den beiden Ecken links und
+   rechts davon teilten sich dessen Spitzenfeld.                                        */
 function seatFreeCells(shape, seats, seatIdx) {
-  const mine = slotCells(shape.slots[seats[seatIdx]]);
-  const others = seats.filter((_, i) => i !== seatIdx)
-    .flatMap(s => slotCells(shape.slots[s]));
-  return mine.map(m => others.every(o => cubeDist(m, o) >= PLACE_MIN_GAP));
+  const K = c => c.join(',');
+  const cellsOf = i => slotCells(shape.slots[seats[i]]);
+  const cand = seats.map((_, i) => {
+    const others = seats.flatMap((s, j) => j === i ? [] : slotCells(shape.slots[s]));
+    return cellsOf(i).map(m => others.every(o => cubeDist(m, o) >= PLACE_MIN_GAP));
+  });
+  const real = new Set(shape.slots.flatMap(slotCells).map(K));
+  const umland = c => cubeNeighbors(c).filter(n => real.has(K(n))).map(K);
+  const teilen = (a, b) => {
+    if (cubeDist(a, b) <= 1) return true;           // eine stünde im Umland der anderen
+    const ub = new Set(umland(b));
+    return umland(a).some(k => ub.has(k));
+  };
+  return cellsOf(seatIdx).map((m, n) => cand[seatIdx][n] &&
+    seats.every((_, j) => j === seatIdx ||
+      cellsOf(j).every((b, bn) => !cand[j][bn] || !teilen(m, b))));
 }
 
 /* ---------------------------------------------------------------- Kartenplan
@@ -206,6 +234,48 @@ function botPlaceSeat(plan, seat, rnd) {
   const mid = TRI_MIDDLE.filter(i => ok[i]);
   const list = mid.length ? mid : ok.map((v, i) => v ? i : -1).filter(i => i >= 0);
   return placeSeat(plan, seat, o, list[Math.floor(rnd() * list.length)]);
+}
+
+/* ---------------------------------------------------------------- Erträge beim Legen
+   Was eine Hauptstadt auf Feld `cell` in Lage `o` im ersten Zug einbringt – die Zahl
+   der Ertragsübersicht in der Legephase. Gerechnet wird von der Regelmaschine auf einer
+   Wegwerf-Partie mit dem Kartenstand, den dieser Platz sehen darf: die offenen
+   Plättchen und das eigene, fremde Startplättchen noch nicht (sonst verriete die Zahl,
+   was dort liegt). Genau ist sie trotzdem: das Umland einer erlaubten Hauptstadt liegt
+   nie auf einem verdeckten Plättchen (seatFreeCells, Bedingung 1; test.js prüft es).
+   `player` ist der Eintrag aus dem Aufbau ({civ, ability}) – Fähigkeiten zählen mit.
+   Die Wegwerf-Partie hat einen Spieler, `tileMap` führt Hauptstädte aber nach PLATZ –
+   deshalb wird die eine auf Platz 0 umgelegt (ohne das sah jeder Platz außer dem ersten
+   keine Erträge, v60). Braucht engine.js, aufgerufen wird erst zur Laufzeit.        */
+function placeYieldAt(plan, seat, o, cell, player) {
+  const shown = planShape(plan).slots.map((_, i) => i)
+    .filter(i => !isSeatSlot(plan, i) || i === seat.slot);
+  const map = tileMap(plan, { show: shown, seat, o, cell, caps: [seat.idx] });
+  map.capitals = map.capitals[seat.idx] ? [map.capitals[seat.idx]] : [];
+  const T0 = newGame({ seed: 1, map,
+    players: [{ civ: player.civ, kind: 'human', ability: player.ability }] });
+  return T0.cities.length ? income(T0, 0) : null;
+}
+/* Alle Wahlmöglichkeiten eines Sitzes: table[o][n] = Ertrag der Hauptstadt auf Feld n in
+   Lage o, oder null, wo sie nicht stehen darf. 3 × 15 Wegwerf-Partien, also einmal je
+   Sitz rechnen und merken – die Lage der offenen Plättchen ändert sich beim Legen nicht. */
+function placeYieldTable(plan, seat, player) {
+  return [0, 1, 2].map(o => placeOptions(plan, seat, o)
+    .map((ok, n) => ok ? placeYieldAt(plan, seat, o, n, player) : null));
+}
+/* „a ist rundum besser als b": in allen drei Erträgen mindestens so viel, in einem mehr. */
+const yieldBeats = (a, b) =>
+  a.sci >= b.sci && a.food >= b.food && a.coins >= b.coins &&
+  (a.sci > b.sci || a.food > b.food || a.coins > b.coins);
+/* Dominierte Startfelder (v73): es gibt ein anderes erlaubtes Feld, das rundum besser ist
+   – in derselben ODER einer anderen Lage, denn Lage und Hauptstadt wählt man zusammen.
+   Liegt das bessere Feld nur in einer anderen Lage, ist in dieser Lage womöglich jedes
+   Feld markiert: dann taugt die ganze Lage nichts. Gleichstand dominiert nicht, und
+   gemessen wird nur, was die Ertragsübersicht zeigt – Siedelraum, Küste für später oder
+   Abstand zum Gegner zählen nicht. Ergebnis wie table: dom[o][n] = true/false.       */
+function dominatedCells(table) {
+  const alle = table.flat().filter(Boolean);
+  return table.map(row => row.map(y => !!y && alle.some(z => yieldBeats(z, y))));
 }
 
 /* ---------------------------------------------------------------- Karte bauen

@@ -1142,7 +1142,8 @@ const UI_EN = {
   'ausgeschieden': 'eliminated',
 
   'Ertragsübersicht': 'Yield overview',
-  '– noch verdeckte Nachbarfelder kommen dazu': '– hidden neighbouring tiles will add to this',
+  'Rot umrandet: ein anderes Feld bringt von etwas mehr und von nichts weniger.':
+    'Red outline: another spot yields more of something and less of nothing.',
 
   /* --- Karteneditor */
   'Größe': 'Size',

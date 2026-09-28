@@ -371,12 +371,18 @@ function cityPopYield(S, pi) {
   return y;
 }
 /* Kontrollierte Felder: alle an eigene Städte angrenzenden Felder (ohne Stadtfelder),
-   plus per Kolonialismus gekaufte Felder. Nicht exklusiv – so steht es in den Regeln. */
+   plus per Kolonialismus gekaufte Felder. Nicht exklusiv – so steht es in den Regeln.
+   „Kein Feld" (X) gehört nie dazu (v73): Plättchenkarten sind in ein Rechteck aus X
+   gebettet, und eine Stadt am Kartenrand zog ihre Reichsgrenze sonst um leere Sechsecke
+   jenseits der Karte (bzw. um das Loch in der Mitte). Erträge änderte das nie, X bringt
+   nichts; auf den festen Karten liegt das Umland jenseits des Rands ohnehin außerhalb
+   des Rasters. */
 function controlledTiles(S, pi) {
   const set = new Set();
   for (const city of citiesOf(S, pi))
     for (const [r, c] of neighbors(city.r, city.c)) {
-      if (!terrainAt(S, r, c)) continue;
+      const t = terrainAt(S, r, c);
+      if (!t || isOff(t)) continue;
       if (cityAt(S, r, c)) continue;
       set.add(key(r, c));
     }
@@ -1329,7 +1335,9 @@ function sacrifice(S, pi, city) {           // Sklaverei
 function buyTile(S, pi, r, c) {             // Kolonialismus
   const p = S.players[pi];
   if (!has(p, 'kolonialismus')) return T('Kolonialismus nicht erforscht.');
-  if (!terrainAt(S, r, c)) return T('Kein Feld.');
+  // X ist kein Feld – gekauft würde es über S.bought doch wieder zum Gebiet (v73)
+  const t = terrainAt(S, r, c);
+  if (!t || isOff(t)) return T('Kein Feld.');
   if (cityAt(S, r, c)) return T('Dort steht eine Stadt.');
   if (S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))))
     return T('Nur herrenlose Felder können gekauft werden.');

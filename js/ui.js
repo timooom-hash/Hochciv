@@ -200,12 +200,18 @@ function drawMap(svg, map, opts) {
     reach: { fill: 'rgba(255,255,255,.42)', stroke: '#2a2721', 'stroke-width': 2, 'stroke-dasharray': '5 4' },
     tut: { fill: 'rgba(255,214,102,.30)', stroke: '#b8860b', 'stroke-width': 3.4, 'stroke-linejoin': 'round' },
     frame: { fill: 'none', stroke: '#b8860b', 'stroke-width': 3, 'stroke-linejoin': 'round' },
+    // Legephase: erlaubt, aber dominiert. Etwas eingerückt, damit es innerhalb des goldenen
+    // Rahmens sitzt und nicht mit der Auswahl (volle Größe, dunkelrot) verwechselt wird.
+    dom: { inset: 5, fill: 'none', stroke: '#d0402c', 'stroke-width': 3, 'stroke-linejoin': 'round' },
     sel: { fill: 'none', stroke: '#9d3b2f', 'stroke-width': 4 },
   };
   const markHexes = (list, art) => (list || []).forEach(([r, c]) => {
     const [x, y] = hexCenter(r, c, HEX);
-    world.appendChild(svgEl('polygon', Object.assign(
-      { points: pts, transform: `translate(${x},${y})`, 'pointer-events': 'none' }, OVERLAY[art])));
+    const { inset, ...stil } = OVERLAY[art];
+    world.appendChild(svgEl('polygon', Object.assign({
+      points: inset ? hexPath(HEX - inset) : pts,
+      transform: `translate(${x},${y})`, 'pointer-events': 'none',
+    }, stil)));
   });
 
   // 1 Gelände. „Kein Feld" (X) gehört nicht zur Karte: es wird nicht gezeichnet und
@@ -304,6 +310,7 @@ function drawMap(svg, map, opts) {
     // die erreichbaren, nur eben vor den Hauptstädten gezeichnet.
     markHexes(opts.highlight, 'reach');
     markHexes(opts.frame, 'frame');
+    markHexes(opts.dominated, 'dom');
     const capList = Array.isArray(map.capitals)
       ? map.capitals.filter(Boolean).map(e => [e.civ, [e.r, e.c]])
       : Object.keys(map.capitals).map(k => [k, map.capitals[k]]);
@@ -715,10 +722,12 @@ function techModal() {
           ? 'afford' : 'costly'}" data-copy="${o.tech.k}" data-mode="paid">
           <span class="c">${o.paidCoins}🪙</span><b>${o.tech.n}</b>
           <span class="eff">${techEffect(o.tech, S)}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
+      // Gratiskopie: dieselbe Kachel wie jede andere, mit der Wirkung der Technologie.
+      // Dass es die Internet-Kopie ist, sagen schon „gratis" und die Überschrift.
       if (o.freeOk)
         buttons.push(`<button class="tech avail afford" data-copy="${o.tech.k}" data-mode="free">
-          <span class="c">gratis</span><b>${o.tech.n}</b>
-          <span class="eff">Internet · Gratiskopie</span>
+          <span class="c">${T('gratis')}</span><b>${o.tech.n}</b>
+          <span class="eff">${techEffect(o.tech, S)}</span>
           ${ownerMarks(S, o.tech.k, pi)}</button>`);
       grid += buttons.join('');
     });
@@ -1547,31 +1556,25 @@ function startPlacement(cfg) {
   show('screen-place');
   placeStep();
 }
+/* Erträge aller Wahlmöglichkeiten des Sitzes, der gerade legt, und welche davon dominiert
+   sind (placeYieldTable/dominatedCells in tiles.js). 3 × 15 Wegwerf-Partien – einmal je
+   Sitz gerechnet und in placeState gemerkt; Drehen und Antippen ändern daran nichts. */
+function placeInfo(st, seat) {
+  if (!st.info || st.info.idx !== seat.idx) {
+    const table = placeYieldTable(st.plan, seat, st.cfg.players[seat.idx]);
+    st.info = { idx: seat.idx, table, dom: dominatedCells(table) };
+  }
+  return st.info;
+}
 /* Ertragsübersicht für die gewählte Hauptstadt – dasselbe, was im Spiel vor dem Siedeln
-   steht. Gerechnet wird auf einer Wegwerf-Partie mit dem Kartenstand, den dieser Platz
-   gerade sehen darf: verdeckte Nachbarplättchen zählen nicht mit, sonst verriete die
-   Zahl, was dort liegt. Grenzt das Feld an noch Verdecktes, steht ein Hinweis dabei. */
+   steht (placeYieldAt). Bis v72 hing hier „– noch verdeckte Nachbarfelder kommen dazu"
+   an jedem Feld am Kartenrand oder am Loch: gezählt wurde jedes X, dort kommt aber nie
+   etwas dazu, und an verdeckte Plättchen grenzt eine erlaubte Hauptstadt nicht. */
 function placeYield(plan, seat, st) {
   if (st.cell == null) return '';
-  const shape = TILE_SHAPES[plan.n];
-  const shown = shape.slots.map((_, i) => i)
-    .filter(i => !isSeatSlot(plan, i) || i === seat.slot);
-  const map = tileMap(plan, { show: shown, seat, o: st.o, cell: st.cell, caps: [seat.idx] });
-  /* `tileMap` führt die Hauptstädte nach PLATZ (`capitals[seat.idx]`), die Wegwerf-Partie
-     hier hat aber nur einen Spieler – und der sitzt zwangsläufig auf Platz 0. Ohne dieses
-     Umlegen fand jeder Platz außer dem ersten seine Hauptstadt nicht und bekam gar keine
-     Ertragsübersicht (gemeldet für den zweiten Menschen im Plättchenmodus). */
-  map.capitals = map.capitals[seat.idx] ? [map.capitals[seat.idx]] : [];
-  const pl = st.cfg.players[seat.idx];   // st ist placeState, trägt die Aufstellung
-  const T0 = newGame({ seed: 1, map, players: [{ civ: pl.civ, kind: 'human', ability: pl.ability }] });
-  if (!T0.cities.length) return '';
-  const c = T0.cities[0];
-  const y = income(T0, 0);
-  const offen = neighbors(c.r, c.c)
-    .some(([r, cc]) => !map.rows[r] || !map.rows[r][cc] || map.rows[r][cc] === 'X');
-  return `<span class="pl-yield"><b>${T('Ertragsübersicht')}</b> ` +
-    `${fmtGain({ sci: y.sci, food: y.food, coins: y.coins })}` +
-    (offen ? ` <i>${T('– noch verdeckte Nachbarfelder kommen dazu')}</i>` : '') + '</span>';
+  const y = placeInfo(st, seat).table[st.o][st.cell];
+  if (!y) return '';
+  return `<span class="pl-yield"><b>${T('Ertragsübersicht')}</b> ${fmtGain(y)}</span>`;
 }
 /* Anzeige eines Sitzes: bei doppelten Zivilisationen der Platzname („Russland II") */
 function seatCiv(seat) {
@@ -1612,8 +1615,11 @@ function drawPlace() {
   const opts = {};
   if (seat) {
     const rcs = slotRC(plan, seat.slot), ok = placeOptions(plan, seat, st.o);
+    const dom = placeInfo(st, seat).dom[st.o];
     opts.frame = rcs;
     opts.highlight = rcs.filter((_, i) => ok[i]);
+    // rötlicher Rand: erlaubt, aber ein anderes Feld bringt rundum mehr (v73)
+    opts.dominated = rcs.filter((_, i) => dom[i]);
     if (st.cell != null) opts.sel = rcs[st.cell];
   }
   drawMap($('pl-map'), map, opts);
@@ -1636,6 +1642,9 @@ function drawPlace() {
       ' · ' + T('Lage %s von 3', st.o + 1) + ' · ' +
       (st.cell == null ? T('Hauptstadt auf ein markiertes Feld tippen')
         : T('Hauptstadt gesetzt – „Fertig", wenn es passt')) +
+      // Legende nur, wenn überhaupt ein Feld rot umrandet ist
+      ((opts.dominated || []).length
+        ? ` <span class="pl-dom">${T('Rot umrandet: ein anderes Feld bringt von etwas mehr und von nichts weniger.')}</span>` : '') +
       placeYield(plan, seat, st);
     $('pl-rot').hidden = false;
     $('pl-ok').textContent = T('Fertig');
