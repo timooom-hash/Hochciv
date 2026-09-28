@@ -462,7 +462,8 @@ html.w-side .tut-scroll{min-height:0}
 .civ-row .civ-a small{display:block;color:var(--ink-soft);font-size:11px}
 .civ-row .civ-a i{color:var(--ink-soft)}
 
-/* Legephase: Fähigkeit und Ertragsvorschau in der Hinweiszeile */
+/* Legephase: Fähigkeit, Legende der dominierten Felder und Ertragsvorschau in der
+   Hinweiszeile. Die Legende trägt die Farbe des rötlichen Rands (OVERLAY.dom in ui.js). */
 .pl-abil{font-weight:600}
+.pl-dom{display:block;margin-top:2px;color:#b3321f}
 .pl-yield{display:block;margin-top:2px}
-.pl-yield i{color:var(--ink-soft);font-style:normal}
