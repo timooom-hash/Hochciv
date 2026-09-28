@@ -31,7 +31,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
 | Fähigkeit sehen | Die eigene Fähigkeit steht in der Kopfzeile neben dem Reichsnamen; das Weltblatt (ⓘ) listet alle Reiche mit Fähigkeit und Wirkung |
 | Karte | Originalkarte, Große Karte, **Plättchenkarte** (die Zufallskarte) oder eigene aus dem Editor |
-| Plättchenkarte | Zufallskarte aus Dreiecken zu 15 Feldern. Vor dem Spiel legt jedes Reich verdeckt sein eigenes Startdreieck: Lage wählen (drei), Hauptstadt setzen. Dann wird aufgedeckt |
+| Plättchenkarte | Zufallskarte aus Dreiecken zu 15 Feldern. Vor dem Spiel legt jedes Reich verdeckt sein eigenes Startdreieck: Lage wählen (drei), Hauptstadt setzen. Dann wird aufgedeckt. **Rötlich umrandet** sind Startfelder, bei denen ein anderes Feld – auch in einer anderen Lage – von einem Ertrag mehr und von keinem weniger bringt |
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
 | 🌾 in der Kopfzeile | Städte füttern (nur mit Gentechnik oder Massenmedien) |
 | Weltwunder bauen | im Stadtblatt, wenn die Erweiterung an ist |
@@ -121,9 +121,16 @@ bleibt bewusst offen.
 
 Jedes Reich legt sein eigenes Dreieck selbst und verdeckt: **Drehen** wählt eine der drei
 Lagen, ein Tipp auf ein markiertes Feld setzt die Hauptstadt. Gesperrt sind nur Felder,
-die einer fremden Hauptstadt näher als 3 Felder kommen könnten (Städte brauchen 3 Felder
-Abstand, und gelegt wird blind). Bots drehen zufällig und setzen auf eines der drei
-mittigen Felder. Erst wenn alle fertig sind, wird aufgedeckt.
+die einem fremden Startdreieck näher als 2 Felder liegen oder deren Umland sich mit dem
+einer möglichen fremden Hauptstadt ein echtes Feld teilen könnte (gelegt wird blind). Im
+1 gegen 1 dürfen sich die Hauptstädte deshalb an der Mitte bis auf 2 nahe kommen – ihr
+einziger gemeinsamer Nachbar ist das Loch. Bots drehen zufällig und setzen auf eines der
+drei mittigen Felder. Erst wenn alle fertig sind, wird aufgedeckt.
+
+Startfelder, die nichts für sich haben, tragen einen **rötlichen Rand**: ein anderes
+erlaubtes Feld bringt im ersten Zug von einem Ertrag mehr und von keinem weniger. Verglichen
+wird über alle drei Lagen und genau mit der Zahl der Ertragsübersicht (Quelle:
+`dominatedCells` in `js/tiles.js`).
 
 Meer liegt immer am Rand eines Plättchens, oft an den Ecken – trifft beim Zusammenlegen
 Kante auf Kante, wächst daraus ein zusammenhängendes Meer. Etwa die Hälfte der Karten

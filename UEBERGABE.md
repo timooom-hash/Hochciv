@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 26.9., `sw.js` v72)
+# Hochzeivilization — Projekt-Übergabe (Stand 28.9., `sw.js` v73)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v72)
+## Letzte Sitzungen auf einen Blick (v61 → v73)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -27,10 +27,13 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v70 | **Alternativer Techtree** als Häkchen im Aufbau: Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5; der Bogen ordnet die Leitern danach | Regel + Oberfläche |
 | v71 | Im alternativen Techtree zusätzlich: **Kolonialismus** 3 statt 5 Münzen je Feld, **Kundschafterei** 2× statt 3× der Grundkosten | Regel |
 | v72 | Kolonialismus 3 und Kundschafterei 2× gelten in **beiden** Techtrees; der alternative unterscheidet sich nur in den Forschungskosten (Klarstellung zu v71) | Regel |
+| v73 | Plättchenmodus: Hauptstadt **eine Reihe näher** am Gegner (2 und 4 Reiche), **dominierte Startfelder rötlich umrandet**, Reichsgrenzen nicht mehr um leere Sechsecke am Kartenrand; Internet-Gratiskachel zeigt die Wirkung | Regel + Oberfläche + Fehler |
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
-(Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei).
+(Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei), seit v73
+Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstand 2) und
+Punkt 12 (dominiert über alle Lagen oder nur je Lage?).
 
 ## Wo alles liegt
 
@@ -58,19 +61,19 @@ der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), sei
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1182 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1183 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 403 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
-| `js/tiles.js` | 264 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln, Kartenbau |
-| `js/engine.js` | 1717 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
+| `js/engine.js` | 1725 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1972 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 1981 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4714 | **1332 Assertions**, `node test.js` |
-| `smoke.js` | 2399 | **115 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 4860 | **1369 Assertions**, `node test.js` |
+| `smoke.js` | 2510 | **117 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -140,16 +143,19 @@ Gedächtnis rekonstruieren.
 - **Startplätze der Viererkarte (v51):** die **beiden oberen und die beiden unteren**
   Dreiecke (Plätze 1, 3, 6, 8 – die einzigen, deren Fünferzeile auf der Ober- oder
   Unterkante liegt), nicht mehr jedes zweite des äußeren Rings. Dadurch liegen die Starts
-  enger: Hauptstadtabstand im Median 7 statt 9, erlaubte Felder 11 statt 13–14 von 15.
+  enger: Hauptstadtabstand im Median 7 statt 9, erlaubte Felder 11 statt 13–14 von 15
+  (seit v73: 13 – eine Reihe näher, siehe unten).
 - **Plättchenkarte + Legephase:** 20 handentworfene Dreiecke zu 15 Feldern (`js/tiles.js`).
   2 Reiche → Sechseck aus 6 (Mitte bleibt **als Loch offen**), 3 → großes Dreieck aus 9
   (Loch), 4 → gestrecktes Sechseck aus 10 (lückenlos). Jedes Reich legt sein Startdreieck
-  **verdeckt**: eine von drei Lagen, Hauptstadt frei auf Land (gesperrt nur, was einer
-  fremden Hauptstadt näher als 3 kommen könnte). Bots legen zufällig auf eines der drei
-  mittigen Felder. Danach Aufdecken, dann startet das Spiel.
+  **verdeckt**: eine von drei Lagen, Hauptstadt frei auf Land (gesperrt nur, was einem
+  fremden Startplättchen näher als 2 liegt oder sich mit einer möglichen fremden Hauptstadt
+  ein Umlandfeld teilen könnte – seit v73, vorher 3 Felder Abstand). Bots legen zufällig auf
+  eines der drei mittigen Felder. Danach Aufdecken, dann startet das Spiel.
 - **Legephase (v56):** keine Plättchennamen mehr in der Oberfläche (nur noch intern und im
   Druckbogen), dafür die Fähigkeit des Platzes und – nach dem Setzen der Hauptstadt – eine
   **Ertragsübersicht**. Sie rechnet nur mit den Plättchen, die dieser Platz sehen darf.
+  Seit v73 tragen **dominierte Startfelder einen rötlichen Rand** (siehe unten).
 - **Ausrollen (v55):** `node tools_version.js` vor jedem Hochladen – der Service Worker
   ist cache-first, ohne neue `VERSION` kommt eine Änderung bei niemandem an. `test.js`
   prüft das über `BUILD_HASH` und schlägt an, wenn Dateien geändert und die Version gleich
@@ -201,6 +207,44 @@ Gedächtnis rekonstruieren.
   wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
+
+### Plättchenmodus: eine Reihe näher, dominierte Startfelder, Grenzen am Rand (v73)
+
+Vier Anweisungen des Autors auf einmal; Einzelheiten und Messungen in `ANNAHMEN.md`
+(Abschnitt „Legephase eine Reihe näher …" am Ende und „Hauptstadt „frei"").
+
+- **Internet-Gratiskachel** zeigt jetzt die Wirkung der Technologie (`techEffect`) statt
+  „Internet · Gratiskopie"; das Preisfeld „gratis" läuft über `T()` (englisch „free").
+- **Reichsgrenzen um leere Sechsecke:** `controlledTiles` schließt `X` aus (vorher nur Felder
+  außerhalb des Rasters). Eine Stadt am Rand der Plättchenkarte oder am Loch zog ihre Grenze
+  sonst um die `X`-Felder dahinter. `buyTile` lehnt `X` ebenfalls ab. Folge für Bots:
+  Priorität 9 („an den Rand des Reichs") sieht den Kartenrand jetzt als Rand, wie auf den
+  festen Karten.
+- **Eine Reihe näher (2 und 4 Reiche):** `seatFreeCells` hat zwei Bedingungen statt „3 Felder
+  Abstand zu fremden Startplättchen": mindestens 2 Felder (`PLACE_MIN_GAP`), und kein echtes
+  Feld darf Umland dieser und einer möglichen fremden Hauptstadt sein (Löcher zählen nicht).
+  Erlaubt: 2 Reiche 15 (vorher 14), 3 Reiche 15 (unverändert), 4 Reiche 13 (vorher 11). Im
+  1 gegen 1 dürfen die Hauptstädte an der Mitte 2 auseinander liegen – geteilt wird nur das
+  Loch. Bei 4 Reichen bleiben die Ecken am offenen Mittelplättchen gesperrt, weil sich zwei
+  Hauptstädte dort dessen Spitze teilten (Offener Punkt 11).
+- **Dominierte Startfelder** bekommen einen rötlichen Rand (`OVERLAY.dom` in `drawMap`,
+  eingerückt innerhalb des goldenen Rahmens), dazu eine Legende in der Hinweiszeile.
+  Dominiert = ein anderes erlaubtes Feld, **auch in einer anderen Lage**, bringt von einem
+  Ertrag mehr und von keinem weniger (Offener Punkt 12). Maßstab ist die Ertragsübersicht,
+  gerechnet in `placeYieldAt` (tiles.js, aus `placeYield` in ui.js herausgelöst); die
+  Oberfläche rechnet die Tabelle einmal je Sitz (`placeInfo`, 3 × 15 Wegwerf-Partien, gut
+  15 ms in Node). Nebenbei entfallen: der Hinweis „– noch verdeckte Nachbarfelder kommen
+  dazu", der nur am Kartenrand und am Loch erschien, wo nie etwas dazukommt.
+
+**Abgesichert:** `test.js` – Umland über alle Paare erlaubter Felder, die Zahlen 15/15/13,
+„jedes bis v72 erlaubte Feld bleibt erlaubt", `yieldBeats`/`dominatedCells` an einer festen
+Tabelle, **Vorschau = echtes Einkommen** für 580 Wahlmöglichkeiten (echte Partie gestartet,
+auch mit Seemacht), jedes Randfeld jeder Form mit einer gedachten Stadt, `buyTile` auf `X`.
+`smoke.js` – rote Ränder Feld für Feld gegen `dominatedCells` in allen drei Lagen, Legende,
+Ertragszeile; die gezeichnete Reichsgrenze am Rand und am Loch Linie für Linie; die
+Gratiskachel auf Deutsch und Englisch. Gegenproben (alter `controlledTiles`, alte
+Platzregel, Regel ohne Umlandbedingung, fehlende Markierung, alter Kacheltext) schlagen
+jeweils an der vorgesehenen Stelle an. Sichtkontrolle in Chromium.
 
 ### Kolonialismus 3 Münzen, Kundschafterei 2× – in beiden Techtrees (v71 → v72)
 
@@ -356,10 +400,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1332 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1369 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (115 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (117 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -474,6 +518,14 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   mit weniger Spielern baut (z. B. die Wegwerf-Partie der Ertragsvorschau), muss die
   Indizes umlegen — `capitalSpot` liest `caps[p.slot]`, und Platz 0 ist dann der einzige,
   der zufällig stimmt. Genau das verdeckte den Fehler bis zum zweiten Menschen.
+- **Die Ertragsvorschau der Legephase ist nur genau, weil `seatFreeCells` Bedingung 1 hält**
+  (seit v73): das Umland einer erlaubten Hauptstadt liegt nie auf einem verdeckten
+  Plättchen. Wer `PLACE_MIN_GAP` auf 1 senkt, macht Vorschau und rote Ränder zu
+  Schätzungen – `test.js` schlägt dann an („kein Umland … auf einem fremden
+  Startplättchen", „Vorschau = echtes Einkommen").
+- **`X` ist nie Gebiet** (seit v73). Wer eine neue Stelle baut, die Umland oder Nachbarn
+  zählt, nimmt `controlledTiles` oder prüft `isOff` – `terrainAt` allein liefert für `X`
+  einen Wert und hält es für ein Feld.
 - **Effekttexte, die mit der Bevölkerung skalieren, müssen das sagen.** `cityPopYield` wird
   mit der Einwohnerzahl multipliziert; „Stadt: +1 Wissenschaft" war um den Faktor der
   Bevölkerung falsch. Seit v60 heißt es „Je Bevölkerung: …" (Schrift, Universitätswesen,
@@ -561,7 +613,8 @@ gegen die Fassung davor — identisch).
   Regelauslegung, und `COMBAT` sitzt mitten in der Kampfrechnung. Wer sie auflösen will,
   entscheidet damit, dass die Auslegung endgültig ist.
 - Einige Sätze stehen ohne `T()` im Code (`'Nur in eigenem oder neutralem Gebiet.'`,
-  `'Schon vorhanden.'`, `'gratis'`, `'Internet · Gratiskopie'`, `'Bewegung '` in `mp()`).
+  `'Schon vorhanden.'`, `'Bewegung '` in `mp()`; `'gratis'` und `'Internet · Gratiskopie'`
+  auf der Internet-Kachel sind seit v73 erledigt).
   `missingStrings()` sieht sie deshalb nie. Das zu beheben ändert die englische Ausgabe —
   Fehlerbehebung, nicht Aufräumen. Ebenso schreibt `mp()` das Dezimalkomma fest.
 
@@ -572,6 +625,13 @@ Kampf-Aufruf bei Bots · Stadtfelder zählen als Straße/Eisenbahn · Armee in e
 anwählbar · Bot-Armeen nutzen Geländedistanz · Angriffswerte addieren sich · Reichweitensprung
 wirkt sofort · England kann Nahrung für Forschung ausgeben · Internet-Gratiskopie ·
 Navigation-Armeen halten nicht auf Wasser · v2-Tech-Labels · leeres Bot-Fenster (Log-Kappung).
+
+Aus der Sitzung v73:
+- **Reichsgrenze um leere Sechsecke** am Rand der Plättchenkarte und am Loch: `X` zählte
+  als Gebiet (`controlledTiles`). Nicht wieder einführen – der Test prüft jedes Randfeld.
+- **„– noch verdeckte Nachbarfelder kommen dazu"** in der Legephase erschien nur, wo es
+  falsch war (jedes `X` galt als verdeckt). Entfallen.
+- **Internet-Gratiskachel ohne Wirkungstext**, dazu „gratis" ohne Übersetzung.
 
 Aus der Sitzung v61–v68:
 - **Burgstädte ohne Kontrollzone (v68, gemeldet aus einem 1-gegen-1):** Burgenbau stellt
@@ -761,6 +821,21 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    mit Rabatt (Griechenland, Wiss. Methode) oder Computertechnik. Tipptext ist Sache des
    Autors, nicht geändert. Außerdem: **Bots kaufen keine Felder und kopieren nie** – beide
    Verbilligungen helfen nur Menschen (wie die Straßen, Punkt 0b).
+
+11. **„Eine Reihe näher" (v73) – zwei Folgen, die der Autor kennen sollte.**
+   *4 Reiche:* die Reihe vor der Spitze ist frei, die Ecke der langen Kante zum offenen
+   Mittelplättchen bleibt gesperrt – zwei Hauptstädte in den beiden Ecken links und rechts
+   davon lägen 2 auseinander und teilten sich dessen Spitzenfeld. Soll sie trotzdem frei
+   sein: Bedingung 2 in `seatFreeCells` weglassen (14 statt 13 Felder, im schlimmsten Fall
+   ein geteiltes Feld).
+   *1 gegen 1:* setzen beide in die Ecke am Loch, stehen die Hauptstädte 2 auseinander.
+   Gemessen über je 150 Bot-Duelle (Russland gegen England): beide Hauptstädte dort gegen
+   normale Bot-Platzierung – Militärsiege 90 gegen 59, Spielende im Median Runde 4 gegen 8.
+   Bots sind keine Menschen, und es braucht beide Ecken; aber so eine Partie kippt schnell.
+12. **Dominiert über alle drei Lagen** (v73, Auslegung): ein Feld ist rot, wenn irgendein
+   anderes erlaubtes Feld – auch in einer anderen Lage – rundum besser ist. Folge: selten
+   (4 % der Lagen) ist eine ganze Lage rot. Nur je Lage verglichen wären 67 % statt 77 % der
+   Wahlmöglichkeiten rot. Umstellen: `dominatedCells` je Zeile aufrufen.
 
 ## Arbeitsweise, die der Autor schätzt
 

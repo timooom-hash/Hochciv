@@ -579,7 +579,26 @@ step('Internet: Gratiskopie im Technologiebogen', () => {
   if (!btn) throw new Error('keine kopierbare Technologie angezeigt');
   const gratis = /gratis/.test(btn.textContent);
   console.log('       Kopie als ' + (gratis ? 'gratis' : 'bezahlt') + ' markiert');
-  btn.onclick();
+  // Die Gratiskachel zeigt die Wirkung der Technologie wie jede andere Kachel – bis v72
+  // stand dort nur „Internet · Gratiskopie", die Wirkung fehlte.
+  const frei = $('ov-body').querySelector('[data-copy="stadtmauern"][data-mode="free"]');
+  if (!frei) throw new Error('keine Gratiskachel für Stadtmauern');
+  const eff = frei.querySelector('.eff').textContent.trim();
+  const soll = G('techEffect')(G('TECH_BY_KEY').stadtmauern, S);
+  if (eff !== soll) throw new Error('Gratiskachel zeigt „' + eff + '" statt der Wirkung „' + soll + '"');
+  if (/Gratiskopie/.test(frei.textContent)) throw new Error('„Gratiskopie" steht noch auf der Kachel');
+  if (frei.querySelector('.c').textContent.trim() !== 'gratis') throw new Error('Preisfeld nicht „gratis"');
+  // auf Englisch: „free" und die englische Wirkung (vorher stand „gratis" fest im Code)
+  G('closeModal')(); G('switchLang')('en'); G('techModal')();
+  const freiEn = $('ov-body').querySelector('[data-copy="stadtmauern"][data-mode="free"]');
+  const effEn = freiEn.querySelector('.eff').textContent.trim();
+  if (effEn !== 'Cities have +5 defence') throw new Error('englische Gratiskachel: „' + effEn + '"');
+  if (freiEn.querySelector('.c').textContent.trim() !== 'free')
+    throw new Error('englisches Preisfeld: „' + freiEn.querySelector('.c').textContent.trim() + '"');
+  G('closeModal')(); G('switchLang')('de'); $('a-tech').onclick();
+  console.log('       Gratiskachel: „' + eff + '" · englisch „' + effEn + '"');
+  const btn2 = [...$('ov-body').querySelectorAll('[data-copy]')].find(b => /Stadtmauern/.test(b.textContent));
+  btn2.onclick();
   if (!G('has')(S.players[pi], 'stadtmauern')) throw new Error('Kopie nicht übernommen');
   G('closeModal')();
 });
@@ -1526,6 +1545,46 @@ step('Legephase: kein Plättchenname, dafür Fähigkeit und Ertragsübersicht', 
   G('drawPlace')();
   if ($('pl-note').querySelector('.pl-yield')) throw new Error('Ertragszeile bleibt stehen');
 });
+/* v73: Startfelder, bei denen ein anderes erlaubtes Feld (in irgendeiner Lage) von einem
+   Ertrag mehr und von keinem weniger bringt, tragen einen rötlichen Rand. Geprüft wird
+   Feld für Feld gegen dominatedCells, in allen drei Lagen, samt Legende und Ertragszeile. */
+step('Legephase: dominierte Startfelder sind rötlich umrandet', () => {
+  const st = G('placeState'), seat = G('placeSeatNow')();
+  const rcs = legeHelfer.rcs(), HEX = G('HEX');
+  const tab = G('placeYieldTable')(st.plan, seat, st.cfg.players[seat.idx]);
+  const dom = G('dominatedCells')(tab);
+  const ort = ([r, c]) => { const [x, y] = G('hexCenter')(r, c, HEX); return `translate(${x},${y})`; };
+  let rotGesamt = 0, gewaehlt = false;
+  for (let k = 0; k < 3; k++) {
+    const o = st.o;
+    const ist = [...$('pl-map').querySelectorAll('polygon[stroke="#d0402c"]')]
+      .map(p => p.getAttribute('transform')).sort();
+    const soll = rcs.filter((_, i) => dom[o][i]).map(ort).sort();
+    if (ist.join('|') !== soll.join('|'))
+      throw new Error(`Lage ${o + 1}: ${ist.length} rote Ränder, aber ${soll.length} dominierte Felder`);
+    // markiert heißt nicht gesperrt: auch unter jedem roten Rand liegt die „erlaubt"-Markierung
+    const erlaubt = new Set([...$('pl-map').querySelectorAll('[stroke-dasharray="5 4"]')]
+      .map(p => p.getAttribute('transform')));
+    if (soll.some(t => !erlaubt.has(t))) throw new Error('ein rot umrandetes Feld ist nicht erlaubt');
+    const leg = $('pl-note').querySelector('.pl-dom');
+    if (!!leg !== soll.length > 0) throw new Error(`Lage ${o + 1}: Legende passt nicht zu den Rändern`);
+    // Ein rotes Feld lässt sich wählen; die Ertragszeile nennt genau die Zahl aus der Tabelle
+    const i = dom[o].indexOf(true);
+    if (i >= 0 && !gewaehlt) {
+      G('plTap')(rcs[i][0], rcs[i][1]);
+      if (st.cell !== i) throw new Error('rot umrandetes Feld lässt sich nicht wählen');
+      const zeile = $('pl-note').querySelector('.pl-yield').textContent.replace(/\s+/g, ' ');
+      if (!zeile.includes(G('fmtGain')(tab[o][i]))) throw new Error('Ertragszeile ≠ Tabelle: ' + zeile);
+      if (/verdeckt/.test(zeile)) throw new Error('alter Hinweis auf verdeckte Nachbarfelder');
+      st.cell = null; G('drawPlace')(); gewaehlt = true;
+    }
+    rotGesamt += soll.length;
+    G('placeRotate')();
+  }
+  if (st.o !== 0) throw new Error('nach drei Drehungen nicht wieder Lage 1');
+  const frei = tab.flat().filter(Boolean).length;
+  console.log(`       ${rotGesamt} von ${frei} erlaubten Wahlmöglichkeiten (3 Lagen) rot umrandet`);
+});
 step('Drehen zeigt dasselbe Plättchen in einer anderen Lage', () => {
   const karte = () => G('tileMap')(G('placeState').plan, {
     show: [G('placeSeatNow')().slot], seat: G('placeSeatNow')(), o: G('placeState').o,
@@ -1595,7 +1654,12 @@ step('Aufdecken zeigt alle Plättchen, dann startet das Spiel', () => {
   }
   if (S.cities.length !== 2) throw new Error('nicht zwei Hauptstädte');
   const [a, b] = S.cities;
-  if (G('hexDistance')(a.r, a.c, b.r, b.c) < 3) throw new Error('Hauptstädte zu nah beieinander');
+  // Seit v73 eine Reihe näher erlaubt: an der Mitte bis auf 2, gemeinsam ist dann nur das
+  // Loch. Ein echtes Umlandfeld teilen sich zwei Hauptstädte nie.
+  const u0 = G('controlledTiles')(S, a.owner), u1 = G('controlledTiles')(S, b.owner);
+  const geteilt = [...u0].filter(k => u1.has(k));
+  if (geteilt.length) throw new Error('Hauptstädte teilen sich Umland: ' + geteilt.join(' '));
+  if (G('hexDistance')(a.r, a.c, b.r, b.c) < 2) throw new Error('Hauptstädte zu nah beieinander');
   if ($('map').querySelectorAll('[data-r]').length !== 90)
     throw new Error('die Spielkarte zeigt nicht 90 Felder');
   // Das Loch in der Mitte ist wirklich keines: unpassierbar, nicht antippbar
@@ -1603,6 +1667,53 @@ step('Aufdecken zeigt alle Plättchen, dann startet das Spiel', () => {
   if (mitte < 0) throw new Error('kein Loch in der Mitte des Sechsecks');
   console.log('       ' + S.map.name + ', Hauptstadtabstand ' +
     G('hexDistance')(a.r, a.c, b.r, b.c));
+});
+/* v73: Eine Stadt am Rand der Plättchenkarte oder am Loch zog ihre Reichsgrenze um die
+   leeren Sechsecke dahinter. Geprüft wird die gezeichnete Grenze selbst: jede Linie muss
+   eine Kante zwischen dem Reich (Stadt + echte Nachbarfelder) und dem Rest sein – und
+   jede solche Kante muss gezeichnet sein. */
+step('Reichsgrenze am Kartenrand und am Loch: nur um echte Felder', () => {
+  const S = G('S'), HEX = G('HEX');
+  const echt = (r, c) => { const t = G('terrainAt')(S, r, c); return !!t && !G('isOff')(t); };
+  const K = (r, c) => r + ',' + c;
+  const nb = (r, c) => G('neighbors')(r, c);
+  let amRand = null, amLoch = null;
+  S.map.rows.forEach((row, r) => [...row].forEach((_, c) => {
+    if (!echt(r, c)) return;
+    const leer = nb(r, c).filter(([x, y]) => !echt(x, y));
+    if (!leer.length) return;
+    // am Loch: ein leerer Nachbar, der selbst ringsum echte Felder hat
+    if (leer.some(([x, y]) => nb(x, y).every(([u, v]) => echt(u, v)))) amLoch = amLoch || [r, c];
+    else amRand = amRand || [r, c];
+  }));
+  if (!amRand || !amLoch) throw new Error('kein Randfeld bzw. kein Feld am Loch gefunden');
+  // Für die Probe steht nur diese eine Stadt auf der Karte – keine fremde Grenze, keine
+  // Nachbarstadt, die das Umland verkleinert. Gezeichnet wird trotzdem die echte Karte.
+  const pi = S.cur, col = G('civOf')(S.players[pi]).color, alt = S.cities;
+  const pts = G('hexPoints')(HEX), rund = v => Math.round(v * 10) / 10;
+  const linien = () => [...$('map').querySelectorAll(`line[stroke="${col}"][stroke-width="3.5"]`)]
+    .map(l => rund((+l.getAttribute('x1') + +l.getAttribute('x2')) / 2) + '/' +
+      rund((+l.getAttribute('y1') + +l.getAttribute('y2')) / 2)).sort();
+  for (const [wo, [r, c]] of [['Rand', amRand], ['Loch', amLoch]]) {
+    S.cities = [{ id: 9990, owner: pi, r, c, pop: 1, cap: true, grown: 0, born: 0 }];
+    G('redraw')();
+    const reich = new Set([K(r, c), ...nb(r, c).filter(([x, y]) => echt(x, y)).map(([x, y]) => K(x, y))]);
+    const soll = [];
+    for (const k of reich) {
+      const [x, y] = k.split(',').map(Number), [cx, cy] = G('hexCenter')(x, y, HEX);
+      for (let d = 0; d < 6; d++) {
+        const [nx, ny] = G('neighbor')(x, y, d);
+        if (reich.has(K(nx, ny))) continue;
+        const p1 = pts[(d + 1) % 6], p2 = pts[(d + 2) % 6];
+        soll.push(rund(cx + (p1[0] + p2[0]) / 2) + '/' + rund(cy + (p1[1] + p2[1]) / 2));
+      }
+    }
+    const ist = linien();
+    if (ist.join() !== soll.sort().join())
+      throw new Error(`${wo} ${r}/${c}: ${ist.length} Grenzlinien gezeichnet, ${soll.length} erwartet`);
+    console.log(`       Stadt am ${wo} (${r}/${c}): ${reich.size - 1} echte Nachbarn, ${ist.length} Grenzlinien`);
+  }
+  S.cities = alt; G('redraw')();
 });
 step('Spielende: Punktetafel und Mensch vor Bot', () => {
   // Vier Reiche, Originalkarte: Platz 1 Mensch, Plätze 2–4 Bots. Die Schritte davor

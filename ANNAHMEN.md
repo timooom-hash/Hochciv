@@ -128,6 +128,8 @@ ebenfalls verbunden.
   kostenlos. Wer einen bezahlten Weg **und** Internet hat, bekommt pro Technologie **beide**
   Optionen angeboten (bezahlt kopieren oder die eine Gratiskopie darauf verwenden). Beim
   Kopieren gelten keine Vergünstigungen (Wiss. Methode etc.), es zählen die Basiskosten.
+  Die Gratiskachel zeigt seit v73 wie jede andere die **Wirkung** der Technologie; bis v72
+  stand dort nur „Internet · Gratiskopie".
 * **Alternativer Techtree** (v70, Anweisung des Autors): ein Häkchen im Aufbau, je Partie,
   ab Werk aus. Es ist **kein Modul** – die Zeile steht immer im Aufbau, die Einstellungen
   kennen sie nicht. Angehakt gelten andere Grundkosten (`ALT_TECH_COSTS` in `js/data.js`):
@@ -1461,17 +1463,33 @@ verzerrt die Form. Ein Test prüft es.
 
 ### Hauptstadt „frei" – mit einer Einschränkung
 
-Gesetzt werden darf auf **jedes Landfeld des eigenen Plättchens**, mit einer Ausnahme:
-Felder, die einem **fremden Startplättchen näher als 3 Felder** kommen könnten, sind
-gesperrt (`PLACE_MIN_GAP = 3` in `js/tiles.js`). Grund: Städte brauchen 3 Felder Abstand,
-beide Seiten legen aber **verdeckt** – ein Verstoß wäre hinterher nicht mehr zu heilen.
-Gesperrt ist damit nur, was auch im schlimmsten Fall zu nah käme, nicht mehr.
+*Stand v73; bis v72 galt „3 Felder Abstand zu jedem fremden Startplättchen", siehe unten.*
 
-Das kostet wenig: bei zwei Reichen 1 Feld von 15 (die innere Spitze), bei vier Reichen 1
-bis 2, bei drei Reichen keines. Die **drei mittigen Felder sind nie gesperrt** – dort
-setzen Bots. Wer den Abstand größer haben will, erhöht `PLACE_MIN_GAP`; mit 4 sind
-Hauptstädte garantiert 6 (2 Reiche) bzw. 4 (4 Reiche) Felder auseinander, es fallen dann
-aber 3 bzw. 5 Felder weg.
+Gesetzt werden darf auf **jedes Landfeld des eigenen Plättchens**, das zwei Bedingungen
+erfüllt (`seatFreeCells` in `js/tiles.js`). Beide Seiten legen **verdeckt**, die Regel muss
+also für jede Wahl der anderen halten – ein Verstoß wäre hinterher nicht mehr zu heilen.
+
+1. **Mindestens 2 Felder** Abstand zu jedem Feld eines fremden Startplättchens
+   (`PLACE_MIN_GAP = 2`). Damit liegt das Umland nie auf einem noch verdeckten Plättchen.
+2. **Kein geteiltes Umland:** kein echtes Feld kann zugleich Nachbar dieser und einer
+   möglichen fremden Hauptstadt sein („möglich" = erfüllt dort Bedingung 1). Umland an
+   Umland ist erlaubt. „Kein Feld" zählt nicht – im 1 gegen 1 dürfen sich zwei
+   Hauptstädte an der Mitte bis auf 2 nahe kommen, ihr einziges gemeinsames Nachbarfeld
+   ist das Loch.
+
+Erlaubte Felder je Startplättchen, rein geometrisch (vor Meer): 2 Reiche **15** (bis v72:
+14, die Ecke am Loch), 3 Reiche **15** (unverändert, die Startplättchen liegen weit
+auseinander), 4 Reiche **13** (bis v72: 11). Die **drei mittigen Felder sind nie gesperrt**
+– dort setzen Bots.
+
+**Auslegung bei vier Reichen:** „eine Reihe näher" (Anweisung des Autors, v73) öffnet dort
+die Reihe vor der Spitze. Gesperrt bleiben die Spitze selbst und **eine Ecke** der langen
+Kante: die zum offenen Mittelplättchen hin. Setzten die beiden oberen (bzw. unteren)
+Reiche ihre Hauptstadt in diese beiden Ecken, lägen sie 2 auseinander und teilten sich
+die Spitze des Mittelplättchens – genau das „ohne Überlappung", mit dem der Autor die
+Lockerung begründet hat, wäre dann nicht mehr wahr. Wer die Ecken trotzdem freigeben will,
+lässt Bedingung 2 weg (eine Zeile); dann sind es 14 Felder und im schlimmsten Fall ein
+geteiltes Feld.
 
 ### Startgüte statt Startgarantie
 
@@ -1493,6 +1511,9 @@ Plättchenkarten sind nicht rechteckig, die Datenstruktur aber schon. Alles, was
 Form gehört, ist das neue Gelände **`X` „Kein Feld"**: wird nicht gezeichnet, ist nicht
 antippbar, unpassierbar, bringt nichts und taucht in keiner Ertragsübersicht auf.
 `isOff(t)` unterscheidet es vom Vulkan, der ein echtes (nur wertloses) Feld ist.
+Seit v73 gehört es auch **nie zum Gebiet** einer Stadt (`controlledTiles`) und lässt sich
+nicht kaufen – vorher zog eine Stadt am Kartenrand ihre Reichsgrenze um die leeren
+Sechsecke jenseits der Karte.
 
 Im **Karteneditor** wird `X` blass und gestrichelt gezeichnet und bleibt antippbar –
 sonst ließe sich ein versehentlich gesetztes „Kein Feld" nicht zurücknehmen. Damit lassen
@@ -2171,7 +2192,9 @@ Wichtig dabei: gerechnet wird auf dem Kartenstand, den **dieser Platz sehen darf
 Verdeckte Nachbarplättchen zählen nicht mit – sonst verriete die Zahl, was dort liegt.
 Grenzt das gewählte Feld an noch Verdecktes, steht der Hinweis „noch verdeckte
 Nachbarfelder kommen dazu" dabei; auf den drei mittigen Feldern kann er nie erscheinen,
-weil dort alle sechs Nachbarn auf dem eigenen Plättchen liegen.
+weil dort alle sechs Nachbarn auf dem eigenen Plättchen liegen. *(v73: entfallen – er
+erschien nur am Kartenrand und am Loch, wo nie etwas dazukommt; an ein verdecktes
+Plättchen grenzt eine erlaubte Hauptstadt gar nicht.)*
 
 **Nebenbei behoben:** Der Name eines Doppelgängers („Griechenland II") war eine fest
 zusammengebaute Zeichenkette und blieb beim Sprachwechsel deutsch. Gespeichert wird jetzt
@@ -2423,3 +2446,74 @@ Fassung tragen. Nötig für 2/24: die lange Fassung ist dort weiter die Ressourc
 („Woher deine Ressourcen kommen"), die kurze heißt „Aktionen". Ohne `tKurz` gilt weiter ein
 gemeinsamer Titel – das bleibt der Normalfall, und `node test.js` verlangt auch für `tKurz`
 eine englische Fassung.
+
+## Legephase eine Reihe näher, dominierte Startfelder, Grenzen am Kartenrand (v73)
+
+Vier Anweisungen des Autors, alle mit Tests festgeschrieben.
+
+### Internet: die Gratiskachel zeigt die Wirkung
+
+Im Kopierteil des Technologiebogens trug die Gratiskachel statt der Wirkung nur „Internet ·
+Gratiskopie" (fest im Code, also auch auf Englisch). Jetzt steht dort `techEffect` wie auf
+jeder anderen Kachel; dass es die Internet-Kopie ist, sagen das Preisfeld „gratis" (jetzt
+über `T()`, englisch „free") und die Überschrift „· 1× gratis per Internet".
+
+### Reichsgrenzen um „Kein Feld"
+
+Plättchenkarten liegen in einem Rechteck aus `X`. `controlledTiles` schloss nur Felder
+außerhalb des Rasters aus, nicht `X` – eine Stadt am Kartenrand oder am Loch hatte die
+leeren Sechsecke dahinter im Gebiet, und `drawMap` zog die Reichsgrenze um sie herum.
+Gemessen über je 30 Bot-Partien (Seeds 1–30): 2 Reiche 9, 3 Reiche 28, 4 Reiche 21 Partien
+mit mindestens einem solchen Feld. Erträge änderte das nie (`X` bringt 0/0/0, und die
+Übersicht blendete es schon aus), wohl aber die Grenze und die Bot-Priorität 9 („an den
+Rand des eigenen Reichs"), die leere Sechsecke als Reich mitzählte – auf Plättchenkarten
+verhalten sich Bots dort jetzt wie auf den festen Karten. `buyTile` lehnt `X` ebenfalls ab
+(über die Oberfläche war es nie antippbar, die Regelmaschine hätte es aber verkauft).
+
+### Hauptstadt eine Reihe näher am Gegner (2 und 4 Reiche)
+
+Die Regel steht oben unter „Hauptstadt „frei" – mit einer Einschränkung". Kurz: statt
+3 Felder Abstand zu fremden Startplättchen jetzt 2, dazu die Bedingung, dass sich zwei
+mögliche Hauptstädte nie ein echtes Umlandfeld teilen. Die Begründung des Autors war
+„ohne Überlappung, im 1 gegen 1 nur am Loch" – für 2 Reiche stimmt das genau, für 4 Reiche
+bis auf die beiden Ecken neben dem offenen Mittelplättchen; die bleiben deshalb gesperrt
+(Auslegung, oben begründet). Bei 3 Reichen war nie etwas gesperrt.
+
+**Folge im 1 gegen 1, gemessen:** setzen beide in die Ecke am Loch, stehen die Hauptstädte
+2 auseinander. Je 150 Bot-Duelle (Russland gegen England), beide Hauptstädte dort gegen
+normale Bot-Platzierung: Militärsiege 90 gegen 59, Spielende im Median Runde 4 gegen 8.
+Regelgerecht nach der Vorgabe (kein geteiltes Feld), aber eine Partie aus dieser Stellung
+kippt schnell.
+
+`test.js` prüft über **alle** Paare erlaubter Felder: kein geteiltes Umland, kein Umland auf
+einem fremden Startplättchen, Abstand unter 3 nur im 1 gegen 1 und nur über das Loch, jedes
+bis v72 erlaubte Feld bleibt erlaubt, und die Zahlen 15/15/13. Gegenproben: die alte Regel
+(14 bzw. 11 Felder) und die Regel ohne Bedingung 2 (4 Reiche: zwei Paare mit geteiltem
+Feld) schlagen jeweils an.
+
+### Dominierte Startfelder: rötlicher Rand
+
+In der Legephase trägt jedes erlaubte Feld einen rötlichen Rand (etwas eingerückt, innerhalb
+des goldenen Plättchenrahmens), wenn ein **anderes erlaubtes Feld von einem Ertrag mehr und
+von keinem weniger** bringt. Die Hinweiszeile erklärt den Rand, sobald einer zu sehen ist.
+
+* **Maßstab** ist genau die Zahl der Ertragsübersicht: Einkommen des ersten Zugs, von der
+  Regelmaschine auf einer Wegwerf-Partie gerechnet (`placeYieldAt`, Fähigkeiten
+  eingerechnet). Siedelraum, Küste für später oder Abstand zum Gegner zählen nicht.
+* **Verglichen wird über alle drei Lagen** (Auslegung): Lage und Hauptstadt wählt man
+  zusammen, „anderswo" ist also auch ein Feld in einer anderen Lage. Folge: in seltenen
+  Fällen ist eine ganze Lage rot – dann taugt sie nichts. Gleichstand dominiert nicht.
+* **Gemessen** (180 Pläne, alle Sitze, 17 775 Wahlmöglichkeiten): 77 % dominiert; nur je
+  Lage verglichen wären es 67 %. Ganz rote Lagen: 58 von 1620 (4 %). Nicht dominiert
+  bleiben je Sitz 1 bis 21 Wahlmöglichkeiten, im Median 7 – über drei Lagen.
+* **Die Vorschau ist genau**, obwohl sie die fremden Startplättchen nicht sieht: das Umland
+  einer erlaubten Hauptstadt liegt nie auf einem verdeckten Plättchen (Bedingung 1 oben).
+  `test.js` startet für 580 Wahlmöglichkeiten die echte Partie und vergleicht das
+  Einkommen des ersten Zugs Zahl für Zahl.
+* Nebenbei entfallen: der Hinweis „– noch verdeckte Nachbarfelder kommen dazu". Er zählte
+  jedes `X` als verdeckt und erschien deshalb nur am Kartenrand und am Loch – dort, wo nie
+  etwas dazukommt.
+
+Umgesetzt in `js/tiles.js` (`placeYieldAt`, `placeYieldTable`, `yieldBeats`,
+`dominatedCells`), in der Oberfläche `placeInfo` (einmal je Sitz gerechnet, 3 × 15
+Wegwerf-Partien) und die Markierung `dom` in `drawMap`.

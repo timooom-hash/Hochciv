@@ -3818,14 +3818,63 @@ function tutRun() {
       const frei = set.map((_, i) => seatFreeCells(sh, set, i));
       eq(frei.every(f => TRI_MIDDLE.every(m => f[m])), true,
         `${n}P: die mittigen Felder sind immer erlaubt (dort setzen Bots)`);
-      // Kein Paar erlaubter Felder kommt sich näher als die Regel zulässt
-      let naeher = 99;
+      /* Seit v73 eine Reihe näher am Gegner: nicht mehr „3 Felder zu jedem fremden
+         Startplättchen", sondern „das Umland zweier Hauptstädte teilt sich nie ein echtes
+         Feld, und es liegt nie auf einem verdeckten Plättchen". Geprüft wird über ALLE
+         Paare erlaubter Felder – gelegt wird blind, es muss für jede Wahl halten. */
+      const echt = new Set(sh.slots.flatMap(slotCells).map(c => c.join(',')));
+      const umland = c => nbCube(c).filter(x => echt.has(x.join(','))).map(x => x.join(','));
+      let naeher = 99, geteilt = 0, nurLoch = 0, aufVerdecktem = 0;
       for (let a = 0; a < set.length; a++) for (let b = a + 1; b < set.length; b++)
         slotCells(sh.slots[set[a]]).forEach((x, xi) => slotCells(sh.slots[set[b]]).forEach((y, yi) => {
-          if (frei[a][xi] && frei[b][yi]) naeher = Math.min(naeher, cubeDist(x, y));
+          if (!frei[a][xi] || !frei[b][yi]) return;
+          const d = cubeDist(x, y);
+          naeher = Math.min(naeher, d);
+          const uy = new Set(umland(y));
+          if (d <= 1 || umland(x).some(k => uy.has(k))) geteilt++;
+          else if (d === 2) nurLoch++;      // gemeinsamer Nachbar, aber kein echtes Feld
         }));
-      eq(naeher >= 3, true, `${n}P: zwei Hauptstädte können nie näher als 3 Felder liegen (${naeher})`);
+      set.forEach((s, i) => {
+        const fremd = new Set(set.filter((_, j) => j !== i)
+          .flatMap(t => slotCells(sh.slots[t])).map(c => c.join(',')));
+        slotCells(sh.slots[s]).forEach((x, xi) => {
+          if (frei[i][xi] && nbCube(x).some(y => fremd.has(y.join(',')))) aufVerdecktem++;
+        });
+      });
+      eq(geteilt, 0, `${n}P: zwei mögliche Hauptstädte teilen sich nie ein Umlandfeld`);
+      eq(aufVerdecktem, 0, `${n}P: kein Umland einer möglichen Hauptstadt liegt auf einem fremden Startplättchen`);
+      // Näher als 3 nur im 1 gegen 1, und dann nur über das Loch in der Mitte
+      eq(naeher >= 3 || (n === 2 && naeher === 2 && nurLoch > 0), true,
+        `${n}P: kleinster Hauptstadtabstand ${naeher}${naeher < 3 ? ' – nur über das Loch' : ''}`);
+      // „Eine Reihe näher": alles, was bis v72 erlaubt war, bleibt erlaubt
+      const alt = set.map((s, i) => {
+        const others = set.filter((_, j) => j !== i).flatMap(t => slotCells(sh.slots[t]));
+        return slotCells(sh.slots[s]).map(m => others.every(o => cubeDist(m, o) >= 3));
+      });
+      eq(alt.every((f, i) => f.every((v, k) => !v || frei[i][k])), true,
+        `${n}P: jedes bis v72 erlaubte Feld bleibt erlaubt`);
+      eq(frei.map(f => f.filter(Boolean).length),
+        set.map(() => ({ 2: 15, 3: 15, 4: 13 })[n]),
+        `${n}P: erlaubte Felder je Startplättchen (bis v72: ${alt.map(f => f.filter(Boolean).length).join('/')})`);
     });
+  }
+  // Vier Reiche: gesperrt bleiben genau die Spitze und die Ecke am offenen Mittelplättchen
+  {
+    const sh = TILE_SHAPES[4], set = sh.seatSets[0];
+    const gesperrt = set.map((s, i) => seatFreeCells(sh, set, i)
+      .map((v, k) => v ? null : TRI_IJK[k].join('')).filter(Boolean).sort().join(' '));
+    // (i,j,k): 004 ist die Spitze, 400 und 040 die Ecken der langen Kante
+    eq(gesperrt.every(g => g.split(' ').length === 2 && g.includes('004')), true,
+      `4P: je Startplättchen gesperrt: Spitze + eine Ecke (${gesperrt.join(' | ')})`);
+    // Die gesperrte Ecke: mit der gegenüberliegenden Ecke des Nachbarsitzes teilte sie sich
+    // die Spitze des offenen Mittelplättchens – genau das verhindert Bedingung 2.
+    const ecke = i => slotCells(sh.slots[set[i]])[seatFreeCells(sh, set, i)
+      .findIndex((v, k) => !v && TRI_IJK[k].join('') !== '004')];
+    const [e1, e3] = [ecke(0), ecke(1)];
+    const mitte = nbCube(e1).find(x => nbCube(e3).some(y => y.join() === x.join()));
+    eq(cubeDist(e1, e3), 2, '4P: die beiden oberen Ecken liegen 2 auseinander');
+    eq(!!mitte && slotCells(sh.slots[2]).some(c => c.join() === mitte.join()), true,
+      '4P: ihr gemeinsames Nachbarfeld ist die Spitze des offenen Mittelplättchens');
   }
   // Vier Reiche: die Sitze sind die beiden oberen und die beiden unteren Dreiecke,
   // also die, deren Fünferzeile auf der Ober- bzw. Unterkante der Form liegt.
@@ -4003,6 +4052,67 @@ function tutRun() {
     eq(tileFaceTerrain(2, 0).join() !== tileFaceTerrain(2, 1).join(), true,
       'aber an anderer Stelle');
   }
+  /* v73: dominierte Startfelder. „Rundum besser" heißt: von keinem Ertrag weniger, von
+     einem mehr. Verglichen wird über alle drei Lagen – Lage und Hauptstadt wählt man
+     zusammen. */
+  {
+    const y = (sci, food, coins) => ({ sci, food, coins });
+    eq(yieldBeats(y(2, 4, 4), y(2, 3, 4)), true, 'mehr Nahrung, sonst gleich: rundum besser');
+    eq(yieldBeats(y(2, 3, 4), y(2, 3, 4)), false, 'Gleichstand ist nicht besser');
+    eq(yieldBeats(y(1, 5, 3), y(2, 4, 4)), false, 'Tausch (mehr Nahrung, dafür weniger anderes) ist nicht besser');
+    eq(yieldBeats(y(2, 3, 6), y(2, -1, 5)), true, 'auch gegen einen negativen Ertrag');
+    const tab = [                       // null: dort darf die Hauptstadt nicht stehen
+      [y(2, 4, 4), y(1, 5, 3), null, y(2, 3, 4)],
+      [y(2, 4, 4), y(1, 1, 1), y(3, 3, 3), null],
+      [y(1, 1, 1), null, y(2, 3, 4), y(0, 6, 0)],
+    ];
+    eq(dominatedCells(tab), [
+      [false, false, false, true],
+      [false, true, false, false],
+      [true, false, true, false],
+    ], 'dominiert wird über alle drei Lagen hinweg, Gleichstand (zweimal 2/4/4) dominiert nicht');
+  }
+  /* Die Ertragsvorschau der Legephase ist genau: legt man die Hauptstadt so und startet
+     die Partie, bringt sie im ersten Zug exakt die Zahl aus placeYieldTable – obwohl die
+     Vorschau die fremden Startplättchen nicht sieht. Wäre sie es nicht, wäre „dominiert"
+     geraten. Wechselnde Reiche und Fähigkeiten, auch ortsabhängige wie Englands Seemacht. */
+  {
+    const alle = CIVS.map(c => c.k);
+    let geprueft = 0, rot = 0, tafeln = 0;
+    const abweichend = [], ohneGegenstueck = [], zuUnrecht = [];
+    for (const n of [2, 3, 4]) for (let seed = 0; seed < 6; seed++) {
+      const civs = alle.slice(seed % 4).concat(alle.slice(0, seed % 4)).slice(0, n);
+      const ability = CIV_BY_KEY[civs[0]].abilities[seed % 3].k;
+      const plan = tilePlan(civs, 500 + seed * 7 + n);
+      const rnd = mapRng(seed + 3), seat = plan.seats[0];
+      plan.seats.slice(1).forEach(st => botPlaceSeat(plan, st, rnd));
+      const tab = placeYieldTable(plan, seat, { civ: civs[0], ability });
+      const dom = dominatedCells(tab);
+      tafeln++;
+      const opt = [];
+      tab.forEach((row, o) => row.forEach((yv, cell) => {
+        if (!yv) return;
+        opt.push({ yv, rot: dom[o][cell] });
+        placeSeat(plan, seat, o, cell);
+        const S = newGame({ seed: 1, map: tileMap(plan), duel: n === 2,
+          players: civs.map((cv, i) => i ? { civ: cv, kind: 'bot' } : { civ: cv, kind: 'human', ability }) });
+        const pi = S.players.findIndex(p => p.slot === 0);
+        geprueft++;
+        if (JSON.stringify(income(S, pi)) !== JSON.stringify(yv))
+          abweichend.push(`${n}P/${seed} ${civs[0]}/${ability} Lage ${o + 1} Feld ${cell}`);
+      }));
+      // Jedes rote Feld hat ein ungefärbtes, das es schlägt; kein ungefärbtes wird geschlagen
+      opt.forEach(a => {
+        if (a.rot) { rot++; if (!opt.some(b => !b.rot && yieldBeats(b.yv, a.yv))) ohneGegenstueck.push(n + 'P/' + seed); }
+        else if (opt.some(b => yieldBeats(b.yv, a.yv))) zuUnrecht.push(n + 'P/' + seed);
+      });
+    }
+    eq(abweichend.slice(0, 3), [], `Vorschau = echtes Einkommen im ersten Zug (${geprueft} Wahlmöglichkeiten)`);
+    eq([ohneGegenstueck.length, zuUnrecht.length], [0, 0],
+      'jedes rot umrandete Feld wird von einem nicht markierten geschlagen, kein nicht markiertes von irgendeinem');
+    eq(rot > 0 && rot < geprueft, true,
+      `auf echten Plättchen ist ein Teil dominiert (${rot} von ${geprueft}, ${tafeln} Legesituationen)`);
+  }
 }
 
 /* ==================================================== Felder außerhalb der Karte */
@@ -4021,6 +4131,42 @@ function tutRun() {
   eq(canFound(S, 0, nr, nc), 'Kein Feld.', 'dort lässt sich keine Stadt gründen');
   eq(isOff('X') && !isOff('M') && !isOff('V'), true, 'nur X gilt als außerhalb');
   eq(TERRAIN.X.land, false, 'außerhalb ist kein Land');
+  // v73: X gehört nie zum Gebiet – sonst zog die Reichsgrenze um leere Sechsecke
+  eq(controlledTiles(S, 0).has(key(nr, nc)), false, 'es gehört nicht zum Gebiet der Stadt daneben');
+  S.players[0].techs.kolonialismus = true; S.players[0].res.coins = 20;
+  eq(buyTile(S, 0, nr, nc), 'Kein Feld.', 'kaufen lässt es sich auch nicht');
+  eq([S.players[0].res.coins, (S.bought[0] || []).length], [20, 0], 'und es kostet nichts');
+}
+/* Plättchenkarten liegen in einem Rechteck aus X. Eine Stadt am Kartenrand oder am Loch
+   zog bis v72 die leeren Sechsecke dahinter in ihr Gebiet – sichtbar als Reichsgrenze
+   jenseits der Karte. Geprüft wird jedes Randfeld jeder Form mit einer gedachten Stadt. */
+for (const n of [2, 3, 4]) {
+  const civs = CIVS.map(c => c.k).slice(0, n);
+  const plan = tilePlan(civs, 40 + n);
+  const rnd = mapRng(9);
+  plan.seats.forEach(st => botPlaceSeat(plan, st, rnd));
+  const S = newGame({ seed: 3, map: tileMap(plan), duel: n === 2,
+    players: civs.map(cv => ({ civ: cv, kind: 'bot' })) });
+  const echt = (r, c) => { const t = terrainAt(S, r, c); return !!t && !isOff(t); };
+  let rand = 0, amLoch = 0, falsch = 0, fehlt = 0;
+  for (let r = 0; r < S.map.rows.length; r++) for (let c = 0; c < S.map.rows[r].length; c++) {
+    if (!echt(r, c) || cityAt(S, r, c)) continue;
+    const nb = neighbors(r, c);
+    if (nb.every(([a, b]) => echt(a, b))) continue;           // kein Randfeld
+    rand++;
+    if (nb.some(([a, b]) => S.map.rows[a] && S.map.rows[a][b] === 'X' &&
+      neighbors(a, b).every(([x, y]) => echt(x, y)))) amLoch++;
+    const alt = S.cities.filter(x => x.owner === 0);
+    S.cities = S.cities.filter(x => x.owner !== 0);
+    S.cities.push({ id: -5, owner: 0, r, c, pop: 1, cap: true, grown: 0, born: 0 });
+    const own = controlledTiles(S, 0);
+    if ([...own].some(k => !echt(...unkey(k)))) falsch++;
+    const soll = nb.filter(([a, b]) => echt(a, b) && !cityAt(S, a, b)).length;
+    if (own.size !== soll) fehlt++;
+    S.cities = S.cities.filter(x => x.id !== -5).concat(alt);
+  }
+  eq([falsch, fehlt], [0, 0],
+    `${n}P: eine Stadt am Rand beherrscht genau ihre echten Nachbarfelder (${rand} Randfelder, ${amLoch} am Loch)`);
 }
 
 /* ============================================== Spielende: Ansprüche und Punkte
