@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 28.9., `sw.js` v73)
+# Hochzeivilization — Projekt-Übergabe (Stand 29.9., `sw.js` v74)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v73)
+## Letzte Sitzungen auf einen Blick (v61 → v74)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -28,6 +28,7 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v71 | Im alternativen Techtree zusätzlich: **Kolonialismus** 3 statt 5 Münzen je Feld, **Kundschafterei** 2× statt 3× der Grundkosten | Regel |
 | v72 | Kolonialismus 3 und Kundschafterei 2× gelten in **beiden** Techtrees; der alternative unterscheidet sich nur in den Forschungskosten (Klarstellung zu v71) | Regel |
 | v73 | Plättchenmodus: Hauptstadt **eine Reihe näher** am Gegner (2 und 4 Reiche), **dominierte Startfelder rötlich umrandet**, Reichsgrenzen nicht mehr um leere Sechsecke am Kartenrand; Internet-Gratiskachel zeigt die Wirkung | Regel + Oberfläche + Fehler |
+| v74 | Alternativer Techtree zusätzlich: **Chemie 11, Biologie 12, Wissenschaftliche Methode 15** (Forschung, Industrialisierung; Standard 12/15/11) | Regel |
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
@@ -64,7 +65,7 @@ Punkt 12 (dominiert über alle Lagen oder nur je Lage?).
 | `js/i18n.js` | 1183 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 403 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 405 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
 | `js/engine.js` | 1725 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
@@ -72,8 +73,8 @@ Punkt 12 (dominiert über alle Lagen oder nur je Lage?).
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ui.js` | 1981 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4860 | **1369 Assertions**, `node test.js` |
-| `smoke.js` | 2510 | **117 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 4887 | **1378 Assertions**, `node test.js` |
+| `smoke.js` | 2532 | **117 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -208,6 +209,24 @@ Gedächtnis rekonstruieren.
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
 
+### Alternativer Techtree: drei Kosten der Industrialisierung (v74)
+
+Auf Anweisung des Autors: im alternativen Techtree kosten **Chemie 11, Biologie 12,
+Wissenschaftliche Methode 15** (Standard 12/15/11). Drei Einträge mehr in `ALT_TECH_COSTS`
+(`js/data.js`), sonst kein Code: Leiter, Bogen, Regelbogen, Aufbauhinweis, Weltblatt,
+Kopierpreise und Bot-Würfe lesen alle über `techBase`/`techsIn` bzw. `altTreeText`. Die
+Leiter Forschung/Industrialisierung heißt im alternativen Techtree jetzt Chemie,
+Biologie, Elektrizität (13, unverändert), Wissenschaftliche Methode. Alle drei Werte
+bleiben im Zeitalter (11–15), `t.age` stimmt also weiter. Der Standard und das Tutorial
+(immer Standard, „kostet 11" im Text) sind unberührt.
+
+**Abgesichert:** `test.js` – die neun Werte, beide Leitern der Industrialisierung, „alle
+übrigen Leitern gleich" (jetzt ohne Forschung/Industrialisierung), Kosten mit
+Griechenland (12/8/9) und mit Wissenschaftlicher Methode (Chemie 5, Biologie 6),
+Kopierpreise (Spionage 15/11/12, Kundschafterei 30/22/24). `smoke.js` – Aufbauhinweis,
+Bogen (Spalte Forschung/Industrialisierung samt Kosten), Bogen der Legephase,
+Regelbogen, und der Standard ohne Häkchen. Gegenprobe mit den Werten von v73 schlägt an.
+
 ### Plättchenmodus: eine Reihe näher, dominierte Startfelder, Grenzen am Rand (v73)
 
 Vier Anweisungen des Autors auf einmal; Einzelheiten und Messungen in `ANNAHMEN.md`
@@ -273,7 +292,8 @@ deutscher bzw. englischer Text, fester Preis 5, fester Faktor 3) schlagen jeweil
 Auf Anweisung des Autors. Ein Häkchen **„Alternativer Techtree"** im Aufbau, je Partie, ab
 Werk aus – **kein Modul**, die Zeile steht immer da. Angehakt gelten andere Grundkosten:
 Forschung Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4; Produktion Bewässerung 1,
-Landwirtschaft 5. Alles in der Antike, Feld und Wirkung bleiben.
+Landwirtschaft 5. Alles in der Antike, Feld und Wirkung bleiben. (Seit v74 dazu drei in
+der Forschung der Industrialisierung, siehe oben.)
 
 **Wie es gebaut ist:** eine Tabelle `ALT_TECH_COSTS` und eine Funktion `techBase(S, t)` in
 `js/data.js` – die Grundkosten dieser Partie, vor Vergünstigungen. `techsIn` sortiert danach,
@@ -400,7 +420,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1369 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1378 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (117 Schritte), inklusive

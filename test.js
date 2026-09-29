@@ -2310,8 +2310,10 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
 /* ============================ Alternativer Techtree (v70, Anweisung des Autors)
    Im Aufbau je Partie zuschaltbar. Andere Grundkosten für sechs Technologien der Antike:
    Forschung Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 – Produktion
-   Bewässerung 1, Landwirtschaft 5. Sie rücken auf der Leiter ihres Feldes um, Feld,
-   Zeitalter und Wirkung bleiben. Ohne Häkchen muss alles genau wie vorher sein.       */
+   Bewässerung 1, Landwirtschaft 5. Seit v74 dazu drei der Forschung in der
+   Industrialisierung: Chemie 11, Biologie 12, Wissenschaftliche Methode 15. Sie rücken
+   auf der Leiter ihres Feldes um, Feld, Zeitalter und Wirkung bleiben. Ohne Häkchen muss
+   alles genau wie vorher sein.                                                        */
 {
   const auf = civ => [{ civ, kind: 'human' }, { civ: 'wikinger', kind: 'bot' }];
   const mkT = (civ, alt, techs = [], extra = {}) => {
@@ -2322,8 +2324,11 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const leiter = (S, f, a = 0) => techsIn(f, a, S).map(t => t.k);
   const STD = mkT('england', false), ALT = mkT('england', true);
 
-  eq(ALT_TECH_COSTS, { mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4, bewaesserung: 1, landwirtschaft: 5 },
-    'Alternativer Techtree: die sechs Kosten der Vorgabe');
+  eq(ALT_TECH_COSTS, {
+    mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4,
+    chemie: 11, biologie: 12, wiss_methode: 15,
+    bewaesserung: 1, landwirtschaft: 5,
+  }, 'Alternativer Techtree: die neun Kosten der Vorgabe (v74: Chemie 11, Biologie 12, Wiss. Methode 15)');
   eq([STD.altTree, ALT.altTree], [false, true], 'Alternativer Techtree: der Schalter steht im Spielstand');
   eq(newGame({ seed: 7, players: auf('england') }).altTree, false, 'ohne Angabe gilt der Standard');
 
@@ -2334,12 +2339,18 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     'Alternativer Techtree: Forschung/Antike nach Kosten 1–4');
   eq(leiter(ALT, 1), ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'],
     'Alternativer Techtree: Produktion/Antike nach Kosten 1–5');
+  // v74: Forschung in der Industrialisierung – Elektrizität (13) bleibt, die drei tauschen
+  eq(leiter(STD, 0, 2), ['wiss_methode', 'chemie', 'elektrizitaet', 'biologie'],
+    'Standard: Forschung/Industrialisierung wie bisher (11/12/13/15)');
+  eq(leiter(ALT, 0, 2), ['chemie', 'biologie', 'elektrizitaet', 'wiss_methode'],
+    'Alternativer Techtree: Forschung/Industrialisierung Chemie 11, Biologie 12, Elektrizität 13, Wiss. Methode 15');
   {
     // Mit Wunder-Techs, damit wirklich jede Leiter drin ist
     const [W0, W1] = [false, true].map(alt => mkT('england', alt, [], { wonders: true }));
     const anders = [], ungeordnet = [];
     for (let f = 0; f < 4; f++) for (let a = 0; a < 4; a++) {
-      if (!(a === 0 && f < 2) && leiter(W0, f, a).join() !== leiter(W1, f, a).join()) anders.push(`${f}/${a}`);
+      const geaendert = (a === 0 && f < 2) || (a === 2 && f === 0);     // Antike 0/1, Industrialisierung 0
+      if (!geaendert && leiter(W0, f, a).join() !== leiter(W1, f, a).join()) anders.push(`${f}/${a}`);
       for (const X of [W0, W1]) {
         const k = techsIn(f, a, X).map(t => techBase(X, t));
         if (k.some((c, i) => i && c <= k[i - 1])) ungeordnet.push(`${X.altTree ? 'alt' : 'std'} ${f}/${a}`);
@@ -2362,6 +2373,14 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(kosten(mkT('griechenland', true)), [3, 0, 1, 2, 4, 0], 'Griechenland: in der Antike je 1 weniger, auf die neuen Kosten');
   eq(kosten(mkT('england', true, ['wiss_methode'])), [2, 0, 0, 1, 3, 0],
     'Wissenschaftliche Methode: −2 in der Antike, nie unter 0');
+  // v74: die drei der Industrialisierung – Griechenland −3, Wissenschaftliche Methode −6
+  const DREI = ['wiss_methode', 'chemie', 'biologie'];
+  const kosten3 = S => DREI.map(k => techCost(S, 0, TECH_BY_KEY[k]));
+  eq(kosten3(STD), [11, 12, 15], 'Standard: Wiss. Methode 11, Chemie 12, Biologie 15');
+  eq(kosten3(ALT), [15, 11, 12], 'Alternativer Techtree: Wiss. Methode 15, Chemie 11, Biologie 12');
+  eq(kosten3(mkT('griechenland', true)), [12, 8, 9], 'Griechenland: in der Industrialisierung je 3 weniger, auf die neuen Kosten');
+  eq(kosten3(mkT('england', true, ['wiss_methode'])).slice(1), [5, 6],
+    'mit Wissenschaftlicher Methode: Chemie 5, Biologie 6 (−6 in der Industrialisierung)');
   {
     const S = mkT('england', true), p = S.players[0];
     S.cur = 0;
@@ -2388,6 +2407,14 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
       'Alternativer Techtree: Kundschafterei zum Doppelten der neuen Grundkosten');
     eq(preise(mkT('england', true, ['kundschafterei', 'spionage'])), [4, 5, 1],
       'mit beiden Wegen gilt der günstigere – Spionage');
+    // v74: auch die drei der Industrialisierung kopieren zu den neuen Grundkosten
+    const preise3 = S => {
+      ['wiss_methode', 'chemie', 'biologie'].forEach(k => { S.players[1].techs[k] = true; });
+      return ['wiss_methode', 'chemie', 'biologie'].map(k => copyableTechs(S, 0).find(o => o.tech.k === k).paidCoins);
+    };
+    eq(preise3(mkT('england', false, ['spionage'])), [11, 12, 15], 'Standard: Spionage kopiert zu 11/12/15 Münzen');
+    eq(preise3(mkT('england', true, ['spionage'])), [15, 11, 12], 'Alternativer Techtree: Spionage kopiert zu 15/11/12 Münzen');
+    eq(preise3(mkT('england', true, ['kundschafterei'])), [30, 22, 24], 'Alternativer Techtree: Kundschafterei 30/22/24');
   }
 
   /* v72 (Anweisung des Autors): Kolonialismus kauft ein Feld für 3 Münzen (vorher 5),

@@ -2305,10 +2305,10 @@ step('Drei Reiche spielen auf der Plättchenkarte', () => {
   console.log('       ' + S.map.name + ' · ' + S.map.rows.length + ' × ' + S.map.rows[0].length);
 });
 /* ============================================ Alternativer Techtree (v70)
-   Ein Häkchen im Aufbau. Angehakt rücken sechs Technologien der Antike auf ihrer Leiter
-   um – und genau so muss der Bogen sie zeigen: in Kostenreihenfolge, mit den neuen
-   Kosten. Das gilt auch für den Bogen der Legephase und den Regelbogen. Ohne Häkchen
-   bleibt alles wie gehabt. */
+   Ein Häkchen im Aufbau. Angehakt rücken sechs Technologien der Antike und seit v74 drei
+   der Forschung in der Industrialisierung auf ihrer Leiter um – und genau so muss der
+   Bogen sie zeigen: in Kostenreihenfolge, mit den neuen Kosten. Das gilt auch für den
+   Bogen der Legephase und den Regelbogen. Ohne Häkchen bleibt alles wie gehabt. */
 // Spalten des Bogens: je Zeitalter vier (Forschung, Produktion, Militär, Spezial)
 const bogenSpalte = i => [...$('ov-body').querySelectorAll('.techgrid .techcol')[i].querySelectorAll('.tech')]
   .map(b => [b.querySelector('b').textContent, b.querySelector('.c').textContent]);
@@ -2343,6 +2343,9 @@ const feldKaufen = () => {
 };
 const ALT_FO = ['mathematik', 'astronomie', 'philosophie', 'schrift'];
 const ALT_PR = ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'];
+// v74: Forschung/Industrialisierung – Spalte 8 im Bogen (Zeitalter 2 × 4 Felder + Forschung)
+const ALT_FO2 = ['chemie', 'biologie', 'elektrizitaet', 'wiss_methode'];
+const STD_FO2 = ['wiss_methode', 'chemie', 'elektrizitaet', 'biologie'];
 const vierReiche = () => {
   $('setup-mode').querySelector('[data-mode=vier]').onclick();
   $('setup-map').value = '0'; $('setup-map').onchange();
@@ -2358,7 +2361,8 @@ step('Alternativer Techtree: Zeile im Aufbau, ab Werk ohne Häkchen', () => {
   $('setup-alttree').checked = true; $('setup-alttree').onchange();
   const hint = $('setup-alttree-hint');
   if (hint.hidden) throw new Error('angehakt erscheint kein Hinweis');
-  for (const s of ['Mathematik 1', 'Astronomie 2', 'Philosophie 3', 'Schrift 4', 'Bewässerung 1', 'Landwirtschaft 5'])
+  for (const s of ['Mathematik 1', 'Astronomie 2', 'Philosophie 3', 'Schrift 4', 'Bewässerung 1', 'Landwirtschaft 5',
+    'Chemie 11', 'Biologie 12', 'Wissenschaftliche Methode 15'])
     if (!hint.textContent.includes(s)) throw new Error('Hinweis nennt nicht „' + s + '": ' + hint.textContent);
   // Der alternative Techtree unterscheidet sich nur in den Forschungskosten (v72)
   if (/Kolonialismus|Kundschafterei/.test(hint.textContent)) throw new Error('Hinweis nennt mehr als Kosten: ' + hint.textContent);
@@ -2388,6 +2392,12 @@ step('Alternativer Techtree: der Bogen zeigt die Leitern nach den neuen Kosten',
   const pi = S.cur;
   const soll = G('techsIn')(0, 0, S).map(t => String(G('techCost')(S, pi, t))).join();
   if (fo.map(x => x[1]).join() !== soll) throw new Error('Kachelkosten ' + fo.map(x => x[1]) + ' ≠ Rechnung ' + soll);
+  // v74: Forschung/Industrialisierung in der neuen Reihenfolge, mit den Kosten der Regelmaschine
+  const fo2 = bogenSpalte(8);
+  if (fo2.map(x => x[0]).join(', ') !== techNamen(ALT_FO2))
+    throw new Error('Forschung/Industrialisierung: ' + fo2.map(x => x.join(' ')).join(', '));
+  const soll2 = ALT_FO2.map(k => String(G('techCost')(S, pi, G('TECH_BY_KEY')[k]))).join();
+  if (fo2.map(x => x[1]).join() !== soll2) throw new Error('Kachelkosten ' + fo2.map(x => x[1]) + ' ≠ Rechnung ' + soll2);
   for (let s = 0; s < 16; s++) {
     const k = bogenSpalte(s).map(x => +x[1]).filter(n => !isNaN(n));
     if (k.some((n, i) => i && n < k[i - 1])) throw new Error('Spalte ' + s + ' fällt: ' + k.join(','));
@@ -2398,6 +2408,7 @@ step('Alternativer Techtree: der Bogen zeigt die Leitern nach den neuen Kosten',
   G('closeModal')();
   console.log('       Forschung: ' + fo.map(x => x.join(' ')).join(', '));
   console.log('       Produktion: ' + pr.map(x => x.join(' ')).join(', '));
+  console.log('       Forschung/Industrialisierung: ' + fo2.map(x => x.join(' ')).join(', '));
 });
 step('Alternativer Techtree: Feld kaufen kostet im Aktionsblatt 3 Münzen', () => {
   const [preis, bezahlt] = feldKaufen();
@@ -2414,6 +2425,12 @@ step('Alternativer Techtree: Regelbogen, Weltblatt und Protokoll nennen ihn', ()
   if (kosten !== '4,1,5,1') throw new Error('Regelbogen zeigt ' + kosten);
   if (reihe.indexOf(K.mathematik.n) > reihe.indexOf(K.schrift.n)) throw new Error('Regelbogen: Schrift vor Mathematik');
   if (reihe.indexOf(K.bewaesserung.n) > reihe.indexOf(K.landwirtschaft.n)) throw new Error('Regelbogen: Landwirtschaft vor Bewässerung');
+  // v74: die drei der Industrialisierung mit ihren neuen Kosten und in dieser Reihenfolge
+  const kosten2 = ['wiss_methode', 'chemie', 'biologie']
+    .map(k => (zeilen.find(z => z[0] === K[k].n) || [])[1]).join();
+  if (kosten2 !== '15,11,12') throw new Error('Regelbogen zeigt für Wiss. Methode/Chemie/Biologie ' + kosten2);
+  const pos = ALT_FO2.map(k => reihe.indexOf(K[k].n));
+  if (pos.some((x, i) => x < 0 || (i && x < pos[i - 1]))) throw new Error('Regelbogen: Industrialisierung nicht nach Kosten');
   if (!/alternative Techtree/.test($('ov-body').textContent)) throw new Error('kein Hinweis im Regelbogen');
   G('closeModal')();
   $('a-info').onclick();
@@ -2421,7 +2438,8 @@ step('Alternativer Techtree: Regelbogen, Weltblatt und Protokoll nennen ihn', ()
     throw new Error('Weltblatt nennt den Techtree nicht');
   G('closeModal')();
   if (!/Alternativer Techtree/.test(G('S').log[0].m)) throw new Error('Protokollkopf: ' + G('S').log[0].m);
-  console.log('       Regelbogen Schrift/Mathematik/Landwirtschaft/Bewässerung: ' + kosten);
+  console.log('       Regelbogen Schrift/Mathematik/Landwirtschaft/Bewässerung: ' + kosten +
+    ' · Wiss. Methode/Chemie/Biologie: ' + kosten2);
 });
 step('Alternativer Techtree: „Nochmal spielen" behält ihn, alte Rezepte nicht', () => {
   const rec = G('S').recipe;
@@ -2443,6 +2461,8 @@ step('Alternativer Techtree: auch der Bogen in der Legephase – und die Partie 
   $('pl-tech').onclick();
   const fo = bogenSpalte(0).map(x => x[0]).join(', ');
   if (fo !== techNamen(ALT_FO)) throw new Error('Legephase: ' + fo);
+  const fo2 = bogenSpalte(8).map(x => x[0]).join(', ');
+  if (fo2 !== techNamen(ALT_FO2)) throw new Error('Legephase, Industrialisierung: ' + fo2);
   G('closeModal')();
   const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
   const gut = frei.indexOf(true);
@@ -2462,6 +2482,7 @@ step('Alternativer Techtree: ohne Häkchen wieder der Standard', () => {
   $('a-tech').onclick();
   const fo = bogenSpalte(0).map(x => x[0]).join(', ');
   const pr = bogenSpalte(1).map(x => x[0]).join(', ');
+  const fo2 = bogenSpalte(8).map(x => x[0]).join(', ');
   const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
   G('closeModal')();
   if (ko !== 'Für 3 Münzen Feld kaufen' || ku !== 'Tech kopieren (2× Kosten in Münzen)')
@@ -2470,6 +2491,7 @@ step('Alternativer Techtree: ohne Häkchen wieder der Standard', () => {
   if (preis !== '3🪙' || bezahlt !== 3) throw new Error(`Standard: Knopf ${preis}, bezahlt ${bezahlt}`);
   if (fo !== techNamen(['schrift', 'mathematik', 'astronomie', 'philosophie'])) throw new Error('Forschung: ' + fo);
   if (pr !== techNamen(['landwirtschaft', 'fischerei', 'rad', 'keramik', 'bewaesserung'])) throw new Error('Produktion: ' + pr);
+  if (fo2 !== techNamen(STD_FO2)) throw new Error('Forschung/Industrialisierung: ' + fo2);
   G('rulesModal')();
   if (/alternative Techtree/.test($('ov-body').textContent)) throw new Error('Regelbogen meldet ihn im Standard');
   G('closeModal')();

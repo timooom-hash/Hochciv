@@ -134,18 +134,25 @@ ebenfalls verbunden.
   ab Werk aus. Es ist **kein Modul** – die Zeile steht immer im Aufbau, die Einstellungen
   kennen sie nicht. Angehakt gelten andere Grundkosten (`ALT_TECH_COSTS` in `js/data.js`):
   Forschung Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 (vorher 2/3/4/1),
-  Produktion Bewässerung 1, Landwirtschaft 5 (vorher 5/1). Ausgelegt so:
+  Produktion Bewässerung 1, Landwirtschaft 5 (vorher 5/1). Seit v74 (Anweisung des
+  Autors) zusätzlich in der Forschung der Industrialisierung: Chemie 11, Biologie 12,
+  Wissenschaftliche Methode 15 (vorher 12/15/11) – die Leiter heißt dort jetzt Chemie,
+  Biologie, Elektrizität (13, unverändert), Wissenschaftliche Methode. Ausgelegt so:
   - **Nur die Kosten ändern sich.** Feld, Zeitalter und Wirkung bleiben. Das Zeitalter
-    kommt weiter aus den Standardkosten (`t.age`); alle sechs Werte liegen in der Antike,
-    ein Test hält fest, dass keiner die Zeitaltergrenze überschreitet. Wer später einen
-    Wert über eine Grenze legen will, muss das Zeitalter mitrechnen lassen.
+    kommt weiter aus den Standardkosten (`t.age`); alle neun Werte bleiben in ihrem
+    Zeitalter (sechs in der Antike, 11/12/15 in der Industrialisierung, 11–15), ein Test
+    hält fest, dass keiner die Zeitaltergrenze überschreitet. Wer später einen Wert über
+    eine Grenze legen will, muss das Zeitalter mitrechnen lassen.
   - **Die Leitern ordnen sich nach den neuen Kosten** (`techsIn`): im Bogen, im
     Regelbogen und im Bogen der Legephase. Damit folgen auch alle Würfe auf „die n-te
     Technologie" der neuen Leiter – Verfügbarkeit, „keine verfügbar → eine auswürfeln"
     und die Bot-Forschung. Derselbe Seed kann deshalb andere Starttechnologien ergeben.
   - **Vergünstigungen setzen auf die neuen Grundkosten auf** (Griechenland −1 in der
-    Antike, Wissenschaftliche Methode −2): Schrift kostet Griechenland also 3.
-  - **Kopieren** zahlt die Basiskosten dieser Partie (Spionage: Schrift 4 Münzen).
+    Antike, Wissenschaftliche Methode −2): Schrift kostet Griechenland also 3. In der
+    Industrialisierung (−3 bzw. −6): Wissenschaftliche Methode kostet Griechenland 12,
+    und wer sie hat, zahlt für Chemie 5 und für Biologie 6.
+  - **Kopieren** zahlt die Basiskosten dieser Partie (Spionage: Schrift 4 Münzen,
+    Wissenschaftliche Methode 15).
   - **Bots** spielen auf denselben Leitern. Das **Tutorial** läuft immer im Standard.
   - „Nochmal spielen" übernimmt den Schalter (er steht im Rezept). Spielstände und
     Rezepte aus v69 und früher kennen ihn nicht und laufen im Standard.
