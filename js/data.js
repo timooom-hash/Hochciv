@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v73';
+const APP_VERSION = 'v74';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -144,13 +144,15 @@ const SINGULARITY = {
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
 };
 /* Alternativer Techtree (v70, Anweisung des Autors): im Aufbau je Partie zuschaltbar,
-   steht dann als S.altTree im Spielstand. Andere Grundkosten für sechs Technologien der
-   Antike – sie rücken damit auf der Leiter ihres Feldes um. Alles andere bleibt: Wirkung,
-   Feld und Zeitalter. Das Zeitalter kommt weiter aus den Standardkosten (t.age); ein Test
-   hält fest, dass keiner dieser Werte die Zeitaltergrenze überschreitet. */
+   steht dann als S.altTree im Spielstand. Andere Grundkosten für neun Technologien: sechs
+   der Antike (v70) und drei der Forschung in der Industrialisierung (v74) – sie rücken
+   damit auf der Leiter ihres Feldes um. Alles andere bleibt: Wirkung, Feld und Zeitalter.
+   Das Zeitalter kommt weiter aus den Standardkosten (t.age); ein Test hält fest, dass
+   keiner dieser Werte die Zeitaltergrenze überschreitet. */
 const ALT_TECH_COSTS = {
-  mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4,     // Forschung
-  bewaesserung: 1, landwirtschaft: 5,                           // Produktion
+  mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4,     // Forschung, Antike
+  chemie: 11, biologie: 12, wiss_methode: 15,                   // Forschung, Industrialisierung (v74)
+  bewaesserung: 1, landwirtschaft: 5,                           // Produktion, Antike
 };
 /* Kolonialismus und Kundschafterei (v72, Anweisung des Autors; gilt in beiden Techtrees –
    der alternative unterscheidet sich nur in den Forschungskosten). Die Techtexte in TECHS
