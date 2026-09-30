@@ -960,8 +960,8 @@ const UI_EN = {
     'Roads: connecting the cities',
   'Tippe auf <b>Zug beenden</b> und klick dich durch die drei Bot-Fenster.':
     'Tap <b>End turn</b> and click through the three bot windows.',
-  'Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.':
-    'Tap the <b>golden tile</b> and choose <b>Found city</b>.',
+  'Tippe unten auf <b>Stadt gründen</b>, dann auf das <b>goldene Feld</b> und auf <b>Hier gründen</b>.':
+    'Tap <b>Found city</b> at the bottom, then the <b>golden tile</b> and <b>Found here</b>.',
   'Tippe deine <b>Hauptstadt</b> an und wähle <b>Bevölkerung wachsen</b>.':
     'Tap your <b>capital</b> and choose <b>Grow population</b>.',
   'Tippe die <b>golden umrandete Stadt</b> an und wähle <b>Armee bauen</b>.':
@@ -1025,8 +1025,8 @@ const UI_EN = {
     '<p>A bot always performs the same steps: grow every city, settle a new city, build an army, move all armies, research twice. However, it carries out each action only with a probability of 17 % (easiest difficulty) to 83 % (highest difficulty). Every roll is in the log.</p> <p><b>How to follow along:</b> <b>Log</b> at the bottom – every die roll is there with its reason.</p>',
   '<p>Eine Armee zu bauen kostet aktuell <b>5 Münzen</b>. Das steigt um weitere 5 je eigener Armee, die zweite kostet also 10. Sie erscheint <i>in</i> einer Stadt und <b>muss sie im selben Zug verlassen</b>; Armeen stehen nie auf Städten, auch nicht auf eigenen.</p> <p><b>Warum überhaupt eine Armee?</b> Ohne Armee kannst du weder angreifen noch aktiv eine Stadt verteidigen.</p> <p><b>So baust du:</b> die golden umrandete Stadt antippen → im Blatt auf <b>Armee bauen</b>. Die Armee steht dann in der Stadt und muss sie noch in diesem Zug verlassen.</p>':
     '<p>Building an army currently costs <b>5 coins</b>. That rises by another 5 per army you own, so the second costs 10. It appears <i>inside</i> a city and <b>has to leave it in the same turn</b>; armies never stand on cities, not even your own.</p> <p><b>Why an army at all?</b> Without one you can neither attack nor actively defend a city.</p> <p><b>How to build:</b> tap the gold-outlined city → <b>Build army</b> in the sheet. The army then stands in the city and still has to leave it this turn.</p>',
-  '<p>Es wird Zeit zu expandieren. Auf dem golden umrandeten Feld zu siedeln kostet insgesamt <b>4 Nahrung</b> – 1 Basiskosten für die erste zusätzliche Stadt plus 3 Distanzkosten für den Weg dorthin von der Hauptstadt aus.</p> <p><b>So gründest du:</b> goldenes Feld antippen → im Blatt auf <b>Stadt gründen</b>.</p>':
-    '<p>Time to expand. Settling on the gold-outlined tile costs <b>4 food</b> in total – 1 base cost for the first additional city plus 3 distance cost for the way there from the capital.</p> <p><b>How to found:</b> tap the golden tile → <b>Found city</b> in the sheet.</p>',
+  '<p>Es wird Zeit zu expandieren. Auf dem golden umrandeten Feld zu siedeln kostet insgesamt <b>4 Nahrung</b> – 1 Basiskosten für die erste zusätzliche Stadt plus 3 Distanzkosten für den Weg dorthin von der Hauptstadt aus.</p> <p><b>So gründest du:</b> unten auf <b>Stadt gründen</b> → das goldene Feld antippen → <b>Hier gründen</b>. Solange der Gründungsmodus läuft, steht auf jedem möglichen Feld, was die Stadt dort kostet.</p>':
+    '<p>Time to expand. Settling on the gold-outlined tile costs <b>4 food</b> in total – 1 base cost for the first additional city plus 3 distance cost for the way there from the capital.</p> <p><b>How to found:</b> <b>Found city</b> at the bottom → tap the golden tile → <b>Found here</b>. While founding mode is on, every possible tile shows what a city there costs.</p>',
   '<p>Griechenland hat im eigenen Zug eine Armee neben deine Stadt gezogen und schon einmal angegriffen – im Protokoll steht dazu „Zug 1/2". Stadt und Armee sind golden umrandet.</p> <p><b>Angriffswert</b> = Machtwert je angreifender Armee, mehrere addieren sich: <b>5</b> (bei Bots ist das ihre Gesamtbevölkerung).<br> <b>Verteidigungswert</b> = 1 je Stadtbevölkerung plus den Machtwert benachbarter eigener Armeen: <b>1</b>.</p> <p>Der Angriff ist höher. Ist er <b>zwei Züge in Folge</b> höher, verlierst du die Stadt und 2 Bevölkerung. Im Protokoll steht dann „Zug 1/2" – das ist deine Vorwarnung, du hast genau eine Runde Zeit.</p>':
     '<p>On its own turn Greece moved an army next to your city and has already attacked once – the log says “turn 1/2”. City and army are outlined in gold.</p> <p><b>Attack value</b> = the power value per attacking army, several add up: <b>5</b> (for bots that is their total population).<br> <b>Defence value</b> = 1 per city population plus the power value of your adjacent armies: <b>1</b>.</p> <p>The attack is higher. If it is higher <b>two turns in a row</b>, you lose the city and 2 population. The log then says “turn 1/2” – that is your warning, you have exactly one round.</p>',
   '<p>Hochzeivilization ist ein Spiel, bei dem vier Zivilisationen ihr Reich von der Antike in die Moderne führen. Alle Reiche beginnen mit nur einer einzigen Stadt, werden aber schon bald expandieren, ihre Bevölkerung vergrößern, neue Technologien erforschen und Armeen bauen. Eine Zivilisation gewinnt durch wirtschaftliche, militärische oder Technologische Vorherrschaft. Wie genau das im Detail funktioniert, wird später erklärt.</p> <p>Du spielst <b>Russland</b>, die anderen drei Reiche übernehmen Bots auf dem höchsten Schwierigkeitsgrad „David".</p> <p>Golden umrandet ist deine <b>Hauptstadt</b>: Der Kreis mit Symbol ist die Stadt, die Striche daneben symbolisieren die Bevölkerung. Die Linie um die Felder darum ist die Reichsgrenze. <p>Gezogen wird immer in derselben Reihenfolge: <b>Russland (grün) → Griechenland (blau) → England (rot) → Wikingerreich (lila)</b>. Wo die Runde beginnt, hängt vom Startspieler ab, hier bist das du.</p> <p class="tut-note">Im Tutorial sind nur die Schritte dieser Beispielpartie möglich – so bleibt alles nachvollziehbar. „Tutorial beenden" gibt alles frei.</p>':
@@ -1142,6 +1142,14 @@ const UI_EN = {
   'ausgeschieden': 'eliminated',
 
   'Ertragsübersicht': 'Yield overview',
+  /* --- Kartenansichten (v75): Erträge, Gründungsmodus, Machtringe */
+  'Erträge': 'Yields',
+  'Hier gründen': 'Found here',
+  'Feld für die neue Stadt antippen': 'Tap a tile for the new city',
+  'Hier ließe sich eine Stadt gründen – über „Stadt gründen" in der Leiste.':
+    'A city could be founded here – via “Found city” in the bar.',
+  'Ringe auf der Karte, ein Teilstück je Punkt: in der Farbe des Besitzers seine Verteidigung bzw. sein Machtwert, in fremder Farbe der Angriff bzw. die Flankierer. Überwiegt ein fremder Anteil, läuft die Belagerung bzw. fällt die Armee – bei Gleichstand hält der Verteidiger. Über %s Punkte nur noch als Anteil.':
+    'Rings on the map, one segment per point: the owner’s colour is its defence or power value, other colours are attackers or flankers. If another share is larger, the siege runs or the army falls – on a tie the defender holds. Above %s points only the share is shown.',
   'Rot umrandet: ein anderes Feld bringt von etwas mehr und von nichts weniger.':
     'Red outline: another spot yields more of something and less of nothing.',
 

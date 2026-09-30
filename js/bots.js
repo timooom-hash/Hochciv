@@ -227,7 +227,8 @@ function botFlankOk(S, pi, army, e, t) {
     .concat(has(p, 'burgenbau') ? citiesOf(S, pi).map(c => [c.r, c.c]) : [])
     .filter(([r, c]) => { const dd = hexDistance(r, c, e.r, e.c); return dd >= 1 && dd <= rng; });
   if (has(p, 'taktik')) return partners.length >= 1;
-  return partners.some(([r, c]) => r === e.r + (e.r - t[0]) && c === e.c + (e.c - t[1]));
+  // gegenüber, am Gegner gespiegelt – in Würfelkoordinaten (v75, vorher Zeile/Spalte)
+  return partners.some(([r, c]) => hexOpposite(e.r, e.c, t[0], t[1], r, c));
 }
 /* Feindliche Armeen, die diese eigene Stadt bedrohen.
    Maßstab ist keine Kraftrechnung, sondern die **laufende Belagerung**: Erst wenn ein
@@ -379,8 +380,7 @@ function botMoveArmy(S, pi, army) {
     const flankSpot = (e, t) => {
       if (hexDistance(e.r, e.c, t[0], t[1]) < 1 || hexDistance(e.r, e.c, t[0], t[1]) > rng) return false;
       if (has(p, 'taktik')) return partnersFor(e).length >= 1;
-      const drow = e.r - t[0], dcol = e.c - t[1];
-      return partnersFor(e).some(([r, c]) => r === e.r + drow && c === e.c + dcol);
+      return partnersFor(e).some(([r, c]) => hexOpposite(e.r, e.c, t[0], t[1], r, c));
     };
     const candidates = [];
     for (const e of S.armies) {

@@ -25,15 +25,24 @@ function closeModal() {
   // Leseschritte im Tutorial warten darauf, dass das Fenster wieder zu ist.
   if (typeof tutMaybeAdvance === 'function' && ui && ui.tut) tutMaybeAdvance();
 }
-function sheet(html) {
+/* `opts.power`: dieses Blatt ist das Machtblatt – nur solange es offen ist, zeigt die
+   Karte die Machtringe (v75). Jedes andere Blatt beendet die Machtansicht. */
+function sheet(html, opts) {
+  const machtAus = ui && ui.powerView && !(opts && opts.power);
+  if (machtAus) ui.powerView = false;
   $('sheet-body').innerHTML = html;
   $('sheet').classList.add('open');
   // Im Tutorial sind auch Macht- und Armeeblatt an die Schienen gebunden. Hier zählt nur
   // die Beschriftung – die Feldprüfung macht openTile für das Aktionsblatt selbst.
   if (typeof ui !== 'undefined' && ui && ui.tut) tutGateSheet(null, null);
   lockBar();
+  if (machtAus && S) redraw();
 }
-function closeSheet() { if (ui.botLock) return; $('sheet').classList.remove('open'); lockBar(); }
+function closeSheet() {
+  if (ui.botLock) return;
+  $('sheet').classList.remove('open'); lockBar();
+  if (ui.powerView) { ui.powerView = false; if (S) redraw(); }
+}
 /* Die Aktionsleiste wird nur noch vom Bot-Fenster gesperrt – dort führt allein
    „Weiter" weiter. Ein normales Aktionsblatt sperrt sie NICHT mehr: es endet seit
    dieser Fassung oberhalb der Leiste (--bar-h), liegt also nicht mehr darauf, und
@@ -183,6 +192,151 @@ function tallyMarks(g, n, x, y, col) {
     }));
   }
 }
+/* ------------------------------------------------------------------ Kartenansichten (v75)
+   Drei Schichten legen sich auf Wunsch über die Karte:
+   · Erträge – je Feld bis zu drei Chips: Wissenschaft blau, Nahrung grün, Münzen gold,
+     Nullen weggelassen. Gerechnet für das Reich, das gerade schaut (tileYieldAt), also
+     mit seinen Technologien. Stadtfelder bringen selbst nichts und bleiben frei.
+   · Gründungsmodus – auf jedem möglichen Platz die Kosten in Nahrung (rot, wenn sie
+     diesen Zug nicht reichen), unmögliche Felder abgeblendet. Entscheiden tun
+     foundSiteError und foundCost aus engine.js, nicht die Oberfläche.
+   · Machtansicht – Ringe um Städte und Armeen: der Anteil in der Farbe des Besitzers ist
+     seine Verteidigung bzw. sein Machtwert, die übrigen Anteile die Angreifer bzw.
+     Flankierer in ihrer Farbe (powerView). Bewusst ohne Zahl: man sieht, wer überwiegt;
+     die Zahlen stehen im Feldblatt.                                                   */
+const YIELD_CHIP = ['#3b6ea5', '#4b8a2c', '#b07a12'];
+function yieldChips(g, S2, pi) {
+  const rows = S2.map.rows;
+  for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
+    const t = rows[r][c];
+    if (!TERRAIN[t] || isOff(t) || cityAt(S2, r, c)) continue;
+    const y = tileYieldAt(S2, pi, r, c);
+    const list = [0, 1, 2].filter(i => y[i] > 0);
+    if (!list.length) continue;
+    const [x, yy] = hexCenter(r, c, HEX);
+    list.forEach((i, k) => {
+      const cx = x + (k - (list.length - 1) / 2) * 13.5, cy = yy + 14.5;
+      g.appendChild(svgEl('circle', {
+        cx, cy, r: 6.6, fill: YIELD_CHIP[i], stroke: '#fbf7ec', 'stroke-width': 1.3,
+        'pointer-events': 'none', 'data-yield': i, 'data-rc': r + '/' + c,
+      }));
+      const tx = svgEl('text', {
+        x: cx, y: cy + 3.3, 'text-anchor': 'middle', 'font-size': y[i] > 9 ? 8 : 9.5,
+        'font-weight': 700, fill: '#fff', 'pointer-events': 'none',
+      });
+      tx.textContent = y[i]; g.appendChild(tx);
+    });
+  }
+}
+/* Gründungsmodus: abblenden, was nicht geht; Kosten auf allem, was geht. Alle Felder
+   auf einmal – mit der vorgerechneten Wegtabelle (withFoundTable), sonst kostete jedes
+   Zeichnen auf der großen Karte gut 50 ms. */
+function foundMarks(g, S2, pi) { withFoundTable(S2, pi, () => foundMarksAll(g, S2, pi)); }
+function foundMarksAll(g, S2, pi) {
+  const rows = S2.map.rows, pts = hexPath(HEX);
+  const food = available(S2, pi, 'food');
+  for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
+    const t = rows[r][c];
+    if (!TERRAIN[t] || isOff(t)) continue;
+    const [x, y] = hexCenter(r, c, HEX);
+    if (foundSiteError(S2, pi, r, c)) {
+      g.appendChild(svgEl('polygon', {
+        points: pts, transform: `translate(${x},${y})`, fill: 'rgba(236,229,208,.66)',
+        'pointer-events': 'none', 'data-found': 'nein', 'data-rc': r + '/' + c,
+      }));
+      continue;
+    }
+    const cost = foundCost(S2, pi, r, c), knapp = food < cost;
+    const col = knapp ? '#b3321f' : '#2a2721';
+    g.appendChild(svgEl('circle', {
+      cx: x, cy: y - 10, r: 10, fill: '#fbf7ec', stroke: col, 'stroke-width': 1.8,
+      'pointer-events': 'none', 'data-found': knapp ? 'knapp' : 'ja', 'data-rc': r + '/' + c,
+    }));
+    const tx = svgEl('text', {
+      x, y: y - 6, 'text-anchor': 'middle', 'font-size': cost > 99 ? 9 : 11.5,
+      'font-weight': 700, fill: col, 'pointer-events': 'none',
+    });
+    tx.textContent = cost; g.appendChild(tx);
+  }
+}
+/* Ein Ring aus Kreisanteilen: parts = [{ v, col }], der erste ist der Besitzer, von zwölf
+   Uhr im Uhrzeigersinn. Seit v76 ist jeder Punkt ein eigenes Teilstück – eine Stadt mit
+   Verteidigung 1 und Angriff 2 trägt drei, eines in der Farbe des Verteidigers und zwei in
+   der des Angreifers. So lässt sich der Wert abzählen, ohne dass eine Zahl dasteht.
+   Über RING_MAX_PUNKTE Punkten würden die Stücke zu schmal zum Zählen (Stadtring bei 60:
+   gut 2 Karteneinheiten je Stück, auf dem iPad bei ganzer Karte etwa 2–3 Pixel); dann
+   bleibt nur der Anteil mit Grenzstrichen zwischen den Reichen.
+   Gemessen an 60 Bot-Partien liegen 99 % der Stadt- und alle Armeeringe darunter, bei
+   bedrohten Städten 93 %.
+   Ohne einen einzigen Punkt (Armee mit Macht 0, niemand flankiert) bleibt der Ring leer:
+   nur der Umriss in der Besitzerfarbe – bis v75 war er dann voll, wie bei voller Stärke. */
+const RING_MAX_PUNKTE = 60;
+function powerRing(g, cx, cy, r0, r1, parts, tag) {
+  const total = Math.round(parts.reduce((s, p) => s + Math.max(0, p.v), 0));
+  const attrs = { 'pointer-events': 'none', 'data-power': tag };
+  const rm = (r0 + r1) / 2;
+  // heller Saum darunter: sonst verschwindet ein grüner Ring auf Wald und Grasland
+  g.appendChild(svgEl('circle', {
+    cx, cy, r: rm, fill: 'none', stroke: '#fbf7ec', 'stroke-width': r1 - r0 + 2.6,
+    'pointer-events': 'none',
+  }));
+  if (total === 0) {
+    [r0, r1].forEach(r => g.appendChild(svgEl('circle', Object.assign({
+      cx, cy, r, fill: 'none', stroke: parts[0].col, 'stroke-width': 1.1, 'data-anteil': '0',
+    }, attrs))));
+    return;
+  }
+  const zeig = parts.filter(p => p.v > 0);
+  const pt = (r, a) => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+  const strich = (a, w, art) => {
+    const [xa, ya] = pt(r0 - 0.4, a), [xb, yb] = pt(r1 + 0.4, a);
+    g.appendChild(svgEl('line', {
+      x1: xa, y1: ya, x2: xb, y2: yb, stroke: '#fbf7ec', 'stroke-width': w,
+      'pointer-events': 'none', [art]: tag,
+    }));
+  };
+  const grenzen = [];
+  if (zeig.length === 1) {
+    g.appendChild(svgEl('circle', Object.assign({
+      cx, cy, r: rm, fill: 'none', stroke: zeig[0].col, 'stroke-width': r1 - r0,
+      'data-anteil': '1',
+    }, attrs)));
+  } else {
+    let a0 = 0;
+    zeig.forEach(p => {
+      const a1 = a0 + 2 * Math.PI * p.v / total;
+      const gross = a1 - a0 > Math.PI ? 1 : 0;
+      const [x1, y1] = pt(r1, a0), [x2, y2] = pt(r1, a1), [x3, y3] = pt(r0, a1), [x4, y4] = pt(r0, a0);
+      g.appendChild(svgEl('path', Object.assign({
+        d: `M${x1},${y1} A${r1},${r1} 0 ${gross} 1 ${x2},${y2} L${x3},${y3} A${r0},${r0} 0 ${gross} 0 ${x4},${y4} Z`,
+        fill: p.col, 'data-anteil': (p.v / total).toFixed(3),
+      }, attrs)));
+      grenzen.push(a0);
+      a0 = a1;
+    });
+  }
+  // Zu viele Punkte zum Zählen: nur die Grenzen zwischen den Reichen, wie bis v75
+  if (total > RING_MAX_PUNKTE) { grenzen.forEach(a => strich(a, 1.3, 'data-grenze')); return; }
+  // sonst ein Trennstrich je Punkt (v76), je mehr Punkte, desto feiner. Die Werte sind
+  // ganze Zahlen, die Grenzen zwischen den Reichen fallen also auf Striche.
+  const w = total <= 12 ? 1.3 : total <= 24 ? 0.9 : 0.55;
+  for (let k = 0; k < total; k++) strich(2 * Math.PI * k / total, w, 'data-strich');
+}
+function powerRings(g, S2, view, was) {
+  const col = pi => civOf(S2.players[pi]).color;
+  if (was === 'armee') view.armies.forEach(({ army, pow, flank }) => {
+    const [x, y] = hexCenter(army.r, army.c, HEX);
+    powerRing(g, x, y - 2, 14, 18.5,
+      [{ v: pow, col: col(army.owner) }].concat(flank.map(f => ({ v: f.v, col: col(f.pi) }))),
+      'armee ' + army.r + '/' + army.c);
+  });
+  if (was === 'stadt') view.cities.forEach(({ city, def, atk }) => {
+    const [x, y] = hexCenter(city.r, city.c, HEX);
+    powerRing(g, x, y, 17, 21.5,
+      [{ v: def, col: col(city.owner) }].concat(atk.map(a => ({ v: a.v, col: col(a.pi) }))),
+      'stadt ' + city.r + '/' + city.c);
+  });
+}
 function drawMap(svg, map, opts) {
   opts = opts || {};
   svg.innerHTML = '';
@@ -267,10 +421,16 @@ function drawMap(svg, map, opts) {
         }
       }
     });
+    // 3b Erträge je Feld und Gründungsmodus (v75) – unter den Einheiten, damit Städte und
+    // Armeen lesbar bleiben; das Abblenden legt sich auch über die Chips
+    if (opts.yields != null) yieldChips(world, S2, opts.yields);
+    if (opts.found != null) foundMarks(world, S2, opts.found);
     // 4 Overlay (erreichbare Felder)
     markHexes(opts.highlight, 'reach');
     // 4b Tutorial-Hervorhebung: goldener Rahmen um die Felder, um die es gerade geht
     markHexes(opts.tutHl, 'tut');
+    // 4c Machtringe der Armeen, unter dem Armeesymbol
+    if (opts.power) powerRings(world, S2, opts.power, 'armee');
     // 5 Armeen
     S2.armies.forEach(a => {
       const [x, y] = hexCenter(a.r, a.c, HEX);
@@ -290,6 +450,8 @@ function drawMap(svg, map, opts) {
           cx: x, cy: y + 15, r: 3, fill: civ.color, 'pointer-events': 'none'
         }));
     });
+    // 5b Machtringe der Städte – außen um die Stadtscheibe, Striche und Wunder darüber
+    if (opts.power) powerRings(world, S2, opts.power, 'stadt');
     // 6 Städte
     S2.cities.forEach(ct => {
       const [x, y] = hexCenter(ct.r, ct.c, HEX);
@@ -345,14 +507,29 @@ function attachTaps(svg, onTap) {
 
 /* ------------------------------------------------------------------ Spielansicht */
 function currentMap() { return customMap || DEFAULT_MAP; }
+/* Wessen Erträge zeigt die Ertragsansicht? Wer am Zug ist – während Bots ziehen, der
+   Mensch, der zuschaut (sonst sprängen die Zahlen mit jedem Bot um). */
+function viewerOf(S2) {
+  if (P(S2).kind !== 'bot') return S2.cur;
+  const m = S2.players.findIndex(p => p.kind === 'human' && !p.dead);
+  return m >= 0 ? m : S2.cur;
+}
 function redraw() {
   if (ui.army && !S.armies.includes(ui.army)) ui.army = null;
+  const p = P(S), civ = civOf(p);
+  const human = p.kind !== 'bot' && !S.over;
+  if (!human && ui.mode === 'found') ui.mode = null;     // Gründen gibt es nur im eigenen Zug
   const highlight = ui.army ? [...armyReach(S, ui.army).keys()].map(unkey) : [];
+  const gruenden = ui.mode === 'found';
   drawMap($('map'), S.map, {
     state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : null,
-    turn: P(S).kind === 'bot' ? -1 : S.cur,
+    turn: p.kind === 'bot' ? -1 : S.cur,
+    yields: showYields || gruenden ? viewerOf(S) : null,
+    found: gruenden ? S.cur : null,
+    power: ui.powerView ? powerView(S) : null,
   });
-  const p = P(S), civ = civOf(p);
+  $('a-found').classList.toggle('on', gruenden);
+  $('a-yields').classList.toggle('on', showYields);
   $('hud-sym').textContent = SYM[civ.sym];
   $('hud-sym').style.borderColor = civ.color;
   // Neben dem Reichsnamen steht die Fähigkeit – ausgelost oder gewählt, hier sieht man,
@@ -374,15 +551,41 @@ function redraw() {
   $('hud-sci').textContent = p.res.sci;
   $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
   $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
-  const human = p.kind !== 'bot' && !S.over;
-  ['a-tech', 'a-power', 'a-army', 'a-end'].forEach(id => $(id).disabled = !human);
+  ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end'].forEach(id => $(id).disabled = !human);
+  // „Erträge" ist reine Ansicht: immer bedienbar, auch im Tutorial und während Bots ziehen
+  $('a-yields').disabled = false;
   if (ui.tut) {
     const bar = tutAllow().bar;
-    ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].forEach(id =>
-      $(id).disabled = !human || (bar ? !bar.includes(id) : true));
+    TUT_BAR.forEach(id => $(id).disabled = !human || (bar ? !bar.includes(id) : true));
     renderTutPanel();
   }
   saveGame();
+}
+/* Die Knöpfe der Leiste, die das Tutorial an seine Schienen bindet (alle außer „Erträge"). */
+const TUT_BAR = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'];
+/* Ertragsansicht an/aus – je Gerät gemerkt. */
+let showYields = !!load('hochciv.yields');
+function toggleYields() {
+  showYields = !showYields;
+  store('hochciv.yields', showYields || null);
+  if (S && $('screen-game').classList.contains('show')) redraw();
+}
+/* Gründungsmodus an/aus (v75). Stadtgründung ist eine eigene Aktion der Leiste: an, zeigt
+   die Karte Erträge und Kosten; ein Tipp auf ein Feld öffnet das Gründungsblatt. */
+function toggleFoundMode() {
+  if (!S || S.over || P(S).kind === 'bot') return;
+  const an = ui.mode !== 'found';
+  ui.mode = an ? 'found' : null;
+  if (an) ui.army = null;
+  closeSheet();
+  redraw();
+  if (an) toast(T('Feld für die neue Stadt antippen'));
+}
+/* Andere Aktionen der Leiste beenden den Gründungsmodus. */
+function endFoundMode() {
+  if (ui.mode !== 'found') return;
+  ui.mode = null;
+  if (S) redraw();
 }
 
 /* Beim Start eines normalen Spiels darf kein Tutorial-Panel stehen bleiben. */
@@ -394,31 +597,55 @@ function endTutorialPanel() {
 }
 function tapHex(r, c) {
   if (S.over || P(S).kind === 'bot') return;
+  ui.powerView = false;                 // ein Feld antippen beendet die Machtansicht
   if (ui.army) {
     if (ui.tut && !tutMoveOk(r, c)) return toast(T('Im Tutorial: ziehe die Armee auf das goldene Feld.'));
     const e = moveArmy(S, ui.army, r, c);
     if (e) { toast(e); } else { ui.army = null; ui.sel = [r, c]; redraw(); return; }
   }
-  ui.sel = [r, c]; redraw(); openTile(r, c);
+  ui.sel = [r, c]; redraw();
+  if (ui.mode === 'found') foundSheet(r, c); else openTile(r, c);
 }
 function mp(a) { return 'Bewegung ' + String(a.mp).replace('.', ','); }
 const Y_ICON = ['🔬', '🌾', '🪙'];
 const fmtY = y => y.map((n, i) => n + Y_ICON[i]).join(' ');
 const fmtGain = g => [g.sci, g.food, g.coins]
   .map((n, i) => (n > 0 ? '+' : '') + n + Y_ICON[i]).join(' ');
-/* Was eine Stadt auf diesem Feld dem Reich einbrächte – nur dann, wenn hier auch
-   wirklich gegründet werden kann. Sonst ist die Zahl eine Antwort auf eine Frage, die
-   sich gar nicht stellt, und der Grund („Nicht auf Meer") steht ohnehin schon am
-   Knopf „Stadt gründen".
+/* Was eine Stadt auf diesem Feld dem Reich einbrächte – nur dort, wo der Platz taugt
+   (foundSiteError). Fehlt bloß die Nahrung, steht der Ertrag trotzdem da: gerade dann
+   will man wissen, ob sich das Sparen lohnt. Wo gar nicht gegründet werden kann, wäre
+   die Zahl eine Antwort auf eine Frage, die sich nicht stellt.
    Der Wert kommt aus settleGain: Umland, Fähigkeiten, Wunder und der eine mitessende
    Bevölkerungspunkt sind darin verrechnet, überlappendes Umland zählt nicht doppelt. */
 function settleFact(r, c) {
   const pi = S.cur;
-  if (canFound(S, pi, r, c)) return '';
+  if (foundSiteError(S, pi, r, c)) return '';
   const g = settleGain(S, pi, r, c);
   return `<div class="tile-facts">
     <span class="fact"><span class="fact-k">${T('Ertrag beim Siedeln')}</span>
       <span class="fact-v">${fmtGain(g)}</span></span></div>`;
+}
+/* Gründungsblatt (v75): im Gründungsmodus öffnet ein Feld dieses Blatt statt des
+   Feldblatts – Kosten, Ertrag beim Siedeln und der Knopf „Hier gründen". Geht es nicht,
+   steht der Grund am gesperrten Knopf. Nach dem Gründen endet der Modus. */
+function foundSheet(r, c) {
+  const pi = S.cur, t = terrainAt(S, r, c);
+  if (!t || isOff(t)) return closeSheet();
+  const cost = foundCost(S, pi, r, c), err = canFound(S, pi, r, c);
+  const id = 'hier' + Math.random().toString(36).slice(2, 6);
+  sheet(`<h3>${T('Stadt gründen')} · ${TERRAIN[t].name}</h3>
+    <p class="sub">${T('Feld %s/%s · Ertrag', r, c)} ${fmtY(tileYieldAt(S, pi, r, c))}</p>` +
+    settleFact(r, c) +
+    `<button class="opt" id="${id}" data-label="Hier gründen" ${err ? 'disabled' : ''}>` +
+    `<span>${T('Hier gründen')}<small>${err || T('Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)')}</small></span>` +
+    `<span class="cost">${cost === Infinity ? '—' : cost + '🌾'}</span></button>`);
+  if (ui.tut) tutGateSheet(r, c);
+  $(id).onclick = () => {
+    const e = foundCity(S, pi, r, c);
+    if (e) return toast(e);
+    ui.mode = null;
+    closeSheet(); redraw();
+  };
 }
 function openTile(r, c) {
   const pi = S.cur, p = P(S);
@@ -447,8 +674,12 @@ function openTile(r, c) {
     if (e) toast(e); else redraw();
     openTile(r, c);
   };
+  // Gegründet wird seit v75 über „Stadt gründen" in der Leiste, nicht mehr hier. Taugt
+  // das Feld als Platz, sagt ein Satz, wo es langgeht.
   let head = `<h3>${TERRAIN[t].name}</h3><p class="sub">${T('Feld %s/%s · Ertrag', r, c)} `
-    + fmtY(tileYieldAt(S, pi, r, c)) + '</p>' + settleFact(r, c);
+    + fmtY(tileYieldAt(S, pi, r, c)) + '</p>' +
+    (!city && !army && !foundSiteError(S, pi, r, c)
+      ? `<p class="sub">${T('Hier ließe sich eine Stadt gründen – über „Stadt gründen" in der Leiste.')}</p>` : '');
 
   if (city) {
     const owner = civOf(S.players[city.owner]);
@@ -502,10 +733,6 @@ function openTile(r, c) {
       btn('Diese Armee bewegen', T('erreichbare Felder werden markiert'), '',
         () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
   } else {
-    const cost = foundCost(S, pi, r, c), ferr = canFound(S, pi, r, c);
-    const costLabel = cost === Infinity ? '—' : `${cost}🌾`;
-    btn('Stadt gründen', ferr || T('Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)'), costLabel,
-      () => { const e = foundCity(S, pi, r, c); e ? toast(e) : redraw(); closeSheet(); }, !!ferr);
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
       btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, `${COLONY_COST}🪙`,
@@ -559,6 +786,7 @@ function doRoad(r, c, ziel) {
 }
 
 function armySheet() {
+  endFoundMode();
   const pi = S.cur, mine = armiesOf(S, pi);
   if (!mine.length)
     return sheet(`<h3>${T('Deine Armeen')}</h3><p class="sub">${T('Du hast noch keine. Eigene Stadt antippen → Armee bauen (%s Münzen).', armyCost(S, pi))}</p>`);
@@ -684,6 +912,7 @@ function techBoardHTML(S, pi, opts) {
   return grid;
 }
 function techModal() {
+  endFoundMode();
   const pi = S.cur, p = P(S);
   // Nur die kleine Legende mit zwei Beispielmarken – der erklärende Absatz darüber ist
   // raus, er stand in jeder Ansicht im Weg.
@@ -758,24 +987,28 @@ function techModal() {
   });
 }
 function powerSheet() {
+  endFoundMode();
   // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
   const pi = S.cur, price = powerPrice(S, pi);
   const maxN = Math.floor(available(S, pi, 'coins', payOpts(S, pi)) / price);
   let h = `<h3>${T('Macht kaufen')}</h3><p class="sub">` +
     T('%s Münzen = 1 Macht · aktuell %s Macht. Zu Zugbeginn verlierst du %s davon.',
       price, P(S).power, has(P(S), 'panzer') ? '1/4' : has(P(S), 'stahl') ? '1/3' : '1/2') +
-    (payOpts(S, pi).foodOk ? ' ' + T('Bürgerkrieg: auch mit Nahrung zahlbar.') : '') + '</p>';
+    (payOpts(S, pi).foodOk ? ' ' + T('Bürgerkrieg: auch mit Nahrung zahlbar.') : '') + '</p>' +
+    // Machtansicht (v75): solange dieses Blatt offen ist, tragen Städte und Armeen Ringe
+    `<p class="sub power-legend">${T('Ringe auf der Karte, ein Teilstück je Punkt: in der Farbe des Besitzers seine Verteidigung bzw. sein Machtwert, in fremder Farbe der Angriff bzw. die Flankierer. Überwiegt ein fremder Anteil, läuft die Belagerung bzw. fällt die Armee – bei Gleichstand hält der Verteidiger. Über %s Punkte nur noch als Anteil.', RING_MAX_PUNKTE)}</p>`;
   [1, 5, maxN].forEach((n, i) => {
     if (n <= 0 || (i === 2 && maxN <= 5)) return;
     h += `<button class="opt" data-n="${n}" data-label="+${n} Macht"><span>${T('+%s Macht', n)}${i === 2 ? `<small>${T('alles ausgeben')}</small>` : ''}</span>
       <span class="cost">${n * price}🪙</span></button>`;
   });
   if (maxN <= 0) h += `<p class="sub">${T('Nicht genug Münzen.')}</p>`;
-  sheet(h);
+  sheet(h, { power: true });
+  if (!ui.powerView) { ui.powerView = true; redraw(); }
   $('sheet-body').querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
     const e = buyPower(S, S.cur, +b.dataset.n);
     if (e) toast(e);
-    redraw(); powerSheet();
+    redraw(); powerSheet();             // die Ringe zeigen gleich den neuen Machtwert
   });
 }
 /* Protokollzeilen als HTML. Die Würfe, die zu einer Aktion geführt haben, hängen als
@@ -1870,8 +2103,10 @@ function boot() {
     startGameScreen();
   };
   $('a-tech').onclick = techModal;
+  $('a-found').onclick = toggleFoundMode;
   $('a-power').onclick = powerSheet;
   $('a-army').onclick = armySheet;
+  $('a-yields').onclick = toggleYields;
   $('a-info').onclick = worldModal;
   $('hud-feed').onclick = () => { if (P(S).kind !== 'bot' && !S.over) foodSheet(); };
   $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };

@@ -148,11 +148,11 @@ const TUT_STEPS = [
   },
   {
     t: T('Die zweite Stadt'),
-    html: () => T('<p>Es wird Zeit zu expandieren. Auf dem golden umrandeten Feld zu siedeln kostet insgesamt <b>4 Nahrung</b> – 1 Basiskosten für die erste zusätzliche Stadt plus 3 Distanzkosten für den Weg dorthin von der Hauptstadt aus.</p> <p><b>So gründest du:</b> goldenes Feld antippen → im Blatt auf <b>Stadt gründen</b>.</p>'),
+    html: () => T('<p>Es wird Zeit zu expandieren. Auf dem golden umrandeten Feld zu siedeln kostet insgesamt <b>4 Nahrung</b> – 1 Basiskosten für die erste zusätzliche Stadt plus 3 Distanzkosten für den Weg dorthin von der Hauptstadt aus.</p> <p><b>So gründest du:</b> unten auf <b>Stadt gründen</b> → das goldene Feld antippen → <b>Hier gründen</b>. Solange der Gründungsmodus läuft, steht auf jedem möglichen Feld, was die Stadt dort kostet.</p>'),
     kurz: () => T('<p>Gründen kostet <b>Basiskosten + Distanz</b> zur Hauptstadt: hier 1 + 3 = 4 Nahrung. Die Basiskosten steigen 1/3/6/10/…</p>'),
-    task: T('Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.'),
+    task: T('Tippe unten auf <b>Stadt gründen</b>, dann auf das <b>goldene Feld</b> und auf <b>Hier gründen</b>.'),
     hl: () => [TUT_CITY_1],
-    allow: { bar: [], labels: [/Stadt gründen/], hex: () => [TUT_CITY_1] },
+    allow: { bar: ['a-found'], labels: [/Hier gründen/], hex: () => [TUT_CITY_1] },
     goal: () => !!cityOn(...TUT_CITY_1),
     auto: () => foundCity(S, RU(), ...TUT_CITY_1),
   },
@@ -225,9 +225,9 @@ const TUT_STEPS = [
     html: () => T('<p>Die dritte Stadt kostet mehr: <b>6 Nahrung</b> (3 Basiskosten plus 3 Distanzkosten). Die Basiskosten steigen mit jeder gesiedelten Stadt: 1 / 3 / 6 / 10. Ausbreitung wird immer teurer.</p>'),
     kurz: () => T('<p>Dritte Stadt: 3 Basiskosten + 3 Distanz = 6 Nahrung.</p>'),
     enter: () => { ui.tutSpot2 = tutSpot(TUT_CITY_2); },
-    task: T('Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.'),
+    task: T('Tippe unten auf <b>Stadt gründen</b>, dann auf das <b>goldene Feld</b> und auf <b>Hier gründen</b>.'),
     hl: () => [ui.tutSpot2 || TUT_CITY_2],
-    allow: { bar: [], labels: [/Stadt gründen/], hex: () => [ui.tutSpot2 || TUT_CITY_2] },
+    allow: { bar: ['a-found'], labels: [/Hier gründen/], hex: () => [ui.tutSpot2 || TUT_CITY_2] },
     goal: () => {
       const sp = ui.tutSpot2 || TUT_CITY_2;
       const c = cityOn(...sp);
@@ -414,9 +414,9 @@ const TUT_STEPS = [
     html: () => T('<p>Auch die 12 Nahrung sollen nicht verfallen. Eine vierte Stadt kostet <b>9 Nahrung</b> – 6 Basiskosten bei drei bestehenden Städten plus Weg. Teuer, aber es ist die einzige Ausgabe, die dauerhaft etwas zurückgibt.</p> <p><b>Warum dieses Feld?</b> Ringsum liegen 4 × Grasland, 1 × Gebirge, 1 × Meer, das bringt <b>+7 🔬, +4 🌾, +3 🪙</b> je Runde. Es liegt südlich deiner Hauptstadt, also im Rücken – weg von der griechischen Grenze, wo gerade gekämpft wird. </p> <div class="tut-key"><b>Merke</b> Vier Städte sind fast immer besser als zwei große: jede bringt eigene Felder, wächst billiger und verteilt das Risiko. Die Basiskosten steigen zwar (1/3/6/10), aber sie sind einmalig – der Ertrag bleibt.</div>'),
     kurz: () => T('<p>Vierte Stadt: Basiskosten 6 + Distanz 3 = 9 Nahrung.</p>'),
     enter: () => { ui.tutSpot3 = tutSpot(TUT_CITY_3); },
-    task: T('Tippe das <b>goldene Feld</b> an und wähle <b>Stadt gründen</b>.'),
+    task: T('Tippe unten auf <b>Stadt gründen</b>, dann auf das <b>goldene Feld</b> und auf <b>Hier gründen</b>.'),
     hl: () => [ui.tutSpot3 || TUT_CITY_3],
-    allow: { bar: [], labels: [/Stadt gründen/], hex: () => [ui.tutSpot3 || TUT_CITY_3] },
+    allow: { bar: ['a-found'], labels: [/Hier gründen/], hex: () => [ui.tutSpot3 || TUT_CITY_3] },
     goal: () => {
       const c = cityOn(...(ui.tutSpot3 || TUT_CITY_3));
       return !!c && c.owner === RU();
@@ -511,7 +511,7 @@ const TUT_LOOK_ONLY = { bar: ['a-info', 'a-log'], labels: [], hex: () => [], tec
    an den Schienen vorbei. */
 function tutAllow() {
   const st = tutStep();
-  if (!st) return { bar: ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
+  if (!st) return { bar: ['a-tech', 'a-found', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
   if (!st.allow || (st.goal && st.goal())) return TUT_LOOK_ONLY;   // Leseschritt oder erledigt
   return Object.assign({ bar: [], labels: [], techs: [] }, st.allow);
 }
@@ -626,7 +626,7 @@ function tutMove(d) {
   if (d > 0 && !tutDone()) return;
   ui.tut.i = Math.max(0, Math.min(tutList().length - 1, ui.tut.i + d));
   ui.tut.max = Math.max(ui.tut.max || 0, ui.tut.i);
-  ui.army = null;
+  ui.army = null; ui.mode = null;       // auch ein offener Gründungsmodus endet mit dem Schritt
   tutEnter();
   redraw();
   const sc = $('tut-panel').querySelector('.tut-scroll');

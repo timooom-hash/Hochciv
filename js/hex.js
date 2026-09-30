@@ -29,6 +29,14 @@ function hexDistance(r1, c1, r2, c2) {
   const a = toCube(r1, c1), b = toCube(r2, c2);
   return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
 }
+/* Liegen a und b einander gegenüber, gespiegelt an m? In Würfelkoordinaten heißt das
+   genau a + b = 2·m – auf allen drei Achsen, in jeder Entfernung. (Bis v74 wurde in
+   Zeile/Spalte gespiegelt. Im versetzten Raster stimmt das nur waagerecht: die beiden
+   Diagonalen paarten Felder derselben Seite, etwa Nordost mit Südost.) */
+function hexOpposite(mr, mc, ar, ac, br, bc) {
+  const m = toCube(mr, mc), a = toCube(ar, ac), b = toCube(br, bc);
+  return a[0] + b[0] === 2 * m[0] && a[1] + b[1] === 2 * m[1] && a[2] + b[2] === 2 * m[2];
+}
 // Ring mit Radius n um ein Feld (inkl. aller Felder mit Distanz <= n, ohne Zentrum)
 function within(r, c, n) {
   const out = [];

@@ -1124,8 +1124,52 @@ function foundPassable(S, pi, r, c, opts) {
 function foundDistance(S, pi, r, c) {
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
   if (!cap) return 0;
+  const tab = foundTable(S, pi, cap, '');
+  if (tab) return tableSteps(tab, cap, r, c);
   const fremd = foreignTerritory(S, pi);
   return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd }));
+}
+/* Wegtabelle für den Gründungsmodus (v75). Die Oberfläche fragt dort JEDES Feld der
+   Karte ab – je Feld zwei bis vier Wegsuchen von der Hauptstadt, auf der großen Karte gut
+   50 ms je Zeichnen. Innerhalb von withFoundTable rechnet eine einzige Breitensuche je
+   Hindernisart die Tiefen aller erreichbaren Felder vor; foundDistance und
+   foundBlockReason lesen daraus. Die Regeln bleiben, wo sie sind (foundPassable,
+   foundSiteError, foundCost) – test.js vergleicht beide Wege Feld für Feld.
+   Die Entfernung zu einem Ziel ist dieselbe wie bei pathSteps: das Ziel selbst muss
+   nicht passierbar sein, es genügt ein erreichter Nachbar (Tiefe + 1). */
+let FOUND_SCOPE = null;
+function withFoundTable(S, pi, fn) {
+  const prev = FOUND_SCOPE;
+  FOUND_SCOPE = { S, pi, tabs: {} };
+  try { return fn(); } finally { FOUND_SCOPE = prev; }
+}
+function foundTable(S, pi, cap, frei) {
+  const sc = FOUND_SCOPE;
+  if (!sc || sc.S !== S || sc.pi !== pi) return null;
+  if (sc.tabs[frei]) return sc.tabs[frei];
+  const fremd = foreignTerritory(S, pi);
+  const tiefe = new Map([[key(cap.r, cap.c), 0]]);
+  let front = [[cap.r, cap.c]], d = 0;
+  while (front.length && d < 200) {                 // dieselbe Grenze wie pathSteps
+    d++;
+    const next = [];
+    for (const [r, c] of front) for (const [nr, nc] of neighbors(r, c)) {
+      const k = key(nr, nc);
+      if (tiefe.has(k) || !foundPassable(S, pi, nr, nc, { fremd, frei: frei || undefined })) continue;
+      tiefe.set(k, d); next.push([nr, nc]);
+    }
+    front = next;
+  }
+  return (sc.tabs[frei] = tiefe);
+}
+function tableSteps(tiefe, cap, r, c) {
+  if (cap.r === r && cap.c === c) return 0;
+  let best = null;
+  for (const [nr, nc] of neighbors(r, c)) {
+    const t = tiefe.get(key(nr, nc));
+    if (t != null && (best == null || t + 1 < best)) best = t + 1;
+  }
+  return best;
 }
 /* Warum gibt es keinen Weg? Nur für die Meldung, und die soll stimmen: „dafür fehlt
    Navigation" ist falsch, wenn ein Vulkan im Weg liegt, und „das Gelände sperrt" ist
@@ -1136,8 +1180,11 @@ function foundBlockReason(S, pi, r, c) {
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
   if (!cap) return 'gelaende';
   const fremd = foreignTerritory(S, pi);
-  const gehtOhne = frei =>
-    pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd, frei })) != null;
+  const gehtOhne = frei => {
+    const tab = foundTable(S, pi, cap, frei);          // im Gründungsmodus vorgerechnet
+    if (tab) return tableSteps(tab, cap, r, c) != null;
+    return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd, frei })) != null;
+  };
   if (gehtOhne('wasser')) return 'wasser';
   if (gehtOhne('gebiet')) return 'gebiet';
   return 'gelaende';
@@ -1171,7 +1218,19 @@ function enemyArmyAdjacent(S, pi, r, c) {
     return a && a.owner !== pi;
   });
 }
+/* Darf hier gegründet werden? In zwei Teilen (v75): foundSiteError prüft den Platz –
+   alles außer der Nahrung –, canFound zusätzlich, ob die Nahrung diesen Zug reicht. Der
+   Gründungsmodus der Oberfläche braucht die Trennung: ein Platz, der nur an der Nahrung
+   scheitert, zeigt seine Kosten (rot), einer, der grundsätzlich nicht geht, wird
+   abgeblendet. Die Prüfungen selbst und ihre Reihenfolge sind unverändert. */
 function canFound(S, pi, r, c) {
+  const err = foundSiteError(S, pi, r, c);
+  if (err) return err;
+  const cost = foundCost(S, pi, r, c);
+  if (available(S, pi, 'food') < cost) return T('Zu wenig Nahrung (%s nötig).', cost);
+  return null;
+}
+function foundSiteError(S, pi, r, c) {
   const t = terrainAt(S, r, c);
   if (!t || isOff(t)) return T('Kein Feld.');
   if (!TERRAIN[t].land) return T('Nicht auf Meer.');
@@ -1187,8 +1246,6 @@ function canFound(S, pi, r, c) {
     return T('Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.');
   }
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return T('Mindestens 3 Felder Abstand zu allen Städten.');
-  const cost = foundCost(S, pi, r, c);
-  if (available(S, pi, 'food') < cost) return T('Zu wenig Nahrung (%s nötig).', cost);
   return null;
 }
 function foundCity(S, pi, r, c) {
@@ -1459,6 +1516,56 @@ function defenseValue(S, city) {
   if (helpers) d += powerOf(S, oi) * (COMBAT.defenseStacks ? helpers : 1);
   return d;
 }
+/* Flankieren – die Stellung. Aus combatPhase herausgelöst (v75), damit die Machtansicht
+   der Oberfläche dieselbe Regel liest wie der Kampf.
+   Positionen, von denen aus ein Reich flankiert: seine Armeen und – mit Burgenbau – seine
+   Städte (die virtuelle Burgenarmee). Nötig sind zwei davon in Reichweite (1, mit
+   Raketentechnik 2), ohne Taktik gegenüberliegend (am Gegner gespiegelt, hexOpposite).
+   Ob die Armee dann fällt, entscheidet erst der Machtvergleich in combatPhase.
+   v75 behoben: gegenüberliegend wurde in Zeile/Spalte gespiegelt – das trifft im
+   versetzten Raster nur Ost–West. Nordwest–Südost und Nordost–Südwest flankierten nicht,
+   dafür zwei Felder derselben Seite (gerade Zeile Nordost + Südost, ungerade Nordwest +
+   Südwest). */
+function flankSpotsOf(S, pi) {
+  const spots = armiesOf(S, pi).map(a => [a.r, a.c]);
+  if (has(S.players[pi], 'burgenbau')) for (const c of citiesOf(S, pi)) spots.push([c.r, c.c]);
+  return spots;
+}
+function canFlank(S, pi, enemy, spots) {
+  const rng = projectRange(S, pi);
+  const near = (spots || flankSpotsOf(S, pi)).filter(([r, c]) => {
+    const d = hexDistance(r, c, enemy.r, enemy.c);
+    return d >= 1 && d <= rng;
+  });
+  if (near.length < 2) return false;
+  if (has(S.players[pi], 'taktik')) return true;
+  return near.some(([r1, c1]) => near.some(([r2, c2]) =>
+    !(r1 === r2 && c1 === c2) && hexOpposite(enemy.r, enemy.c, r1, c1, r2, c2)));
+}
+/* Die Machtansicht (v75): was bei geöffnetem Machtblatt als Ring auf Städten und Armeen
+   steht. Je Stadt ihr Verteidigungswert und der Angriffswert jedes anderen Reichs, das
+   gerade Armeen in Reichweite hat; je Armee der Machtwert ihres Reichs und der jedes
+   Reichs, das sie gerade flankieren könnte. Dieselben Funktionen wie im Kampf
+   (defenseValue, attackersOn/attackValue, canFlank, powerOf) – eine Momentaufnahme: wer
+   am Zug ist, kann noch Macht kaufen oder ziehen. Tote Reiche zählen nicht. */
+function powerView(S) {
+  const alive = S.players.map((p, i) => i).filter(i => !S.players[i].dead);
+  const spots = {};
+  alive.forEach(i => { spots[i] = flankSpotsOf(S, i); });
+  const cities = S.cities.map(city => ({
+    city, def: defenseValue(S, city),
+    atk: alive.filter(e => e !== city.owner).map(e => {
+      const n = attackersOn(S, e, city).length;
+      return n ? { pi: e, v: attackValue(S, e, n) } : null;
+    }).filter(Boolean),
+  }));
+  const armies = S.armies.map(army => ({
+    army, pow: powerOf(S, army.owner),
+    flank: alive.filter(e => e !== army.owner && canFlank(S, e, army, spots[e]))
+      .map(e => ({ pi: e, v: powerOf(S, e) })),
+  }));
+  return { cities, armies };
+}
 function combatPhase(S, pi) {
   const p = S.players[pi];
   // Wikinger "Beutezüge": Stand vor den Belagerungen festhalten, Auszahlung nächste Runde
@@ -1483,29 +1590,11 @@ function combatPhase(S, pi) {
       S.sieges[sk] = 0;
     }
   }
-  // Flankieren. Positionen, von denen aus flankiert werden kann: eigene Armeen und
-  // – falls Burgenbau erforscht – die eigenen Städte (die virtuelle Burgenarmee).
-  const flankSpots = armiesOf(S, pi).map(a => [a.r, a.c]);
-  if (has(p, 'burgenbau')) for (const c of citiesOf(S, pi)) flankSpots.push([c.r, c.c]);
-  const rng = projectRange(S, pi);
+  // Flankieren: Stellung (canFlank), dann der Machtvergleich.
+  const flankSpots = flankSpotsOf(S, pi);
   for (const enemy of S.armies.slice()) {
     if (enemy.owner === pi) continue;
-    const near = flankSpots.filter(([r, c]) => {
-      const d = hexDistance(r, c, enemy.r, enemy.c);
-      return d >= 1 && d <= rng;
-    });
-    if (near.length < 2) continue;
-    let ok = has(p, 'taktik');
-    if (!ok) {
-      // gegenüberliegend: zwei Felder, deren Richtung vom Gegner sich um 180° unterscheidet.
-      // Mit Raketentechnik zählt auch Distanz 2 auf beiden gegenüberliegenden Seiten.
-      ok = near.some(([r1, c1]) => near.some(([r2, c2]) => {
-        if (r1 === r2 && c1 === c2) return false;
-        const drow = enemy.r - r1, dcol = enemy.c - c1;
-        return r2 === enemy.r + drow && c2 === enemy.c + dcol;   // Punktspiegelung am Gegner
-      }));
-    }
-    if (ok && powerOf(S, pi) > powerOf(S, enemy.owner)) {
+    if (canFlank(S, pi, enemy, flankSpots) && powerOf(S, pi) > powerOf(S, enemy.owner)) {
       S.armies = S.armies.filter(a => a !== enemy);
       log(S, 'fight', T('%s flankiert und zerstört eine Armee von %s.', civOf(p).n, civOf(S.players[enemy.owner]).n));
     }
