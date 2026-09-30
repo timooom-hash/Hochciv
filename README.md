@@ -1,6 +1,6 @@
 # Hochzeivilization – digitale Fassung
 
-Vollständige Regelmaschine mit Bots, Technologiebogen und Karteneditor.
+Vollständige Regelmaschine mit KI-Gegnern (nach den Regeln für Menschen), Bots, Technologiebogen und Karteneditor.
 Läuft als Web-App offline auf dem iPad.
 
 ## Auf GitHub Pages stellen
@@ -30,6 +30,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | Einstellungen | Im Hauptmenü: die Erweiterungsmodule **Ereignisse** und **Weltwunder** zuschalten. Ab Werk sind beide aus und fehlen im Aufbau ganz; eingeschaltet steht dort wieder das Häkchen und entscheidet je Partie |
 | Alternativer Techtree | Häkchen im Aufbau, je Partie, ab Werk aus: andere Kosten in der Antike – Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5 – und in der Forschung der Industrialisierung – Chemie 11, Biologie 12, Wissenschaftliche Methode 15. Sonst nichts – Wirkungen und alle übrigen Preise sind in beiden Techtrees gleich. Der Technologiebogen ordnet die Leitern nach diesen Kosten. Quelle: `ALT_TECH_COSTS` in `js/data.js` |
 | Spielart | „Vier Reiche“, „Drei Reiche“ oder „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) |
+| Mensch / KI / Bot | Je Platz im Aufbau. Die **KI** spielt nach den Regeln für Menschen: sie bezahlt alles, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie, und sie legt ihr Startplättchen verdeckt selbst. Stufe Leicht/Mittel/Schwer für alle KI gemeinsam. **Bots** spielen nach den Bot-Regeln (Würfelproben, Macht = Bevölkerung) und haben ihre eigene Schwierigkeit. Ab Werk sind die Gegner KI |
 | Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen. Bei ausgelostem Reich steht die Fähigkeit zwangsläufig ebenfalls auf Zufall |
 | Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
 | Fähigkeit sehen | Die eigene Fähigkeit steht in der Kopfzeile neben dem Reichsnamen; das Weltblatt (ⓘ) listet alle Reiche mit Fähigkeit und Wirkung |
@@ -51,6 +52,8 @@ sonst behalten installierte Geräte die alte Fassung.
 ## Spielende
 
 Ein **Militärsieg** (fremde Hauptstadt erobert) endet das Spiel auf der Stelle.
+Der **Wirtschaftssieg** verlangt mehr als 2/3 der Weltbevölkerung (im Duell mehr als 3/4,
+mit Theologie oder Vereinten Nationen weniger) und ist in Runde 1 nicht möglich.
 **Wirtschafts-, Forschungs- und Kultursieg** werden angemeldet: die Runde wird noch zu
 Ende gespielt, die Kopfzeile zeigt dann „letzte Runde". Erfüllen mehrere Reiche in
 derselben Runde eine Bedingung, entscheiden am Rundenende Punkte:
@@ -68,9 +71,9 @@ verloren. Gezogen wird einer je Partie, er wechselt also nicht, wenn man das Fen
 noch einmal öffnet. Die Tipps stehen in `TIPS` (`js/data.js`), englisch in
 `DATA_EN.tips` an derselben Stelle der Liste.
 
-Wer **allein gegen Bots** spielt, findet dort außerdem **„Nochmal spielen"**: dieselbe
+Wer **allein gegen KI oder Bots** spielt, findet dort außerdem **„Nochmal spielen"**: dieselbe
 Aufstellung, aber ein ausgelostes Reich samt ausgeloster Fähigkeit – und nach einem Sieg
-eine Stufe schwerer (bei David bleibt es dabei). Auf der Plättchenkarte wird dafür neu
+eine Stufe schwerer (bei Schwer bzw. David bleibt es dabei). Auf der Plättchenkarte wird dafür neu
 gelegt. Zu mehreren Menschen gibt es den Knopf nicht: die Aufstellung gehört dann nicht
 einem allein. Möglich ist das, weil `newGame` die rohe Wahl aus dem Aufbau als `recipe`
 im Spielstand ablegt – Spielstände aus älteren Fassungen haben keines und zeigen nur den
@@ -229,6 +232,7 @@ Im Browser reicht danach ein Neuladen; die alte Fassung räumt der Service Worke
 ```bash
 node test.js     # Regeln gegen die Beispiele aus dem Regelheft
 node smoke.js    # Oberfläche in jsdom durchspielen (braucht: npm install jsdom)
+node tools_ki.js duell 40 diff=david   # Messreihen mit der KI (siehe Kopf der Datei)
 ```
 
 `test.js` rechnet unter anderem die Einkommensbeispiele des Regelhefts nach,
@@ -245,6 +249,7 @@ js/hex.js             Hexraster, Distanzen, Wegsuche
 js/tiles.js           Dreiecksplättchen: Vorrat, Formen, Legephase, Kartenbau
 js/engine.js          Regeln: Einkommen, Aktionen, Kampf, Sieg
 js/bots.js            Bot-Züge nach den Bot-Regeln
+js/ki.js              KI-Züge nach den Regeln für Menschen
 js/ui.js              Karte, Gesten, Aktionsblätter, Editor
 sw.js                 Offline-Cache
 ANNAHMEN.md           wo die Regeln offen sind und wie hier entschieden wurde

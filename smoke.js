@@ -22,7 +22,7 @@ const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 // Im Browser teilen sich <script>-Tags den globalen Gültigkeitsbereich; eval nicht.
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
-const src = ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js', 'js/ui.js']
+const src = ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/tutorial.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
   + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
@@ -30,6 +30,8 @@ const G = n => window.__get(n);
 const CIV_BY_KEY_TEST = k => G('CIV_BY_KEY')[k];
 const CIVS_TEST = () => G('CIVS');
 const SET = (n, v) => window.__set(n, v);
+// Züge ohne Eingabe: Bots und KI (beide laufen über das Blatt mit „Weiter“)
+const AUTO = p => p.kind === 'bot' || p.kind === 'ki';
 // Das Auto-Weiterschalten im Tutorial läuft in der App über setTimeout. Im Test
 // wird die Verzögerung auf 0 gesetzt, damit es synchron und damit prüfbar abläuft.
 SET('TUT_AUTO_MS', 0);
@@ -195,7 +197,7 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
       if (/Zug beenden/.test(t)) {
         $('a-end').onclick();
         let g2 = 0;
-        while (g2++ < 24 && G('P')(G('S')).kind === 'bot' && $('bot-next')) $('bot-next').onclick();
+        while (g2++ < 24 && AUTO(G('P')(G('S'))) && $('bot-next')) $('bot-next').onclick();
         manual++;
       } else if (/Forschen|Wissenschaftliche|null|Mauern|Burgenbau|Technologien|Rad/.test(t)) {
         $('a-tech').onclick();
@@ -483,7 +485,7 @@ step('Armeeübersicht in der Leiste', () => {
 });
 step('Welt-Ansicht zeigt Ereignis und Weltwunder', () => {
   const S = G('S');
-  while (S.players[S.cur].kind === 'bot' && !S.over && $('bot-next')) $('bot-next').onclick();
+  while (AUTO(S.players[S.cur]) && !S.over && $('bot-next')) $('bot-next').onclick();
   if (S.over) return console.log('       Spiel schon entschieden – übersprungen');
   $('a-info').onclick();
   const txt = $('ov-body').textContent.replace(/\s+/g, ' ');
@@ -493,7 +495,7 @@ step('Welt-Ansicht zeigt Ereignis und Weltwunder', () => {
 });
 step('Weltwunder in der Stadt bauen', () => {
   const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
-  if (!cap || S.players[pi].kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  if (!cap || AUTO(S.players[pi])) return console.log('       kein menschlicher Zug – übersprungen');
   S.players[pi].res.coins = 200;
   G('tapHex')(cap.r, cap.c);
   const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Weltwunder bauen/.test(x.textContent));
@@ -511,7 +513,7 @@ step('Weltwunder in der Stadt bauen', () => {
 });
 step('Nahrungsfenster: Bevölkerungskosten aus Münzen bestreiten', () => {
   const S = G('S'), pi = S.cur, p = S.players[pi];
-  if (p.kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  if (AUTO(p)) return console.log('       kein menschlicher Zug – übersprungen');
   p.techs.massenmedien = true;
   // Lage von Hand stellen: Saldo −3, Bevölkerung isst 5
   p.res.coins = 12; p.res.food = 0; p.foodDeficit = 3; p.foodRaw = -3;
@@ -541,7 +543,7 @@ step('Nahrungsfenster: Bevölkerungskosten aus Münzen bestreiten', () => {
 });
 step('Gentechnik: Nahrung im Einkommen UND Füttern 1:1 im Blatt', () => {
   const S = G('S'), p = G('P')(S);
-  if (p.kind === 'bot') return console.log('       kein menschlicher Zug – übersprungen');
+  if (AUTO(p)) return console.log('       kein menschlicher Zug – übersprungen');
   const hatteMM = !!p.techs.massenmedien, hatteGT = !!p.techs.gentechnik;
   /* Ereignisse für die Messung stummschalten: läuft gerade eine Hungersnot, produziert
      niemand Nahrung – dann wäre auch der Gentechnik-Posten korrekt 0 und der Vergleich
@@ -703,20 +705,20 @@ step('Bot-Fenster zeigt Einträge auch bei vollem Log (Bugfix)', () => {
   for (let i = 0; i < 650; i++) G('log')(S, 'roll', 'Füller ' + i);
   if (S.log.length !== 600) throw new Error('Log nicht gekappt');
   $('a-end').onclick();                       // Bots laufen
-  if (S.players[S.cur].kind === 'bot') {
+  if (AUTO(S.players[S.cur])) {
     const lines = $('sheet-body').querySelectorAll('.logline').length;
     if (lines === 0) throw new Error('Bot-Fenster leer trotz Aktionen (der alte Bug)');
     console.log('       Bot-Fenster: ' + lines + ' Zeilen bei vollem Log');
     // die Runde zu Ende klicken
     let g = 0;
-    while (S.players[S.cur].kind === 'bot' && !S.over && g++ < 6 && $('bot-next')) $('bot-next').onclick();
+    while (AUTO(S.players[S.cur]) && !S.over && g++ < 6 && $('bot-next')) $('bot-next').onclick();
   }
 });
 step('Bot-Zug: nur „Weiter" führt weiter (Punkt 5)', () => {
   const S = G('S');
   $('a-end').onclick();                       // menschlichen Zug beenden → Bots laufen
   let guard = 0;
-  while (S.players[S.cur].kind === 'bot' && !S.over && guard++ < 6) {
+  while (AUTO(S.players[S.cur]) && !S.over && guard++ < 6) {
     if (!$('bot-next')) throw new Error('kein Weiter-Knopf im Bot-Sheet');
     if (!G('ui').botLock) throw new Error('Sheet ist während Bot-Zug nicht gesperrt');
     G('closeSheet')();                         // darf nichts bewirken
@@ -729,7 +731,7 @@ step('Zug beenden + Bot-Züge', () => {
   for (let i = 0; i < 8 && !G('S').over; i++) {
     $('a-end').onclick();
     let guard = 0;
-    while (G('S').players[G('S').cur].kind === 'bot' && !G('S').over && guard++ < 6) {
+    while (AUTO(G('S').players[G('S').cur]) && !G('S').over && guard++ < 6) {
       const next = $('bot-next'); if (!next) break; next.onclick();
     }
   }
@@ -2707,6 +2709,134 @@ step('Karteneditor zeigt Felder außerhalb der Karte', () => {
   G('edTap')(0, 0);
   if (G('__get')('editMap').rows[0][0] !== 'G') throw new Error('X lässt sich nicht zurücknehmen');
   G('show')('screen-menu');
+});
+
+/* ================================================ KI (js/ki.js, v77)
+   Dritte Sitzart neben Mensch und Bot. Die KI spielt nach den Regeln für Menschen; hier
+   wird die Oberfläche geprüft: Aufbau, Züge mit „Weiter", Legephase, Englisch und
+   „Nochmal spielen" mit KI-Stufen. */
+const kiAufbau = (mode, kinds, map) => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector(`[data-mode=${mode}]`).onclick();
+  if (map != null) { $('setup-map').value = map; $('setup-map').onchange(); }
+  kinds.forEach((k, i) => $('setup-list').children[i].querySelector(`[data-kind="${k}"]`).onclick());
+};
+step('KI: Aufbau bietet Mensch, KI und Bot – Gegner sind ab Werk die KI', () => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  // frisch zeichnen, damit keine Wahl aus früheren Schritten stehen bleibt
+  $('setup-list').innerHTML = ''; G('renderSlots')();
+  const plaetze = [...$('setup-list').children];
+  const arten = plaetze.map(x => [...x.querySelectorAll('[data-kind]')].map(b => b.dataset.kind).join('/'));
+  if (!arten.every(a => a === 'human/ki/bot')) throw new Error('Sitzarten: ' + arten.join(' | '));
+  const an = plaetze.map(x => x.querySelector('[data-kind].on').dataset.kind);
+  if (an.join(',') !== 'human,ki,ki,ki') throw new Error('Vorgabe ist ' + an.join(','));
+  if ($('setup-kilevel-row').hidden) throw new Error('KI-Stufe fehlt, obwohl KI am Tisch sitzt');
+  if (!$('setup-diff-row').hidden) throw new Error('Bot-Schwierigkeit steht da, ohne dass ein Bot mitspielt');
+  if ($('setup-kilevel').value !== G('KI_DEFAULT_LEVEL')) throw new Error('KI-Stufe ist nicht die Vorgabe');
+  if (plaetze[1].querySelector('[data-abil]').disabled) throw new Error('die KI darf keine Fähigkeit wählen');
+  plaetze[3].querySelector('[data-kind="bot"]').onclick();
+  if ($('setup-diff-row').hidden) throw new Error('mit Bot am Tisch fehlt seine Schwierigkeit');
+  if (!plaetze[3].querySelector('[data-abil]').disabled) throw new Error('Bots bekommen eine Fähigkeit');
+  plaetze.slice(1).forEach(x => x.querySelector('[data-kind="human"]').onclick());
+  if (!$('setup-kilevel-row').hidden || !$('setup-diff-row').hidden)
+    throw new Error('ohne KI und Bots stehen ihre Zeilen noch da');
+  const opt = [...$('setup-start').options].map(o => o.textContent);
+  plaetze[1].querySelector('[data-kind="ki"]').onclick();
+  if (![...$('setup-start').options].some(o => /\(KI\)/.test(o.textContent)))
+    throw new Error('Startspieler-Liste nennt die KI nicht: ' + opt.join(','));
+});
+step('KI: Züge laufen über das Blatt mit „Weiter", dann ist wieder der Mensch dran', () => {
+  kiAufbau('vier', ['human', 'ki', 'ki', 'ki'], '0');
+  $('setup-start').value = '0'; $('setup-start').onchange();
+  $('setup-go').onclick();
+  const S = G('S');
+  if (AUTO(G('P')(S))) throw new Error('das Spiel beginnt nicht beim Menschen');
+  const mensch = S.cur;
+  $('a-end').onclick();
+  let n = 0, titel = '';
+  while (G('P')(G('S')).kind === 'ki' && !G('S').over && n++ < 6) {
+    titel = $('sheet-body').querySelector('h3').textContent;
+    if (!/\(KI\)/.test(titel)) throw new Error('Blatt nennt die KI nicht: ' + titel);
+    if (!G('ui').botLock) throw new Error('Blatt während des KI-Zugs nicht gesperrt');
+    if (!$('bot-next')) throw new Error('kein „Weiter"');
+    // Kartenansichten (v75 des Autors) wie beim Bot-Zug: Erträge aus Sicht des Menschen,
+    // kein Gründungsmodus
+    if (G('viewerOf')(G('S')) !== mensch) throw new Error('beim KI-Zug zählen die Erträge der KI');
+    if (!$('a-found').disabled) throw new Error('„Stadt gründen" ist im KI-Zug frei');
+    $('a-found').onclick();
+    if (G('ui').mode === 'found') throw new Error('Gründungsmodus im KI-Zug');
+    $('bot-next').onclick();
+  }
+  if (!G('S').over && G('P')(G('S')).kind !== 'human') throw new Error('nach den KI-Zügen ist nicht der Mensch dran');
+  const kis = S.players.filter(p => p.kind === 'ki');
+  if (!kis.every(p => Object.keys(p.techs).length)) throw new Error('eine KI hat in ihrem Zug nichts erforscht');
+  if (S.armies.some(a => S.players[a.owner].kind === 'ki' && G('cityAt')(S, a.r, a.c)))
+    throw new Error('eine KI-Armee steht noch in einer Stadt');
+  console.log(`       ${n} KI-Züge · ` + kis.map(p => `${G('civOf')(p).n}: ${Object.keys(p.techs).length} Techs`).join(', '));
+});
+step('KI: in der Legephase legt die KI selbst, gefragt wird nur der Mensch', () => {
+  kiAufbau('duell', ['human', 'ki']);
+  $('setup-go').onclick();
+  const st = G('placeState');
+  if (!st) throw new Error('keine Legephase');
+  if (st.queue.length !== 1) throw new Error(`${st.queue.length} Plätze warten statt einem`);
+  const ki = st.plan.seats.find(seat => st.cfg.players[seat.idx].kind === 'ki');
+  if (!ki || ki.cell == null) throw new Error('die KI hat nicht gelegt');
+  if (!G('placeOptions')(st.plan, ki, ki.o)[ki.cell]) throw new Error('die KI liegt auf einem verbotenen Feld');
+  const seat = G('placeSeatNow')();
+  const rcs = G('slotRC')(st.plan, seat.slot), ok = G('placeOptions')(st.plan, seat, st.o);
+  const i = ok.indexOf(true);
+  G('plTap')(rcs[i][0], rcs[i][1]);
+  G('placeConfirm')();            // aufdecken
+  G('placeConfirm')();            // Spiel beginnen
+  const S = G('S');
+  if (!S || S.cities.length !== 2) throw new Error('das Spiel beginnt nicht mit zwei Hauptstädten');
+  let n = 0;
+  while (AUTO(G('P')(G('S'))) && !G('S').over && n++ < 3 && $('bot-next')) $('bot-next').onclick();
+});
+step('KI: auf Englisch heißen Sitzart, Stufe und Blatt „AI"', () => {
+  G('switchLang')('en');
+  G('clearMissing')();
+  kiAufbau('vier', ['human', 'ki', 'ki', 'bot'], '0');
+  const knoepfe = [...$('setup-list').children[1].querySelectorAll('[data-kind]')].map(b => b.textContent);
+  if (!knoepfe.includes('AI')) throw new Error('Knopf nicht übersetzt: ' + knoepfe.join('/'));
+  const stufen = [...$('setup-kilevel').options].map(o => o.textContent);
+  if (stufen.join(',') !== 'Easy,Medium,Hard') throw new Error('Stufen: ' + stufen.join(','));
+  const zeile = $('setup-kilevel-row').querySelector('span').textContent.trim();
+  if (zeile !== 'AI level (all AI)') throw new Error('Zeile: ' + zeile);
+  $('setup-start').value = '0'; $('setup-start').onchange();
+  $('setup-go').onclick();
+  $('a-end').onclick();
+  let n = 0, titel = '';
+  while (AUTO(G('P')(G('S'))) && !G('S').over && n++ < 6) {
+    const h = $('sheet-body').querySelector('h3').textContent;
+    if (G('P')(G('S')).kind === 'ki') titel = h;
+    $('bot-next').onclick();
+  }
+  if (!/\(AI\)/.test(titel)) throw new Error('Blatt der KI: ' + titel);
+  const fehlt = G('missingStrings')().filter(k => /KI|forscht|greift|verteidigt|flankiert|kauft|baut|gründet|opfert|kopiert|wächst|Rückschau|gratis/.test(k));
+  if (fehlt.length) throw new Error('unübersetzt: ' + fehlt.join(' | '));
+  G('switchLang')('de');
+});
+step('KI: „Nochmal spielen" nach einem Sieg eine KI-Stufe schwerer', () => {
+  kiAufbau('vier', ['human', 'ki', 'ki', 'ki'], '0');
+  $('setup-kilevel').value = 'leicht';
+  $('setup-go').onclick();
+  const S = G('S');
+  const mensch = S.players.findIndex(p => p.kind === 'human');
+  if (S.players.find(p => p.kind === 'ki').kiLevel !== 'leicht') throw new Error('Stufe aus dem Aufbau fehlt');
+  G('claimVictory')(S, mensch, 'Wirtschaftssieg (Test)');
+  let guard = 0;
+  while (!G('S').over && guard++ < 8) G('endTurn')(S);
+  G('gameOver')();
+  const text = $('ov-body').textContent;
+  if (!/schwerer: Mittel/.test(text)) throw new Error('kein Hinweis auf die nächste KI-Stufe: ' + text.slice(0, 160));
+  $('go-again').onclick();
+  const nachher = G('S').players.filter(p => p.kind === 'ki').map(p => p.kiLevel);
+  if (!nachher.every(k => k === 'mittel')) throw new Error('nach dem Sieg: ' + nachher.join(','));
+  console.log('       leicht → Sieg → ' + nachher[0]);
 });
 
 /* CIV_KEYS ist eine gemeinsame Liste, kein frisches Array je Aufruf. Der Aufbau

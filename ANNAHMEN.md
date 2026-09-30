@@ -2628,3 +2628,195 @@ abzählen lässt sich, was klein ist: Armeen und Städte vor der ersten Belageru
 mit Macht 0 ohne Flankierer; Städte behalten immer mindestens eine Bevölkerung und damit
 Verteidigung 1 –, bleibt er leer: nur Innen- und Außenkante in der Farbe des Besitzers.
 Bis v75 war er dann voll, als stünde die Armee in voller Stärke.
+
+## KI: ein Gegner nach den Regeln für Menschen (v77)
+
+Auf Wunsch des Autors: ein Gegner, der die Bots ersetzt und dabei nach den Regeln spielt,
+die zwischen Menschen gelten. Entscheidungen des Autors vor dem Bau: **KI als dritte
+Sitzart neben Mensch und Bot** (Bots bleiben, das Tutorial spielt weiter mit ihnen),
+**Stufen durch Abschwächen der KI** statt durch Ressourcen-Handicap, abgestimmt vor allem
+auf **1 gegen 1 und 3–4 Reiche auf der Plättchenkarte, mit Ereignissen/Weltwundern**.
+
+### Was „nach den Regeln für Menschen" heißt
+
+Bot ist in der Regelmaschine nur eine Sitzart: rund ein Dutzend Stellen fragen
+`kind === 'bot'` ab (Macht = Bevölkerung, keine Fähigkeit, keine Wunderwirkung, immun
+gegen Ereignisse …). Die KI hat die Sitzart `'ki'` und fällt damit überall unter die Regeln
+für Menschen – ohne Änderung an diesen Stellen. Sie bekommt ihre Zivilisationsfähigkeit
+(wählbar im Aufbau wie beim Menschen), zahlt jeden Preis, verliert Macht zu Zugbeginn,
+Ereignisse treffen sie, Wunder wirken für sie.
+
+Handeln kann sie nur über die Funktionen, die auch die Oberfläche benutzt (`foundCity`,
+`growCity`, `doResearch`, `buyPower`, `moveArmy`, `buildRoad`, `copyTech`, `coverPop`, …).
+Schummeln ist damit ausgeschlossen: die Regelmaschine rechnet ihr ab wie einem Menschen.
+Die einzige Stelle, an der sie selbst in den Spielstand schreibt, ist ihr eigener
+Zufallszustand `p.kiRng`.
+
+**Auslegungen:**
+* **Spielende:** Die KI zählt als vollwertiger Spieler (`isHumanPlayer` ist für sie wahr).
+  Melden Mensch und KI in derselben Runde an, entscheiden nur die Punkte. Gegen einen Bot
+  gilt für sie „Mensch vor Bot" genauso wie für Menschen.
+* **Öffentlich** ist, was am Tisch sichtbar wäre: Karte, Städte, Armeen, Macht,
+  Technologien und Verfügbarkeiten. Der Technologiebogen zeigt deshalb auch die
+  Verfügbarkeiten der KI („könnte sie erforschen"), wie bei Menschen.
+* **Nicht verwendet:** künftige Würfe (die KI rechnet auf Kopien mit eigenem Zufallswert),
+  das vorgewürfelte Ereignis der nächsten Runde (`S.evNext`, auch nicht mit dem Orakel),
+  die verdeckten Startplättchen der anderen. `test.js` prüft alle drei (siehe unten).
+
+### Wie sie entscheidet (`js/ki.js`)
+
+1. **Lage** (`kiContext`): geschätzte Restrunden (daraus ein abgezinster Horizont), für
+   jeden Gegner, wohin seine Armeen im nächsten Zug kommen und aus welchen Städten er neue
+   schicken könnte (`kiEnemyInfo`, mit den Reichweiten der Regelmaschine).
+2. **Bewertung** (`kiValue`) eines Spielstands, alles in einer Einheit („eine Wissenschaft
+   Einkommen für eine Runde"): dauerhaftes Einkommen über den Horizont, Bevölkerung, Städte,
+   Technologien samt einer lesbaren Tabelle für Wirkungen jenseits der Erträge
+   (`kiTechBonus`, z. B. Keramik, Rad, Kartografie), erschlossene Zeitalter, Gefahr für die
+   eigenen Städte (`kiRisk`), Aussicht auf Eroberungen (`kiOffense`), Siegansprüche.
+   **Übrige Ressourcen zählen nicht** – sie verfallen am Zugende.
+3. **Gefahr:** je eigener Stadt und Gegner der kleinste und der größte mögliche Angriff am
+   Ende seines nächsten Zuges (größter: neue Armeen und sein ganzes Münzbudget in Macht).
+   Liegt die Verteidigung dazwischen, sinkt die Gefahr mit jedem Punkt, steil nahe am
+   Höchstwert. Läuft schon eine Belagerung, ist der nächste Treffer die Eroberung; sonst
+   zählt, ob man nach einem ersten Treffer genug nachlegen könnte (`kiDefensePotential`).
+   Die Hauptstadt ist so viel wert wie das Spiel (`KI_W.game`).
+4. **Planen** (`kiPlan`): Kandidaten bilden (Forschung, Wachstum, Gründung, Straßen zur
+   Hauptstadt, Wunder, Kopieren, Sklaverei, Kolonialismus, Macht, Angriffs-, Verteidigungs-
+   und Flankenpakete), jeden auf einer **Kopie** mit der echten Regelmaschine ausführen, den
+   **Kampf am Zugende mitrechnen** (`combatPhase` auf der Kopie) und bewerten. Ausgeführt
+   wird die beste Aktion je eingesetzter Ressource; danach wird neu geplant, damit Würfel
+   (Verfügbarkeit nach einer Forschung) und neue Preise einfließen. Voneinander unabhängige
+   Aktionen werden gebündelt.
+5. **Militärpakete:** Angriff (Armeen in Reichweite ziehen, neue bauen, die nötige Macht
+   kaufen), Verteidigung (Armeen und bis zu zwei neue an die Stadt), Flankieren (zwei
+   Positionen gegenüber bzw. mit Taktik beliebig, auch mit neu gebauten Armeen). Eine Armee,
+   die so eine Aufgabe bekommen hat, zieht im selben Zug nicht mehr um.
+6. **Aufstellen** (`kiPositionArmies`): übrige Armeen dorthin, wo sie die Städte schützen
+   oder einen späteren Angriff vorbereiten; keine bleibt in einer Stadt.
+7. **Legen** (`kiPlaceSeat`): jede Lage × erlaubtes Feld nach dem Ertrag im ersten Zug
+   (dieselbe Zahl wie die Ertragsübersicht), die besten acht zusätzlich nach Siedelplätzen
+   auf der sichtbaren Karte.
+
+### Stufen
+
+`KI_LEVELS` (data.js): Leicht, Mittel (Vorgabe), Schwer. Alle drei spielen nach denselben
+Regeln; `KI_PARAMS` (ki.js) regelt Rauschen in der Bewertung, gelegentliche bewusste
+Fehlgriffe, wie ernst Gefahr und Angriffschancen genommen werden, und das Budget an
+Bewertungen je Zug. „Nochmal spielen" erhöht nach einem Sieg die KI-Stufe.
+
+**Gemessen (v77), noch schwach getrennt:** gepaarte Partien (derselbe Startwert zweimal,
+die Stufen tauschen die Plätze): Duell Schwer–Leicht 25 : 15, Mittel–Leicht 22 : 18,
+Schwer–Mittel 19 : 21 (je 40 Partien); zu viert 2× Schwer gegen 2× Leicht 17 : 7 (24).
+Im Duell überdeckt der Startvorteil fast alles: der Startspieler gewann 31 bzw. 32 von 40.
+Die Stufen deutlicher zu trennen ist der nächste Schritt.
+
+### Rechenzeit
+
+Die KI zählt Bewertungen statt Zeit (Budget je Stufe), damit das Ergebnis nicht von der
+Geschwindigkeit des Geräts abhängt. Gemessen in Node über die Messreihen unten (v77):
+Median 18–34 ms je Zug, 90 % unter 140 ms; der längste Zug 1,5 s (drei Reiche, KI gegen
+KI), gegen Bots höchstens 0,6 s. Auf einem iPad ist mit dem Zwei- bis Fünffachen zu
+rechnen (Schätzung, nicht gemessen). Ein Zug mit Luftwaffe und
+16 Armeen dauerte vorher 27 s; zwei Ursachen, beide behoben: `reachable` sortierte seine
+Warteschlange vor jedem Schritt (jetzt Heap, siehe unten), und der Planer bewertete bis zu
+53 Schritte mit je rund hundert Kandidaten (jetzt Bündeln und Budget).
+
+### Stärke (Messungen v77, Plättchenkarte, Stufe Schwer)
+
+| Aufstellung | Partien | KI gewinnt |
+|---|---|---|
+| Duell gegen Bot Prinz, Beginn abwechselnd | 80 | 71 |
+| Duell gegen Bot David | 80 | 38 |
+| 1 KI gegen 3 Bots Prinz, Platz wandert | 48 | 31 (fairer Anteil 12) |
+| 1 KI gegen 3 Bots David | 48 | 9 (fairer Anteil 12) |
+
+Befehle: `node tools_ki.js duell 80 diff=prinz`, `… duell 80 diff=david`,
+`… vier 48 diff=prinz`, `… vier 48 diff=david`. **Berichtigung:** Während der Arbeit
+genannte Zahlen (37/40, 17/40, 21/24, 8/24) stammten aus einem früheren Stand der KI und
+waren nach den letzten Änderungen nicht neu gemessen; schon auf der v74-Grundlage ergab
+`vier 24 diff=prinz` zuletzt 16 statt 21. Gegen David ist die KI zu viert also
+**schwächer** als ein David-Bot, im Duell etwa gleich stark.
+
+Zum Vergleich ein einfaches Skript nach Menschenregeln (wachsen, billigste Forschung,
+siedeln, kein Militär) auf der Originalkarte gegen 3 Bots: 30 von 60 gegen Siedler, 4 von
+60 gegen Prinz, 0 von 60 gegen David.
+
+**Schwächen, die bleiben:** Die KI ist so gut wie ihre Bewertung und ein Zug Vorausschau.
+Kampf rechnet sie exakt, mehrzügige Pläne (einen Angriff drei Züge vorbereiten, Ketten der
+griechischen Rückschau) kaum. Partien KI gegen KI enden früh und meist militärisch (zu
+viert Runde 4–7); ob das an der KI liegt oder an den Regeln, ist offen.
+
+### Auf v76 des Autors aufgesetzt
+
+Gebaut wurde die KI auf v74; während der Arbeit entstanden v75 und v76 des Autors. Die
+KI-Fassung ist darauf aufgesetzt (v77). Was das inhaltlich verlangte:
+
+* **Flankieren „gegenüber":** v75 hat die Spiegelung am Gegner auf Würfelkoordinaten
+  umgestellt (`hexOpposite`, alle drei Achsen). Die KI hatte dieselbe Spiegelung in
+  Zeile/Spalte in ihren Flankenplänen – sie schlug also dieselben falschen Paare vor wie die
+  Bots bis v74 (auf der Diagonale dieselbe Seite statt gegenüber) und fand die richtigen
+  nicht. Weil sie jeden Plan auf einer Kopie samt Kampf nachrechnet, führte sie falsche
+  Paare nicht aus – sie ließ die Flanke nur aus. Jetzt fragt `kiFlankPlans` für jedes Paar
+  `hexOpposite`, dieselbe Regel wie `canFlank` im Kampf.
+* **Kartenansichten und Gründungsmodus:** die neuen Stellen der Oberfläche, die fragen, ob
+  gerade ein Bot zieht (`viewerOf`, `redraw`, `toggleFoundMode`, `tapHex`), fragen jetzt
+  `isAuto`. Im KI-Zug zeigt die Ertragsansicht also die Sicht des Menschen, der
+  Gründungsmodus ist aus und nicht einschaltbar, und das KI-Blatt beendet die Machtringe
+  wie das Bot-Blatt (`sheet` ohne `power`).
+* **Gründen als eigene Aktion:** nur Oberfläche; `foundCity` und `canFound` antworten wie
+  zuvor (der Test des Autors vergleicht das Feld für Feld). Die KI gründet weiter über
+  `foundCity`. Ihre eigene Suche nach Siedelplätzen (eine Breitensuche je Zug) ist jetzt
+  ebenfalls Feld für Feld an die Regel gebunden: gleiche Plätze, gleiche Kosten wie
+  `foundSiteError`/`foundCost`, mit und ohne Kartografie und Navigation.
+
+### Abgesichert
+
+`test.js`, Block „KI": Fähigkeiten, Macht, Ereignisse und Wunder gelten für die KI; neun
+volle Partien (2/3/4 Reiche, Plättchen mit Legephase und feste Karte, mit und ohne
+Erweiterungen, alle Stufen, gemischt mit Bots) enden regulär, ohne Ausnahme, ohne negative
+Ressourcen, ohne Armee in einer Stadt, kein Zug über 2 s; derselbe Startwert ergibt
+dieselbe Partie; der Würfelstrom rückt in KI-Zügen genau um die protokollierten Würfe
+weiter (die Kopien würfeln mit eigenem Wert); `S.evNext` wird nie gelesen (Feld, das beim
+Lesen zählt); die Wahl beim Legen hängt nicht davon ab, wie der Gegner gelegt hat;
+Punktvergleich Mensch gegen KI und KI gegen Bot; Flanke über die Diagonale (Partner
+Nordwest, die zweite Armee geht nach Südost) und jeder Flankenplan aus drei Partien zu
+dritt, auch mit Taktik, steht nach `canFlank`; Siedelplätze der KI = Regel, Feld für Feld.
+Gegenprobe: mit der alten Spiegelung in Zeile/Spalte schlagen beide Flankentests an.
+`smoke.js`: Aufbau mit drei Sitzarten, KI-Züge über das Blatt mit „Weiter" (dabei Erträge
+aus Sicht des Menschen, kein Gründungsmodus), Legephase (nur der Mensch wird gefragt),
+Englisch, „Nochmal spielen" mit KI-Stufe.
+
+## Wirtschaftssieg: mehr als 2/3, nicht in Runde 1 (v77)
+
+Beim Bau der KI aufgefallen, zwei Anweisungen des Autors.
+
+**Mehr als 2/3.** Der Code verlangte für den Standard „mindestens 2/3" (`strict: false`),
+Theologie und Vereinte Nationen dagegen „mehr als". Laut Autor gilt überall „mehr als" –
+so stand es auch schon im Tutorial („mehr als zwei Drittel"). Jetzt `strict: true`; zu
+dritt reichen 4 von 6 also nicht mehr.
+
+**Nicht in Runde 1.** Mit einer Handvoll Bevölkerung auf der Welt reichte dem Startspieler
+eine Gründung und ein Wachstum: im Duell 4 von 5 (mehr als 3/4), zu dritt 4 von 6 (vor der
+ersten Änderung). Der Anspruch blieb gültig, auch wenn die anderen im selben Zug nachzogen.
+Gemessen mit der KI, je 30 Partien KI gegen KI auf der Plättchenkarte: im Duell endeten
+5 in Runde 1 und 2 in Runde 2, zu dritt 3 in Runde 1, zu viert keine. `checkVictory` meldet
+in Runde 1 nichts an, auch nicht bei der Nachprüfung am Rundenende.
+
+**Was bleibt (offener Punkt):** Dasselbe Muster rückt im Duell um eine Runde nach hinten –
+nach der Änderung endeten 5 von 30 KI-Duellen in Runde 2 mit einem Wirtschaftssieg, und
+der Startspieler gewann 18 von 30 Duellen (gemessen auf v77). Zu dritt endete 1 von 30 so in Runde 2, zu
+viert keine.
+
+`test.js`: genau 2/3 reicht nicht, mehr als 2/3 schon; in Runde 1 kein Anspruch, auch nicht
+am Rundenende; ab Runde 2 wie gewohnt. Die Tests zum Rundenende laufen jetzt in Runde 2
+mit 7 von 10 statt 6 von 9 Bevölkerung.
+
+## reachable: Heap statt Sortieren, Passierbarkeit gemerkt (v77)
+
+Reine Beschleunigung, Ergebnis unverändert. Die Warteschlange der Wegsuche (`hex.js`) wurde
+vor jedem Schritt ganz sortiert; jetzt ist sie ein binärer Heap, und `passable` wird je
+Feld nur einmal gefragt (es prüft Städte, Armeen und Kontrollzonen und wurde bis zu sechsmal
+für dasselbe Feld gerufen). Gemessen an 1188 Aufrufen aus echten Partien: 734 → 360 ms.
+`test.js` vergleicht die alte Fassung (wörtlich im Test) mit der neuen an 112 Spielständen
+mit Reichweiten bis 20, Straßen und Eisenbahn: keine Abweichung. Nebenwirkung: `test.js`
+läuft schneller.

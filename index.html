@@ -88,7 +88,11 @@
     <label class="row" id="setup-alttree-row"><span>Alternativer Techtree</span>
       <input type="checkbox" id="setup-alttree"></label>
     <p class="hint" id="setup-alttree-hint" hidden></p>
-    <label class="row"><span>Schwierigkeit (alle Bots)</span>
+    <label class="row" id="setup-kilevel-row"><span>KI-Stufe (alle KI)</span>
+      <select id="setup-kilevel"></select></label>
+    <p class="hint" id="setup-ki-hint">Die KI spielt nach denselben Regeln wie ein Mensch:
+      sie bezahlt alles, hat ihre Zivilisationsfähigkeit, und Ereignisse treffen sie.</p>
+    <label class="row" id="setup-diff-row"><span>Schwierigkeit (alle Bots)</span>
       <select id="setup-diff"></select></label>
     <label class="row"><span>Startspieler*in</span>
       <select id="setup-start"></select></label>
@@ -195,6 +199,7 @@
 <script src="js/engine.js"></script>
 <script src="js/expansion.js"></script>
 <script src="js/bots.js"></script>
+<script src="js/ki.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/ui.js"></script>
 </body>

@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/tutorial.js'])
+for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/tutorial.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -2607,17 +2607,42 @@ const duellKarte = (civA, civB, seed) => {
     players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }],
   });
   const a = capitalOf(S, 0), b = capitalOf(S, 1);
+  S.round = 2;                               // in Runde 1 gibt es keinen Wirtschaftssieg (v77)
   a.pop = 3; b.pop = 1;                     // genau 3/4
   checkVictory(S, 0);
   eq(S.claims.length, 0, 'genau 3/4 reicht nicht (strikt größer)');
   a.pop = 4;                                 // 4/5 > 3/4
   checkVictory(S, 0);
   eq(S.claims.map(c => c.pi), [0], 'über 3/4 wird der Sieg angemeldet');
-  // im Vier-Reiche-Spiel hätte 3/4 schon gereicht
+  // im Vier-Reiche-Spiel hätte 3/4 schon gereicht – dort gilt „mehr als 2/3" (seit v77
+  // strikt wie alle anderen Schwellen; bis v74 genügten genau 2/3)
   const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
-  N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = 2/3
+  N.round = 2;
+  N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = genau 2/3
   checkVictory(N, 0);
-  eq(N.claims.map(c => c.pi), [0], 'ohne Duell genügen 2/3');
+  eq(N.claims.length, 0, 'ohne Duell reichen genau 2/3 nicht mehr (mehr als 2/3, v77)');
+  N.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
+  checkVictory(N, 0);
+  eq(N.claims.map(c => c.pi), [0], 'mehr als 2/3 wird angemeldet');
+}
+/* Kein Wirtschaftssieg in Runde 1 (v77, Anweisung des Autors). Vorher reichte dem
+   Startspieler eine Gründung und ein Wachstum: im Duell 4 von 5, zu dritt 4 von 6 – und
+   der Anspruch blieb, auch wenn die anderen im selben Zug nachzogen. */
+{
+  const S = newGame({ seed: 8, duel: true, map: duellKarte('russland', 'england', 8),
+    players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+  eq(S.round, 1, 'das Spiel beginnt in Runde 1');
+  const a = capitalOf(S, 0), b = capitalOf(S, 1);
+  a.pop = 4; b.pop = 1;                              // 4 von 5 – weit über 3/4
+  checkVictory(S, 0);
+  eq(S.claims.length, 0, 'in Runde 1 wird kein Wirtschaftssieg angemeldet');
+  endTurn(S);                                         // zweiter Spieler
+  eq(S.claims.length, 0, 'auch nicht bei der Nachprüfung am Ende von Runde 1');
+  eq([S.over, S.round], [null, 1], 'das Spiel läuft weiter');
+  endTurn(S);                                         // Runde 2 beginnt
+  eq(S.round, 2, 'Runde 2');
+  checkVictory(S, 0);
+  eq(S.claims.map(c => c.pi), [0], 'ab Runde 2 wie gewohnt');
 }
 /* Eine vollständige 1-gegen-1-Partie Mensch gegen Bot läuft durch */
 {
@@ -4343,10 +4368,15 @@ for (const n of [2, 3, 4]) {
   // Hilfsspiel: vier Menschen in Zugreihenfolge, Startspieler Russland (Index 0),
   // damit die Runde nachvollziehbar bei Russland beginnt und endet.
   const ZUGFOLGE = ['russland', 'griechenland', 'england', 'wikinger'];
-  const mkEnd = () => newGame({
-    seed: 77, wonders: true, startPlayer: 0,
-    players: ZUGFOLGE.map(k => ({ civ: k, kind: 'human' })),
-  });
+  // Es steht in Runde 2: in Runde 1 gibt es keinen Wirtschaftssieg (v77).
+  const mkEnd = () => {
+    const S = newGame({
+      seed: 77, wonders: true, startPlayer: 0,
+      players: ZUGFOLGE.map(k => ({ civ: k, kind: 'human' })),
+    });
+    S.round = 2;
+    return S;
+  };
   eq([mkEnd().startIdx, mkEnd().cur], [0, 0], 'Russland ist Startspieler');
   // --- Punkteformel
   {
@@ -4363,23 +4393,23 @@ for (const n of [2, 3, 4]) {
   // --- Ein Anspruch: die Runde läuft weiter, das Spiel endet am Rundenende
   {
     const S = mkEnd();
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 ≥ 2/3
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
     eq(finishTurn(S), null, 'der Wirtschaftssieg beendet den Zug nicht');
     eq(S.claims.map(c => c.pi), [0], 'er ist aber angemeldet');
-    eq([S.over, S.endRound], [null, 1], 'Ende ist für Runde 1 vorgemerkt');
+    eq([S.over, S.endRound], [null, 2], 'Ende ist für Runde 2 vorgemerkt');
     advanceTurn(S);
-    eq([S.over, S.cur, S.round], [null, 1, 1], 'Griechenland ist regulär am Zug');
+    eq([S.over, S.cur, S.round], [null, 1, 2], 'Griechenland ist regulär am Zug');
     endTurn(S); endTurn(S);                       // Griechenland, England
     eq([!!S.over, S.cur], [false, 3], 'auch die Wikinger kommen noch dran');
     endTurn(S);                                    // Wikinger beenden die Runde
     eq(!!S.over, true, 'am Rundenende ist das Spiel zu Ende');
-    eq([S.over.winner, S.round, S.over.shared], [0, 1, false], 'Russland gewinnt in Runde 1');
+    eq([S.over.winner, S.round, S.over.shared], [0, 2, false], 'Russland gewinnt in Runde 2');
     eq(S.over.how.startsWith('Wirtschaftssieg'), true, 'und zwar mit dem Wirtschaftssieg');
   }
   // --- Verlorene Bedingung schadet dem Anspruch nicht
   {
     const S = mkEnd();
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     finishTurn(S);
     eq(S.claims.length, 1, 'Anspruch steht');
     capitalOf(S, 0).pop = 1;                       // Bedingung fällt weg
@@ -4393,7 +4423,7 @@ for (const n of [2, 3, 4]) {
   {
     const S = mkEnd();
     // Russland: Wirtschaftssieg, wenig Technologien
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     S.players[0].techs = { rad: true };
     finishTurn(S);                                  // Anspruch Russland
     // Griechenland: Forschungssieg, dafür viele Technologien
@@ -4544,7 +4574,7 @@ for (const n of [2, 3, 4]) {
   // --- Militärsieg schlägt jeden angemeldeten Anspruch, sofort
   {
     const S = mkEnd();
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     finishTurn(S);
     eq(S.claims.map(c => c.pi), [0], 'Russland hat angemeldet');
     // Griechenland erobert die russische Hauptstadt
@@ -4562,7 +4592,7 @@ for (const n of [2, 3, 4]) {
     const S = mkEnd();
     // Wikinger (letzter im Zug) melden an; Russland erfüllt die Schwelle erst danach
     claimVictory(S, 3, 'Kultursieg (Weltwunder der Stufe 3)');
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     for (let i = 0; i < 4; i++) endTurn(S);
     eq(S.claims.map(c => c.pi).sort(), [0, 3],
       'Russland kommt am Rundenende noch in den Vergleich');
@@ -4577,7 +4607,7 @@ for (const n of [2, 3, 4]) {
     for (let i = 0; i < 5; i++) if (!S.over) endTurn(S);
     eq(S.over, null, 'ein ausgeschiedenes Reich gewinnt nicht');
     eq([S.endRound, S.claims.length], [null, 0], 'der Anspruch verfällt, das Spiel läuft');
-    eq(S.round >= 2, true, 'und die nächste Runde beginnt');
+    eq(S.round >= 3, true, 'und die nächste Runde beginnt');
   }
   // --- Nur ein Anspruch je Reich, auch bei mehreren Gründen
   {
@@ -4766,7 +4796,7 @@ for (const n of [2, 3, 4]) {
      die Flaggen direkt aus LANGS, ohne T(). Die Zahl darf sinken, nicht steigen. */
   {
     const norm = x => x.replace(/\s+/g, ' ');
-    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ui', 'tutorial']
+    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ki', 'ui', 'tutorial']
       .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8'))
       .concat(fs.readFileSync(__dirname + '/index.html', 'utf8')).join('\n');
     const heu = norm(quellen);
@@ -5020,6 +5050,317 @@ for (const n of [2, 3, 4]) {
   eq(civOf({ civ: 'england', kind: 'human', name: 'England II' }).n, 'England II',
     'gespeicherte Namen ohne Ziffer funktionieren weiter');
   eq(civOf({ civ: 'england', kind: 'human' }).n, 'England', 'ohne beides der normale Name');
+}
+
+/* ===================================== reachable: Heap statt Sortieren (v77)
+   Die Warteschlange war ein Array, das vor jedem Schritt ganz sortiert wurde; jetzt ist sie
+   ein Heap, und passable wird je Feld nur einmal gefragt. Das Ergebnis muss dasselbe sein:
+   verglichen wird mit der alten Fassung (hier wörtlich) an echten Spielständen, mit
+   Reichweiten bis 20 und mit Straßen und Eisenbahn (Kosten 0,5 und 0). */
+{
+  const alt = (startR, startC, budget, passable, edgeCost) => {
+    const dist = new Map();
+    dist.set(key(startR, startC), 0);
+    const queue = [[startR, startC]];
+    const stopped = new Set();
+    while (queue.length) {
+      queue.sort((a, b) => dist.get(key(a[0], a[1])) - dist.get(key(b[0], b[1])));
+      const [r, c] = queue.shift();
+      const d = dist.get(key(r, c));
+      if (d > budget) continue;
+      if (stopped.has(key(r, c)) && !(r === startR && c === startC)) continue;
+      for (const [nr, nc] of neighbors(r, c)) {
+        const pp = passable(nr, nc);
+        if (!pp) continue;
+        const nd = d + edgeCost(r, c, nr, nc);
+        if (nd > budget + 1e-9) continue;
+        const k = key(nr, nc);
+        if (!dist.has(k) || nd < dist.get(k) - 1e-9) {
+          dist.set(k, nd);
+          if (pp === 'stop') stopped.add(k);
+          queue.push([nr, nc]);
+        }
+      }
+    }
+    dist.delete(key(startR, startC));
+    return dist;
+  };
+  const gleich = (a, b) => a.size === b.size && [...a].every(([k, v]) => b.has(k) && Math.abs(b.get(k) - v) < 1e-9);
+  let n = 0, abw = 0;
+  const S = newGame({ seed: 71, players: CIVS.map(c => ({ civ: c.k, kind: 'bot', diff: 'david' })) });
+  // Straßen und Eisenbahn streuen, Schießpulver für Kontrollzonen
+  let z = 7;
+  const rnd = () => { z = (z * 1103515245 + 12345) & 0x7fffffff; return z / 0x7fffffff; };
+  S.players.forEach(p => { p.techs.schiesspulver = true; });
+  for (let runde = 0; runde < 6 && !S.over; runde++) {
+    for (let i = 0; i < 4 && !S.over; i++) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+    for (let i = 0; i < 12; i++) {
+      const r = Math.floor(rnd() * S.map.rows.length), c = Math.floor(rnd() * S.map.rows[0].length);
+      if (isLand(S, r, c)) S.roads[key(r, c)] = 1 + (i % 2);
+    }
+    for (const a of S.armies) for (const mp of [3, 6, 9, 20]) {
+      const pi = a.owner;
+      const pass = (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false;
+      const cost = (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2);
+      n++;
+      if (!gleich(alt(a.r, a.c, mp, pass, cost), reachable(a.r, a.c, mp, pass, cost))) abw++;
+    }
+  }
+  eq([n > 100, abw], [true, 0], `reachable liefert dieselben Felder und Kosten wie die alte Fassung (${n} Vergleiche)`);
+}
+/* ============================================================ KI (js/ki.js, v77)
+   Die KI spielt nach den Regeln für Menschen. Geprüft wird: dass sie das wirklich tut
+   (Fähigkeiten, Macht, Ereignisse, Wunderwirkungen), dass sie in keiner Aufstellung hängen
+   bleibt oder einen ungültigen Zustand hinterlässt, dass sie fair ist (keine Würfel der
+   Partie für ihre Planung, kein Blick auf das vorgewürfelte Ereignis, verdecktes Legen) und
+   dass Partien mit ihr aus demselben Startwert gleich ablaufen. */
+{
+  const kiP = (civ, ability, extra) => Object.assign({ civ, kind: 'ki', ability }, extra || {});
+  // --- Regeln für Menschen, nicht für Bots
+  const S = newGame({ seed: 7, players: [kiP('wikinger', 'basis'), kiP('england', 'basis')] });
+  const wi = S.players.findIndex(p => p.civ === 'wikinger');
+  const en = S.players.findIndex(p => p.civ === 'england');
+  eq(armiesOf(S, wi).length, 1, 'KI-Wikinger bekommen die Gratisarmee – die Fähigkeit gilt');
+  eq(rates(S, en).foodToCoins, 1, 'KI-England tauscht Nahrung 1:1 in Münzen (Handelsreich)');
+  eq(powerOf(S, wi), 0, 'Machtwert der KI ist gekaufte Macht, nicht die Bevölkerung');
+  eq([isAuto(S.players[wi]), isAuto({ kind: 'bot' }), isAuto({ kind: 'human' })], [true, true, false],
+    'KI und Bots ziehen von selbst, Menschen nicht');
+  eq(S.players[wi].kiLevel, KI_DEFAULT_LEVEL, 'ohne Angabe spielt die KI auf der Vorgabestufe');
+  eq(KI_LEVELS.every(l => KI_PARAMS[l.k]), true, 'jede Stufe hat ihre Werte in KI_PARAMS');
+  eq(/\(KI\)/.test(S.log[0].m), true, 'das Protokoll nennt die KI als solche');
+  // Ereignisse treffen die KI, Bots weiter nicht
+  const E = newGame({ seed: 3, events: true, players: [kiP('russland', 'basis'), { civ: 'england', kind: 'bot' }] });
+  const eKi = E.players.findIndex(p => p.kind === 'ki'), eBot = 1 - eKi;
+  E.event = { round: E.round, row: 2, col: 3, k: 'duerre' };
+  eq([evActive(E, eKi, 'duerre'), evActive(E, eBot, 'duerre')], [true, false], 'Ereignisse treffen die KI, Bots nicht');
+  // Wunderwirkungen gelten für die KI
+  const W = newGame({ seed: 4, wonders: true, players: [kiP('griechenland', 'basis'), kiP('england', 'basis')] });
+  W.wonders.push({ k: 'zeus', lvl: 1, owner: 0, cityId: W.cities[0].id, r: W.cities[0].r, c: W.cities[0].c });
+  eq(hasWonder(W, 0, 'zeus') && powerOf(W, 0) === 3, true, 'Wunderwirkungen gelten für die KI (Zeusstatue +3 Macht)');
+  // Die KI zahlt: nach ihrem Zug ist vom Einkommen etwas ausgegeben und das Reich gewachsen
+  const Z = newGame({ seed: 11, players: [kiP('russland', 'basis'), kiP('griechenland', 'basis')] });
+  const z = Z.cur, vorher = popOf(Z, z) + citiesOf(Z, z).length, inc = Object.assign({}, Z.players[z].res);
+  kiTurn(Z, z);
+  eq(popOf(Z, z) + citiesOf(Z, z).length > vorher, true, 'im ersten Zug wächst oder siedelt die KI');
+  eq(Z.players[z].res.food + Z.players[z].res.coins < inc.food + inc.coins, true, '… und bezahlt dafür');
+}
+{
+  // --- Volle Partien: 2, 3 und 4 Reiche, Plättchenkarte mit Legephase und feste Karte,
+  //     mit und ohne Erweiterungen, alle Stufen, alle Fähigkeiten reihum, gemischt mit Bots.
+  //     Nach jedem KI-Zug: keine Armee in einer Stadt (wenn sie herauskönnte), keine
+  //     negativen Ressourcen oder Macht, keine Ausnahme; jede Partie endet regulär.
+  let ended = 0, stuck = [], errs = [], turns = 0, slow = 0, slowest = 0;
+  const civKeys = CIVS.map(c => c.k);
+  for (let g = 0; g < 9; g++) {
+    const np = [2, 3, 4][g % 3];
+    const tiles = g < 6;
+    const players = [];
+    for (let i = 0; i < np; i++) {
+      const c = civKeys[(g + i) % 4];
+      const lv = KI_LEVELS[(g + i) % KI_LEVELS.length].k;
+      players.push((g >= 6 && i === np - 1) ? { civ: c, kind: 'bot', diff: 'prinz' }
+        : { civ: c, kind: 'ki', kiLevel: lv, ability: CIV_BY_KEY[c].abilities[(g + 2 * i) % 3].k });
+    }
+    const cfg = { seed: 600 + g, players, duel: np === 2, events: g % 2 === 0, wonders: g % 3 !== 1, startPlayer: g % np };
+    if (tiles) {
+      const plan = tilePlan(players.map(p => p.civ), 600 + g);
+      const setup = rollSetup(Object.assign({}, cfg));
+      plan.seats.forEach(seat => {
+        const pl = players[seat.idx];
+        if (pl.kind === 'ki') { const e = kiPlaceSeat(plan, seat, pl, setup); if (e) errs.push('Legen: ' + e); }
+        else botPlaceSeat(plan, seat, mapRng(g + 1));
+      });
+      Object.assign(cfg, { map: tileMap(plan), avail: setup.avail, wpool: setup.wpool });
+    } else cfg.map = MAPS[g % 2];
+    const S = newGame(cfg);
+    let guard = 0;
+    while (!S.over && guard++ < 300) {
+      const pi = S.cur, p = S.players[pi];
+      try {
+        if (p.kind === 'ki') {
+          const t0 = Date.now();
+          kiTurn(S, pi);
+          const dt = Date.now() - t0;
+          turns++; slowest = Math.max(slowest, dt); if (dt > 2000) slow++;
+          if (blockingIssues(S, pi).length) stuck.push(`${g}/${S.round}/${p.civ}`);
+          if (['sci', 'food', 'coins'].some(k => p.res[k] < 0) || p.power < 0) errs.push(`negativ ${g}/${S.round}`);
+        } else botTurn(S, pi);
+      } catch (e) { errs.push(`${g}/${S.round}/${p.civ}: ${e.message}`); break; }
+      if (S.over) break;
+      endTurn(S);
+    }
+    if (S.over) ended++;
+  }
+  eq(ended, 9, '9 Partien mit KI enden regulär (2/3/4 Reiche, Plättchen und feste Karte, Erweiterungen)');
+  eq(errs, [], 'keine Ausnahme und keine negativen Ressourcen');
+  eq(stuck, [], 'nach keinem KI-Zug steht eine Armee in einer Stadt, die herauskönnte');
+  eq(slow, 0, `kein KI-Zug über 2 s (${turns} Züge, längster ${slowest} ms)`);
+}
+{
+  // --- Gleicher Startwert, gleiche Partie – auch mit der KI (sie hat einen eigenen,
+  //     im Spielstand gespeicherten Zufall)
+  const lauf = () => {
+    const S = newGame({ seed: 21, players: [
+      { civ: 'griechenland', kind: 'ki', kiLevel: 'leicht', ability: 'rueckschau' },
+      { civ: 'wikinger', kind: 'ki', kiLevel: 'mittel', ability: 'basis' }] });
+    for (let i = 0; i < 10 && !S.over; i++) { kiTurn(S, S.cur); if (S.over) break; endTurn(S); }
+    return JSON.stringify(S.log.map(l => l.m)) + '|' + S.seed;
+  };
+  eq(lauf() === lauf(), true, 'zwei Läufe aus demselben Startwert sind Zeichen für Zeichen gleich');
+}
+{
+  // --- Fair: die KI verbraucht für ihre Planung keine Würfe der Partie. Jeder Wurf der
+  //     Partie hinterlässt eine Würfelzeile (d6 protokolliert immer); ohne Weltwunder (dort
+  //     zieht refillPool ohne Protokoll) rückt S.seed also genau so oft weiter, wie neue
+  //     Würfelzeilen dazukommen. Würde die KI in ihren Kopien den Würfelstrom der Partie
+  //     weiterdrehen oder in die Zukunft schauen, stimmte die Rechnung nicht mehr.
+  const A = 0x6D2B79F5;
+  let inv = A;
+  for (let i = 0; i < 5; i++) inv = Math.imul(inv, 2 - Math.imul(A, inv));
+  const schritte = (vor, nach) => Math.imul((nach - vor) | 0, inv) >>> 0;
+  const S = newGame({ seed: 33, events: true, players: [
+    { civ: 'russland', kind: 'ki', ability: 'siedler' }, { civ: 'england', kind: 'ki', ability: 'basis' },
+    { civ: 'griechenland', kind: 'ki', ability: 'gratistech' }] });
+  let ok = true, zuege = 0;
+  for (let i = 0; i < 12 && !S.over; i++) {
+    const vor = S.seed, seq = S.logSeq;
+    kiTurn(S, S.cur);
+    const wuerfe = S.log.filter(l => l.seq > seq && l.c === 'roll').length;
+    if (schritte(vor, S.seed) !== wuerfe) ok = false;
+    zuege++;
+    if (S.over) break;
+    endTurn(S);
+  }
+  eq(ok, true, `in ${zuege} KI-Zügen rückt der Würfelstrom genau um die protokollierten Würfe weiter`);
+  // Das vorgewürfelte Ereignis der nächsten Runde liest sie nie
+  const E = newGame({ seed: 34, events: true, players: [
+    { civ: 'wikinger', kind: 'ki', ability: 'basis' }, { civ: 'england', kind: 'ki', ability: 'basis' }] });
+  let gelesen = 0;
+  for (let i = 0; i < 4 && !E.over; i++) {
+    const wert = E.evNext;
+    Object.defineProperty(E, 'evNext', { get() { gelesen++; return wert; }, set(v) { }, enumerable: true, configurable: true });
+    kiTurn(E, E.cur);
+    delete E.evNext; E.evNext = wert;
+    if (E.over) break;
+    endTurn(E);
+  }
+  eq(gelesen, 0, 'das vorgewürfelte Ereignis der nächsten Runde bleibt ungelesen');
+  // Verdeckt legen: die Wahl hängt nicht davon ab, wie der andere gelegt hat
+  const wahl = legt => {
+    const plan = tilePlan(['russland', 'england'], 17);
+    if (legt != null) placeSeat(plan, plan.seats[1], legt.o, legt.cell);
+    kiPlaceSeat(plan, plan.seats[0], { civ: 'russland', kind: 'ki', ability: 'basis' }, null);
+    return plan.seats[0].o + '/' + plan.seats[0].cell;
+  };
+  const leer = wahl(null);
+  const probe = tilePlan(['russland', 'england'], 17);
+  const andere = [];
+  for (let o = 0; o < 3; o++) placeOptions(probe, probe.seats[1], o).forEach((v, cell) => { if (v && andere.length < 6) andere.push({ o, cell }); });
+  eq(andere.every(l => wahl(l) === leer), true, 'die KI legt gleich, egal wie der Gegner verdeckt gelegt hat');
+  const plan = tilePlan(['griechenland', 'wikinger', 'russland'], 18);
+  plan.seats.forEach(seat => kiPlaceSeat(plan, seat, { civ: seat.civ, kind: 'ki', ability: 'basis' }, null));
+  eq(plan.seats.every(seat => placeOptions(plan, seat, seat.o)[seat.cell]), true, 'jede KI legt auf ein erlaubtes Feld');
+}
+{
+  // --- Flanke nach der Regel des Kampfes (v77, aufgesetzt auf v75 des Autors): „gegenüber"
+  //     ist die Spiegelung in Würfelkoordinaten (hexOpposite). Erst das Beispiel des
+  //     Bot-Tests über die Diagonale: Partner nordwestlich des Gegners (4/6), gegenüber liegt
+  //     Südost 6/7 – nicht 6/6, wohin die Spiegelung in Zeile/Spalte führte (dieselbe Seite).
+  const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'ki', ability: 'basis' }, { civ: 'england', kind: 'human' }] });
+  S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+  S.cities.length = 0; S.armies.length = 0; S.sieges = {};
+  const stadt = (owner, r, c, pop, cap) => { const x = { id: S.nextId++, owner, r, c, pop, cap, grown: 0, born: -1 }; S.cities.push(x); return x; };
+  const armee = (owner, r, c, mp) => { const x = { id: S.nextId++, owner, r, c, mp, born: -1 }; S.armies.push(x); return x; };
+  const hs = stadt(0, 5, 5, 1, true); stadt(0, 1, 1, 8, false);
+  stadt(1, 5, 16, 6, true);
+  S.players[1].power = 6; S.players[0].power = 0;
+  const feind = armee(1, 5, 6, 0);
+  S.sieges['1|' + hs.id] = 1;
+  armee(0, 4, 6, moveAllowance(S, 0));
+  armee(0, 8, 7, moveAllowance(S, 0));
+  S.cur = 0; S.players[0].res = { sci: 0, food: 0, coins: 80 };
+  const K = kiContext(S, 0);
+  const plaene = kiFlankPlans(S, 0, K, kiStepMemo({})).filter(f => f.tag === 'flank:' + feind.id);
+  eq(plaene.length, 1, 'die KI findet die Flanke über die Diagonale');
+  const X = kiClone(S, 1);
+  eq(plaene[0].run(X), null, '… der Plan läuft durch');
+  eq([!!armyAt(X, 6, 7), !!armyAt(X, 6, 6), canFlank(X, 0, kiArmy(X, feind.id))], [true, false, true],
+    '… stellt die zweite Armee nach Südost (6/7), nicht nach Südwest, und die Stellung flankiert');
+  combatPhase(X, 0);
+  eq(!!kiArmy(X, feind.id), false, '… und die Armee fällt im Kampf');
+}
+{
+  //     Dann an echten Spielständen: jeder Flankenplan der KI endet in einer Stellung, die
+  //     nach canFlank flankiert – mit und ohne Taktik, in Partien zu dritt.
+  let plaene = 0, falsch = [];
+  for (const seed of [81, 82, 83]) {
+    const S = newGame({ seed, players: ['russland', 'england', 'wikinger'].map((c, i) =>
+      ({ civ: c, kind: 'ki', kiLevel: 'schwer', ability: CIV_BY_KEY[c].abilities[i % 3].k })) });
+    for (let z = 0; z < 36 && !S.over; z++) {
+      const pi = S.cur;
+      if (seed === 83 && S.round === 4) S.players.forEach(p => { p.techs.taktik = true; });
+      const K = kiContext(S, pi);
+      for (const f of kiFlankPlans(S, pi, K, kiStepMemo({}))) {
+        const X = kiClone(S, 5), eid = +f.tag.split(':')[1];
+        if (f.run(X)) continue;
+        plaene++;
+        const e = kiArmy(X, eid);
+        if (e && !canFlank(X, pi, e)) falsch.push(`${seed}/${S.round}: ${e.r}/${e.c}`);
+      }
+      kiTurn(S, pi);
+      if (S.over) break;
+      endTurn(S);
+    }
+  }
+  eq([plaene > 0, falsch], [true, []], `jeder Flankenplan der KI steht nach canFlank (${plaene} Pläne)`);
+}
+{
+  // --- Siedelplätze: die KI rechnet Wege und Kosten selbst (eine Breitensuche je Zug). Sie
+  //     muss dieselben Plätze zu denselben Kosten sehen wie die Regel (foundSiteError,
+  //     foundCost) – sonst plant sie Städte, die es nicht gibt, oder übersieht welche.
+  const S = newGame({ seed: 5, players: CIVS.map(c => ({ civ: c.k, kind: 'bot' })) });
+  let guard = 0;
+  while (!S.over && S.round < 6 && guard++ < 200) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+  S.over = null;
+  const abw = [];
+  let plaetze = 0;
+  S.players.forEach((p, pi) => {
+    if (p.dead) return;
+    for (const techs of [[], ['kartografie'], ['navigation']]) {
+      const alt = Object.assign({}, p.techs);
+      techs.forEach(k => { p.techs[k] = true; });
+      const ki = new Map(kiSitesAll(S, pi, kiContext(S, pi)).filter(s => !armyAt(S, s.r, s.c)).map(s => [key(s.r, s.c), s.cost]));
+      S.map.rows.forEach((row, r) => [...row].forEach((t, c) => {
+        const regel = foundSiteError(S, pi, r, c) ? null : foundCost(S, pi, r, c);
+        const k = key(r, c), soll = regel != null && regel < 60 ? regel : null;
+        const ist = ki.has(k) && ki.get(k) < 60 ? ki.get(k) : null;
+        if (soll != null) plaetze++;
+        if (soll !== ist) abw.push(`${p.civ} ${techs.join()} ${k}: Regel ${soll}, KI ${ist}`);
+      }));
+      p.techs = alt;
+    }
+  });
+  eq(abw.slice(0, 3), [], `die KI sieht dieselben Siedelplätze zu denselben Kosten wie die Regel (${plaetze} Plätze)`);
+}
+{
+  // --- Spielende: die KI ist ein vollwertiger Spieler. Gegen einen Bot gilt für sie
+  //     „Mensch vor Bot" wie für Menschen; gegen einen Menschen entscheiden nur die Punkte.
+  const S = newGame({ seed: 40, players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'ki' }] });
+  const m = S.players.findIndex(p => p.kind === 'human'), k = 1 - m;
+  S.players[k].techs = { schrift: true, rad: true, papier: true };
+  claimVictory(S, m, 'Forschungssieg (Test)');
+  claimVictory(S, k, 'Forschungssieg (Test)');
+  S.endRound = S.round;
+  resolveClaims(S);
+  eq(S.over && S.over.winners, [k], 'Mensch und KI melden an: die Punkte entscheiden, hier für die KI');
+  const B = newGame({ seed: 41, players: [{ civ: 'griechenland', kind: 'bot' }, { civ: 'england', kind: 'ki' }] });
+  const bb = B.players.findIndex(p => p.kind === 'bot'), kk = 1 - bb;
+  B.players[bb].techs = { schrift: true, rad: true, papier: true };
+  claimVictory(B, bb, 'Forschungssieg (Test)');
+  claimVictory(B, kk, 'Forschungssieg (Test)');
+  B.endRound = B.round;
+  resolveClaims(B);
+  eq(B.over && B.over.winners, [kk], 'KI und Bot melden an: wie bei Menschen gewinnt die KI');
 }
 
 console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');

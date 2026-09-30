@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 30.9., `sw.js` v76)
+# Hochzeivilization — Projekt-Übergabe (Stand 30.9., `sw.js` v77)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v76)
+## Letzte Sitzungen auf einen Blick (v61 → v77)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -31,13 +31,19 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v74 | Alternativer Techtree zusätzlich: **Chemie 11, Biologie 12, Wissenschaftliche Methode 15** (Forschung, Industrialisierung; Standard 12/15/11) | Regel |
 | v75 | **Erträge** je Feld (Umschalter), **Stadt gründen** als eigene Aktion mit Kostenkarte, **Machtringe** bei offenem Machtblatt; Flankieren „gegenüber" jetzt auf allen drei Achsen (Fehler) | Oberfläche + Fehler |
 | v76 | Machtringe aus **einem Teilstück je Punkt** (Verteidigung 1 gegen Angriff 2 = drei Stücke); über 60 Punkte nur der Anteil, bei 0 Punkten ein leerer Ring | Oberfläche |
+| v77 | **KI** als dritte Sitzart (Mensch / KI / Bot): spielt nach den Regeln für Menschen, drei Stufen, legt ihr Startplättchen selbst (`js/ki.js`). **Wirtschaftssieg „mehr als 2/3" und nicht in Runde 1.** `reachable` mit Heap (gleiches Ergebnis, schneller). Messwerkzeug `tools_ki.js` | KI + Regel + Tempo |
+
+Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitt „KI (v77)" unten,
+ausführlich in `ANNAHMEN.md`) und Punkt 14–16 der offenen Punkte (Wirtschaftssieg in
+Runde 2 im Duell, Stufen der KI noch schwach getrennt, Rechenzeit auf dem iPad nicht
+gemessen).
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
 (Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei), seit v73
 Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstand 2) und
 Punkt 12 (dominiert über alle Lagen oder nur je Lage?), seit v75 Punkt 13 (Bot-Partner
-verlässt die Flanke).
+verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 ## Wo alles liegt
 
@@ -53,7 +59,7 @@ verlässt die Flanke).
   Danach `npm install jsdom --no-fund --no-audit` — für `smoke.js` und `check_single.js` nötig.
   Am besten im **Elternordner** (`cd /home/claude`): Node findet es dort über die
   Verzeichnissuche, und `node_modules` kann gar nicht erst ins Paket rutschen (so in v69).
-- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (31 Dateien),
+- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (33 Dateien),
   `hochzeivilization.zip`, und `hochzeivilization-einzeldatei.html` — Letzteres ist, was der
   Autor tatsächlich aufs iPad lädt.
 - **Wichtig beim Paketieren:** `node_modules` und `package*.json` ausschließen
@@ -65,23 +71,25 @@ verlässt die Flanke).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1191 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1220 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 405 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
-| `js/hex.js` | 117 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable`, `pathSteps` |
+| `js/data.js` | 415 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1814 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` |
+| `js/engine.js` | 1830 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 2216 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/ki.js` | 1444 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ui.js` | 2253 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 5027 | **1399 Assertions**, `node test.js` |
-| `smoke.js` | 2724 | **120 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 5368 | **1435 Assertions**, `node test.js` |
+| `smoke.js` | 2854 | **125 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
+| `tools_ki.js` | 128 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI (`node tools_ki.js duell 40 diff=david` …) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -104,6 +112,15 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **KI (v77).** Dritte Sitzart im Aufbau (Mensch / KI / Bot), ab Werk sind die Gegner KI.
+  Sie spielt nach den Regeln für Menschen – nur über die Aktionen der Regelmaschine, also
+  ohne Möglichkeit zu schummeln –, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie,
+  und sie legt ihr Startplättchen verdeckt selbst. Stufen Leicht/Mittel/Schwer (`KI_LEVELS`
+  in data.js, Werte `KI_PARAMS` in ki.js), gleiche Regeln auf jeder Stufe. Bots gibt es
+  weiter, das Tutorial spielt mit ihnen. Einzelheiten und Messungen in `ANNAHMEN.md`,
+  Abschnitt „KI: ein Gegner nach den Regeln für Menschen".
+- **Wirtschaftssieg (v77):** „mehr als 2/3" (vorher „mindestens"), und in Runde 1 gar nicht –
+  beides Anweisung des Autors nach einem Fund der KI (Sieg in Runde 1 mit 4 von 5 im Duell).
 - **Eine Regelvariante.** Die früher „experimentell v2" genannten Regeln sind der Standard:
   Singularität 100, Keramik und Theologie in der Techliste, Verbundwerkstoffe = kostenloses
   Wachstum, Sklaverei ab Moderne obsolet (im Bogen durchgestrichen), Siegschwellen stapeln
@@ -211,6 +228,43 @@ Gedächtnis rekonstruieren.
   wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
+
+### KI als dritte Sitzart, Wirtschaftssieg, schnellere Wegsuche (v77)
+
+Auf Wunsch des Autors: ein Gegner, der nach den Regeln für Menschen spielt. Gebaut auf v74,
+dann auf v76 des Autors aufgesetzt. Ausführlich in `ANNAHMEN.md` (Abschnitte „KI",
+„Wirtschaftssieg: mehr als 2/3, nicht in Runde 1", „reachable: Heap").
+
+- **Sitzart `'ki'`** (Aufbau: Mensch / KI / Bot, Gegner ab Werk KI, Stufe Leicht/Mittel/
+  Schwer für alle KI gemeinsam). Die Regelmaschine kennt nur `kind === 'bot'` als
+  Ausnahme – die KI fällt damit überall unter die Regeln für Menschen. Neu in engine.js nur
+  `isAuto` (Bot oder KI: zieht von selbst), `kindTag` (Zusatz im Protokoll) und `kiLevel`
+  am Spieler.
+- **`js/ki.js`**: bewertet Spielstände, probiert jede Aktion auf einer Kopie mit der echten
+  Regelmaschine samt Kampf am Zugende, nimmt die beste je eingesetzter Ressource. Eigener
+  Zufall (`p.kiRng`), kein Blick auf künftige Würfe, `S.evNext` oder verdeckte Plättchen.
+  Legt ihr Startplättchen selbst (`kiPlaceSeat`). Die Oberfläche zeigt ihre Züge wie
+  Bot-Züge (Blatt mit „Weiter", Titel „(KI)", ein Satz mit ihren Gründen im Protokoll).
+- **Wirtschaftssieg** (Anweisung des Autors): überall „mehr als" 2/3, und in Runde 1 gar
+  nicht – `victoryOption` (`strict: true`) und `checkVictory` (`S.round <= 1`).
+- **`reachable`** (hex.js) mit Heap und gemerkter Passierbarkeit: gleiches Ergebnis, etwa
+  doppelt so schnell; ohne das dauerte ein KI-Zug mit Luftwaffe bis 27 s.
+- **Aufgesetzt auf v76:** die neuen Stellen der Oberfläche, die „zieht gerade ein Bot?"
+  fragen (`viewerOf`, `redraw`, `toggleFoundMode`, `tapHex`), fragen jetzt `isAuto` – im
+  KI-Zug zeigt die Ertragsansicht die Sicht des Menschen, der Gründungsmodus ist aus, das
+  KI-Blatt beendet die Machtringe wie das Bot-Blatt. Die KI hatte „gegenüber" genauso in
+  Zeile/Spalte gespiegelt wie die Bots bis v74; `kiFlankPlans` fragt jetzt `hexOpposite`.
+  Gründen als eigene Aktion ist nur Oberfläche (`foundCity` unverändert) – die KI braucht
+  dafür nichts Neues.
+
+**Abgesichert:** `test.js`, Block „KI" – Regeln für Menschen (Fähigkeit, Macht, Ereignisse,
+Wunder), neun volle Partien in allen Aufstellungen ohne Ausnahme und ohne Zug über 2 s,
+Wiederholbarkeit, Fairness (Würfelstrom, `S.evNext`, verdecktes Legen), Punktvergleich;
+Flanke über die Diagonale und jeder Flankenplan aus echten Partien nach `canFlank`;
+Siedelplätze der KI = `foundSiteError`/`foundCost` Feld für Feld; `reachable` gegen die alte
+Fassung; die Siegschwellen. `smoke.js` – Aufbau, KI-Züge mit „Weiter" (auch: Erträge aus
+Sicht des Menschen, kein Gründungsmodus), Legephase, Englisch, „Nochmal spielen".
+Gegenprobe: mit der alten Spiegelung schlagen die Flankentests an.
 
 ### Machtringe: ein Teilstück je Punkt (v76)
 
@@ -493,10 +547,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1399 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1435 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (120 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (125 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -510,6 +564,9 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
    Fehler, und der naheliegende Ein-Zeilen-Fix hätte nur den ersten behoben.
 6. **Messen statt behaupten.** Bei Balance- und Häufigkeitsaussagen mit ausreichend großen
    Stichproben arbeiten und die Zahl nennen.
+7. **KI messen mit `tools_ki.js`** (seit v77): gleiche Befehlszeile, gleiche Zahlen.
+   Stufen immer **gepaart** vergleichen (`stufen`): im Duell gewinnt sonst vor allem der
+   Startspieler (KI gegen KI 19 von 30), und das überdeckt jeden Unterschied.
 
 ## Oberfläche und Regeln (Stand 22.8.)
 
@@ -597,6 +654,23 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   `p.freeArmyCity` beim Koloss). Ein Parameter am Aufruf reicht nicht: er wirkt nur beim
   ersten Mal. Und: Tests für ortsabhängige Wirkungen dürfen **nicht** in der Hauptstadt
   bauen, sonst sind sie blind (genau das verdeckte den Koloss-Fehler).
+- **Neue Aktionen brauchen einen KI-Kandidaten** (seit v77). Die KI kennt nur, was in
+  `kiCandidates` steht. Wer eine Aktion in die Oberfläche einbaut, baut sie auch dort ein –
+  sonst benutzt die KI sie nie, und kein Test fällt auf.
+- **Sitzart abfragen: `isAuto(p)` für „zieht von selbst", `p.kind === 'human'` nur für
+  echte Menschen** (seit v77). Regeln, die `kind === 'bot'` prüfen, lassen die KI
+  automatisch unter die Regeln für Menschen fallen – so soll es sein. Wer dagegen
+  `kind === 'human'` prüft, schließt die KI aus; das ist nur für „Nochmal spielen" richtig
+  (`humanSeats`), nicht für Regeln.
+- **Die KI rechnet auf Kopien mit eigenem Zufall** (`kiClone`, seit v77). Eine Regelfunktion,
+  die direkt `Math.random` benutzt statt `d6`/`nextRand`, würde das umgehen. Und wer
+  `S.evNext` ohne Orakel irgendwo liest, macht die Fairness-Prüfung in `test.js` rot.
+- **Zwei Stellen der KI rechnen eine Regel nach, statt sie zu fragen** (seit v77), beide
+  aus Tempogründen und beide durch einen Test an die Regel gebunden: die Siedelplätze
+  (`kiSitesAll`, eine Breitensuche statt einer Wegsuche je Feld – Test gegen
+  `foundSiteError`/`foundCost`) und die Paare fürs Flankieren (`kiFlankPlans`, fragt
+  `hexOpposite`; Test: jeder Plan steht nach `canFlank`). Wer die Gründungs- oder
+  Flankenregel ändert, sieht dort, ob die KI nachziehen muss.
 - **Technologiekosten immer über `techBase(S, t)`, nie über `t.c`** (seit v70). `t.c` sind
   die Standardkosten; im alternativen Techtree weichen sechs davon ab. Wer eine neue Stelle
   baut, die Kosten zeigt, vergleicht oder sortiert, und dort `t.c` nimmt, zeigt im
@@ -951,6 +1025,18 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    zieht er in `botPlanArmies` (b) „verteidigen" nachträglich zur Stadt – die eben
    gebildete Flanke ist dann wieder offen. Der Test legt den Partner deshalb auch neben die
    Stadt. Lösung wäre, Flankenpartner in (a) mit zu belegen; Balancefrage, nicht angefasst.
+14. **Wirtschaftssieg in Runde 2 im Duell (v77).** Seit Runde 1 gesperrt ist, rückt das
+   Muster eine Runde nach hinten: 5 von 30 Duellen KI gegen KI endeten in Runde 2 mit einem
+   Wirtschaftssieg, der Startspieler gewann 18 von 30. Zu dritt 1 von 30, zu viert keins.
+   Mögliche Abhilfen, je eine Zeile in `checkVictory`: Sperre bis Runde 2 (oder 3), oder eine
+   Mindest-Weltbevölkerung (etwa 4 × Zahl der Reiche). **Entscheidung des Autors steht aus.**
+15. **Stufen der KI noch schwach getrennt (v77).** Gepaart gemessen: Duell Schwer–Leicht
+   25 : 15, Mittel–Leicht 22 : 18, Schwer–Mittel 19 : 21 (je 40 Partien), zu viert
+   2× Schwer gegen 2× Leicht 17 : 7. Im Duell gewinnt vor allem der Startspieler (31 bzw.
+   32 von 40). Leicht muss deutlich leichter werden (nächster Schritt).
+16. **Rechenzeit der KI auf dem iPad nicht gemessen.** In Node: Median 18–34 ms je Zug,
+   längster gemessener Zug 1,5 s (drei Reiche, KI gegen KI). Das iPad dürfte zwei- bis
+   fünfmal langsamer sein – Schätzung.
 
 ## Arbeitsweise, die der Autor schätzt
 
