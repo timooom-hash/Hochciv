@@ -29,6 +29,13 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
   „verteidigt die eigene Stadt" – offene Auslegung, siehe Uebergabe.
 - **Taktik**: Flankieren von zwei beliebigen benachbarten Feldern; ohne Taktik muessen die
   zwei Felder gegenueberliegen (mit Raketentechnik auf Distanz 2 gegenueberliegend).
+  **Seit v75 auf allen drei Achsen** (behobener Fehler): gespiegelt wurde bis v74 in
+  Zeile/Spalte, und das stimmt im versetzten Raster nur Ost–West. Nordwest–Suedost und
+  Nordost–Suedwest flankierten nicht, dafuer zwei Felder derselben Seite (gerade Zeile
+  Nordost + Suedost, ungerade Nordwest + Suedwest). Jetzt Wuerfelkoordinaten
+  (`hexOpposite`), in Kampf und Bot-Zielwahl gleich. Gemessen an 200 Bot-Partien
+  (Originalkarte, vier Bots): Flankierungen 226 → 237, Militaersiege 161 → 169, Spielende
+  im Median unveraendert Runde 6.
 - **Schiesspulver (Kontrollzone)**: gegnerische Armeen halten an, sobald sie ein Feld in
   Reichweite (1, mit Raketentechnik 2) einer deiner Armeen betreten. **Luftwaffe** ignoriert
   Kontrollzonen.
@@ -2524,3 +2531,100 @@ von keinem weniger** bringt. Die Hinweiszeile erklärt den Rand, sobald einer zu
 Umgesetzt in `js/tiles.js` (`placeYieldAt`, `placeYieldTable`, `yieldBeats`,
 `dominatedCells`), in der Oberfläche `placeInfo` (einmal je Sitz gerechnet, 3 × 15
 Wegwerf-Partien) und die Markierung `dom` in `drawMap`.
+
+## Kartenansichten und Gründen als eigene Aktion (v75)
+
+Drei Wünsche aus einer Testrunde, mit dem Autor vorab abgestimmt (Rückfragen: wann die
+Machtansicht erscheint, was die Ringe zeigen, wie Gründen abläuft, wie Erträge aussehen).
+
+### Erträge je Feld
+
+Ein Umschalter **Erträge** in der Leiste legt auf jedes Feld bis zu drei farbige Chips mit
+Zahl: Wissenschaft blau, Nahrung grün, Münzen gold; Nullen fehlen. Gerechnet wird mit
+`tileYieldAt` für das Reich, das gerade schaut – also mit dessen Technologien, Ereignissen
+und Bürokratie. Während Bots ziehen, bleibt es die Sicht des Menschen (`viewerOf`), sonst
+sprängen die Zahlen mit jedem Bot um. Stadtfelder bleiben frei: das Feld unter der Stadt
+bringt nichts. Die Wahl gilt je Gerät (`hochciv.yields`). Der Schalter ist reine Ansicht und
+deshalb auch im Tutorial und während Bot-Zügen bedienbar.
+
+### Stadt gründen
+
+**Auslegung (vom Autor gewählt):** Gründen ist eine eigene Aktion der Leiste, nicht mehr
+eine Möglichkeit im Feldblatt. „Stadt gründen" schaltet den Gründungsmodus an:
+* jedes Feld zeigt seine Erträge (wie oben), jeder **mögliche** Platz seine Kosten in
+  Nahrung – **rot**, wenn die Nahrung diesen Zug nicht reicht (Münzen 2:1 mitgerechnet);
+* was **grundsätzlich** nicht geht (Meer, Vulkan, besetzt, neben einer fremden Armee, kein
+  Weg, unter 3 Felder zur nächsten Stadt), ist abgeblendet;
+* ein Tipp auf ein Feld öffnet das **Gründungsblatt**: Kosten, Ertrag beim Siedeln (auch
+  dann, wenn nur die Nahrung fehlt – gerade dann will man wissen, ob sich Sparen lohnt),
+  und der Knopf **Hier gründen**; geht es nicht, steht der Grund am gesperrten Knopf;
+* nach dem Gründen endet der Modus, ebenso durch einen zweiten Tipp auf „Stadt gründen",
+  durch Forschen, Macht, Armeen, Zugende oder den Bot-Zug.
+
+Für die Trennung „geht nicht" / „zu wenig Nahrung" ist `canFound` geteilt:
+`foundSiteError` prüft den Platz, `canFound` zusätzlich die Nahrung – Prüfungen und
+Meldungen sind dieselben, ein Test vergleicht jedes Feld. Damit das Zeichnen schnell
+bleibt, rechnet `withFoundTable` die Wege von der Hauptstadt einmal vor (eine
+Breitensuche statt zwei bis vier je Feld; große Karte 126 → 7 ms, gemessen in Node) – die
+Regeln bleiben in `foundPassable`, `foundSiteError` und `foundCost`, ein Test vergleicht
+beide Wege Feld für Feld.
+
+**Tutorial:** Die drei Gründungsschritte laufen jetzt über die Leiste (Aufgabe: „Tippe
+unten auf Stadt gründen, dann auf das goldene Feld und auf Hier gründen."), im Langtext
+von Schritt 4 steht der neue Weg. Die Kurztexte nannten den Weg nie und sind unverändert.
+Schienen: `bar: ['a-found']`, `labels: [/Hier gründen/]`, dasselbe Feld wie bisher.
+
+### Machtansicht
+
+**Auslegung (vom Autor gewählt):** Solange das Machtblatt offen ist, tragen alle Städte und
+Armeen einen Ring aus Kreisanteilen – **ohne Zahl**, wie in Ozymandias:
+* **Stadt:** Anteil des Besitzers = Verteidigungswert (`defenseValue`); dazu je fremdem Reich
+  mit Armeen in Reichweite dessen Angriffswert (`attackValue`) in seiner Farbe;
+* **Armee:** Anteil des Besitzers = Machtwert seines Reichs; dazu je Reich, das sie gerade
+  flankieren könnte (`canFlank`), dessen Machtwert.
+Ein Reich ohne Gegenüber hat einen vollen Ring. Überwiegt ein fremder Anteil, läuft die
+Belagerung bzw. fällt die Armee; bei Gleichstand hält der Verteidiger (Legende im Blatt).
+Käufe verschieben die Ringe sofort. Die Zahlen stehen weiter im Feldblatt.
+
+Die Ansicht ist eine **Momentaufnahme**: gekämpft wird am Ende des Zugs des Angreifers,
+bis dahin kann er Macht kaufen und ziehen. Gerechnet wird mit denselben Funktionen wie im
+Kampf (`powerView` in `engine.js`); das Flankieren ist dafür aus `combatPhase` in
+`canFlank` herausgelöst – dabei fiel der Spiegelungsfehler auf (Abschnitt 1).
+
+## Machtringe: ein Teilstück je Punkt (v76)
+
+**Wunsch des Autors:** die Ringe der Machtansicht in Stücke der Größe eins teilen – eine
+Stadt mit Verteidigung 1 und Angriff 2 trägt drei Stücke, eines in der Farbe des
+Verteidigers und zwei in der des Angreifers.
+
+Umgesetzt in `powerRing` (`js/ui.js`): Die Anteile bleiben wie in v75 (Besitzer ab zwölf
+Uhr im Uhrzeigersinn, dann die fremden Reiche), darüber liegt je Punkt ein heller
+Trennstrich. Die Werte sind ganze Zahlen, die Grenze zwischen zwei Reichen fällt also
+immer auf einen Strich. Damit lässt sich jeder Wert abzählen, ohne dass eine Zahl
+dasteht. Die Striche werden mit der Zahl der Punkte feiner (bis 12 Punkte 1,3, bis 24
+0,9, darüber 0,55 Karteneinheiten), sonst verschwände die Farbe unter ihnen.
+
+**Auslegung – Obergrenze 60 Punkte (`RING_MAX_PUNKTE`):** Der Stadtring ist in der Mitte
+gut 120 Karteneinheiten lang; bei 60 Stücken bleiben je Stück gut 2 Einheiten, auf dem
+iPad bei ganzer Karte etwa 2–3 Pixel (geschätzt aus der Kartenbreite von 987 Einheiten,
+nicht auf dem Gerät gemessen). Darüber entfallen die Striche je Punkt; es bleibt der
+Anteil mit einem Grenzstrich zwischen den Reichen, wie bis v75.
+
+Wie groß die Ringe tatsächlich werden – 60 Bot-Partien mit allen vier Reichen, Ringe nach
+jedem Zug von Reich 0 gezählt (Stadt: Verteidigung + Angriffe, Armee: Macht +
+Flankierer):
+
+| Ring | Anzahl | Median | 90 % | höchstens | ≤ 24 | ≤ 60 |
+|---|---|---|---|---|---|---|
+| Stadt | 3616 | 5 | 25 | 141 | 90 % | 99 % |
+| Stadt mit Angreifern | 661 | 22 | 52 | 141 | 54 % | 93 % |
+| Armee | 2539 | 7 | 16 | 54 | 98 % | 100 % |
+
+Folge: Bei knapp der Hälfte der bedrohten Städte sind es mehr als 24 Stücke. So viele
+zählt man nicht mehr auf einen Blick – dort liest man den Anteil, wie vorher. Genau
+abzählen lässt sich, was klein ist: Armeen und Städte vor der ersten Belagerung.
+
+**Null Punkte:** Hat ein Ring gar keinen Punkt – praktisch nur die Armee eines Menschen
+mit Macht 0 ohne Flankierer; Städte behalten immer mindestens eine Bevölkerung und damit
+Verteidigung 1 –, bleibt er leer: nur Innen- und Außenkante in der Farbe des Besitzers.
+Bis v75 war er dann voll, als stünde die Armee in voller Stärke.

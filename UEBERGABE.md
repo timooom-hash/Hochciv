@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 29.9., `sw.js` v74)
+# Hochzeivilization — Projekt-Übergabe (Stand 30.9., `sw.js` v76)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v74)
+## Letzte Sitzungen auf einen Blick (v61 → v76)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -29,12 +29,15 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v72 | Kolonialismus 3 und Kundschafterei 2× gelten in **beiden** Techtrees; der alternative unterscheidet sich nur in den Forschungskosten (Klarstellung zu v71) | Regel |
 | v73 | Plättchenmodus: Hauptstadt **eine Reihe näher** am Gegner (2 und 4 Reiche), **dominierte Startfelder rötlich umrandet**, Reichsgrenzen nicht mehr um leere Sechsecke am Kartenrand; Internet-Gratiskachel zeigt die Wirkung | Regel + Oberfläche + Fehler |
 | v74 | Alternativer Techtree zusätzlich: **Chemie 11, Biologie 12, Wissenschaftliche Methode 15** (Forschung, Industrialisierung; Standard 12/15/11) | Regel |
+| v75 | **Erträge** je Feld (Umschalter), **Stadt gründen** als eigene Aktion mit Kostenkarte, **Machtringe** bei offenem Machtblatt; Flankieren „gegenüber" jetzt auf allen drei Achsen (Fehler) | Oberfläche + Fehler |
+| v76 | Machtringe aus **einem Teilstück je Punkt** (Verteidigung 1 gegen Angriff 2 = drei Stücke); über 60 Punkte nur der Anteil, bei 0 Punkten ein leerer Ring | Oberfläche |
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
 (Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei), seit v73
 Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstand 2) und
-Punkt 12 (dominiert über alle Lagen oder nur je Lage?).
+Punkt 12 (dominiert über alle Lagen oder nur je Lage?), seit v75 Punkt 13 (Bot-Partner
+verlässt die Flanke).
 
 ## Wo alles liegt
 
@@ -62,19 +65,19 @@ Punkt 12 (dominiert über alle Lagen oder nur je Lage?).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1183 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1191 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 405 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
-| `js/hex.js` | 109 | Hexraster (pointy-top, odd-r), `hexDistance`, `reachable`, `pathSteps` |
+| `js/hex.js` | 117 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable`, `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1725 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll |
+| `js/engine.js` | 1814 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ui.js` | 1981 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) |
+| `js/ui.js` | 2216 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 4887 | **1378 Assertions**, `node test.js` |
-| `smoke.js` | 2532 | **117 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 5027 | **1399 Assertions**, `node test.js` |
+| `smoke.js` | 2724 | **120 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -208,6 +211,76 @@ Gedächtnis rekonstruieren.
   wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
+
+### Machtringe: ein Teilstück je Punkt (v76)
+
+Auf Wunsch des Autors: jeder Punkt ist ein eigenes Stück des Rings – eine Stadt mit
+Verteidigung 1 und Angriff 2 trägt drei Stücke, eines in der Farbe des Verteidigers, zwei
+in der des Angreifers. Nur `powerRing` in `js/ui.js` hat sich geändert (dazu Legende
+deutsch/englisch); `powerView` und alle Regeln sind unberührt.
+
+- Über den Anteilen liegt je Punkt ein heller Trennstrich (`data-strich`), feiner, je
+  mehr Punkte es sind. Die Werte sind ganze Zahlen, Reichsgrenzen fallen also auf Striche.
+- **Obergrenze `RING_MAX_PUNKTE` = 60:** darüber nur der Anteil mit Grenzstrichen
+  zwischen den Reichen (`data-grenze`), wie bis v75. Gemessen an 60 Bot-Partien liegen
+  99 % der Stadtringe, 93 % der Ringe bedrohter Städte und alle Armeeringe darunter
+  (Tabelle in `ANNAHMEN.md`). Bedrohte Städte haben im Median 22 Punkte – dort liest man
+  in der Praxis den Anteil, abzählen lohnt bei Armeen und kleinen Städten.
+- **0 Punkte** (Armee mit Macht 0, niemand flankiert): leerer Ring, nur die Kanten in der
+  Besitzerfarbe. Bis v75 war er voll.
+
+**Abgesichert:** `smoke.js` (Machtschritt) – jede Stadt und jede Armee trägt genau so
+viele Striche, wie ihr Ring Punkte hat, auch nach einem Machtkauf; das Beispiel des
+Autors (1 gegen 2) ergibt drei Striche bei 0°, 120° und 240° und die Anteile ⅓/⅔; über 60
+Punkten keine Striche, aber zwei Grenzen (ein voller Ring: keine); 0 Punkte → leerer
+Ring. Gegenproben (keine Striche, einer zu viel, um ein halbes Stück versetzt, Grenzen
+fehlen, Obergrenze ignoriert, 0 Punkte wieder voll) schlagen jeweils genau dort an.
+
+### Kartenansichten, Gründen in der Leiste, Flankieren diagonal (v75)
+
+Drei Wünsche aus einer Testrunde, vorab mit dem Autor abgestimmt; Einzelheiten und
+Auslegungen in `ANNAHMEN.md` (Abschnitt „Kartenansichten und Gründen als eigene Aktion").
+
+- **Erträge** (`a-yields`, Umschalter, `hochciv.yields`): je Feld bis zu drei Chips,
+  Wissenschaft blau, Nahrung grün, Münzen gold, gerechnet mit `tileYieldAt` für den
+  Zuschauenden (`viewerOf`: beim Bot-Zug der Mensch). Reine Ansicht – auch im Tutorial und
+  im Bot-Zug bedienbar, deshalb nicht in `TUT_BAR`.
+- **Stadt gründen** (`a-found`, `ui.mode = 'found'`): Kosten auf jedem möglichen Platz,
+  rot bei zu wenig Nahrung, Unmögliches abgeblendet, dazu die Erträge. Tipp → `foundSheet`
+  mit Kosten, Ertrag beim Siedeln und **Hier gründen**. Das Feldblatt gründet nicht mehr
+  (nur ein Hinweissatz). In der Regelmaschine: `canFound` geteilt in `foundSiteError`
+  (Platz) + Nahrung; `withFoundTable` rechnet für das Zeichnen die Wege einmal vor.
+- **Machtansicht** (`ui.powerView`, nur solange das Machtblatt offen ist): Ringe aus
+  Kreisanteilen in Reichsfarben, ohne Zahl – Stadt: Verteidigung gegen jedes Reich mit
+  Armeen in Reichweite; Armee: Machtwert gegen jedes Reich, das sie flankieren könnte.
+  Quelle ist `powerView` (engine.js) mit denselben Funktionen wie der Kampf. Jedes andere
+  Blatt, Schließen oder ein Feldtipp beendet die Ansicht (`sheet(html, { power: true })`).
+- **Tutorial:** die drei Gründungsschritte laufen über die Leiste – neue Aufgabe und im
+  Langtext von 4/29 der neue Weg (deutsch und englisch), Schienen `bar: ['a-found']`,
+  `labels: [/Hier gründen/]`. Der Ablauf (Würfel, Bots) ist unverändert; `test.js` fährt
+  ihn weiter zweimal auf Gleichheit.
+- **Fehler behoben – Flankieren „gegenüber":** gespiegelt wurde in Zeile/Spalte; im
+  versetzten Raster stimmt das nur Ost–West. Nordwest–Südost und Nordost–Südwest
+  flankierten nicht, dafür Nordost+Südost (gerade Zeile) bzw. Nordwest+Südwest (ungerade).
+  Aufgefallen beim Herauslösen von `canFlank`; ein alter Testkommentar hielt es sogar fest
+  („liegt in odd-r nur waagerecht") und stellte die Flanker deshalb waagerecht. Jetzt
+  `hexOpposite` (Würfelkoordinaten) in `canFlank` und in beiden Bot-Stellen
+  (`botFlankOk`, Priorität 8). Gemessen: 200 Bot-Partien, Flankierungen 226 → 237,
+  Militärsiege 161 → 169, Spielende im Median gleich (Runde 6).
+
+**Abgesichert:** `test.js` – alle 15 Nachbarpaare in gerader und ungerader Zeile (genau die
+drei Gegenüber flankieren), Taktik, Raketentechnik auf Distanz 2, Bot stellt sich diagonal
+gegenüber; `canFound` = Platzprüfung + Nahrung auf jedem Feld; Wegtabelle = Einzelsuche
+(864 Felder, vier Technikstände); `powerView` für Städte (zwei Armeen addieren sich,
+ausgeschiedene Reiche zählen nicht) und Armeen. `smoke.js` – Chips Feld für Feld gegen
+`tileYieldAt`, Kostenmarken Feld für Feld gegen `foundSiteError`/`foundCost`,
+Gründungsblatt (Siedelertrag, Gründe, knappe Nahrung), Modus endet nach dem Gründen;
+Machtringe: Anteil = Verteidigung/(Verteidigung + Angriff), wächst beim Kauf, verschwindet
+beim Schließen, Feldtipp und Armeeblatt; Tutorial-Audit und -Durchlauf über die neue Leiste,
+auch auf Englisch. Gegenproben (alte Spiegelung, Tabelle um eins daneben, Angriff nur einer
+Armee, fehlende Marken/Ringe, falscher Zuschauer) schlagen jeweils an. Nebenbei: der
+Smoke-Schritt „Leseschritte erlauben gar keine Aktion" prüfte seit jeher den
+Gründungsschritt statt Schritt 2 (er blätterte nicht zurück) – korrigiert.
 
 ### Alternativer Techtree: drei Kosten der Industrialisierung (v74)
 
@@ -420,10 +493,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1378 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1399 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (117 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (120 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -543,6 +616,13 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Plättchen. Wer `PLACE_MIN_GAP` auf 1 senkt, macht Vorschau und rote Ränder zu
   Schätzungen – `test.js` schlägt dann an („kein Umland … auf einem fremden
   Startplättchen", „Vorschau = echtes Einkommen").
+- **Die Leiste hat zwei Sorten Knöpfe** (seit v75): Aktionen, die das Tutorial bindet
+  (`TUT_BAR` in ui.js, auch vom Smoke-Audit gelesen), und den Ansichtsschalter
+  „Erträge", der immer frei ist. Wer einen Knopf ergänzt, trägt ihn in `TUT_BAR` ein oder
+  begründet, warum nicht – sonst ist er im Tutorial entweder offen oder tot.
+- **`withFoundTable` gilt nur innerhalb des Aufrufs und nur für (S, pi)** (seit v75). Wer
+  zwischendurch den Spielstand ändert, darf das nicht im Bereich der Tabelle tun – sie
+  kennt die Änderung nicht. `foundMarks` liest nur.
 - **`X` ist nie Gebiet** (seit v73). Wer eine neue Stelle baut, die Umland oder Nachbarn
   zählt, nimmt `controlledTiles` oder prüft `isOff` – `terrainAt` allein liefert für `X`
   einen Wert und hält es für ein Feld.
@@ -645,6 +725,15 @@ Kampf-Aufruf bei Bots · Stadtfelder zählen als Straße/Eisenbahn · Armee in e
 anwählbar · Bot-Armeen nutzen Geländedistanz · Angriffswerte addieren sich · Reichweitensprung
 wirkt sofort · England kann Nahrung für Forschung ausgeben · Internet-Gratiskopie ·
 Navigation-Armeen halten nicht auf Wasser · v2-Tech-Labels · leeres Bot-Fenster (Log-Kappung).
+
+Aus der Sitzung v76:
+- **Machtring ohne Punkt voll gezeichnet** (Armee mit Macht 0 sah aus wie in voller
+  Stärke). Jetzt leer; der Smoke-Schritt prüft es.
+
+Aus der Sitzung v75:
+- **Flankieren „gegenüber" nur waagerecht richtig** (Spiegelung in Zeile/Spalte statt in
+  Würfelkoordinaten). Nicht wieder einführen – `hexOpposite` benutzen; der Test prüft alle
+  Nachbarpaare in beiden Zeilenarten.
 
 Aus der Sitzung v73:
 - **Reichsgrenze um leere Sechsecke** am Rand der Plättchenkarte und am Loch: `X` zählte
@@ -856,6 +945,12 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    anderes erlaubtes Feld – auch in einer anderen Lage – rundum besser ist. Folge: selten
    (4 % der Lagen) ist eine ganze Lage rot. Nur je Lage verglichen wären 67 % statt 77 % der
    Wahlmöglichkeiten rot. Umstellen: `dominatedCells` je Zeile aufrufen.
+
+13. **Ein Bot-Partner verlässt die Flanke** (vorbestehend, beim Testen von v75 gesehen):
+   Steht der Partner neben dem Angreifer, aber nicht in Reichweite der bedrohten Stadt,
+   zieht er in `botPlanArmies` (b) „verteidigen" nachträglich zur Stadt – die eben
+   gebildete Flanke ist dann wieder offen. Der Test legt den Partner deshalb auch neben die
+   Stadt. Lösung wäre, Flankenpartner in (a) mit zu belegen; Balancefrage, nicht angefasst.
 
 ## Arbeitsweise, die der Autor schätzt
 

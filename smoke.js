@@ -75,7 +75,7 @@ step('Tutorial: Übungsspiel startet in der Spieloberfläche', () => {
 });
 step('Tutorial: Schienen sperren alles außer dem vorgesehenen Schritt', () => {
   // Leseschritt 1: Aktionsleiste bis auf Nachschlagen gesperrt
-  const locked = ['a-tech', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
+  const locked = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
   if (locked.length) throw new Error('offene Knöpfe im Leseschritt: ' + locked.join(','));
   // Gründungsschritt: nur das goldene Feld reagiert
   G('tutMove')(1); G('tutMove')(1); G('tutMove')(1);
@@ -89,15 +89,20 @@ step('Tutorial: Schienen sperren alles außer dem vorgesehenen Schritt', () => {
   console.log('       Zielfeld ' + hl[0].join('/') + ', andere Felder gesperrt');
 });
 step('Tutorial: Leseschritte erlauben gar keine Aktion', () => {
-  // Schritt 2 ist ein reiner Leseschritt – dort darf man weder gründen noch wachsen
+  // Schritt 2 ist ein reiner Leseschritt – dort darf man weder gründen noch wachsen.
+  // Der Schritt davor endet im Gründungsschritt (4), also erst zurückblättern: bis v74
+  // lief diese Prüfung versehentlich dort, und das fiel nicht auf, weil Gründen damals
+  // im Blatt stattfand und die Leiste im Gründungsschritt ganz zu war.
   const S = G('S');
+  while (+$('tut-count').textContent.split('/')[0] > 2) $('tut-prev').onclick();
   while (+$('tut-count').textContent.split('/')[0] < 2) $('tut-next').onclick();
+  if (G('tutStep')().allow) throw new Error('Schritt 2 ist kein Leseschritt mehr');
   const cap = G('capitalOf')(S, G('RU')());
   G('tapHex')(cap.r, cap.c);
   const open = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
   if (open.length) throw new Error('im Leseschritt anklickbar: ' + open.map(b => b.textContent.trim()).join(', '));
   G('closeSheet')();
-  const bar = ['a-tech', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
+  const bar = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
   if (bar.length) throw new Error('Leiste im Leseschritt offen: ' + bar.join(', '));
   console.log('       Stadtblatt und Leiste im Leseschritt vollständig gesperrt');
   $('tut-prev').onclick();
@@ -110,7 +115,7 @@ step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
   const labelsOk = (al, txt) => (al.labels || []).some(rx => new RegExp(rx.source || rx).test(txt));
   for (let i = 0; i < n; i++) {
     const t = $('tut-title').textContent, al = G('tutAllow')();
-    const barOn = ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].filter(id => !$(id).disabled);
+    const barOn = G('TUT_BAR').filter(id => !$(id).disabled);
     const extra = barOn.filter(id => !al.bar.includes(id));
     if (extra.length) problems.push((i + 1) + ' „' + t + '": Leiste offen: ' + extra);
     const S = G('S');
@@ -134,6 +139,19 @@ step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
       if (bad.length) problems.push((i + 1) + ' „' + t + '": ' + id + ' offen: ' + bad);
       G('closeSheet')();
     }
+    // Gründungsmodus (v75): auf jedem Feld außer dem vorgesehenen bleibt „Hier gründen" zu
+    if (!$('a-found').disabled) {
+      $('a-found').onclick();
+      const ziel = (al.hex ? al.hex() : []).map(h => h.join('/'));
+      for (const [r, c] of spots.concat(G('tutHighlight')() || [])) {
+        G('tapHex')(r, c);
+        const on = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
+        if (on.length && !ziel.includes(r + '/' + c))
+          problems.push((i + 1) + ' „' + t + '": gründen auf ' + r + '/' + c + ' offen');
+        G('closeSheet')();
+      }
+      if (G('ui').mode === 'found') $('a-found').onclick();       // Modus wieder aus
+    }
     if (!$('a-tech').disabled) {
       $('a-tech').onclick();
       const on = [...$('ov-body').querySelectorAll('[data-tech]')].filter(b => !b.disabled).map(b => b.dataset.tech);
@@ -144,8 +162,7 @@ step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
     // Aufgabe per Skript erledigen (nur hier im Test), Index aus dem Panel lesen
     // Gegenprobe: bei offener Aufgabe muss auch wirklich etwas bedienbar sein
     if ($('tut-next').disabled) {
-      const anyBar = ['a-tech', 'a-power', 'a-army', 'a-end', 'a-log', 'a-info']
-        .some(id => !$(id).disabled);
+      const anyBar = G('TUT_BAR').some(id => !$(id).disabled);
       let anySheet = false;
       for (const [r, c] of spots.concat(G('tutHighlight')() || [])) {
         G('tapHex')(r, c);
@@ -187,10 +204,14 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
         free.forEach(b => b.onclick());
         G('closeModal')(); manual++;
       } else if (/Stadt/.test(t) && hl.length) {
+        // v75: gegründet wird über „Stadt gründen" in der Leiste, dann Feld, dann Knopf
+        if ($('a-found').disabled) throw new Error('„Stadt gründen" gesperrt in: ' + t);
+        $('a-found').onclick();
         G('tapHex')(hl[0][0], hl[0][1]);
         const en = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
         if (!en.length) throw new Error('kein Knopf freigegeben in: ' + t);
         en[0].onclick(); G('closeSheet')(); manual++;
+        if (G('ui').mode === 'found') throw new Error('Gründungsmodus bleibt nach dem Gründen an');
       } else if (/wachsen/.test(t)) {
         for (const h of hl) {
           G('tapHex')(h[0], h[1]);
@@ -277,7 +298,7 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
 step('Tutorial: „Fertig" gibt das Spiel frei', () => {
   $('tut-next').onclick();
   if (!$('tut-panel').hidden) throw new Error('Panel bleibt stehen');
-  const locked = ['a-tech', 'a-power', 'a-army', 'a-end'].filter(id => $(id).disabled);
+  const locked = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end', 'a-yields'].filter(id => $(id).disabled);
   if (locked.length) throw new Error('Leiste bleibt gesperrt: ' + locked.join(','));
   const S = G('S');
   if (S.over) throw new Error('Spiel schon entschieden');
@@ -771,7 +792,7 @@ step('Aktionsleiste bleibt bedienbar, solange ein Blatt offen ist (Punkt 3)', ()
   if (!$('sheet').classList.contains('open')) throw new Error('Blatt öffnet nicht');
   if (window.document.body.classList.contains('blocked'))
     throw new Error('Blatt sperrt die Aktionsleiste weiterhin');
-  const aus = ['a-tech', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'].filter(id => $(id).disabled);
+  const aus = [...$('screen-game').querySelectorAll('.actionbar button')].filter(b => b.disabled).map(b => b.id);
   if (aus.length) throw new Error('Menüpunkte gesperrt: ' + aus.join(', '));
   G('closeSheet')();
   // Das Bot-Fenster sperrt weiterhin – dort führt nur „Weiter" weiter
@@ -779,7 +800,7 @@ step('Aktionsleiste bleibt bedienbar, solange ein Blatt offen ist (Punkt 3)', ()
   if (!window.document.body.classList.contains('blocked'))
     throw new Error('Bot-Fenster sperrt die Leiste nicht mehr');
   G('ui').botLock = false; G('lockBar')();
-  console.log('       Blatt offen, alle sechs Menüpunkte frei');
+  console.log('       Blatt offen, alle ' + $('screen-game').querySelectorAll('.actionbar button').length + ' Menüpunkte frei');
 });
 step('Kopfzeile: Weltbevölkerungsanteil in Prozent (Punkt 4)', () => {
   frischesSpiel();
@@ -803,7 +824,7 @@ step('Ressourcenleiste: vier getrennte Werte mit Beschriftung (Punkt 2)', () => 
     throw new Error('falsche Reihenfolge: ' + werte.join(','));
   console.log('       ' + labels.join(' · '));
 });
-step('Feldblatt: Feldertrag klein, Siedelertrag nur wo siedelbar (Punkt 7)', () => {
+step('Feldblatt: Feldertrag klein, gegründet wird nur noch über die Leiste (v75)', () => {
   frischesSpiel();
   const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
   // Nahrung großzügig setzen: sonst hängt der Test davon ab, wie viel das ausgewürfelte
@@ -812,34 +833,204 @@ step('Feldblatt: Feldertrag klein, Siedelertrag nur wo siedelbar (Punkt 7)', () 
   const gut = G('within')(cap.r, cap.c, 7).find(([r, c]) => !G('canFound')(S, pi, r, c));
   if (!gut) throw new Error('kein gründbares Feld trotz 40 Nahrung');
   G('tapHex')(gut[0], gut[1]);
-  const txt = $('sheet-body').textContent;
-  // Feldertrag steht klein in der Unterzeile, nicht mehr im Kästchen
+  // Feldertrag steht klein in der Unterzeile, nicht als eigenes Kästchen
   const sub = $('sheet-body').querySelector('p.sub');
   if (!sub || !/Feld \d+\/\d+ · Ertrag /.test(sub.textContent))
     throw new Error('Feldertrag steht nicht klein in der Unterzeile: ' + (sub && sub.textContent));
-  if (/FELDERTRAG/i.test(txt.replace(/Feld \d+\/\d+ · Ertrag/, '')))
-    throw new Error('Feldertrag steht immer noch als eigenes Kästchen da');
+  // Kein Gründen im Feldblatt mehr – nur ein Satz, wo es langgeht
+  if ($('sheet-body').querySelector('[data-label="Stadt gründen"], [data-label="Hier gründen"]'))
+    throw new Error('das Feldblatt bietet noch Gründen an');
+  if ($('sheet-body').querySelectorAll('.tile-facts').length)
+    throw new Error('das Feldblatt zeigt noch den Siedelertrag');
+  if (!/Stadt gründen/.test($('sheet-body').textContent)) throw new Error('kein Hinweis auf die Leiste');
+  G('closeSheet')();
+  console.log('       Feldblatt ' + gut.join('/') + ': Ertrag klein, kein Gründen, Hinweis auf die Leiste');
+});
+step('Gründungsmodus: Kosten auf der Karte, Blatt mit Siedelertrag, danach wieder aus (v75)', () => {
+  const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi), p = G('P')(S);
+  p.res.food = 40;
+  $('a-found').onclick();
+  if (G('ui').mode !== 'found') throw new Error('Modus geht nicht an');
+  if (!$('a-found').classList.contains('on')) throw new Error('Knopf zeigt den Modus nicht');
+  // Karte: jedes echte Feld ist genau eines – Kosten, knapp oder abgeblendet
+  const marks = new Map([...$('map').querySelectorAll('[data-found]')].map(e => [e.getAttribute('data-rc'), e]));
+  let ja = 0, nein = 0, falsch = [];
+  S.map.rows.forEach((row, r) => [...row].forEach((t, c) => {
+    if (G('isOff')(t)) return;
+    const m = marks.get(r + '/' + c);
+    const platz = !G('foundSiteError')(S, pi, r, c);
+    if (!m) return falsch.push(r + '/' + c + ' ohne Markierung');
+    const art = m.getAttribute('data-found');
+    if (platz !== (art !== 'nein')) falsch.push(r + '/' + c + ' ' + art);
+    if (platz) {
+      ja++;
+      const kosten = G('foundCost')(S, pi, r, c);
+      if (m.nextSibling.textContent !== String(kosten)) falsch.push(r + '/' + c + ' Kosten ' + m.nextSibling.textContent);
+      if ((art === 'knapp') !== (G('available')(S, pi, 'food') < kosten)) falsch.push(r + '/' + c + ' knapp?');
+    } else nein++;
+  }));
+  if (falsch.length) throw new Error('Markierungen: ' + falsch.slice(0, 4).join(', '));
+  // im Gründungsmodus stehen auch die Erträge auf der Karte
+  if (!$('map').querySelector('[data-yield]')) throw new Error('keine Erträge im Gründungsmodus');
+  // Blatt: gründbares Feld – Siedelertrag und freier Knopf
+  const gut = G('within')(cap.r, cap.c, 7).find(([r, c]) => !G('canFound')(S, pi, r, c));
+  G('tapHex')(gut[0], gut[1]);
   const facts = $('sheet-body').querySelectorAll('.tile-facts .fact');
-  if (facts.length !== 1) throw new Error(facts.length + ' statt 1 Kästchen');
-  if (facts[0].querySelector('.fact-n')) throw new Error('Untertext ist noch da');
+  if (facts.length !== 1) throw new Error(facts.length + ' statt 1 Kästchen (Siedelertrag)');
   const g = G('settleGain')(S, pi, gut[0], gut[1]);
   const soll = (g.sci > 0 ? '+' : '') + g.sci + '🔬';
-  if (!facts[0].textContent.includes(soll))
-    throw new Error('Siedelertrag stimmt nicht: erwartet ' + soll);
-  // Wo nicht gesiedelt werden kann, fehlt das Kästchen ganz
+  if (!facts[0].textContent.includes(soll)) throw new Error('Siedelertrag stimmt nicht: erwartet ' + soll);
+  const knopf = $('sheet-body').querySelector('[data-label="Hier gründen"]');
+  if (!knopf || knopf.disabled) throw new Error('„Hier gründen" fehlt oder ist gesperrt');
+  if (!knopf.textContent.includes(G('foundCost')(S, pi, gut[0], gut[1]) + '🌾')) throw new Error('Kosten fehlen am Knopf');
+  // Meer und eigene Stadt: kein Siedelertrag, Knopf gesperrt mit Grund
   const meer = G('within')(cap.r, cap.c, 6).find(([r, c]) => G('terrainAt')(S, r, c) === 'M');
-  if (!meer) throw new Error('kein Meerfeld in der Nähe');
-  G('tapHex')(meer[0], meer[1]);
-  if ($('sheet-body').querySelectorAll('.tile-facts').length)
-    throw new Error('Meerfeld zeigt trotzdem einen Siedelertrag');
-  if (!/· Ertrag /.test($('sheet-body').querySelector('p.sub').textContent))
-    throw new Error('Meerfeld zeigt keinen Feldertrag');
-  // Auch das eigene Stadtfeld nicht (zu nah an sich selbst)
-  G('tapHex')(cap.r, cap.c);
-  if ($('sheet-body').querySelectorAll('.tile-facts').length)
-    throw new Error('Stadtfeld zeigt einen Siedelertrag');
+  for (const [r, c] of [meer, [cap.r, cap.c]].filter(Boolean)) {
+    G('tapHex')(r, c);
+    if ($('sheet-body').querySelectorAll('.tile-facts').length) throw new Error(r + '/' + c + ' zeigt einen Siedelertrag');
+    const k = $('sheet-body').querySelector('[data-label="Hier gründen"]');
+    if (!k || !k.disabled) throw new Error(r + '/' + c + ': Knopf nicht gesperrt');
+  }
+  // Nur die Nahrung fehlt: Ertrag steht, Knopf gesperrt mit Grund
+  p.res.food = 0; p.res.coins = 0;
+  G('tapHex')(gut[0], gut[1]);
+  if ($('sheet-body').querySelectorAll('.tile-facts').length !== 1) throw new Error('bei knapper Nahrung kein Siedelertrag');
+  const k2 = $('sheet-body').querySelector('[data-label="Hier gründen"]');
+  if (!k2.disabled || !/Nahrung/.test(k2.textContent)) throw new Error('knappe Nahrung: ' + k2.textContent);
+  if ($('map').querySelector(`[data-rc="${gut[0]}/${gut[1]}"][data-found]`).getAttribute('data-found') !== 'knapp')
+    throw new Error('knappes Feld nicht rot markiert');
+  // Gründen beendet den Modus
+  p.res.food = 40;
+  G('tapHex')(gut[0], gut[1]);
+  $('sheet-body').querySelector('[data-label="Hier gründen"]').onclick();
+  const neu = G('cityAt')(S, gut[0], gut[1]);
+  if (!neu || neu.owner !== pi) throw new Error('keine Stadt gegründet');
+  if (G('ui').mode === 'found' || $('map').querySelector('[data-found]')) throw new Error('Modus bleibt nach dem Gründen an');
+  // An und aus über den Knopf, andere Aktionen beenden ihn
+  $('a-found').onclick(); $('a-found').onclick();
+  if (G('ui').mode === 'found') throw new Error('zweiter Tipp schaltet nicht aus');
+  $('a-found').onclick(); $('a-tech').onclick(); G('closeModal')();
+  if (G('ui').mode === 'found') throw new Error('Forschen beendet den Modus nicht');
+  console.log(`       ${ja} mögliche Plätze, ${nein} abgeblendet · gegründet auf ${gut.join('/')}, Modus danach aus`);
+});
+step('Erträge: Chips je Feld, gemerkt, immer bedienbar (v75)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur;
+  if (G('showYields')) $('a-yields').onclick();              // sauberer Ausgangspunkt
+  if ($('map').querySelector('[data-yield]')) throw new Error('Chips ohne Ertragsansicht');
+  $('a-yields').onclick();
+  if (!G('showYields') || !$('a-yields').classList.contains('on')) throw new Error('Umschalten wirkt nicht');
+  // je Feld genau die Erträge ≠ 0, in der Reihenfolge Wissenschaft, Nahrung, Münzen
+  const ist = {};
+  $('map').querySelectorAll('[data-yield]').forEach(ch => {
+    const k = ch.getAttribute('data-rc');
+    (ist[k] = ist[k] || []).push(+ch.getAttribute('data-yield') + ':' + ch.nextSibling.textContent);
+  });
+  const falsch = [];
+  let felder = 0;
+  S.map.rows.forEach((row, r) => [...row].forEach((t, c) => {
+    if (G('isOff')(t)) return;
+    const y = G('tileYieldAt')(S, pi, r, c);
+    const soll = G('cityAt')(S, r, c) ? [] : [0, 1, 2].filter(i => y[i] > 0).map(i => i + ':' + y[i]);
+    if ((ist[r + '/' + c] || []).join() !== soll.join()) falsch.push(r + '/' + c);
+    if (soll.length) felder++;
+  }));
+  if (falsch.length) throw new Error('Chips falsch auf ' + falsch.slice(0, 5).join(', '));
+  if (!G('load')('hochciv.yields')) throw new Error('Wahl nicht gemerkt');
+  // Während ein Bot zieht, zeigt die Ansicht die Erträge des Menschen
+  const bot = S.players.findIndex(q => q.kind === 'bot');
+  const vorher = S.cur; S.cur = bot;
+  if (G('viewerOf')(S) !== vorher) throw new Error('beim Bot-Zug zählen die Erträge des Bots');
+  S.cur = vorher;
+  $('a-yields').onclick();
+  if ($('map').querySelector('[data-yield]') || G('load')('hochciv.yields')) throw new Error('Abschalten wirkt nicht');
+  console.log('       ' + felder + ' Felder mit Chips, Wahl gemerkt, beim Bot-Zug die Sicht des Menschen');
+});
+step('Machtansicht: Ringe mit einem Teilstück je Punkt, nur solange das Machtblatt offen ist (v75/v76)', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S), cap = G('capitalOf')(S, pi);
+  const feind = S.players.findIndex((q, i) => i !== pi);
+  // eine fremde Armee neben der eigenen Hauptstadt, zwei eigene diagonal gegenüber
+  // einer zweiten fremden Armee
+  S.armies = S.armies.filter(a => a.owner !== feind);
+  const nb = G('neighbors')(cap.r, cap.c).filter(([r, c]) => G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && !G('armyAt')(S, r, c));
+  if (nb.length < 2) throw new Error('keine zwei Nachbarfelder frei');
+  S.armies.push({ id: 7001, owner: feind, r: nb[0][0], c: nb[0][1], mp: 0, born: 0 });
+  // eine eigene Armee daneben: sie trägt den Machtwert zur Verteidigung bei, also muss
+  // ein Machtkauf den eigenen Anteil vergrößern
+  S.armies.push({ id: 7002, owner: pi, r: nb[1][0], c: nb[1][1], mp: 0, born: 0 });
+  p.power = 2; p.res.coins = 40;
+  if (G('P')(S).kind === 'bot') throw new Error('Mensch nicht am Zug');
+  $('a-power').onclick();
+  if (!G('ui').powerView) throw new Error('Machtansicht geht nicht an');
+  const ring = tag => [...$('map').querySelectorAll(`[data-power="${tag}"]`)];
+  const stadtRing = () => ring('stadt ' + cap.r + '/' + cap.c);
+  const view = G('powerView')(S);
+  const st = view.cities.find(x => x.city === cap);
+  if (!st.atk.length) throw new Error('kein Angreifer an der Hauptstadt erkannt');
+  const anteil = () => +stadtRing()[0].getAttribute('data-anteil');
+  const soll = st.def / (st.def + st.atk.reduce((s2, a) => s2 + a.v, 0));
+  if (stadtRing().length !== 1 + st.atk.length) throw new Error('Stadtring: ' + stadtRing().length + ' Teile');
+  if (Math.abs(anteil() - soll) > 0.001) throw new Error('Anteil ' + anteil() + ' statt ' + soll.toFixed(3));
+  // jede Stadt und jede Armee trägt einen Ring
+  if (S.cities.some(c => !ring('stadt ' + c.r + '/' + c.c).length)) throw new Error('eine Stadt ohne Ring');
+  if (S.armies.some(a => !ring('armee ' + a.r + '/' + a.c).length)) throw new Error('eine Armee ohne Ring');
+  // v76: ein Teilstück je Punkt – so viele Trennstriche, wie der Ring Punkte hat
+  const striche = tag => $('map').querySelectorAll(`[data-strich="${tag}"]`).length;
+  const MAX = G('RING_MAX_PUNKTE'), falsch = [];
+  const pruefe = (tag, punkte) => {
+    const soll = punkte > MAX ? 0 : punkte;
+    if (striche(tag) !== soll) falsch.push(`${tag}: ${striche(tag)} Striche, ${punkte} Punkte`);
+  };
+  const pv = () => G('powerView')(S);
+  pv().cities.forEach(x => pruefe('stadt ' + x.city.r + '/' + x.city.c, x.def + x.atk.reduce((s2, a) => s2 + a.v, 0)));
+  pv().armies.forEach(x => pruefe('armee ' + x.army.r + '/' + x.army.c, x.pow + x.flank.reduce((s2, f) => s2 + f.v, 0)));
+  if (falsch.length) throw new Error('Teilstücke: ' + falsch.slice(0, 3).join(' · '));
+  const stueckVorher = striche('stadt ' + cap.r + '/' + cap.c);
+  // Macht kaufen: der eigene Anteil wächst sofort
+  const a1 = anteil();
+  $('sheet-body').querySelector('[data-n="5"]').onclick();
+  if (!G('ui').powerView) throw new Error('nach dem Kauf ist die Ansicht weg');
+  if (!(anteil() > a1)) throw new Error('eigener Anteil wächst nicht: ' + a1 + ' → ' + anteil());
+  const nach = pv().cities.find(x => x.city === cap);
+  const punkteNach = nach.def + nach.atk.reduce((s2, a) => s2 + a.v, 0);
+  if (striche('stadt ' + cap.r + '/' + cap.c) !== (punkteNach > MAX ? 0 : punkteNach))
+    throw new Error('nach dem Kauf: ' + striche('stadt ' + cap.r + '/' + cap.c) + ' Striche, ' + punkteNach + ' Punkte');
+  // Das Beispiel aus der Rückmeldung: Verteidigung 1, Angriff 2 → drei Stücke, eines
+  // in der Farbe des Verteidigers, zwei in der des Angreifers
+  const probe = window.document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  G('powerRing')(probe, 0, 0, 17, 21.5, [{ v: 1, col: '#111' }, { v: 2, col: '#999' }], 'probe');
+  const teile = [...probe.querySelectorAll('[data-anteil]')].map(e => [e.getAttribute('fill'), e.getAttribute('data-anteil')]);
+  if (probe.querySelectorAll('[data-strich]').length !== 3) throw new Error('1 gegen 2: nicht drei Stücke');
+  if (JSON.stringify(teile) !== JSON.stringify([['#111', '0.333'], ['#999', '0.667']]))
+    throw new Error('1 gegen 2: ' + JSON.stringify(teile));
+  // Über der Grenze keine Striche je Punkt mehr, nur die Grenzen zwischen den Reichen;
+  // bei 0 Punkten ein leerer Ring
+  const gross = window.document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  G('powerRing')(gross, 0, 0, 17, 21.5, [{ v: MAX, col: '#111' }, { v: 1, col: '#999' }], 'gross');
+  if (gross.querySelectorAll('[data-strich]').length) throw new Error('über ' + MAX + ' Punkten noch Striche');
+  if (gross.querySelectorAll('[data-grenze]').length !== 2) throw new Error('über ' + MAX + ' Punkten: ' + gross.querySelectorAll('[data-grenze]').length + ' Grenzen statt 2');
+  const allein = window.document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  G('powerRing')(allein, 0, 0, 17, 21.5, [{ v: MAX + 5, col: '#111' }], 'allein');
+  if (allein.querySelectorAll('[data-strich],[data-grenze]').length) throw new Error('voller Ring über ' + MAX + ': Striche');
+  // unter der Grenze liegen die Reichsgrenzen auf Strichen: 1 gegen 2 → Striche bei 0°,
+  // 120° (Grenze Verteidiger/Angreifer) und 240°
+  const winkel = [...probe.querySelectorAll('[data-strich]')].map(e => Math.round(Math.atan2(+e.getAttribute('x2'), -e.getAttribute('y2')) * 180 / Math.PI));
+  if (JSON.stringify(winkel) !== JSON.stringify([0, 120, -120])) throw new Error('1 gegen 2: Striche bei ' + winkel);
+  const leer = window.document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  G('powerRing')(leer, 0, 0, 17, 21.5, [{ v: 0, col: '#111' }], 'leer');
+  if (leer.querySelector('[data-anteil="1"]') || !leer.querySelector('[data-anteil="0"]')) throw new Error('0 Punkte: kein leerer Ring');
+  if (!$('sheet-body').querySelector('.power-legend')) throw new Error('keine Legende im Machtblatt');
+  // Schließen und Feld antippen beenden die Ansicht
   G('closeSheet')();
-  console.log('       Feld ' + gut.join('/') + ': Siedelertrag ' + soll + ', Meer und Stadt ohne');
+  if (G('ui').powerView || $('map').querySelector('[data-power]')) throw new Error('Ringe bleiben nach dem Schließen');
+  $('a-power').onclick(); G('tapHex')(cap.r, cap.c);
+  if ($('map').querySelector('[data-power]')) throw new Error('Ringe bleiben beim Feldblatt');
+  $('a-power').onclick(); $('a-army').onclick();
+  if ($('map').querySelector('[data-power]')) throw new Error('Ringe bleiben beim Armeeblatt');
+  G('closeSheet')();
+  console.log(`       Hauptstadt: Verteidigung ${st.def} gegen ${st.atk.map(a => a.v).join('+')} = ${stueckVorher} Stücke · ` +
+    `nach +5 Macht ${punkteNach} · 1 gegen 2 = drei Stücke · Schließen, Feld, Armeen beenden die Ansicht`);
 });
 step('Bürgerkrieg: Armee-Knopf ist mit Nahrung + Münzen bedienbar (gemeldeter Fehler)', () => {
   frischesSpiel();
@@ -2161,12 +2352,13 @@ step('Tutorial: die ersten Aufgaben lassen sich auch auf Englisch lösen', () =>
     G('closeSheet')();                       // ein Blatt aus einem früheren Schritt weg
     if ($('sheet').classList.contains('open'))
       throw new Error(sprache + ': altes Blatt lässt sich nicht schließen (botLock?)');
+    $('a-found').onclick();                  // v75: Gründen ist eine eigene Aktion der Leiste
     G('tapHex')(ziel[0], ziel[1]);
     if (!$('sheet').classList.contains('open'))
       throw new Error(sprache + ': Blatt öffnet nicht · Spieler ' +
         G('P')(G('S')).kind + ' · over ' + !!G('S').over);
     const knopf = [...$('sheet-body').querySelectorAll('.opt')]
-      .find(b => b.dataset.label === 'Stadt gründen');
+      .find(b => b.dataset.label === 'Hier gründen');
     if (!knopf) throw new Error(sprache + ': kein Gründen-Knopf mit deutschem Schlüssel');
     if (knopf.disabled) throw new Error(sprache + ': Gründen ist gesperrt');
     const vorher = G('S').cities.length;

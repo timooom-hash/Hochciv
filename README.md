@@ -21,7 +21,10 @@ sonst behalten installierte Geräte die alte Fassung.
 
 | | |
 |---|---|
-| Feld antippen | Aktionsblatt für dieses Feld (Stadt gründen, wachsen, Armee bauen …) |
+| Feld antippen | Aktionsblatt für dieses Feld (wachsen, Armee bauen, Straße, Feld kaufen …) – gegründet wird seit v75 über **Stadt gründen** in der Leiste |
+| **Stadt gründen** | Gründungsmodus: jedes Feld zeigt seine Erträge, jeder mögliche Platz die Kosten in Nahrung (rot, wenn sie diesen Zug nicht reichen), unmögliche Felder sind abgeblendet. Feld antippen → Blatt mit Kosten und **Ertrag beim Siedeln** → **Hier gründen**. Nochmal tippen beendet den Modus |
+| **Erträge** | Umschalter: auf jedem Feld bis zu drei Chips – Wissenschaft blau, Nahrung grün, Münzen gold –, gerechnet mit den eigenen Technologien. Die Wahl bleibt gespeichert |
+| **Macht** | Macht kaufen. Solange das Blatt offen ist, tragen Städte und Armeen **Ringe** aus **einem Teilstück je Punkt**: in der Farbe des Besitzers seine Verteidigung bzw. sein Machtwert, in fremder Farbe Angreifer bzw. Flankierer – Verteidigung 1 gegen Angriff 2 sind drei Stücke, eines gegen zwei. Überwiegt ein fremder Anteil, läuft die Belagerung bzw. fällt die Armee; Käufe verschieben die Ringe sofort. Über 60 Punkte zeigt der Ring nur noch den Anteil, bei 0 Punkten bleibt er leer |
 | Bevölkerung wachsen | zwei Knöpfe, wenn Verbundwerkstoffe ein Gratis-Wachstum erlaubt: „Kostenlos wachsen" und der bezahlte „Bevölkerung wachsen" |
 | Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
 | Einstellungen | Im Hauptmenü: die Erweiterungsmodule **Ereignisse** und **Weltwunder** zuschalten. Ab Werk sind beide aus und fehlen im Aufbau ganz; eingeschaltet steht dort wieder das Häkchen und entscheidet je Partie |
@@ -38,7 +41,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | **Forschen** | links die Ertragsübersicht (Felder, **Handelsrouten**, Bevölkerung, Summe fürs nächste Einkommen), rechts der Technologiebogen |
 | **Armeen** | Übersicht aller eigenen Armeen; antippen wählt aus, dann Zielfeld antippen |
 | Armee auf der Karte | antippen → *Bewegen*; steht sie in der eigenen Stadt, steht die Aktion im Stadtblatt |
-| Feld antippen | Aktionsblatt mit dem Feldertrag; ist das Feld siedelbar, steht darunter der **Ertrag beim Siedeln** — was eine Stadt hier ab der nächsten Runde brächte |
+| Feld antippen | Aktionsblatt mit dem Feldertrag. Den **Ertrag beim Siedeln** — was eine Stadt hier ab der nächsten Runde brächte — zeigt das Blatt des Gründungsmodus |
 | Karte | fest und immer vollständig sichtbar – kein Zoomen, kein Schieben. Im Hochformat dreht die App sich selbst quer (im ☰-Menü abschaltbar) |
 | **Forschen** | Technologiebogen; erforschbares ist rot umrandet — durchgezogen heißt bezahlbar, gestrichelt zu teuer. Kopieren (Spionage/Kundschafterei/Internet) erscheint unten im selben Fenster |
 | Atomwaffen | Zielfeld antippen → *Atomschlag* im Aktionsblatt (einmal pro Runde) |

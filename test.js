@@ -358,6 +358,25 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     eq(S.armies.filter(a => a.owner === 1).length, feinde - 1,
       'die angreifende Armee wird flankiert und zerstört');
   }
+  // v75: dasselbe über eine Diagonale. Bis v74 spiegelte der Bot in Zeile/Spalte und
+  // stellte sich zum Partner im Nordwesten (4/6) nach Südwest (6/6) – dieselbe Seite.
+  // Gegenüber liegt Südost, 6/7. Der Partner steht zugleich neben der Hauptstadt, damit
+  // er nicht zum Verteidigen wegzieht (das täte er sonst, unabhängig von der Spiegelung).
+  {
+    const S = flach();
+    const hs2 = stadt(S, 0, 5, 5, 1, true);   // westlich neben dem Gegner
+    stadt(S, 0, 1, 1, 8, false);              // Hinterland: Machtwert 9
+    stadt(S, 1, 5, 16, 6, true); macht(S, 1, 6);
+    armee(S, 1, 5, 6); belagert(S, 1, hs2);
+    armee(S, 0, 4, 6);                        // Partner nordwestlich des Gegners
+    armee(S, 0, 8, 7);                        // soll nach Südost, 6/7
+    plan(S, 0);
+    eq(S.armies.some(a => a.owner === 0 && a.r === 6 && a.c === 7), true,
+      'Bot stellt sich diagonal gegenüber (Südost zu Nordwest)');
+    const feinde = S.armies.filter(a => a.owner === 1).length;
+    combatPhase(S, 0);
+    eq(S.armies.filter(a => a.owner === 1).length, feinde - 1, 'und zerstört die Armee über die Diagonale');
+  }
   // Prio 4/5: unter mehreren bedrohten Städten zuerst die größere
   {
     const S = flach();
@@ -566,11 +585,59 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const adj = neighbors(gr.r, gr.c).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
   enemy.r = adj[0]; enemy.c = adj[1];
   S.players[1].power = 1;
-  const opp = [enemy.r + (enemy.r - gr.r), enemy.c + (enemy.c - gr.c)];
+  // gegenüber = am Gegner gespiegelt, in Würfelkoordinaten (Zeile/Spalte stimmt nur waagerecht)
+  const opp = neighbors(enemy.r, enemy.c).find(([r, c]) => hexOpposite(enemy.r, enemy.c, gr.r, gr.c, r, c));
   S.armies.push({ id: 611, owner: 0, r: opp[0], c: opp[1], mp: 0, born: 0 });
   S.armies.push(enemy);
   S.cur = 0; combatPhase(S, 0);
   eq(S.armies.some(a => a.id === 610), false, 'Burgenstadt hilft, eine benachbarte Gegnerarmee zu flankieren');
+}
+
+/* v75: Flankieren „gegenüberliegend" – auf allen drei Achsen, in geraden wie ungeraden
+   Zeilen. Bis v74 wurde in Zeile/Spalte gespiegelt: nur Ost–West stimmte, dafür
+   flankierten Nordost+Südost (gerade Zeile) bzw. Nordwest+Südwest (ungerade Zeile). */
+{
+  const flankiert = (er, ec, a, b, techs = {}) => {
+    const S = newGame({ seed: 3, players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.cities = S.cities.filter(c => hexDistance(c.r, c.c, er, ec) > 4);
+    S.armies = [{ id: 900, owner: 1, r: er, c: ec, mp: 0, born: 0 },
+      { id: 901, owner: 0, r: a[0], c: a[1], mp: 0, born: 0 },
+      { id: 902, owner: 0, r: b[0], c: b[1], mp: 0, born: 0 }];
+    S.players[0].power = 10; S.players[1].power = 0;
+    Object.assign(S.players[0].techs, techs);
+    const stellung = canFlank(S, 0, S.armies[0]);
+    combatPhase(S, 0);
+    const weg = !S.armies.some(x => x.id === 900);
+    return stellung === weg ? weg : 'Stellung und Kampf uneins';
+  };
+  for (const [er, ec, zeile] of [[6, 6, 'gerade'], [5, 6, 'ungerade']]) {
+    const paare = [];
+    for (let d1 = 0; d1 < 6; d1++) for (let d2 = d1 + 1; d2 < 6; d2++)
+      if (flankiert(er, ec, neighbor(er, ec, d1), neighbor(er, ec, d2)) === true) paare.push(d1 + '+' + d2);
+    eq(paare, ['0+3', '1+4', '2+5'], `${zeile} Zeile: genau die drei gegenüberliegenden Paare flankieren (O–W, SO–NW, SW–NO)`);
+    eq(flankiert(er, ec, neighbor(er, ec, 0), neighbor(er, ec, 1), { taktik: true }), true,
+      `${zeile} Zeile: mit Taktik auch zwei benachbarte Seiten`);
+    // Raketentechnik: auf Distanz 2 gegenüber, auch diagonal
+    const zwei = d => neighbor(...neighbor(er, ec, d), d);
+    eq([flankiert(er, ec, zwei(1), zwei(4), { raketentechnik: true }),
+      flankiert(er, ec, zwei(1), zwei(4))], [true, false],
+      `${zeile} Zeile: auf Distanz 2 diagonal gegenüber nur mit Raketentechnik`);
+  }
+  eq([hexOpposite(5, 6, 4, 7, 6, 6), hexOpposite(5, 6, 4, 6, 6, 6), hexOpposite(6, 6, 5, 5, 7, 6)],
+    [true, false, true], 'hexOpposite: Spiegelung in Würfelkoordinaten');
+  // Die Machtansicht liest dieselbe Regel: eine flankierte Armee trägt das flankierende Reich
+  {
+    const S = newGame({ seed: 3, players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.cities = S.cities.filter(c => hexDistance(c.r, c.c, 5, 6) > 4);
+    S.armies = [{ id: 900, owner: 1, r: 5, c: 6, mp: 0, born: 0 },
+      { id: 901, owner: 0, r: 4, c: 7, mp: 0, born: 0 }, { id: 902, owner: 0, r: 6, c: 6, mp: 0, born: 0 }];
+    S.players[0].power = 7; S.players[1].power = 4;
+    const v = powerView(S).armies.find(x => x.army.id === 900);
+    eq([v.pow, v.flank], [4, [{ pi: 0, v: 7 }]], 'Machtansicht: Armee 4 gegen den Flankierer 7');
+    eq(powerView(S).armies.find(x => x.army.id === 901).flank, [], 'die eigenen Flankierer sind nicht bedroht');
+  }
 }
 
 /* Sklaverei: max. 1 pro Runde pro Stadt */
@@ -3367,6 +3434,77 @@ const duellKarte = (civA, civB, seed) => {
     eq(mit - ohne, n, `Waldfähigkeit bringt genau +1 je Wald (${n} Wälder)`);
   }
 }
+/* ==================================================== Gründungsmodus (v75)
+   Die Oberfläche fragt jedes Feld ab: taugt der Platz (foundSiteError), was kostet er
+   (foundCost), reicht die Nahrung (canFound). Dafür wurde canFound geteilt – an seinen
+   Antworten darf sich nichts ändern – und eine Wegtabelle eingeführt, die dieselben
+   Entfernungen liefern muss wie die Einzelsuche. */
+{
+  const S = newGame({ seed: 5, players: CIVS.map(c => ({ civ: c.k, kind: 'bot' })) });
+  let guard = 0;
+  while (!S.over && S.round < 6 && guard++ < 200) { botTurn(S, S.cur); if (S.over) break; endTurn(S); }
+  S.over = null;
+  const pi = S.players.findIndex(p => !p.dead);
+  // canFound = foundSiteError, sonst die Nahrung – Feld für Feld
+  let uneins = 0, knapp = 0;
+  S.players[pi].res = { sci: 0, food: 2, coins: 0 };
+  S.map.rows.forEach((row, r) => [...row].forEach((t, c) => {
+    const site = foundSiteError(S, pi, r, c), cost = foundCost(S, pi, r, c);
+    const soll = site || (available(S, pi, 'food') < cost ? T('Zu wenig Nahrung (%s nötig).', cost) : null);
+    if (canFound(S, pi, r, c) !== soll) uneins++;
+    if (!site && soll) knapp++;
+  }));
+  eq(uneins, 0, 'canFound = Platzprüfung + Nahrung, auf jedem Feld');
+  eq(knapp > 0, true, `mit 2 Nahrung scheitern Plätze nur an der Nahrung (${knapp}) – sie zeigen ihre Kosten rot`);
+  // Wegtabelle gegen Einzelsuche, auch mit Navigation, Kartografie und Luftwaffe
+  const abw = [];
+  let felder = 0;
+  for (const techs of [[], ['navigation'], ['kartografie'], ['luftwaffe']]) {
+    const alt = Object.assign({}, S.players[pi].techs);
+    techs.forEach(k => { S.players[pi].techs[k] = true; });
+    const einzeln = S.map.rows.flatMap((row, r) => [...row].map((t, c) =>
+      JSON.stringify([foundSiteError(S, pi, r, c), foundCost(S, pi, r, c)])));
+    const tabelle = withFoundTable(S, pi, () => S.map.rows.flatMap((row, r) => [...row].map((t, c) =>
+      JSON.stringify([foundSiteError(S, pi, r, c), foundCost(S, pi, r, c)]))));
+    einzeln.forEach((e, i) => { felder++; if (e !== tabelle[i]) abw.push(techs.join() + '#' + i); });
+    S.players[pi].techs = alt;
+  }
+  eq(abw.slice(0, 3), [], `Wegtabelle = Einzelsuche (${felder} Felder, vier Technikstände)`);
+  eq(FOUND_SCOPE, null, 'außerhalb von withFoundTable rechnet wieder die Einzelsuche');
+  // Die Tabelle gilt nur für das Reich, für das sie gerechnet wurde
+  const anderer = S.players.findIndex((p, i) => i !== pi && !p.dead);
+  const probe = S.map.rows.flatMap((row, r) => [...row].map((t, c) => [r, c]))
+    .filter(([r, c]) => isLand(S, r, c)).slice(0, 40);
+  eq(withFoundTable(S, pi, () => probe.map(([r, c]) => foundCost(S, anderer, r, c))),
+    probe.map(([r, c]) => foundCost(S, anderer, r, c)), 'ein anderes Reich rechnet in der Tabelle nicht mit');
+}
+/* ==================================================== Machtansicht (v75)
+   powerView: je Stadt Verteidigung und Angriff jedes Reichs mit Armeen in Reichweite,
+   je Armee Machtwert und Flankierer – dieselben Zahlen wie im Kampf. */
+{
+  const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' },
+    { civ: 'wikinger', kind: 'human' }] });
+  S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+  S.armies.length = 0;
+  const ru = S.players.findIndex(p => p.civ === 'russland');
+  const en = S.players.findIndex(p => p.civ === 'england');
+  const wi = S.players.findIndex(p => p.civ === 'wikinger');
+  const cap = capitalOf(S, ru);
+  S.players[ru].power = 2; S.players[en].power = 4; S.players[wi].power = 3;
+  const nb = neighbors(cap.r, cap.c);
+  S.armies.push({ id: 1, owner: en, r: nb[0][0], c: nb[0][1], mp: 0, born: 0 });
+  S.armies.push({ id: 2, owner: en, r: nb[1][0], c: nb[1][1], mp: 0, born: 0 });
+  S.armies.push({ id: 3, owner: wi, r: nb[3][0], c: nb[3][1], mp: 0, born: 0 });
+  const v = powerView(S).cities.find(x => x.city === cap);
+  eq(v.def, defenseValue(S, cap), 'Stadt: Verteidigung wie im Kampf');
+  eq(v.atk.map(a => [a.pi, a.v]).sort((a, b) => a[0] - b[0]),
+    [[en, attackValue(S, en, 2)], [wi, attackValue(S, wi, 1)]].sort((a, b) => a[0] - b[0]),
+    'Stadt: je angreifendem Reich sein Angriffswert (zwei Armeen addieren sich)');
+  eq(powerView(S).cities.filter(x => x.city.owner !== ru).every(x => !x.atk.length), true,
+    'Städte ohne fremde Armeen in Reichweite: kein Angreifer');
+  S.players[wi].dead = true;
+  eq(powerView(S).cities.find(x => x.city === cap).atk.map(a => a.pi), [en], 'ein ausgeschiedenes Reich greift nicht an');
+}
 /* Der Protokollschritt im Tutorial darf beim Weiterschalten nicht das offene Fenster
    wegreißen – dafür gibt es keepOpen. */
 {
@@ -3565,7 +3703,9 @@ function tutRun() {
   eq(tutAllow().bar, ['a-info', 'a-log'], 'im Leseschritt sind nur Welt und Protokoll offen');
   // Gründungsschritt
   ui.tut.i = TUT_STEPS.findIndex(st => /zweite Stadt/.test(st.t));
-  eq(tutAllow().bar, [], 'beim Gründen ist die Aktionsleiste gesperrt');
+  // v75: gegründet wird über „Stadt gründen" in der Leiste – nur dieser Knopf ist frei
+  eq(tutAllow().bar, ['a-found'], 'beim Gründen ist nur „Stadt gründen" in der Leiste offen');
+  eq(tutAllow().labels.map(String), ['/Hier gründen/'], 'und im Blatt nur „Hier gründen"');
   eq(tutHexOk(...TUT_CITY_1), true, 'das Zielfeld ist freigegeben');
   eq(tutHexOk(0, 0), false, 'andere Felder nicht');
   // Forschungsschritt – über die Freigabe gesucht, nicht über den Titel: die Texte
