@@ -64,18 +64,58 @@ function hexPoints(size) {
 }
 
 /* Dijkstra über Bewegungskosten. passable(r,c) -> bool | 'stop' (betretbar, endet Bewegung)
-   edgeCost(from,to) -> Kosten (1, 0.5 mit Straße, 0 mit Eisenbahn) */
-function reachable(startR, startC, budget, passable, edgeCost) {
+   edgeCost(from,to) -> Kosten (1, 0.5 mit Straße, 0 mit Eisenbahn)
+   Die Warteschlange ist ein binärer Heap (v77). Vorher wurde sie vor jedem Schritt ganz
+   sortiert – bei Luftwaffe (Bewegung 9) über die halbe Karte gut 1 ms je Aufruf, und die
+   KI fragt Reichweiten tausendfach ab. Das Ergebnis ist dasselbe: Dijkstra liefert die
+   kürzesten Wege unabhängig davon, in welcher Reihenfolge gleich weite Felder drankommen
+   (test.js vergleicht beide Fassungen an echten Spielständen).
+   Ebenso neu: passable wird je Feld nur einmal gefragt. Es liest den Spielstand, der sich
+   während der Suche nicht ändert, und prüft Städte, Armeen und Kontrollzonen – bis zu
+   sechsmal dieselbe Antwort für dasselbe Feld war der größere Teil der Rechenzeit. */
+function reachable(startR, startC, budget, passable0, edgeCost) {
+  const known = new Map();
+  const passable = (r, c) => {
+    const k = key(r, c);
+    let v = known.get(k);
+    if (v === undefined) { v = passable0(r, c); known.set(k, v); }
+    return v;
+  };
   const dist = new Map();
-  dist.set(key(startR, startC), 0);
-  const queue = [[startR, startC]];
+  const start = key(startR, startC);
+  dist.set(start, 0);
+  const heap = [[0, startR, startC]];                  // [Entfernung, Zeile, Spalte]
+  const push = e => {
+    heap.push(e);
+    for (let i = heap.length - 1; i > 0;) {
+      const j = (i - 1) >> 1;
+      if (heap[j][0] <= heap[i][0]) break;
+      [heap[i], heap[j]] = [heap[j], heap[i]]; i = j;
+    }
+  };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) {
+      heap[0] = last;
+      for (let i = 0; ;) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+        if (m === i) break;
+        [heap[i], heap[m]] = [heap[m], heap[i]]; i = m;
+      }
+    }
+    return top;
+  };
   const stopped = new Set();
-  while (queue.length) {
-    queue.sort((a, b) => dist.get(key(a[0], a[1])) - dist.get(key(b[0], b[1])));
-    const [r, c] = queue.shift();
-    const d = dist.get(key(r, c));
+  while (heap.length) {
+    const [dq, r, c] = pop();
+    const k0 = key(r, c);
+    const d = dist.get(k0);
+    if (dq > d + 1e-9) continue;                       // veralteter Eintrag
     if (d > budget) continue;
-    if (stopped.has(key(r, c)) && !(r === startR && c === startC)) continue;
+    if (stopped.has(k0) && k0 !== start) continue;
     for (const [nr, nc] of neighbors(r, c)) {
       const p = passable(nr, nc);
       if (!p) continue;
@@ -85,11 +125,11 @@ function reachable(startR, startC, budget, passable, edgeCost) {
       if (!dist.has(k) || nd < dist.get(k) - 1e-9) {
         dist.set(k, nd);
         if (p === 'stop') stopped.add(k);
-        queue.push([nr, nc]);
+        push([nd, nr, nc]);
       }
     }
   }
-  dist.delete(key(startR, startC));
+  dist.delete(start);
   return dist;
 }
 

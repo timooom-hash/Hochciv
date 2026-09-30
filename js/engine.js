@@ -57,6 +57,11 @@ const civOf = p => {
   const n = p.roman ? `${base.n} ${p.roman}` : p.name;
   return Object.assign({}, base, n ? { n } : null, p.color ? { color: p.color } : null);
 };
+/* Wer zieht von selbst? Bots nach den Bot-Regeln, die KI nach den Regeln für Menschen
+   (js/ki.js). Beide brauchen keine Eingabe – die Oberfläche fragt das hier ab. */
+const isAuto = p => !!p && (p.kind === 'bot' || p.kind === 'ki');
+// Zusatz hinter dem Reichsnamen im Protokoll: „ (Bot)" bzw. „ (KI)", bei Menschen nichts
+const kindTag = p => p.kind === 'bot' ? T(' (Bot)') : p.kind === 'ki' ? T(' (KI)') : '';
 /* Hauptstadt eines Reiches auf der Karte. Feste Karten führen sie nach Zivilisation,
    Plättchenkarten nach Platz – dort kann es dieselbe Zivilisation zweimal geben. */
 function capitalSpot(map, p) {
@@ -139,12 +144,14 @@ function newGame(cfg) {
       civ: pc.civ, kind: pc.kind, diff: pc.diff || 'prinz', name: pc.name || null,
       roman: pc.roman || null, color: pc.color || null, slot: cfg.players.indexOf(pc),
       ability: pc.kind === 'bot' ? 'basis' : (pc.ability || 'basis'),
+      // KI (js/ki.js): spielt nach den Regeln für Menschen, nur die Stufe kommt dazu
+      kiLevel: pc.kind === 'ki' ? (pc.kiLevel || KI_DEFAULT_LEVEL) : null,
       power: 0, techs: {}, avail: {}, res: { sci: 0, food: 0, coins: 0 },
       copies: 0, nuked: false, dead: false,
     })),
   };
   log(S, 'head', 'Neues Spiel — ' + (S.duel ? '1 gegen 1: ' : '') +
-    S.players.map(p => civOf(p).n + (p.kind === 'bot' ? T(' (Bot)') : '')).join(', ') +
+    S.players.map(p => civOf(p).n + kindTag(p)).join(', ') +
     ` · ${S.map.name}` +
     (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : '') +
     (S.altTree ? T(' · Alternativer Techtree') : ''));
@@ -763,7 +770,7 @@ function growthBlocked(S, pi, city, delta = 1) {
 function beginTurn(S) {
   const p = P(S);
   if (p.dead || !citiesOf(S, S.cur).length && !armiesOf(S, S.cur).length) { p.dead = true; return; }
-  log(S, 'head', T('Runde %s — %s%s', S.round, civOf(p).n, p.kind === 'bot' ? ' (Bot)' : ''));
+  log(S, 'head', T('Runde %s — %s%s', S.round, civOf(p).n, kindTag(p)));
   // 0 Kultursieg: ein Stufe-3-Wunder gewinnt zu Beginn des nächsten eigenen Zuges
   if (checkCultureVictory(S, S.cur)) return;
   // 1 Einkommen. foodRaw ist der rohe Nahrungssaldo (darf negativ sein); daraus ergeben
@@ -1628,14 +1635,16 @@ function captureCity(S, pi, city) {
 
 /* ------------------------------------------------------------ Sieg & Zugende */
 /* Alle verfügbaren Siegschwellen. UN und Theologie senken die Standardschwelle von ⅔;
-   es gilt immer die niedrigste. UN/Theologie sind „mehr als", der Standard „mindestens". */
+   es gilt immer die niedrigste. Alle Schwellen sind „mehr als" – seit v77 auch der
+   Standard (Anweisung des Autors: 4 von 6 sind nicht mehr als 2/3). Bis v74 galt dort
+   „mindestens", und im Spiel zu dritt reichten so 4 von 6 schon in Runde 1. */
 function victoryOption(S, p) {
   const duel = !!(S && S.duel);
-  // Im Duell liegen alle Schwellen höher: >3/4 statt >=2/3, Theologie 7/10, UN 2/3
+  // Im Duell liegen alle Schwellen höher: >3/4 statt >2/3, Theologie 7/10, UN 2/3
   const L = victoryLabels(duel);
   const opts = duel
     ? [{ frac: DUEL_VICTORY_FRAC, strict: true, label: L.base }]
-    : [{ frac: VICTORY_FRAC, strict: false, label: L.base }];
+    : [{ frac: VICTORY_FRAC, strict: true, label: L.base }];
   if (has(p, 'un'))
     opts.push({ frac: duel ? DUEL_UN_FRAC : UN_FRAC, strict: true, label: L.un });
   if (has(p, 'theologie'))
@@ -1651,8 +1660,15 @@ function techEffect(t, S) {
   if (t.k === 'un') return T('>%s der Bevölkerung zum Sieg', L.un);
   return t.e;
 }
+/* Wirtschaftssieg. In Runde 1 gibt es ihn nicht (v77, Anweisung des Autors): mit einer
+   Handvoll Bevölkerung auf der Welt reichte dem Startspieler eine gegründete Stadt und
+   ein Wachstum, im Duell etwa 4 von 5 – und der Anspruch bleibt gültig, auch wenn der
+   Gegner im selben Zug nachzieht. Gemessen mit der KI: 5 von 30 Duellen endeten so in
+   Runde 1. Die Sperre greift auch bei der Nachprüfung am Rundenende (resolveClaims ruft
+   diese Funktion). */
 function checkVictory(S, pi) {
   if (S.over) return S.over;
+  if (S.round <= 1) return S.over;
   const p = S.players[pi], w = worldPop(S), mine = popOf(S, pi);
   const o = victoryOption(S, p);
   const enough = o.strict ? mine > w * o.frac : mine >= w * o.frac;

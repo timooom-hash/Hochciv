@@ -33,6 +33,7 @@ const DATA_EN = {
     siedler: 'Settler', haeuptling: 'Chieftain', prinz: 'Prince',
     koenig: 'King', david: 'David',
   },
+  kilevel: { leicht: 'Easy', mittel: 'Medium', schwer: 'Hard' },
   evmode: {
     hard: 'Hard (an event every round)',
     easy: 'Light (roughly every other round)',
@@ -246,6 +247,7 @@ function snapshotGerman() {
     terrain: Object.fromEntries(Object.values(TERRAIN).map(t => [t.key, t.name])),
     ages: AGES.slice(), fields: FIELDS.slice(),
     diff: Object.fromEntries(DIFFICULTIES.map(d => [d.k, d.n])),
+    kilevel: Object.fromEntries(KI_LEVELS.map(d => [d.k, d.n])),
     evmode: Object.fromEntries(EVENT_MODES.map(m => [m.k, m.n])),
     maps: MAPS.map(m => m.name),
     shapes: Object.fromEntries(Object.values(TILE_SHAPES).map(s => [s.key, s.name])),
@@ -269,6 +271,7 @@ function applyDataLang() {
   D.ages.forEach((n, i) => { AGES[i] = n; });
   D.fields.forEach((n, i) => { FIELDS[i] = n; });
   DIFFICULTIES.forEach(d => { d.n = D.diff[d.k] || d.n; });
+  KI_LEVELS.forEach(d => { d.n = D.kilevel[d.k] || d.n; });
   EVENT_MODES.forEach(m => { m.n = D.evmode[m.k] || m.n; });
   MAPS.forEach((m, i) => { m.name = D.maps[i] || m.name; });
   Object.values(TILE_SHAPES).forEach(s => { s.name = D.shapes[s.key] || s.name; });
@@ -901,8 +904,8 @@ const UI_EN = {
     'Resources only count for the current turn – only power carries over. 2 coins count as 1 food or 1 science.',
   'Sieg':
     'Victory',
-  'Sieg: Singularität · %s der Weltbevölkerung (UN %s, Theologie %s) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).':
-    'Victory: Singularity · %s of the world population (UN %s, Theology %s) · an enemy capital · a level 3 wonder. Except for a military victory the game only ends at the end of the round; if several claim it, points decide (population + wonders + technologies).',
+  'Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; ab Runde 2) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).':
+    'Victory: Singularity · more than %s of the world population (UN %s, Theology %s; from round 2) · an enemy capital · a level 3 wonder. Except for a military victory the game only ends at the end of the round; if several claim it, points decide (population + wonders + technologies).',
   'Stadt (je Bevölkerung)':
     'City (per population)',
   'Weltwunder (Erweiterung)':
@@ -1152,6 +1155,32 @@ const UI_EN = {
     'Rings on the map, one segment per point: the owner’s colour is its defence or power value, other colours are attackers or flankers. If another share is larger, the siege runs or the army falls – on a tie the defender holds. Above %s points only the share is shown.',
   'Rot umrandet: ein anderes Feld bringt von etwas mehr und von nichts weniger.':
     'Red outline: another spot yields more of something and less of nothing.',
+
+  /* --- KI (js/ki.js): Sitzart im Aufbau, Stufe, Protokoll */
+  'KI': 'AI',
+  ' (KI)': ' (AI)',
+  ' · KI': ' · AI',
+  'KI-Stufe (alle KI)': 'AI level (all AI)',
+  'Die KI spielt nach denselben Regeln wie ein Mensch: sie bezahlt alles, hat ihre Zivilisationsfähigkeit, und Ereignisse treffen sie.':
+    'The AI plays by the same rules as a human: it pays for everything, has its civilization ability, and events affect it.',
+  'KI: %s': 'AI: %s',
+  'forscht %s': 'researches %s',
+  'Freie Forschung: %s': 'Free research: %s',
+  'Rückschau: %s': 'Hindsight: %s',
+  'gratis: %s': 'free: %s',
+  'kopiert %s': 'copies %s',
+  'Stadt wächst': 'city grows',
+  'Stadt wächst kostenlos': 'city grows for free',
+  'gründet eine Stadt auf %s/%s': 'founds a city at %s/%s',
+  'opfert Bevölkerung': 'sacrifices population',
+  'kauft Feld %s/%s': 'buys tile %s/%s',
+  'baut %s': 'builds %s',
+  'kauft %s Macht': 'buys %s power',
+  'greift die Stadt auf %s/%s an': 'attacks the city at %s/%s',
+  'verteidigt die Stadt auf %s/%s': 'defends the city at %s/%s',
+  'flankiert eine Armee auf %s/%s': 'flanks an army at %s/%s',
+  'baut Straße zur Stadt auf %s/%s': 'builds a road to the city at %s/%s',
+  'baut Eisenbahn zur Stadt auf %s/%s': 'builds a railway to the city at %s/%s',
 
   /* --- Karteneditor */
   'Größe': 'Size',

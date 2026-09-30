@@ -507,23 +507,23 @@ function attachTaps(svg, onTap) {
 
 /* ------------------------------------------------------------------ Spielansicht */
 function currentMap() { return customMap || DEFAULT_MAP; }
-/* Wessen Erträge zeigt die Ertragsansicht? Wer am Zug ist – während Bots ziehen, der
-   Mensch, der zuschaut (sonst sprängen die Zahlen mit jedem Bot um). */
+/* Wessen Erträge zeigt die Ertragsansicht? Wer am Zug ist – während Bots oder die KI
+   ziehen, der Mensch, der zuschaut (sonst sprängen die Zahlen mit jedem Zug um). */
 function viewerOf(S2) {
-  if (P(S2).kind !== 'bot') return S2.cur;
+  if (!isAuto(P(S2))) return S2.cur;
   const m = S2.players.findIndex(p => p.kind === 'human' && !p.dead);
   return m >= 0 ? m : S2.cur;
 }
 function redraw() {
   if (ui.army && !S.armies.includes(ui.army)) ui.army = null;
   const p = P(S), civ = civOf(p);
-  const human = p.kind !== 'bot' && !S.over;
+  const human = !isAuto(p) && !S.over;
   if (!human && ui.mode === 'found') ui.mode = null;     // Gründen gibt es nur im eigenen Zug
   const highlight = ui.army ? [...armyReach(S, ui.army).keys()].map(unkey) : [];
   const gruenden = ui.mode === 'found';
   drawMap($('map'), S.map, {
     state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : null,
-    turn: p.kind === 'bot' ? -1 : S.cur,
+    turn: isAuto(p) ? -1 : S.cur,
     yields: showYields || gruenden ? viewerOf(S) : null,
     found: gruenden ? S.cur : null,
     power: ui.powerView ? powerView(S) : null,
@@ -535,7 +535,7 @@ function redraw() {
   // Neben dem Reichsnamen steht die Fähigkeit – ausgelost oder gewählt, hier sieht man,
   // was man hat. Bots haben keine.
   const abil = abilInfo(p);
-  $('hud-name').innerHTML = esc(civ.n) + (p.kind === 'bot' ? T(' · Bot') : '') +
+  $('hud-name').innerHTML = esc(civ.n) + (p.kind === 'bot' ? T(' · Bot') : p.kind === 'ki' ? T(' · KI') : '') +
     (abil ? `<span class="hud-abil" title="${esc(abil.e)}">${esc(abil.n)}</span>` : '');
   const ev = curEvent();
   // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
@@ -573,7 +573,7 @@ function toggleYields() {
 /* Gründungsmodus an/aus (v75). Stadtgründung ist eine eigene Aktion der Leiste: an, zeigt
    die Karte Erträge und Kosten; ein Tipp auf ein Feld öffnet das Gründungsblatt. */
 function toggleFoundMode() {
-  if (!S || S.over || P(S).kind === 'bot') return;
+  if (!S || S.over || isAuto(P(S))) return;
   const an = ui.mode !== 'found';
   ui.mode = an ? 'found' : null;
   if (an) ui.army = null;
@@ -596,7 +596,7 @@ function endTutorialPanel() {
   document.body.classList.remove('tut');
 }
 function tapHex(r, c) {
-  if (S.over || P(S).kind === 'bot') return;
+  if (S.over || isAuto(P(S))) return;
   ui.powerView = false;                 // ein Feld antippen beendet die Machtansicht
   if (ui.army) {
     if (ui.tut && !tutMoveOk(r, c)) return toast(T('Im Tutorial: ziehe die Armee auf das goldene Feld.'));
@@ -810,7 +810,7 @@ function armySheet() {
 
 /* Wie viele Menschen spielen mit? Nur dann lohnt die Anzeige, wer eine Technologie
    erforschen KÖNNTE – Bots kennen keine Verfügbarkeiten, sie würfeln frei aus dem Pool. */
-function humanCount(S) { return S.players.filter(p => p.kind === 'human' && !p.dead).length; }
+function humanCount(S) { return S.players.filter(p => (p.kind === 'human' || p.kind === 'ki') && !p.dead).length; }
 /* Marken an einer Technologiekachel: wer sie hat, wer sie erforschen könnte – zwei sehr
    verschiedene Dinge (erledigte Tatsache gegen bloße Möglichkeit), die vorher kaum zu
    unterscheiden waren (gleiches Symbol, gleiche Farbe, nur der Ring gestrichelt statt
@@ -834,7 +834,7 @@ function ownerMarks(S, techKey, pi) {
     const civ = civOf(pl), self = i === pi;
     if (pl.techs[techKey]) return ownerMark(civ, 'hat', self);
     // Verfügbar bei einem anderen Menschen – die eigene Verfügbarkeit sieht man an der Kachel
-    if (mehrere && !self && pl.kind === 'human' && pl.avail && pl.avail[techKey])
+    if (mehrere && !self && (pl.kind === 'human' || pl.kind === 'ki') && pl.avail && pl.avail[techKey])
       return ownerMark(civ, 'kann', false);
     return '';
   }).join('');
@@ -1081,20 +1081,23 @@ function endHumanTurn() {
   runBots();
   if (fights.length) toast(fights[fights.length - 1].m);
 }
+/* Züge, die ohne Eingabe laufen: Bots nach den Bot-Regeln, die KI nach den Regeln für
+   Menschen (kiTurn in js/ki.js). Beide enden gleich – Kampf und Sieg in finishTurn, dann
+   das Blatt mit dem, was passiert ist, und „Weiter". */
 function runBots() {
   if (S.over) return gameOver();
   const p = P(S);
-  if (p.kind !== 'bot') return humanTurnStart();
+  if (!isAuto(p)) return humanTurnStart();
   const sinceSeq = S.logSeq || 0;
-  botTurn(S, S.cur);
-  finishTurn(S);                       // Kampf des Bots, einmal pro Zug
+  if (p.kind === 'ki') kiTurn(S, S.cur); else botTurn(S, S.cur);
+  finishTurn(S);                       // Kampf des Bots bzw. der KI, einmal pro Zug
   redraw();
   const entries = logSince(S, sinceSeq);
   const lines = entries.length
     ? logHtml(entries)
     : `<div class="logline info">${T('Keine Aktionen in dieser Runde.')}</div>`;
   ui.botLock = true;                   // Sheet ist jetzt gesperrt: nur „Weiter" führt weiter
-  sheet(`<h3>${civOf(p).n} (${T('Bot')})</h3><p class="sub">${T('Runde %s', S.round)}</p>${lines}
+  sheet(`<h3>${civOf(p).n} (${p.kind === 'ki' ? T('KI') : T('Bot')})</h3><p class="sub">${T('Runde %s', S.round)}</p>${lines}
     <button class="btn wide" id="bot-next">${T('Weiter')}</button>`);
   $('sheet').classList.add('locked');
   $('bot-next').onclick = () => {
@@ -1103,7 +1106,7 @@ function runBots() {
     closeSheet();
     if (S.over) return gameOver();
     advanceTurn(S); redraw();
-    if (P(S).kind === 'bot') runBots();
+    if (isAuto(P(S))) runBots();
     else humanTurnStart();
   };
 }
@@ -1119,7 +1122,7 @@ function runBots() {
 // Plätze, nicht Überlebende: ein Mensch, dessen Hauptstadt gefallen ist, saß trotzdem
 // mit am Tisch. Barbaren sind eine Ereignisfraktion und kein Platz.
 const humanSeats = S => S.players
-  .map((p, i) => i).filter(i => !['bot', 'barbar'].includes(S.players[i].kind));
+  .map((p, i) => i).filter(i => S.players[i].kind === 'human');
 // Der einzige Mensch – oder −1, wenn es mehrere sind oder kein Rezept vorliegt
 // (Tutorial und von Hand geladene Spielstände älterer Fassungen haben keines).
 function soloHuman(S) {
@@ -1136,12 +1139,22 @@ const nextDiff = k => {
 const diffName = k => (DIFFICULTIES.find(d => d.k === k) || DIFFICULTIES[2]).n;
 // Der Aufbau setzt einen Grad für alle Plätze, gelesen wird deshalb der erste.
 const recipeDiff = rec => ((rec.players || []).find(p => p.diff) || {}).diff || 'prinz';
+/* Dasselbe für die KI: ihre Stufen (KI_LEVELS, leicht → schwer). Sitzt eine KI mit am
+   Tisch, spricht „Nochmal spielen" von ihrer Stufe – sie ist dann der eigentliche Gegner. */
+const nextKiLevel = k => {
+  const i = KI_LEVELS.findIndex(d => d.k === k);
+  return KI_LEVELS[Math.min(KI_LEVELS.length - 1, (i < 0 ? 1 : i) + 1)].k;
+};
+const kiLevelName = k => (KI_LEVELS.find(d => d.k === k) || KI_LEVELS[1]).n;
+const recipeHasKi = rec => (rec.players || []).some(p => p.kind === 'ki');
+const recipeKiLevel = rec => ((rec.players || []).find(p => p.kind === 'ki' && p.kiLevel) || {}).kiLevel || KI_DEFAULT_LEVEL;
 
 function rematch(harder) {
   const rec = JSON.parse(JSON.stringify(S.recipe));
   const frei = rec.mapPick === 'plaettchen';    // dort darf ein Reich doppelt sitzen
   rec.players.forEach((p, i) => {
     if (harder) p.diff = nextDiff(p.diff);
+    if (harder && p.kind === 'ki') p.kiLevel = nextKiLevel(p.kiLevel);
     if (p.kind !== 'human') return;
     // Ausgelostes Reich – und damit auch eine ausgeloste Fähigkeit.
     p.ability = 'zufall';
@@ -1212,12 +1225,16 @@ function gameOver() {
   const gewonnen = mensch >= 0 && (o.winners || [w]).includes(mensch);
   let nochmal = '';
   if (mensch >= 0) {
-    const alt = recipeDiff(S.recipe), neu = gewonnen ? nextDiff(alt) : alt;
+    // Mit KI am Tisch zählt ihre Stufe, sonst der Schwierigkeitsgrad der Bots
+    const ki = recipeHasKi(S.recipe);
+    const alt = ki ? recipeKiLevel(S.recipe) : recipeDiff(S.recipe);
+    const neu = gewonnen ? (ki ? nextKiLevel(alt) : nextDiff(alt)) : alt;
+    const name = ki ? kiLevelName : diffName;
     const sub = !gewonnen
-      ? T('Dieselben Einstellungen, ausgelostes Reich, Schwierigkeit %s.', diffName(alt))
+      ? T('Dieselben Einstellungen, ausgelostes Reich, Schwierigkeit %s.', name(alt))
       : neu !== alt
-        ? T('Dieselben Einstellungen, ausgelostes Reich – und eine Stufe schwerer: %s.', diffName(neu))
-        : T('Dieselben Einstellungen, ausgelostes Reich. Schwerer als %s geht es nicht.', diffName(alt));
+        ? T('Dieselben Einstellungen, ausgelostes Reich – und eine Stufe schwerer: %s.', name(neu))
+        : T('Dieselben Einstellungen, ausgelostes Reich. Schwerer als %s geht es nicht.', name(alt));
     nochmal = `<button class="btn primary wide" id="go-again">${T('Nochmal spielen')}</button>
       <p class="sub" style="margin:6px 2px 0;text-align:center">${sub}</p>`;
   }
@@ -1548,6 +1565,8 @@ function setupScreen() {
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
     `<option value="${x.k}"${x.k === 'prinz' ? ' selected' : ''}>${x.n}</option>`).join('');
+  $('setup-kilevel').innerHTML = KI_LEVELS.map(x =>
+    `<option value="${x.k}"${x.k === KI_DEFAULT_LEVEL ? ' selected' : ''}>${x.n}</option>`).join('');
   $('setup-events').onchange = evmodeRow;
   $('setup-alttree').onchange = altTreeRow;
   altTreeRow();
@@ -1606,9 +1625,12 @@ function renderSlots() {
              <option value="zufall"${zufall ? ' selected' : ''}>${T('Zufall')}</option>
            </select></label>`
       : `<h3>${SYM[civ.sym]} ${civ.n}</h3>`) +
+      /* Drei Arten: Mensch, KI (spielt nach den Regeln für Menschen, js/ki.js) und Bot (nach
+         den Bot-Regeln). Die KI ist die Vorgabe für die Gegner – Bots bleiben wählbar. */
       `<div class="seg">
         <button data-kind="human" class="${(alt[i] ? alt[i].kind === 'human' : i === 0) ? 'on' : ''}">${T('Mensch')}</button>
-        <button data-kind="bot" class="${(alt[i] ? alt[i].kind === 'bot' : i !== 0) ? 'on' : ''}">${T('Bot')}</button>
+        <button data-kind="ki" class="${(alt[i] ? alt[i].kind === 'ki' : i !== 0) ? 'on' : ''}">${T('KI')}</button>
+        <button data-kind="bot" class="${(alt[i] && alt[i].kind === 'bot') ? 'on' : ''}">${T('Bot')}</button>
       </div>
       <label class="row"><span>${T('Fähigkeit')}</span>
         <select data-abil="${zufall ? 'zufall' : civ.k}">${abils.map(a =>
@@ -1628,6 +1650,7 @@ function renderSlots() {
       note.textContent = kind === 'bot' ? T('Bots erhalten keine Zivilisationsfähigkeit.')
         : zufall ? T('Zivilisation und Fähigkeit werden beim Spielstart ausgelost.')
           : (a.e || T('Wird beim Spielstart ausgelost.'));
+      kindRows();
     };
     sela.onchange = paint;
     d.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
@@ -1654,13 +1677,25 @@ let pickCivs = ['griechenland', 'wikinger', 'russland', 'england'];
 function pickChoice(n) { return pickCivs.slice(0, n); }
 function setupConfig() {
   const diff = $('setup-diff').value;    // ein Schwierigkeitsgrad für alle Bots
+  const kiLevel = $('setup-kilevel').value || KI_DEFAULT_LEVEL;   // eine Stufe für alle KI
   // Rohwahl: 'zufall' bleibt stehen, aufgelöst wird erst in startPlayers()
   return [...$('setup-list').children].map(slot => ({
     civ: slot.dataset.civ,
     kind: slot.querySelector('[data-kind].on').dataset.kind,
-    diff,
+    diff, kiLevel,
     ability: slot.querySelector('[data-abil]').value,
   }));
+}
+/* Die Zeilen für Bot-Schwierigkeit und KI-Stufe stehen nur da, wenn es solche Plätze gibt –
+   sonst fragt der Aufbau nach etwas, das in dieser Partie niemand braucht. */
+function kindRows() {
+  const kinds = [...$('setup-list').children].map(x => {
+    const on = x.querySelector('[data-kind].on');
+    return on ? on.dataset.kind : null;
+  });
+  $('setup-diff-row').hidden = !kinds.includes('bot');
+  $('setup-kilevel-row').hidden = !kinds.includes('ki');
+  $('setup-ki-hint').hidden = !kinds.includes('ki');
 }
 /* Rezept einer Partie: die ROHE Wahl aus dem Aufbau, „Zufall" noch nicht aufgelöst.
    Genau das macht es wiederverwendbar – wer mit ausgeloster Zivilisation gestartet ist,
@@ -1739,7 +1774,7 @@ function refreshStart() {
   const label = p => p.civ === 'zufall' ? T('Zufällige Zivilisation')
     : (CIV_BY_KEY[p.civ] ? CIV_BY_KEY[p.civ].n : p.civ);
   sel.innerHTML = `<option value="zufall">${T('Zufällig')}</option>` + cfg.map((p, i) =>
-    `<option value="${i}">${label(p)}${p.kind === 'bot' ? ' (Bot)' : ''}</option>`).join('');
+    `<option value="${i}">${label(p)}${kindTag(p)}</option>`).join('');
   const menschen = cfg.filter(p => p.kind === 'human').length;
   sel.value = (startWanted != null && [...sel.options].some(o => o.value === startWanted))
     ? startWanted
@@ -1784,6 +1819,8 @@ function startPlacement(cfg) {
   plan.seats.forEach(seat => {
     const pl = cfg.players[seat.idx];        // nach Platz, nicht nach Zivilisation
     if (pl && pl.kind === 'bot') botPlaceSeat(plan, seat, rnd);
+    // Die KI legt wie ein Mensch – verdeckt, sie sieht nur die offenen und ihr Plättchen
+    else if (pl && pl.kind === 'ki') { if (kiPlaceSeat(plan, seat, pl, setup)) botPlaceSeat(plan, seat, rnd); }
     else placeState.queue.push(seat);
   });
   show('screen-place');
@@ -2108,7 +2145,7 @@ function boot() {
   $('a-army').onclick = armySheet;
   $('a-yields').onclick = toggleYields;
   $('a-info').onclick = worldModal;
-  $('hud-feed').onclick = () => { if (P(S).kind !== 'bot' && !S.over) foodSheet(); };
+  $('hud-feed').onclick = () => { if (!isAuto(P(S)) && !S.over) foodSheet(); };
   $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };
   $('a-end').onclick = endHumanTurn;
   $('g-menu').onclick = () => {
@@ -2154,7 +2191,7 @@ function startGameScreen() {
   show('screen-game');
   redraw();
   setBarHeight();
-  if (P(S).kind === 'bot') setTimeout(runBots, 400);
+  if (isAuto(P(S))) setTimeout(runBots, 400);
   else setTimeout(humanTurnStart, 60);
 }
 function rulesModal() {
@@ -2165,7 +2202,7 @@ function rulesModal() {
       <li>${T('Macht halbiert sich (aufgerundet).')}</li>
       <li>${T('Aktionen in beliebiger Reihenfolge, beliebig oft.')}</li>
       <li>${T('Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen. Zwei Züge in Folge stärker → Stadt erobert.')}</li>
-      <li>${T('Sieg: Singularität · %s der Weltbevölkerung (UN %s, Theologie %s) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
+      <li>${T('Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; ab Runde 2) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
         victoryLabels(!!(S && S.duel)).base, victoryLabels(!!(S && S.duel)).un,
         victoryLabels(!!(S && S.duel)).theologie)}</li>
     </ol>

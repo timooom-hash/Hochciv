@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v76';
+const APP_VERSION = 'v77';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -243,6 +243,16 @@ const DIFFICULTIES = [
   { k: 'koenig', n: 'König', min: 3 },
   { k: 'david', n: 'David', min: 2 },
 ];
+/* Stufen der KI (js/ki.js). Die KI spielt auf jeder Stufe nach denselben Regeln wie ein
+   Mensch – sie bekommt weder Ressourcen geschenkt noch abgezogen. Die Stufe regelt nur,
+   wie gründlich sie rechnet und wie oft sie sich bewusst vergreift (Einzelheiten in
+   KI_PARAMS, js/ki.js). Reihenfolge von leicht nach schwer, wie bei DIFFICULTIES. */
+const KI_LEVELS = [
+  { k: 'leicht', n: 'Leicht' },
+  { k: 'mittel', n: 'Mittel' },
+  { k: 'schwer', n: 'Schwer' },
+];
+const KI_DEFAULT_LEVEL = 'mittel';
 
 /* ---------------------------------------------------------------- Ereignisse
    Aus dem Ereignisbogen. Erster Würfel = Zeile (1–6), zweiter = Spalte.
