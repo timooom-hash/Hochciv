@@ -60,6 +60,8 @@ button,select,input{font:inherit;color:inherit}
 .btn.primary{background:var(--red);border-color:var(--red);color:#fdf7e8}
 .btn.ghost{background:transparent;box-shadow:none}
 .btn.small{padding:9px 11px;font-size:13px;border-radius:8px;flex:1;min-width:0}
+/* Umschalter in der Leiste (v75): „Stadt gründen" im Gründungsmodus, „Erträge" an */
+.actionbar .btn.small.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .btn.wide{width:100%;margin-top:18px}
 .btn[disabled]{opacity:.42}
 .icon-btn{background:none;border:0;font-size:22px;padding:6px 12px;line-height:1;cursor:pointer}
