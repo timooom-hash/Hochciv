@@ -5315,6 +5315,129 @@ for (const n of [2, 3, 4]) {
   eq([plaene > 0, falsch], [true, []], `jeder Flankenplan der KI steht nach canFlank (${plaene} Pläne)`);
 }
 {
+  // --- Gemerkte Reichweiten (kiStepMemo, v78): der nächste Planungsschritt rechnet mit den
+  //     Reichweiten weiter, solange sich nichts ändert, wovon sie abhängen (kiMoveSig). Hier:
+  //     nach jeder Art Aktion, die die KI ausführt, gleichen die gemerkten Reichweiten einer
+  //     frischen Rechnung – sonst fehlt der Signatur etwas.
+  let geprueft = 0, falsch = [];
+  const arten = new Set();
+  for (const seed of [91, 92]) {
+    const S = newGame({ seed, players: ['wikinger', 'england', 'russland'].map((c, i) =>
+      ({ civ: c, kind: 'ki', kiLevel: 'schwer', ability: CIV_BY_KEY[c].abilities[i % 3].k })) });
+    for (let z = 0; z < 24 && !S.over; z++) {
+      const pi = S.cur, K = kiContext(S, pi);
+      if (S.round >= 3) {
+        const memo = kiStepMemo({}, S, pi);
+        armiesOf(S, pi).forEach(a => kiTilesOf(S, a, memo));
+        citiesOf(S, pi).forEach(c => kiNewReach(S, pi, c, memo));
+        const cands = kiCandidates(S, pi, K, memo);
+        for (let i = 0; i < cands.length; i += 3) {
+          const X = kiClone(S, 1), m = { armyTiles: new Map(memo.armyTiles), newReach: new Map(memo.newReach), moveSig: memo.moveSig };
+          if (cands[i].run(X)) continue;
+          kiStepMemo(m, X, pi);
+          arten.add(cands[i].tag.split(':')[0]);
+          for (const a of armiesOf(X, pi)) {
+            geprueft++;
+            if (JSON.stringify(kiTilesOf(X, a, m)) !== JSON.stringify(kiArmyTiles(X, a))) falsch.push(`${seed}/${S.round} ${cands[i].tag} Armee ${a.id}`);
+          }
+          for (const c of citiesOf(X, pi)) {
+            geprueft++;
+            const fresh = kiReachKeys(X, pi, c.r, c.c, moveAllowance(X, pi));
+            if ([...kiNewReach(X, pi, c, m)].sort().join() !== [...fresh].sort().join()) falsch.push(`${seed}/${S.round} ${cands[i].tag} Stadt ${c.id}`);
+          }
+        }
+      }
+      kiTurn(S, pi);
+      if (S.over) break;
+      endTurn(S);
+    }
+  }
+  eq([geprueft > 200, falsch.slice(0, 3)], [true, []],
+    `gemerkte Reichweiten = frisch gerechnete nach jeder Aktion (${geprueft} Vergleiche, Aktionen: ${[...arten].sort().join(', ')})`);
+}
+{
+  // --- Stufen (v78): Leichtere Stufen übersehen Möglichkeiten (`see`), geben aber aus, was
+  //     sie haben – findet sich unter dem Gesehenen nichts, schauen sie ein zweites Mal.
+  //     Probe mit einer Stufe, die fast nichts sieht: sie wächst trotzdem und zahlt.
+  KI_PARAMS.probe = { see: 0.01, noise: 0, slip: 0, defend: 1, strike: 1, evals: 600 };
+  const Z = newGame({ seed: 11, players: [{ civ: 'russland', kind: 'ki', kiLevel: 'probe', ability: 'basis' },
+    { civ: 'griechenland', kind: 'ki', kiLevel: 'probe', ability: 'basis' }] });
+  const z = Z.cur, vorher = popOf(Z, z) + citiesOf(Z, z).length, inc = Object.assign({}, Z.players[z].res);
+  kiTurn(Z, z);
+  eq([popOf(Z, z) + citiesOf(Z, z).length > vorher, Z.players[z].res.food + Z.players[z].res.coins < inc.food + inc.coins],
+    [true, true], 'eine Stufe, die fast nichts sieht, wächst trotzdem und zahlt dafür (zweiter Blick)');
+  delete KI_PARAMS.probe;
+  eq(KI_LEVELS.map(l => KI_PARAMS[l.k].see), [0.25, 0.5, 1], 'Leicht übersieht am meisten, Schwer sieht alles');
+  eq(KI_LEVELS.map(l => KI_PARAMS[l.k].noise), [1, 0.5, 0], '… und rechnet am ungenauesten');
+}
+{
+  // --- Abwehr gegen einen Vorstoß (v78): zwei Armeen eines Menschen stehen einen Zug vor der
+  //     Hauptstadt der KI, Stadtmauern gibt es nicht. Die KI muss den ersten Treffer
+  //     verhindern – Armeen neben die Stadt UND Macht dazu (bis v77 baute sie Armeen ohne
+  //     Macht oder flankierte eine und ließ die Stadt offen).
+  const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'ki', kiLevel: 'schwer', ability: 'basis' }, { civ: 'england', kind: 'human' }] });
+  S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+  S.cities.length = 0; S.armies.length = 0; S.sieges = {};
+  const stadt = (owner, r, c, pop, cap) => { const x = { id: S.nextId++, owner, r, c, pop, cap, grown: 0, born: -1 }; S.cities.push(x); return x; };
+  const armee = (owner, r, c) => { const x = { id: S.nextId++, owner, r, c, mp: 0, born: -1 }; S.armies.push(x); return x; };
+  const hs = stadt(0, 5, 5, 3, true); stadt(0, 1, 1, 3, false);
+  stadt(1, 5, 14, 4, true); stadt(1, 9, 12, 2, false);
+  S.players[1].power = 4;
+  armee(1, 5, 8); armee(1, 7, 7);
+  S.cur = 0; S.players[0].res = { sci: 0, food: 0, coins: 45 }; S.players[0].avail = {};
+  const K = kiContext(S, 0), info = K.info.get(1);
+  eq([info.human, kiDetermined(S, info, hs)], [true, true], 'gegen einen Menschen rechnet die KI mit dem entschlossenen Angreifer');
+  const a1 = kiAttackPotential(S, info, hs, true);
+  eq(a1 > defenseValue(S, hs), true, `ohne Abwehr säße der erste Treffer (${a1} gegen ${defenseValue(S, hs)})`);
+  kiTurn(S, 0);
+  combatPhase(S, 0);
+  const nachher = kiAttackPotential(S, kiContext(S, 0).info.get(1), hs, true);
+  eq(nachher <= defenseValue(S, hs), true, `nach dem Zug der KI hält die Hauptstadt jedem Angriff im nächsten Zug stand (${nachher} gegen ${defenseValue(S, hs)})`);
+  eq(powerOf(S, 0) > 0 && armiesOf(S, 0).some(a => hexDistance(a.r, a.c, hs.r, hs.c) <= 1), true, '… mit Armeen neben der Stadt und Macht dazu');
+}
+{
+  // --- Entschlossener Angreifer (Menschen): sein Budget enthält Alchemie, wenn er sie diesen
+  //     Zug erforschen kann (Wissenschaft 1:1 in Münzen), und seine zweite Welle baut auf
+  //     dem Rest der ersten auf. Gegen KI und Bots rechnet die KI milder.
+  const S = newGame({ seed: 12, players: [{ civ: 'griechenland', kind: 'ki', ability: 'basis' }, { civ: 'england', kind: 'ki', ability: 'basis' }] });
+  const ki = S.players.findIndex(p => p.civ === 'england'), gr = 1 - ki;
+  const hs = capitalOf(S, ki);
+  const K = kiContext(S, ki), info = K.info.get(gr);
+  eq(kiDetermined(S, info, hs), false, 'gegen eine KI: milde Schätzung');
+  S.sieges[gr + '|' + hs.id] = 1;
+  eq(kiDetermined(S, info, hs), false, '… auch mit laufender Belagerung (gemessen: härter rechnen änderte gegen die KI nichts)');
+  delete S.sieges[gr + '|' + hs.id];
+  const p = S.players[gr];
+  p.techs = {}; p.avail = { alchemie: true };
+  const inc = income(S, gr), kosten = techCost(S, gr, TECH_BY_KEY.alchemie);
+  if (inc.sci < kosten) S.cities.filter(c => c.owner === gr).forEach(c => { c.pop += 6; });
+  const inc2 = income(S, gr);
+  eq(kiThreatBudget(S, gr) - kiCoinBudget(S, gr), Math.max(0, inc2.sci - kosten),
+    'Budget des entschlossenen Angreifers: dazu die Wissenschaft nach Alchemie, abzüglich ihrer Kosten');
+  p.avail = {};
+  eq(kiThreatBudget(S, gr), kiCoinBudget(S, gr), 'ohne verfügbare Alchemie bleibt es beim gewöhnlichen Budget');
+  // zwei Wellen an einer Armee vor der Stadt
+  S.armies = S.armies.filter(a => a.owner !== gr);
+  const nb = neighbors(hs.r, hs.c).find(([r, c]) => isLand(S, r, c) && !cityAt(S, r, c));
+  S.armies.push({ id: 991, owner: gr, r: nb[0], c: nb[1], mp: 0, born: 0 });
+  // Budget ausdrücklich gesetzt, damit die Rechnung nachprüfbar ist: Preis 5, keine Boni
+  const welle = (macht, budget) => {
+    p.power = macht;
+    const i2 = kiContext(S, ki).info.get(gr);
+    i2.budget = i2.budgetHard = budget; i2.cityReach = [];
+    i2.hits = new Map();
+    return { hart: kiAttackWaves(S, i2, hs, true), mild: kiAttackWaves(S, i2, hs, false), i2 };
+  };
+  const w0 = welle(2, 30);
+  // Welle 1: 2 − 1 (Machtverlust) + 30/5 = 7. Welle 2: 7 − 4 = 3, dazu 6 = 9; mit einer
+  // zweiten Armee (10 Münzen) 3 + 4 = 7 je Armee, also 14.
+  eq([w0.hart.a1, w0.hart.a2], [7, 14], 'entschlossen: erste Welle 7, zweite 14 (Rest der ersten + neues Budget, eine Armee mehr)');
+  eq(w0.mild.a2, w0.mild.a1 * 1.3 + 2, 'milde Schätzung: zweite Welle wie bis v77 (1,3 × erste + 2)');
+  // viel Macht und kein Budget: der Machtverlust überwiegt, die zweite Welle ist schwächer
+  const w1 = welle(40, 0);
+  eq([w1.hart.a1, w1.hart.a2], [20, 10], 'entschlossen, viel Macht und kein Budget: 40 → 20 → 10');
+}
+{
   // --- Siedelplätze: die KI rechnet Wege und Kosten selbst (eine Breitensuche je Zug). Sie
   //     muss dieselben Plätze zu denselben Kosten sehen wie die Regel (foundSiteError,
   //     foundCost) – sonst plant sie Städte, die es nicht gibt, oder übersieht welche.

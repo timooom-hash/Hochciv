@@ -2708,7 +2708,8 @@ Bewertungen je Zug. „Nochmal spielen" erhöht nach einem Sieg die KI-Stufe.
 die Stufen tauschen die Plätze): Duell Schwer–Leicht 25 : 15, Mittel–Leicht 22 : 18,
 Schwer–Mittel 19 : 21 (je 40 Partien); zu viert 2× Schwer gegen 2× Leicht 17 : 7 (24).
 Im Duell überdeckt der Startvorteil fast alles: der Startspieler gewann 31 bzw. 32 von 40.
-Die Stufen deutlicher zu trennen ist der nächste Schritt.
+Die Stufen deutlicher zu trennen ist der nächste Schritt. **(v78: getan – neue Werte und
+Messungen im Abschnitt „KI-Stufen deutlich getrennt, kürzere Züge (v78)".)**
 
 ### Rechenzeit
 
@@ -2820,3 +2821,213 @@ für dasselbe Feld gerufen). Gemessen an 1188 Aufrufen aus echten Partien: 734 �
 `test.js` vergleicht die alte Fassung (wörtlich im Test) mit der neuen an 112 Spielständen
 mit Reichweiten bis 20, Straßen und Eisenbahn: keine Abweichung. Nebenwirkung: `test.js`
 läuft schneller.
+
+## KI-Stufen deutlich getrennt, kürzere Züge (v78)
+
+Bis v77 lagen die Stufen dicht beieinander (Duell Schwer–Leicht 25 : 15, Schwer–Mittel
+19 : 21), und gegen Bots spielten Leicht und Mittel fast wie Schwer (Duell gegen Prinz 68,
+70, 71 von 80). Leicht war damit keine Stufe für Einsteiger.
+
+### Was eine Stufe schwächer macht
+
+Weiterhin nur Denkfehler – gleiche Regeln, keine Ressourcen geschenkt oder abgezogen
+(Anweisung des Autors). `KI_PARAMS` in `js/ki.js`:
+
+| | Leicht | Mittel | Schwer |
+|---|---|---|---|
+| `see` – Anteil der Möglichkeiten, die sie je Schritt erwägt | 0,25 | 0,5 | 1 |
+| `noise` – Rauschen auf den Nutzen (Faktor 1 ± noise) | 1,0 | 0,5 | 0 |
+| `slip` – statt der besten eine der nächsten vier | 0,5 | 0,2 | 0 |
+| `defend` – Gewicht der Gefahr für eigene Städte | 0,25 | 0,8 | 1 |
+| `strike` – Gewicht einer begonnenen Belagerung | 0,2 | 0,7 | 1 |
+| `evals` – Bewertungen je Zug (Tempo) | 600 | 1000 | 1000 |
+
+**Neu ist `see`:** Jede mögliche Aktion wird je Planungsschritt nur mit dieser
+Wahrscheinlichkeit überhaupt erwogen, in jedem Schritt neu gezogen – die KI übersieht mal
+dies, mal das, wie ein Mensch, der nicht jede Stadt und jede Technologie durchgeht. Taugt
+unter dem Gesehenen nichts, schaut sie ein zweites Mal auf den Rest. Ohne diesen zweiten
+Blick beendete Leicht Züge mit vollen Taschen; so gibt es aus, was es hat (übrig am Zugende
+je nach Runde 1–14 % des Ressourcenwerts, bei Schwer 4–14 % – 20 Duelle Leicht gegen
+Schwer gemessen), und wählt nur schlechter.
+
+**Gemessen und verworfen:**
+* *Weniger Planungsschritte je Zug* (höchstens 2–4, teils zusammen mit `see`): trennt stark
+  (Duell gegen Prinz 27–65 von 80, gegen Schwer gepaart 1–9 von 40), aber Leicht ließ ab
+  Runde 4 zwischen gut einem Drittel und zwei Dritteln seiner Ressourcen liegen – sichtbar
+  faul, kein Einsteiger spielt so.
+* *Kürzerer Horizont* (30 % der Restrunden): praktisch wirkungslos (67 statt 68 von 80
+  gegen Prinz).
+* *Weniger Angriff und Verteidigung allein* (`strike` 0, `defend` 0,3): im Duell kaum
+  Wirkung (66 von 80), zu viert deutlich (ältere Messung, v74-Grundlage: Schwer gegen
+  Schwer ohne Angriffe 30 : 10) – deshalb für Leicht mit drin, aber nicht allein.
+
+### Messungen (Plättchenkarte, `tools_ki.js`, reproduzierbar)
+
+KI gegen KI, gepaart (jeder Startwert zweimal, die Stufen tauschen die Plätze), Siege –
+gemessen mit dem Endstand von v78, also samt der Abwehr (Abschnitt unten):
+
+| Paarung | Duell (40) | zu dritt (24) | zu viert (24) |
+|---|---|---|---|
+| Schwer – Mittel | 27 : 13 | | 19 : 5 |
+| Mittel – Leicht | 26 : 14 | | 17 : 7 |
+| Schwer – Leicht | 32 : 8 | 21 : 3 | 21 : 3 |
+| Schwer – Leicht, mit Ereignissen und Wundern | 29 : 11 | | 23 : 1 |
+
+Gegen die Bot-Stufen – Duell (80 Partien, Beginn abwechselnd) / eine KI gegen drei Bots
+(48 Partien, fairer Anteil 12):
+
+| KI | Siedler | Häuptling | Prinz | König | David |
+|---|---|---|---|---|---|
+| Leicht | 80 / 40 | 74 / 26 | 48 / 6 | 26 / 4 | 13 / 0 |
+| Mittel | 80 / 42 | 78 / 36 | 69 / 21 | 45 / 7 | 20 / 2 |
+| Schwer | – | – | 72 / 32 | 56 / 20 | 34 / 8 |
+
+**Lesart:** Im Duell spielt Leicht etwa wie ein Prinz-Bot (48 von 80), Mittel etwa wie
+König (45), Schwer etwa wie David (34). Zu dritt und zu viert trennen die Stufen stärker als
+im Duell. (Vor der Abwehr, sonst gleicher Stand: Schwer–Mittel 24 : 16 im Duell, 15 : 9 zu
+viert – die Pakete mit Macht helfen den Stufen, die Gefahr ernster nehmen.)
+
+**Im Duell wiegt der Anzug schwer.** Schwer gegen Leicht: beginnt Schwer, gewinnt es 20
+von 20; beginnt Leicht, gewinnt Leicht immerhin 8 von 20. Zwischen Schwer und Mittel:
+beginnt Mittel, gewinnt Mittel 11 von 20 – der Startvorteil wiegt dort etwa so viel wie der
+Abstand der Stufen. Zwischen gleich starken KI gewinnt der Startspieler 60–80 % der Duelle (`selbst 30`: 18 von 30;
+Schwer gegen Schwer mit halbem Budget, also gleich stark: 32 von 40). Ob es zwischen
+Menschen genauso ist, ist nicht gemessen (Schluss aus den KI-Partien); es gehört zur
+Balancefrage „Wirtschaftssieg in Runde 2" (offener Punkt in der Übergabe).
+
+**Einschränkung:** Bots und KI sind keine Menschen. Ob Leicht für Einsteiger passt, zeigt
+erst das Spielen; die Stellschrauben stehen in einer Tabelle (`KI_PARAMS`), `tools_ki.js
+stufen` misst jede Änderung gepaart nach.
+
+### Kürzere Züge
+
+Der längste gemessene Zug (drei Reiche, KI gegen KI, Luftwaffe und Eisenbahn) dauerte
+1,5 s in Node. Jetzt 0,7 s, ohne dass sich eine Partie ändert:
+* **Budget Schwer 1000 statt 2000 Bewertungen.** Es greift nur in wenigen Zügen mit
+  Luftwaffe; gepaart gemessen (Duell 40, zu dritt 24 mit und ohne Erweiterungen, zu viert
+  24): jeweils genau unentschieden, gegen Prinz und David dieselben Siegzahlen wie vorher.
+* **Wer eine Stadt angreifen kann,** wird je Stadtfeld einmal je Zug gerechnet
+  (`kiHits`) statt in jeder Bewertung.
+* **Reichweiten** bleiben über Planungsschritte gemerkt, solange sich nichts ändert, wovon
+  sie abhängen (`kiMoveSig`: Armeen, Städte, Straßen, eigene Technologien, Wunder).
+* **Nach dem Budget** bildet der Planer Militär-, Wunder- und Sklaverei-Kandidaten gar nicht
+  erst, statt sie zu bilden und wegzuwerfen.
+
+Die drei letzten ändern kein Ergebnis: 30 Partien (Schwer, 2/3/4 Reiche, mit und ohne
+Erweiterungen) laufen mit alter und neuer Fassung Zeichen für Zeichen gleich, 16 % schneller.
+Gemessen über 30 Partien zu dritt: Median 20 ms je Zug, längster 0,72 s; zu viert und im
+Duell höchstens 0,3 s. Auf dem iPad ist mit dem Zwei- bis Fünffachen zu rechnen (Schätzung).
+
+### Abgesichert
+
+`test.js`: eine Stufe, die fast nichts sieht (`see` 0,01), wächst trotzdem und zahlt (zweiter
+Blick); die Werte sind nach Stufen geordnet; gemerkte Reichweiten gleichen nach jeder Art
+Aktion, die die KI ausführt (Forschung, Wachstum, Gründung, Straße, Macht, Angriff,
+Verteidigung, Flanke, Kopieren), einer frischen Rechnung – 3436 Vergleiche. Gegenprobe: ohne
+Straßen in der Signatur schlägt der Test an.
+
+## Abwehr gegen Vorstöße (v78)
+
+**Anlass:** Rückmeldung des Autors aus Partien auf Schwer zu viert: die KI wehrt einen
+menschlichen Rush – überhaupt jeden militärischen Vorstoß – schlecht ab.
+
+### Nachgestellt
+
+Stellungen aus echten Partien: bis Runde 3–5 spielen alle als KI, dann wird ein Platz zum
+Menschen. Seine n Armeen stehen einen Zug vor der Hauptstadt der nächsten KI, mit Macht P;
+die KI ist am Zug und sieht sie. Der Mensch zieht dann heran und kauft Macht – alles
+(„allin") oder gerade genug, um die Verteidigung zu übertreffen („knapp") –, zweimal. Er
+sieht dabei, was die KI aufgestellt hat. 187 Stellungen: 2 und 4 Reiche, Runde 3–5, 2–4
+Armeen, Macht 2–6. Nachzurechnen mit `node tools_ki.js vorstoss …` (dort entstehen die
+Stellungen mit der jeweils geprüften Fassung).
+
+### Was schiefging (bis v77)
+
+1. **Armeen ohne Macht, Macht ohne Armeen.** Gekaufte Macht verteidigt nur über Armeen neben
+   der Stadt, und eine Armee daneben verteidigt nur mit Macht. Einzeln bringt keins von
+   beiden etwas – der Planer, der Aktion für Aktion bewertet, nahm dann keins oder nur die
+   Armeen. Beispiel: Russland baute zwei Armeen (15 Münzen) neben die Hauptstadt, kaufte
+   keine Macht, Verteidigung 3; Griechenland traf mit 5.
+2. **Den entschlossenen Angreifer unterschätzt.** Sein Budget fehlte Alchemie: wer sie
+   verfügbar hat, erforscht sie im Angriffszug und tauscht seine Wissenschaft 1:1 in Münzen
+   – gemessen sprang Griechenlands Budget so von 18 auf 51. Und die zweite Welle war mit
+   1,3 × der ersten angesetzt; wer zweimal alles in Macht steckt, kommt auf gut das
+   Anderthalbfache. Die KI verließ sich deshalb auf eine Antwort nach dem ersten Treffer,
+   die es dann nicht gab.
+3. Hielt sie die Lage für verloren, baute sie weiter aus, statt wenigstens den Preis des
+   Angriffs hochzutreiben.
+
+### Geändert
+
+* **Macht gehört ins Verteidigungspaket** (`kiDefensePlan`): Umzüge und neue Armeen neben
+  die Stadt, dazu Macht – „ziel" bis die Verteidigung den stärksten Angriff seines nächsten
+  Zuges erreicht, „alles" was die Münzen hergeben, und ist Alchemie zu haben, wahlweise
+  zuerst Alchemie (dann zahlt die Wissenschaft mit). Gilt gegen jeden Gegner.
+* **Gegen Menschen rechnet die KI mit dem entschlossenen Angreifer** (`kiDetermined`,
+  `kiThreatBudget`, `kiAttackWaves`): Budget samt Alchemie, die er diesen Zug erforschen
+  kann, und die zweite Welle aus dem, was ihm von der ersten nach dem Machtverlust bleibt,
+  plus einem neuen Budget und wahlweise einer Armee mehr. Gewichtet zu drei Vierteln; zu
+  einem Viertel gilt die mildere Schätzung – ganz sicher wirft auch ein Mensch nicht alles
+  hinein, und ohne diesen Anteil hielt die KI eine Lage, die sie nicht ganz halten kann,
+  für verloren und baute weiter aus (Punkt 3). Gegen KI und Bots bleibt es bei der
+  milderen Schätzung von v77.
+
+**Auslegung:** Die KI behandelt Menschen damit anders als KI-Gegner – nicht mit anderen
+Regeln, sondern mit einer anderen Erwartung, was der Gegner tun wird. Sie sieht dafür
+nichts, was ein Mensch am Tisch nicht auch sähe.
+
+### Gemessen
+
+| | bis v77 | v78 |
+|---|---|---|
+| Stellungen, in denen die Hauptstadt fällt (allin, 187) | 32 | 20 |
+| dasselbe, Angreifer kauft knapp (187) | 23 | 18 |
+| darunter früher Vorstoß zu viert, Runde 3, 2 Armeen (39, allin) | 7 | 3 |
+
+Beide Fassungen spielten dieselben Stellungen (erzeugt mit dem Stand vor der Änderung).
+Gegen die KI ändert sich nichts Messbares: beide Fassungen in denselben Partien, die Plätze
+gepaart getauscht – Duell 29 : 31, zu dritt 22 : 26, zu viert 25 : 23 (156 Partien,
+76 : 80); Hauptstadt verloren zu dritt und zu viert gleich oft, im Duell 10 gegen 5 von 60
+(bei so wenigen Fällen nicht von Zufall zu unterscheiden). Und die Vorsicht gegen Menschen
+macht die KI nicht ausnutzbar: ein „Mensch", der in Wahrheit mit der KI Schwer spielt,
+gewann zu viert gegen die alte wie die neue Fassung je 7 von 40 Partien.
+
+Mit dem Werkzeug (Stellungen aus Partien der geprüften Fassung selbst):
+
+| `node tools_ki.js vorstoss 40 …` | Stellungen | erster Treffer | Hauptstadt fällt |
+|---|---|---|---|
+| `reiche=4 runde=3 armeen=2 macht=2` | 39 | 20 | 3 |
+| `reiche=4 runde=4 armeen=3 macht=4` | 34 | 12 | 4 |
+| `… art=knapp` | 34 | 12 | 2 |
+| `reiche=2 runde=4 armeen=3 macht=4` | 32 | 15 | 0 |
+
+**Verworfen:**
+* *Harte Schätzung gegen alle:* zu viert gegen die alte Fassung 17 : 31 – die KI gab Städte
+  zu früh verloren und verteidigte, wo niemand angriff. Auch nur ab laufender Belagerung
+  hart zu rechnen, änderte gegen die KI kein Ergebnis (Duell und zu viert, 108 Partien,
+  dieselben Zahlen) – deshalb weggelassen.
+* *Nur die harte Schätzung gegen Menschen*, ohne das Viertel der milden: 21 statt 20 bzw.
+  19 statt 18 gefallene Hauptstädte – knapp, aber in beiden Reihen schlechter, und der
+  Grund (Punkt 3) spricht dafür.
+* *Alles andere nur zählen, wenn die Hauptstadt steht* (Wirtschaft × Wahrscheinlichkeit,
+  dass sie hält): gegen den Menschen kaum besser (21 statt 20 gefallene Hauptstädte),
+  gegen die KI im Duell 25 : 35 – vermutlich, weil auch eigene Angriffe nur noch mit dieser
+  Wahrscheinlichkeit zählten.
+
+### Was bleibt
+
+In gut jeder zehnten Stellung fällt die Hauptstadt weiter. Die angesehenen Fälle waren
+wirtschaftlich verloren: der Angreifer bringt je Zug das Doppelte an Münzen auf (etwa 104
+gegen 56), oder schon seine Armeen ohne einen Kauf übertreffen alles, was die KI aufstellen
+kann. Dagegen hilft nur, früher vorzusorgen (Stadtmauern, Armeen an der Hauptstadt, bevor
+jemand kommt) oder ein Gegenangriff; beides plant die KI nicht gezielt. Und das Skript ist
+kein Mensch – ob sich die KI jetzt besser wehrt, zeigt erst das Spielen.
+
+### Abgesichert
+
+`test.js`: zwei Armeen eines Menschen einen Zug vor der Hauptstadt, keine Stadtmauern – nach
+ihrem Zug hält die KI jedem Angriff seines nächsten Zuges stand, mit Armeen neben der Stadt
+und Macht dazu; gegen Menschen rechnet sie entschlossen, gegen eine KI mild (auch bei
+laufender Belagerung); das Budget mit Alchemie ist das gewöhnliche plus die Wissenschaft
+nach den Kosten der Alchemie, ohne verfügbare Alchemie das gewöhnliche; die zwei Wellen
+nachgerechnet (7 und 14 mit vollem Budget, 20 und 10 ohne).

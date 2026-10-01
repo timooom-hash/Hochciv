@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 30.9., `sw.js` v77)
+# Hochzeivilization — Projekt-Übergabe (Stand 1.10., `sw.js` v78)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v77)
+## Letzte Sitzungen auf einen Blick (v61 → v78)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -32,11 +32,12 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v75 | **Erträge** je Feld (Umschalter), **Stadt gründen** als eigene Aktion mit Kostenkarte, **Machtringe** bei offenem Machtblatt; Flankieren „gegenüber" jetzt auf allen drei Achsen (Fehler) | Oberfläche + Fehler |
 | v76 | Machtringe aus **einem Teilstück je Punkt** (Verteidigung 1 gegen Angriff 2 = drei Stücke); über 60 Punkte nur der Anteil, bei 0 Punkten ein leerer Ring | Oberfläche |
 | v77 | **KI** als dritte Sitzart (Mensch / KI / Bot): spielt nach den Regeln für Menschen, drei Stufen, legt ihr Startplättchen selbst (`js/ki.js`). **Wirtschaftssieg „mehr als 2/3" und nicht in Runde 1.** `reachable` mit Heap (gleiches Ergebnis, schneller). Messwerkzeug `tools_ki.js` | KI + Regel + Tempo |
+| v78 | **KI-Stufen deutlich getrennt:** Leicht übersieht Möglichkeiten (`see`), rechnet ungenau und vergreift sich öfter, gibt aber aus, was es hat – im Duell etwa wie ein Prinz-Bot, Mittel wie König, Schwer wie David. **Abwehr gegen Vorstöße** (Rückmeldung des Autors): Verteidigung mit Macht im selben Paket, gegen Menschen mit dem entschlossenen Angreifer gerechnet – gefallene Hauptstädte im Test 32 → 20 von 187. Längster KI-Zug 1,5 → 0,7 s | KI + Tempo |
 
-Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitt „KI (v77)" unten,
-ausführlich in `ANNAHMEN.md`) und Punkt 14–16 der offenen Punkte (Wirtschaftssieg in
-Runde 2 im Duell, Stufen der KI noch schwach getrennt, Rechenzeit auf dem iPad nicht
-gemessen).
+Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitte „KI (v77)" und
+„KI-Stufen (v78)" unten, ausführlich in `ANNAHMEN.md`) und Punkt 14–16 der offenen Punkte
+(Wirtschaftssieg in Runde 2 im Duell, ob Leicht für Einsteiger passt, Rechenzeit auf dem
+iPad nicht gemessen) und 17 (Abwehr gegen Menschen nur gegen ein Skript gemessen).
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
@@ -74,22 +75,22 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 | `js/i18n.js` | 1220 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 415 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 416 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
 | `js/engine.js` | 1830 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1444 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ki.js` | 1605 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/ui.js` | 2253 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 5368 | **1435 Assertions**, `node test.js` |
-| `smoke.js` | 2854 | **125 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 5491 | **1450 Assertions**, `node test.js` |
+| `smoke.js` | 2858 | **125 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
-| `tools_ki.js` | 128 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI (`node tools_ki.js duell 40 diff=david` …) |
+| `tools_ki.js` | 213 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI (`node tools_ki.js duell 40 diff=david` …) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -116,9 +117,10 @@ Gedächtnis rekonstruieren.
   Sie spielt nach den Regeln für Menschen – nur über die Aktionen der Regelmaschine, also
   ohne Möglichkeit zu schummeln –, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie,
   und sie legt ihr Startplättchen verdeckt selbst. Stufen Leicht/Mittel/Schwer (`KI_LEVELS`
-  in data.js, Werte `KI_PARAMS` in ki.js), gleiche Regeln auf jeder Stufe. Bots gibt es
+  in data.js, Werte `KI_PARAMS` in ki.js), gleiche Regeln auf jeder Stufe; seit v78
+  deutlich getrennt, im Duell etwa wie die Bots Prinz, König und David. Bots gibt es
   weiter, das Tutorial spielt mit ihnen. Einzelheiten und Messungen in `ANNAHMEN.md`,
-  Abschnitt „KI: ein Gegner nach den Regeln für Menschen".
+  Abschnitte „KI: ein Gegner nach den Regeln für Menschen" und „KI-Stufen deutlich getrennt".
 - **Wirtschaftssieg (v77):** „mehr als 2/3" (vorher „mindestens"), und in Runde 1 gar nicht –
   beides Anweisung des Autors nach einem Fund der KI (Sieg in Runde 1 mit 4 von 5 im Duell).
 - **Eine Regelvariante.** Die früher „experimentell v2" genannten Regeln sind der Standard:
@@ -228,6 +230,44 @@ Gedächtnis rekonstruieren.
   wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
+
+### KI-Stufen deutlich getrennt, kürzere Züge (v78)
+
+Bis v77 spielten Leicht und Mittel fast wie Schwer (Duell gegen Prinz 68/70/71 von 80).
+Jetzt, alles in `KI_PARAMS` (js/ki.js), weiter nur Denkfehler bei gleichen Regeln:
+
+- **`see`** (neu): Anteil der Möglichkeiten, die die KI je Planungsschritt erwägt – Leicht
+  0,25, Mittel 0,5, Schwer 1. Findet sich unter dem Gesehenen nichts, schaut sie ein zweites
+  Mal: Leicht gibt aus, was es hat, und wählt nur schlechter. Dazu mehr Rauschen und
+  Fehlgriffe, weniger Gewicht auf Gefahr und Angriff.
+- **Gemessen** (Tabellen in `ANNAHMEN.md`, Endstand samt Abwehr): gepaart im Duell
+  Schwer–Mittel 27 : 13, Mittel–Leicht 26 : 14, Schwer–Leicht 32 : 8; zu viert 19 : 5,
+  17 : 7, 21 : 3; zu dritt Schwer–Leicht 21 : 3. Gegen Bots im Duell: Leicht 48/80 gegen
+  Prinz, Mittel 45/80 gegen König, Schwer 34/80 gegen David.
+- **Verworfen:** weniger Planungsschritte je Zug (Leicht ließ bis zu zwei Drittel liegen),
+  kürzerer Horizont (wirkungslos).
+- **Abwehr gegen Vorstöße** (Rückmeldung des Autors, Schwer zu viert): Verteidigungspakete
+  enthalten jetzt die Macht (sonst baute die KI Armeen ohne Macht – einzeln bringt keins von
+  beiden etwas), wahlweise mit Alchemie davor. Gegen Menschen rechnet sie mit dem
+  entschlossenen Angreifer (Budget samt Alchemie, zwei Wellen; `kiDetermined`,
+  `kiThreatBudget`, `kiAttackWaves`), zu einem Viertel mit der milden Schätzung. Gemessen an
+  187 nachgestellten Vorstößen: Hauptstadt fällt 32 → 20 (alles in Macht) bzw. 23 → 18 (knapp
+  gekauft); gegen die KI unverändert (gepaart, beide Fassungen in denselben Partien).
+  Verworfen: harte Schätzung gegen alle (zu viert 17 : 31), Wirtschaft nur zählen, wenn die
+  Hauptstadt steht (Duell 25 : 35). Messwerkzeug: `node tools_ki.js vorstoss`.
+- **Tempo:** Budget Schwer 1000 statt 2000 Bewertungen (gepaart genau gleich stark),
+  `kiHits` (wer eine Stadt angreifen kann, einmal je Zug), über Schritte gemerkte
+  Reichweiten (`kiMoveSig`), keine teuren Kandidaten nach dem Budget. Die drei letzten
+  ändern keine Partie (30 Partien Zeichen für Zeichen gleich). Längster Zug in Node
+  1,5 → 0,7 s.
+
+**Abgesichert:** `test.js` – Stufe mit `see` 0,01 wächst und zahlt trotzdem; Werte nach
+Stufen geordnet; gemerkte Reichweiten = frische nach jeder Aktionsart (3436 Vergleiche,
+Gegenprobe ohne Straßen in der Signatur schlägt an); Abwehr: zwei Armeen eines Menschen
+vor der Hauptstadt ohne Stadtmauern – nach ihrem Zug hält die KI jedem Angriff seines
+nächsten Zuges stand, mit Armeen und Macht; entschlossen gegen Menschen, mild gegen die KI;
+Budget mit Alchemie und die zwei Wellen nachgerechnet. Stärke lässt sich nicht in
+`test.js` prüfen (zu viele Partien) – dafür `node tools_ki.js stufen …` und `vorstoss …`.
 
 ### KI als dritte Sitzart, Wirtschaftssieg, schnellere Wegsuche (v77)
 
@@ -547,7 +587,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1435 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1450 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (125 Schritte), inklusive
@@ -565,8 +605,11 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 6. **Messen statt behaupten.** Bei Balance- und Häufigkeitsaussagen mit ausreichend großen
    Stichproben arbeiten und die Zahl nennen.
 7. **KI messen mit `tools_ki.js`** (seit v77): gleiche Befehlszeile, gleiche Zahlen.
-   Stufen immer **gepaart** vergleichen (`stufen`): im Duell gewinnt sonst vor allem der
-   Startspieler (KI gegen KI 19 von 30), und das überdeckt jeden Unterschied.
+   Stufen immer **gepaart** vergleichen (`stufen`, druckt auch die Siege je Startspieler):
+   im Duell gewinnt sonst vor allem der Startspieler (KI gegen KI gleicher Stärke 60–80 %),
+   und das überdeckt jeden Unterschied. Eine Änderung, die kein Ergebnis ändern soll
+   (Tempo), mit alter und neuer Fassung auf denselben Startwerten laufen lassen und die
+   Protokolle vergleichen – so in v78 geprüft.
 
 ## Oberfläche und Regeln (Stand 22.8.)
 
@@ -665,6 +708,14 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
 - **Die KI rechnet auf Kopien mit eigenem Zufall** (`kiClone`, seit v77). Eine Regelfunktion,
   die direkt `Math.random` benutzt statt `d6`/`nextRand`, würde das umgehen. Und wer
   `S.evNext` ohne Orakel irgendwo liest, macht die Fairness-Prüfung in `test.js` rot.
+- **Die KI erwartet von Menschen mehr als von KI und Bots** (`kiDetermined` fragt
+  `kind === 'human'`, seit v78): gegen Menschen rechnet sie mit dem entschlossenen Angreifer.
+  Wer eine neue Sitzart einführt, entscheidet dort, wie die KI ihr begegnet.
+- **`kiMoveSig` muss alles enthalten, wovon `armyReach` abhängt** (seit v78). Der Planer
+  merkt sich Reichweiten über Schritte, solange diese Signatur gleich bleibt (Armeen,
+  Städte, Straßen, eigene Technologien, Wunder). Wer eine Bewegungsregel einführt, die an
+  etwas anderem hängt (Ereignis, Gelände, das sich ändert …), nimmt es dort auf – `test.js`
+  vergleicht gemerkte mit frischen Reichweiten nach jeder Aktionsart der KI.
 - **Zwei Stellen der KI rechnen eine Regel nach, statt sie zu fragen** (seit v77), beide
   aus Tempogründen und beide durch einen Test an die Regel gebunden: die Siedelplätze
   (`kiSitesAll`, eine Breitensuche statt einer Wegsuche je Feld – Test gegen
@@ -1030,13 +1081,22 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Wirtschaftssieg, der Startspieler gewann 18 von 30. Zu dritt 1 von 30, zu viert keins.
    Mögliche Abhilfen, je eine Zeile in `checkVictory`: Sperre bis Runde 2 (oder 3), oder eine
    Mindest-Weltbevölkerung (etwa 4 × Zahl der Reiche). **Entscheidung des Autors steht aus.**
-15. **Stufen der KI noch schwach getrennt (v77).** Gepaart gemessen: Duell Schwer–Leicht
-   25 : 15, Mittel–Leicht 22 : 18, Schwer–Mittel 19 : 21 (je 40 Partien), zu viert
-   2× Schwer gegen 2× Leicht 17 : 7. Im Duell gewinnt vor allem der Startspieler (31 bzw.
-   32 von 40). Leicht muss deutlich leichter werden (nächster Schritt).
-16. **Rechenzeit der KI auf dem iPad nicht gemessen.** In Node: Median 18–34 ms je Zug,
-   längster gemessener Zug 1,5 s (drei Reiche, KI gegen KI). Das iPad dürfte zwei- bis
-   fünfmal langsamer sein – Schätzung.
+15. **Passt Leicht für Einsteiger? (v78)** Seit v78 sind die Stufen deutlich getrennt
+   (Duell gepaart Schwer–Leicht 32 : 8, zu dritt und zu viert je 21 : 3) und an den Bots
+   geeicht: im Duell spielt Leicht etwa wie Prinz, Mittel wie König, Schwer wie David. Ob
+   das für Menschen stimmt, zeigt erst das Spielen – nachstellen in `KI_PARAMS`,
+   nachmessen mit `tools_ki.js stufen`. Im Duell wiegt zwischen Schwer und Mittel der
+   Startvorteil etwa so viel wie der Abstand der Stufen (beginnt Mittel, gewinnt es 11 von
+   20).
+16. **Rechenzeit der KI auf dem iPad nicht gemessen.** In Node (v78): Median um 20 ms je
+   Zug, längster gemessener Zug 0,72 s (drei Reiche, KI gegen KI, Luftwaffe); zu viert und
+   im Duell höchstens 0,3 s. Das iPad dürfte zwei- bis fünfmal langsamer sein – Schätzung.
+17. **Abwehr gegen Menschen nur gegen ein Skript gemessen (v78).** Das Skript zieht heran
+   und kauft Macht; ein Mensch plant geschickter (Flanken, Ablenkung, Ziel wechseln). Noch
+   offen: vorsorgen, bevor jemand kommt (Stadtmauern, Armeen an der Hauptstadt) und ein
+   gezielter Gegenangriff – beides plant die KI nicht eigens. In gut jeder zehnten
+   nachgestellten Stellung fällt die Hauptstadt weiter, die angesehenen davon waren
+   wirtschaftlich verloren (Angreifer mit doppeltem Budget).
 
 ## Arbeitsweise, die der Autor schätzt
 

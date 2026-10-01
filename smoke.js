@@ -2770,11 +2770,15 @@ step('KI: Züge laufen über das Blatt mit „Weiter", dann ist wieder der Mensc
     $('bot-next').onclick();
   }
   if (!G('S').over && G('P')(G('S')).kind !== 'human') throw new Error('nach den KI-Zügen ist nicht der Mensch dran');
-  const kis = S.players.filter(p => p.kind === 'ki');
-  if (!kis.every(p => Object.keys(p.techs).length)) throw new Error('eine KI hat in ihrem Zug nichts erforscht');
+  // Jede KI hat in ihrem Zug gehandelt: geforscht, ist gewachsen oder hat gegründet. (Bis v77
+  // stand hier „hat geforscht" – seit die Stufe Mittel Möglichkeiten übersieht (v78), lässt
+  // sie im ersten Zug auch einmal die Forschung aus. Die Partie startet mit Zufallswert.)
+  const kis = S.players.map((p, i) => i).filter(i => S.players[i].kind === 'ki');
+  const tat = i => Object.keys(S.players[i].techs).length + G('citiesOf')(S, i).length - 1 + G('popOf')(S, i) - G('citiesOf')(S, i).length;
+  if (!kis.every(i => tat(i) > 0)) throw new Error('eine KI hat in ihrem Zug nichts getan');
   if (S.armies.some(a => S.players[a.owner].kind === 'ki' && G('cityAt')(S, a.r, a.c)))
     throw new Error('eine KI-Armee steht noch in einer Stadt');
-  console.log(`       ${n} KI-Züge · ` + kis.map(p => `${G('civOf')(p).n}: ${Object.keys(p.techs).length} Techs`).join(', '));
+  console.log(`       ${n} KI-Züge · ` + kis.map(i => `${G('civOf')(S.players[i]).n}: ${Object.keys(S.players[i].techs).length} Techs, ${G('citiesOf')(S, i).length} Städte, ${G('popOf')(S, i)} Bev.`).join(', '));
 });
 step('KI: in der Legephase legt die KI selbst, gefragt wird nur der Mensch', () => {
   kiAufbau('duell', ['human', 'ki']);
