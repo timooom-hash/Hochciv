@@ -27,14 +27,26 @@
    und Verfügbarkeiten – das darf sie, wie jeder am Tisch, verwenden.
 
    Stufen (KI_LEVELS in data.js, Werte in KI_PARAMS): dieselben Regeln auf jeder Stufe.
-   Leichtere Stufen rechnen ungenauer (Rauschen in der Bewertung), vergreifen sich
-   gelegentlich bewusst und denken beim Militär weniger weit voraus.                    */
+   Leichtere Stufen übersehen Möglichkeiten, rechnen ungenauer (Rauschen in der
+   Bewertung), vergreifen sich öfter und nehmen Gefahr und Angriffschancen weniger ernst. */
 
 /* ------------------------------------------------------------------ Stufen */
+/* Was die Stufen unterscheidet – alles Denkfehler, keine Regeln und keine Ressourcen:
+   · see    Anteil der möglichen Aktionen, die sie je Planungsschritt überhaupt erwägt
+            (jedes Mal neu gezogen – sie übersieht mal dies, mal das)
+   · noise  Rauschen auf den Nutzen jeder Aktion (1,0: Faktor zwischen 0 und 2)
+   · slip   Wahrscheinlichkeit, statt der besten eine der nächsten vier zu nehmen
+   · defend / strike  wie ernst sie Gefahr für die eigenen Städte bzw. eine begonnene
+            Belagerung nimmt
+   · evals  Budget an Bewertungen je Zug (nur Tempo, kaum Stärke)
+   Abgestimmt per Selbstspiel (gepaart) und gegen die Bot-Stufen, Zahlen in ANNAHMEN.md.
+   Ziel: Leicht etwa wie ein Prinz-Bot, Mittel wie König, Schwer die volle Stärke; Leicht
+   gibt dabei aus, was es hat – es wählt nur schlechter. Verworfen: weniger Schritte je Zug
+   (ließ bis zu zwei Drittel der Ressourcen liegen) und ein kürzerer Horizont (wirkungslos). */
 const KI_PARAMS = {
-  leicht: { noise: 0.45, slip: 0.25, defend: 0.55, strike: 0.35, evals: 600 },
-  mittel: { noise: 0.15, slip: 0.06, defend: 0.85, strike: 0.8, evals: 1200 },
-  schwer: { noise: 0, slip: 0, defend: 1, strike: 1, evals: 2000 },
+  leicht: { see: 0.25, noise: 1.0, slip: 0.5, defend: 0.25, strike: 0.2, evals: 600 },
+  mittel: { see: 0.5, noise: 0.5, slip: 0.2, defend: 0.8, strike: 0.7, evals: 1000 },
+  schwer: { see: 1, noise: 0, slip: 0, defend: 1, strike: 1, evals: 1000 },
 };
 const kiLevelOf = p => (p && KI_PARAMS[p.kiLevel]) ? p.kiLevel : KI_DEFAULT_LEVEL;
 
@@ -152,6 +164,27 @@ function kiArmyCostNth(S, pi, k) {
   const mult = has(p, 'nationalismus') ? 2 : has(p, 'demokratie') ? 4 : 5;
   return mult * n;
 }
+/* Was ein GEGNER im nächsten Zug höchstens in Münzen (also in Macht und Armeen) stecken
+   kann – wie kiCoinBudget, aber mit dem, was er in diesem Zug erst freischalten kann:
+   Alchemie (Wissenschaft 1:1 in Münzen) erforscht er, wenn sie verfügbar ist, und tauscht
+   im selben Zug. Bis v77 fehlte das: gemessen sprang das Budget Griechenlands so von 18 auf
+   51 Münzen, und England hielt seine Hauptstadt mit Verteidigung 2 für sicher. Gilt nur für
+   den entschlossenen Angreifer (kiDetermined). */
+function kiThreatBudget(S, e) {
+  const p = S.players[e];
+  const inc = income(S, e);
+  let b = kiCoinBudget(S, e, inc);
+  const alch = TECH_BY_KEY.alchemie;
+  if (alch && !has(p, 'alchemie') && p.avail.alchemie && !evActive(S, e, 'dunkles_zeitalter')) {
+    const cost = techCost(S, e, alch);
+    if (inc.sci >= cost) {
+      const r = rates(S, e);
+      const schon = r.sciToCoins !== Infinity ? Math.floor(Math.max(0, inc.sci) / r.sciToCoins) : 0;
+      b += Math.max(0, inc.sci - cost) - schon;
+    }
+  }
+  return b;
+}
 /* Münzbudget eines Reiches im nächsten Zug: sein Einkommen, samt dem, was sich über die
    Kurse in Münzen tauschen lässt (Alchemie, Handelsreich/Pyramiden). Obergrenze – wer
    alles in Macht steckt, gibt nichts anderes aus. */
@@ -250,14 +283,19 @@ function kiEnemyInfo(S, e) {
   const ep = S.players[e];
   const mp = moveAllowance(S, e);
   const info = {
-    e, bot: ep.kind === 'bot', rng: attackRange(S, e), reach: new Map(), cityReach: [],
+    e, bot: ep.kind === 'bot', human: ep.kind === 'human',
+    rng: attackRange(S, e), reach: new Map(), cityReach: [], armies: [],
+    hits: new Map(),        // je Stadtfeld: welche Armeen und Städte herankommen (kiAttackPotential)
   };
-  for (const a of armiesOf(S, e)) info.reach.set(a.id, kiReachKeys(S, e, a.r, a.c, mp));
+  for (const a of armiesOf(S, e)) {
+    info.reach.set(a.id, kiReachKeys(S, e, a.r, a.c, mp));
+    info.armies.push({ id: a.id, r: a.r, c: a.c });
+  }
   for (const ct of citiesOf(S, e)) {
     if (armyAt(S, ct.r, ct.c)) continue;
     // Bots bauen nur in der Hauptstadt, und nur mit Glück
     if (info.bot && !ct.cap) continue;
-    info.cityReach.push({ id: ct.id, keys: kiReachKeys(S, e, ct.r, ct.c, mp) });
+    info.cityReach.push({ id: ct.id, r: ct.r, c: ct.c, keys: kiReachKeys(S, e, ct.r, ct.c, mp) });
   }
   if (info.bot) {
     info.powerNow = powerOf(S, e);
@@ -265,7 +303,10 @@ function kiEnemyInfo(S, e) {
     info.newArmies = 1;
   } else {
     info.afterDecay = kiPowerAfterDecay(S, e);
+    // zwei Budgets: das gewöhnliche (Einkommen, Umtausch mit den Technologien von jetzt) und
+    // das eines entschlossenen Angreifers, der dafür noch Alchemie erforscht (kiDetermined)
     info.budget = kiCoinBudget(S, e);
+    info.budgetHard = kiThreatBudget(S, e);
     info.price = powerPrice(S, e);
     info.powerNow = powerOf(S, e);
   }
@@ -273,38 +314,83 @@ function kiEnemyInfo(S, e) {
 }
 /* Größtmöglicher Angriff eines Gegners auf eine Stadt am Ende seines nächsten Zuges.
    Obergrenze: er steckt sein ganzes Münzbudget in Macht und neue Armeen. */
-function kiAttackPotential(S, info, city) {
-  const e = info.e;
+/* Wer kommt an eine Stadt heran – welche Armeen (schon in Reichweite oder im nächsten Zug)
+   und aus welchen Städten eine neue Armee? Hängt nur an der Lage der Stadt und an den Lagen
+   und Reichweiten zu Zugbeginn (info.armies, info.cityReach), also je Feld einmal gerechnet
+   und gemerkt – und zwar nicht aus S: der erste Aufruf kann auf einer Kopie kommen, in der
+   schon eine Armee fehlt. Gezählt wird danach auf S; was dort wegflankiert oder erobert
+   ist, zählt nicht mit. (Vorher je Bewertung neu gerechnet – ein Zehntel der Rechenzeit.) */
+function kiHits(S, info, city) {
+  const ck = key(city.r, city.c);
+  let hit = info.hits.get(ck);
+  if (hit) return hit;
   const near = new Set(kiDisk(S, city.r, city.c, info.rng).map(([r, c]) => key(r, c)));
-  let nE = 0;
-  for (const a of armiesOf(S, e)) {
+  const armies = new Set(), cities = new Set();
+  for (const a of info.armies) {
+    if (hexDistance(a.r, a.c, city.r, city.c) <= info.rng) { armies.add(a.id); continue; }
     const ks = info.reach.get(a.id);
-    if (hexDistance(a.r, a.c, city.r, city.c) <= info.rng) { nE++; continue; }
-    if (!ks) continue;
-    for (const k of near) if (ks.has(k)) { nE++; break; }
+    for (const k of near) if (ks.has(k)) { armies.add(a.id); break; }
   }
-  let nC = 0;
   for (const cr of info.cityReach) {
-    const ct = kiCity(S, cr.id);
-    if (!ct || ct.owner !== e) continue;
-    if (hexDistance(ct.r, ct.c, city.r, city.c) <= info.rng) { nC++; continue; }
-    for (const k of near) if (cr.keys.has(k)) { nC++; break; }
+    if (hexDistance(cr.r, cr.c, city.r, city.c) <= info.rng) { cities.add(cr.id); continue; }
+    for (const k of near) if (cr.keys.has(k)) { cities.add(cr.id); break; }
   }
+  hit = { armies, cities };
+  info.hits.set(ck, hit);
+  return hit;
+}
+function kiAttackPotential(S, info, city, hard) { return kiAttackWaves(S, info, city, hard).a1; }
+/* Rechnet die KI mit einem entschlossenen Angreifer? Gegen Menschen ja: sie sehen eine
+   schwache Hauptstadt und werfen alles hinein, auch Wissenschaft über Alchemie. Gegen KI und
+   Bots gilt die mildere Schätzung, mit der die KI gegen ihresgleichen am besten fährt –
+   gemessen spielte sie mit der harten Schätzung gegen alle zu viert deutlich schlechter
+   (17 : 31; sie gab Städte zu früh verloren und verteidigte, wo niemand angriff). Auch erst
+   ab laufender Belagerung hart zu rechnen, änderte gegen die KI keine einzige Partie
+   (ANNAHMEN.md „Abwehr gegen Vorstöße"). Die Stadt bleibt als Parameter, falls sich das
+   einmal nach der Lage richten soll. */
+const kiDetermined = (S, info, city) => info.human;
+/* Die beiden Wellen eines Angriffs, jeweils das Höchste, was der Gegner aufbringen kann:
+   a1 am Ende seines nächsten Zuges (erster Treffer), a2 am Ende des übernächsten – dann
+   kommt zu der Macht, die ihm vom ersten Mal nach dem Machtverlust bleibt, ein zweites
+   Budget dazu, und eine Armee mehr kann heran sein. So rechnet die KI beim entschlossenen
+   Angreifer (hard, kiDetermined); sonst bleibt es bei der Schätzung bis v77, a2 = 1,3 × a1 + 2.
+   Wer zweimal alles in Macht steckt, kommt auf gut das Anderthalbfache – mit der groben
+   Schätzung verließ sich die KI auf eine Antwort nach dem ersten Treffer, die es nicht gab
+   (ANNAHMEN.md „Abwehr gegen Vorstöße"). */
+function kiAttackWaves(S, info, city, hard) {
+  const e = info.e;
+  const hit = kiHits(S, info, city);
+  let nE = 0;
+  for (const a of armiesOf(S, e)) if (hit.armies.has(a.id)) nE++;
+  let nC = 0;
+  for (const id of hit.cities) { const ct = kiCity(S, id); if (ct && ct.owner === e) nC++; }
   if (info.bot) {
     const n = nE + Math.min(nC, info.newArmies);
-    return n ? kiAttackPer(S, e, info.power) * n : 0;
+    const a1 = n ? kiAttackPer(S, e, info.power) * n : 0;
+    return { a1, a2: a1 ? a1 + 2 : 0 };
   }
-  let best = 0, armyCost = 0;
+  const ep = S.players[e], div = kiDecayDiv(ep), nOwn = armiesOf(S, e).length;
+  const budget = hard ? info.budgetHard : info.budget;
+  let a1 = 0, a2 = 0, armyCost = 0;
   for (let m = 0; m <= nC; m++) {
     if (m > 0) armyCost += kiArmyCostNth(S, e, m);
-    if (armyCost > info.budget) break;
+    if (armyCost > budget) break;
     const n = nE + m;
     if (!n) continue;
-    const x = Math.floor((info.budget - armyCost) / info.price);
-    const pw = info.afterDecay + x + kiPowerBonus(S, e, armiesOf(S, e).length + m);
-    best = Math.max(best, kiAttackPer(S, e, pw) * n);
+    const bonus = kiPowerBonus(S, e, nOwn + m);
+    const bought = info.afterDecay + Math.floor((budget - armyCost) / info.price);   // gekaufte Macht nach Welle 1
+    a1 = Math.max(a1, kiAttackPer(S, e, bought + bonus) * n);
+    // Welle 2: Machtverlust zu Beginn seines übernächsten Zuges, dann ein neues Budget –
+    // wahlweise mit einer weiteren Armee
+    const keep = bought - Math.min(bought, Math.ceil((bought + bonus) / div));
+    for (let k = 0; k <= 1; k++) {
+      const cost2 = k ? kiArmyCostNth(S, e, m + 1) : 0;
+      if (cost2 > budget) break;
+      const pw2 = keep + Math.floor((budget - cost2) / info.price) + kiPowerBonus(S, e, nOwn + m + k);
+      a2 = Math.max(a2, kiAttackPer(S, e, pw2) * (n + k));
+    }
   }
-  return best;
+  return { a1, a2: hard ? a2 : (a1 ? a1 * 1.3 + 2 : 0) };
 }
 /* Größtmögliche Verteidigung, die ein Reich in seinem nächsten Zug an einer Stadt aufbauen
    kann: Macht kaufen (zählt je Armee in Reichweite und mit Burgenbau einmal mehr), eine
@@ -451,13 +537,9 @@ function kiCityValue(S, pi, city, K) {
 const kiSig = x => 1 / (1 + Math.exp(-x));
 function kiAttackMin(S, info, city) {
   const e = info.e;
-  const near = new Set(kiDisk(S, city.r, city.c, info.rng).map(([r, c]) => key(r, c)));
+  const hit = kiHits(S, info, city);
   let n = 0;
-  for (const a of armiesOf(S, e)) {
-    if (hexDistance(a.r, a.c, city.r, city.c) <= info.rng) { n++; continue; }
-    const ks = info.reach.get(a.id);
-    if (ks) for (const k of near) if (ks.has(k)) { n++; break; }
-  }
+  for (const a of armiesOf(S, e)) if (hit.armies.has(a.id)) n++;
   if (!n) return 0;
   const pw = info.bot ? info.powerNow : info.afterDecay + kiPowerBonus(S, e, armiesOf(S, e).length);
   return kiAttackPer(S, e, pw) * n;
@@ -468,35 +550,44 @@ function kiCaptureChance(aMax, aMin, d) {
   // unterhalb des Mindestangriffs sicher, darüber steil zum Höchstwert hin
   return aMin > d ? 1 : kiSig((aMax - d) / s - 1.2);
 }
+/* Liefert zweierlei: `cities` – was an den übrigen Städten auf dem Spiel steht (Wert ×
+   Wahrscheinlichkeit) – und `pCap`, die Wahrscheinlichkeit, die Hauptstadt zu verlieren
+   (fällt sie, ist die Partie verloren; kiValue rechnet sie mit dem Wert des Spiels). */
 function kiRisk(S, pi, K, myBudget) {
-  let risk = 0;
+  let risk = 0, pCap = 0;
   for (const city of citiesOf(S, pi)) {
     const d = defenseValue(S, city);
     let pCity = 0;
     for (const e of K.enemies) {
       const info = K.info.get(e);
       if (!info || S.players[e].dead) continue;
-      const aMax = kiAttackPotential(S, info, city);
-      if (aMax <= d) continue;
-      const aMin = kiAttackMin(S, info, city);
-      const pNow = kiCaptureChance(aMax, aMin, d);
-      let pc;
-      if ((S.sieges[e + '|' + city.id] || 0) >= 1) pc = pNow;
-      else {
-        // erster Treffer: danach bleibt ein Zug zum Nachlegen. Sein zweiter Angriff kann
-        // noch einmal ein Budget obendrauf legen.
-        const resp = kiDefensePotential(S, pi, city, myBudget);
-        const a2 = info.bot ? aMax + 2 : aMax * 1.3 + 2;
-        const pNoResp = a2 <= resp ? 0.05 : kiSig((a2 - resp) / Math.max(1.5, 0.12 * a2) - 0.5);
-        pc = pNow * pNoResp * (city.cap ? 0.8 : 0.5);
-      }
+      const siege = (S.sieges[e + '|' + city.id] || 0) >= 1;
+      let aMin = null, resp = null;
+      const chance = w => {
+        if (w.a1 <= d) return 0;
+        if (aMin == null) aMin = kiAttackMin(S, info, city);
+        const pNow = kiCaptureChance(w.a1, aMin, d);
+        if (siege) return pNow;
+        // erster Treffer: danach bleibt ein Zug zum Nachlegen – gegen seine zweite Welle
+        if (resp == null) resp = kiDefensePotential(S, pi, city, myBudget);
+        const pNoResp = w.a2 <= resp ? 0.05 : kiSig((w.a2 - resp) / Math.max(1.5, 0.12 * w.a2) - 0.5);
+        return pNow * pNoResp * (city.cap ? 0.8 : 0.5);
+      };
+      // Gegen Menschen meist der entschlossene Angreifer, zu einem Viertel der mildere: ganz
+      // sicher ist auch ein Mensch nicht, dass er alles hineinwirft. Ohne diesen Anteil sah die
+      // KI eine Lage, die sie nicht ganz halten kann, als verloren an und baute weiter aus,
+      // statt den Preis des Angriffs hochzutreiben.
+      const pc = kiDetermined(S, info, city)
+        ? 0.75 * chance(kiAttackWaves(S, info, city, true)) + 0.25 * chance(kiAttackWaves(S, info, city, false))
+        : chance(kiAttackWaves(S, info, city, false));
+      if (!pc) continue;
       pCity = 1 - (1 - pCity) * (1 - pc);
     }
     if (!pCity) continue;
-    const value = city.cap ? K.vGame : kiCityValue(S, pi, city, K);
-    risk += value * K.lvl.defend * pCity;
+    if (city.cap) pCap = 1 - (1 - pCap) * (1 - pCity);
+    else risk += kiCityValue(S, pi, city, K) * K.lvl.defend * pCity;
   }
-  return risk;
+  return { cities: risk, pCap: Math.min(1, pCap * K.lvl.defend) };
 }
 /* Angriff: Städte, an denen nach dem Kampf dieses Zuges der eigene Belagerungszähler auf 1
    steht. Wie viel das wert ist, hängt daran, ob der zweite Treffer im nächsten Zug kommt –
@@ -566,7 +657,14 @@ function kiValue(S, pi, K) {
   v += kiProgress(S, pi, K);
   v += K.w.army * Math.min(armiesOf(S, pi).length, 2 + cities.length);
   const myBudget = kiCoinBudget(S, pi, y);
-  v -= kiRisk(S, pi, K, myBudget);
+  const risk = kiRisk(S, pi, K, myBudget);
+  // Die Hauptstadt zählt mit dem Wert des Spiels. Gemessen und verworfen (v78): alles andere
+  // nur mit der Wahrscheinlichkeit zu zählen, dass sie steht – „wer die Hauptstadt verliert,
+  // dem nützt keine neue Stadt". Gegen Menschen half das kaum (21 statt 20 gefallene
+  // Hauptstädte in 187 Stellungen), gegen die KI verlor sie damit deutlich öfter (Duell
+  // gepaart 25 : 35) – vermutlich, weil auch eigene Angriffe nur noch mit dieser
+  // Wahrscheinlichkeit zählten, solange die eigene Hauptstadt bedroht war.
+  v -= risk.cities + risk.pCap * K.vGame;
   v += kiOffense(S, pi, K, myBudget);
   v += kiVictory(S, pi, K);
   if (S.wo) v += kiWonderValue(S, pi, K);
@@ -608,7 +706,9 @@ const kiValueAfterCombat = (S, pi, K, seed) => kiScore(kiClone(S, seed), pi, K);
 /* Jeder Kandidat ist eine kleine Folge von Aktionen der Regelmaschine. `run(S)` führt sie
    aus – auf einer Kopie zum Bewerten und danach, falls gewählt, auf dem echten Spielstand.
    Städte und Armeen werden deshalb über ihre id angesprochen, nie über das Objekt. */
-function kiCandidates(S, pi, K, memo) {
+/* `billig`: nur, was der Planer nach aufgebrauchtem Budget noch erwägt (KI_BATCH und
+   Gründungen) – Militär, Wunder und Sklaverei werden dann gar nicht erst gebildet. */
+function kiCandidates(S, pi, K, memo, billig) {
   const p = S.players[pi];
   const out = [];
   const add = (label, run, tag) => out.push({ label, run, tag });
@@ -653,7 +753,7 @@ function kiCandidates(S, pi, K, memo) {
   if (canBuildRoads(p)) for (const plan of kiRoadPlans(S, pi).slice(0, 4))
     add(plan.label, X => kiBuildRoadPlan(X, pi, plan), plan.tag);
   // --- Sklaverei: Bevölkerung gegen 10 Münzen
-  if (slaveryUsable(p)) for (const city of citiesOf(S, pi))
+  if (!billig && slaveryUsable(p)) for (const city of citiesOf(S, pi))
     if (city.pop >= 2 && city.sacrificed !== S.round) {
       const id = city.id;
       add(() => T('opfert Bevölkerung'), X => sacrifice(X, pi, kiCity(X, id)), 'slave:' + id);
@@ -663,7 +763,7 @@ function kiCandidates(S, pi, K, memo) {
     for (const t of kiColonySpots(S, pi).slice(0, 3))
       add(() => T('kauft Feld %s/%s', t[0], t[1]), X => buyTile(X, pi, t[0], t[1]), 'col:' + t[0] + ',' + t[1]);
   // --- Weltwunder
-  if (S.wo) for (const w of availableWonders(S)) {
+  if (S.wo && !billig) for (const w of availableWonders(S)) {
     const city = kiWonderCity(S, pi, w.k);
     if (city && !canBuildWonder(S, pi, city, w.k)) {
       const id = city.id;
@@ -671,7 +771,7 @@ function kiCandidates(S, pi, K, memo) {
     }
   }
   // --- Militär: Verteidigung, Angriff, Flankieren, Macht
-  for (const m of kiMilitaryCandidates(S, pi, K, memo)) out.push(m);
+  if (!billig) for (const m of kiMilitaryCandidates(S, pi, K, memo)) out.push(m);
   return out;
 }
 /* Mit Massenmedien (1 Münze ernährt 3) oder Gentechnik (1 Wissenschaft ernährt 1) Nahrung
@@ -905,9 +1005,25 @@ function kiMilitaryCandidates(S, pi, K, memo) {
 /* Zwischenspeicher je Planungsschritt: erreichbare Felder jeder eigenen Armee und die
    Reichweite einer neuen Armee aus jeder eigenen Stadt. Innerhalb eines Schritts gehen alle
    Kandidaten vom selben Spielstand aus; nach dem Schritt wird neu gerechnet. */
-function kiStepMemo(memo) {
-  memo.armyTiles = new Map();
-  memo.newReach = new Map();
+/* Reichweiten gelten, solange sich nichts ändert, wovon armyReach abhängt: Armeen (Lage,
+   Bewegung), Städte, Straßen, eigene Technologien (Navigation, Luftwaffe …) und Wunder
+   (Militärlogistik). Die Fremden ändern sich im eigenen Zug nicht. Bleibt das alles gleich,
+   rechnet der nächste Planungsschritt mit den gemerkten Reichweiten weiter – sonst fing
+   jeder Schritt von vorn an (bei Luftwaffe ein Fünftel eines langen Zuges). */
+const kiMoveSig = (S, pi) => {
+  let r = 0, n = 0;
+  for (const k in S.roads) { n++; r += S.roads[k]; }
+  return S.armies.map(a => a.id + ':' + a.r + ',' + a.c + ',' + a.mp).join(';') + '|' +
+    S.cities.map(c => c.id + ':' + c.r + ',' + c.c + ',' + c.owner).join(';') + '|' + n + ',' + r + '|' +
+    Object.keys(S.players[pi].techs).length + '|' + (S.wonders ? S.wonders.length : 0);
+};
+function kiStepMemo(memo, S, pi) {
+  const sig = S ? kiMoveSig(S, pi) : null;
+  if (sig == null || memo.moveSig !== sig) {
+    memo.armyTiles = new Map();
+    memo.newReach = new Map();
+    memo.moveSig = sig;
+  }
   if (!memo.committed) memo.committed = new Set();
   return memo;
 }
@@ -1051,7 +1167,7 @@ function kiDefensePlan(S, pi, city, K, memo) {
   let worst = 0;
   for (const e of K.enemies) {
     const info = K.info.get(e);
-    if (info) worst = Math.max(worst, kiAttackPotential(S, info, city));
+    if (info) worst = Math.max(worst, kiAttackPotential(S, info, city, kiDetermined(S, info, city)));
   }
   if (!worst || worst <= defenseValue(S, city)) return null;
   const rng = projectRange(S, pi);
@@ -1071,10 +1187,20 @@ function kiDefensePlan(S, pi, city, K, memo) {
     .filter(([r, c]) => !cityAt(S, r, c) && hexDistance(r, c, city.r, city.c) <= rng)
     .sort((x, y) => kiExposure(S, pi, x[0], x[1]) - kiExposure(S, pi, y[0], y[1]))
     .map(([r, c]) => [r, c, 1]) : [];
-  if (!movers.length && !canBuild) return null;
+  // Armeen, die schon helfen (in Reichweite, nicht in einer Stadt), und Burgenbau: dann
+  // wirkt gekaufte Macht auch ohne Umzug
+  const helpNow = armiesOf(S, pi).some(a => hexDistance(a.r, a.c, city.r, city.c) <= rng && !cityAt(S, a.r, a.c)) ||
+    has(S.players[pi], 'burgenbau');
+  if (!movers.length && !canBuild && !helpNow) return null;
   const id = city.id;
-  const mk = builds => ({
-    label: () => T('verteidigt die Stadt auf %s/%s', city.r, city.c), tag: 'defend:' + id + ':' + builds,
+  /* Macht gehört ins Paket (v78): Armeen neben der Stadt helfen nur mit Macht, und Macht
+     hilft nur mit Armeen daneben. Einzeln bringt keins von beiden etwas, und der Planer
+     nahm dann keins – die KI baute Armeen ohne Macht oder gar nichts. `macht`: 0 = keine,
+     'ziel' = so viel, dass die Verteidigung den stärksten Angriff seines nächsten Zuges
+     erreicht, 'alles' = was die Münzen hergeben. */
+  const mk = (builds, macht, alch) => ({
+    label: () => T('verteidigt die Stadt auf %s/%s', city.r, city.c),
+    tag: 'defend:' + id + ':' + builds + (macht ? ':' + macht : '') + (alch ? '+a' : ''),
     run: X => {
       const ct = kiCity(X, id);
       if (!ct) return 'Stadt verloren.';
@@ -1089,10 +1215,35 @@ function kiDefensePlan(S, pi, city, K, memo) {
         const a = armyAt(X, ct.r, ct.c);
         if (!kiMoveToFirst(X, a, newTiles)) { kiLeaveCity(X, pi, a); break; }
       }
+      // Alchemie zuerst: dann zahlt die Wissenschaft mit (1:1 in Münzen). Einzeln brächte die
+      // Technologie gegen den Angriff nichts, also gehört sie wie die Macht ins Paket.
+      if (alch && !has(X.players[pi], 'alchemie')) doResearch(X, pi, 'alchemie');
+      if (macht) {
+        const price = powerPrice(X, pi);
+        const can = Math.floor(available(X, pi, 'coins', payOpts(X, pi)) / price);
+        let n = can;
+        if (macht === 'ziel') {
+          const per = armiesOf(X, pi).filter(a => hexDistance(a.r, a.c, ct.r, ct.c) <= rng && !cityAt(X, a.r, a.c)).length +
+            (has(X.players[pi], 'burgenbau') ? 1 : 0);
+          const gap = worst - defenseValue(X, ct);
+          n = per && gap > 0 ? Math.min(can, Math.ceil(gap / per)) : 0;
+        }
+        if (n > 0 && !buyPower(X, pi, n)) did = true;
+      }
       return did ? null : 'Nichts zu tun.';
     },
   });
-  return [mk(0), mk(1), mk(2)].filter((_, i) => i === 0 ? movers.length : canBuild);
+  const out = [];
+  const p = S.players[pi];
+  const alchOk = !has(p, 'alchemie') && researchable(S, pi).some(t => t.k === 'alchemie') &&
+    available(S, pi, 'sci') >= techCost(S, pi, TECH_BY_KEY.alchemie) + powerPrice(S, pi);
+  for (const builds of [0, 1, 2]) {
+    if (builds === 0 ? !(movers.length || helpNow) : !canBuild) continue;
+    if (builds > 0 || movers.length) out.push(mk(builds, 0));
+    out.push(mk(builds, 'ziel'), mk(builds, 'alles'));
+    if (alchOk) out.push(mk(builds, 'ziel', true), mk(builds, 'alles', true));
+  }
+  return out;
 }
 /* Flankieren: eine gegnerische Armee zwischen zwei eigene Positionen nehmen – gegenüber-
    liegend (hexOpposite, dieselbe Regel wie canFlank im Kampf), mit Taktik zwei beliebige; mit
@@ -1247,25 +1398,35 @@ function kiPlan(S, pi, K, notes, memo) {
   const budget = lvl.evals || 2000;
   let evals = 0;
   for (let step = 0; step < 60 && !S.over; step++) {
-    kiStepMemo(memo);
+    kiStepMemo(memo, S, pi);
     const base = kiValueAfterCombat(S, pi, K, seedOf());
-    let cands = kiCandidates(S, pi, K, memo).filter(c => !failed.has(c.tag));
+    let cands = kiCandidates(S, pi, K, memo, evals > budget).filter(c => !failed.has(c.tag));
     if (evals > budget) cands = cands.filter(c => KI_BATCH.test(c.tag) || /^found:/.test(c.tag));
     if (evals > 2 * budget) break;
     const scored = [];
-    for (const c of cands) {
-      const X = kiClone(S, seedOf());
-      let err;
-      try { err = c.run(X); } catch (e) { err = String(e && e.message || e); }
-      evals++;
-      if (err) continue;
-      const v = kiScore(X, pi, K);
-      let dv = v - base;
-      if (lvl.noise) dv *= 1 + (kiRandom(p) * 2 - 1) * lvl.noise;
-      if (!(dv > 0.05)) continue;
-      const spent = kiSpent(S.players[pi].res, X.players[pi].res);
-      scored.push({ c, dv, spent, ratio: dv / (Math.max(0, spent) + 2) });
-    }
+    const score = list => {
+      for (const c of list) {
+        const X = kiClone(S, seedOf());
+        let err;
+        try { err = c.run(X); } catch (e) { err = String(e && e.message || e); }
+        evals++;
+        if (err) continue;
+        const v = kiScore(X, pi, K);
+        let dv = v - base;
+        if (lvl.noise) dv *= 1 + (kiRandom(p) * 2 - 1) * lvl.noise;
+        if (!(dv > 0.05)) continue;
+        const spent = kiSpent(S.players[pi].res, X.players[pi].res);
+        scored.push({ c, dv, spent, ratio: dv / (Math.max(0, spent) + 2) });
+      }
+    };
+    // Leichtere Stufen übersehen etwas: jeder Kandidat wird nur mit Wahrscheinlichkeit
+    // `see` erwogen, in jedem Schritt neu gezogen. Taugt nichts davon, schaut sie ein
+    // zweites Mal auf den Rest – übersehen heißt nicht, den Zug mit vollen Taschen zu beenden.
+    if (lvl.see != null && lvl.see < 1) {
+      const seen = new Set(cands.filter(() => kiRandom(p) < lvl.see));
+      score([...seen]);
+      if (!scored.length) score(cands.filter(c => !seen.has(c)));
+    } else score(cands);
     if (!scored.length) break;
     scored.sort((a, b) => b.ratio - a.ratio);
     let pick = scored[0];

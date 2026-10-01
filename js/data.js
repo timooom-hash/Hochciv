@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v77';
+const APP_VERSION = 'v78';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -245,8 +245,9 @@ const DIFFICULTIES = [
 ];
 /* Stufen der KI (js/ki.js). Die KI spielt auf jeder Stufe nach denselben Regeln wie ein
    Mensch – sie bekommt weder Ressourcen geschenkt noch abgezogen. Die Stufe regelt nur,
-   wie gründlich sie rechnet und wie oft sie sich bewusst vergreift (Einzelheiten in
-   KI_PARAMS, js/ki.js). Reihenfolge von leicht nach schwer, wie bei DIFFICULTIES. */
+   wie viel sie übersieht, wie gründlich sie rechnet und wie oft sie sich vergreift
+   (Einzelheiten in KI_PARAMS, js/ki.js). Im Duell gemessen etwa wie die Bots Prinz,
+   König und David. Reihenfolge von leicht nach schwer, wie bei DIFFICULTIES. */
 const KI_LEVELS = [
   { k: 'leicht', n: 'Leicht' },
   { k: 'mittel', n: 'Mittel' },
