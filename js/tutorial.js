@@ -379,7 +379,7 @@ const TUT_STEPS = [
       return [ui.tutStrike || TUT_STRIKE, gcap && [gcap.r, gcap.c]].filter(Boolean);
     },
     allow: {
-      bar: ['a-tech', 'a-power', 'a-army'],
+      bar: ['a-tech', 'a-power'],
       techs: ['belagerung'],
       labels: [/Macht/, /bewegen/],
       // Antippbar: die eigene Armee (um sie auszuwählen) und das Zielfeld
@@ -511,7 +511,7 @@ const TUT_LOOK_ONLY = { bar: ['a-info', 'a-log'], labels: [], hex: () => [], tec
    an den Schienen vorbei. */
 function tutAllow() {
   const st = tutStep();
-  if (!st) return { bar: ['a-tech', 'a-found', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
+  if (!st) return { bar: ['a-tech', 'a-found', 'a-power', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
   if (!st.allow || (st.goal && st.goal())) return TUT_LOOK_ONLY;   // Leseschritt oder erledigt
   return Object.assign({ bar: [], labels: [], techs: [] }, st.allow);
 }

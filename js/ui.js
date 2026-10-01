@@ -551,7 +551,7 @@ function redraw() {
   $('hud-sci').textContent = p.res.sci;
   $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
   $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
-  ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end'].forEach(id => $(id).disabled = !human);
+  ['a-tech', 'a-found', 'a-power', 'a-end'].forEach(id => $(id).disabled = !human);
   // „Erträge" ist reine Ansicht: immer bedienbar, auch im Tutorial und während Bots ziehen
   $('a-yields').disabled = false;
   if (ui.tut) {
@@ -562,7 +562,7 @@ function redraw() {
   saveGame();
 }
 /* Die Knöpfe der Leiste, die das Tutorial an seine Schienen bindet (alle außer „Erträge"). */
-const TUT_BAR = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-info', 'a-log', 'a-end'];
+const TUT_BAR = ['a-tech', 'a-found', 'a-power', 'a-info', 'a-log', 'a-end'];
 /* Ertragsansicht an/aus – je Gerät gemerkt. */
 let showYields = !!load('hochciv.yields');
 function toggleYields() {
@@ -785,28 +785,6 @@ function doRoad(r, c, ziel) {
   openTile(r, c);
 }
 
-function armySheet() {
-  endFoundMode();
-  const pi = S.cur, mine = armiesOf(S, pi);
-  if (!mine.length)
-    return sheet(`<h3>${T('Deine Armeen')}</h3><p class="sub">${T('Du hast noch keine. Eigene Stadt antippen → Armee bauen (%s Münzen).', armyCost(S, pi))}</p>`);
-  const rows = mine.map((a, i) => {
-    const inCity = cityAt(S, a.r, a.c);
-    const note = a.mp <= 0 ? T('diese Runde schon gezogen')
-      : inCity && a.born === S.round ? T('muss die Stadt noch verlassen')
-        : T('auf %s', TERRAIN[terrainAt(S, a.r, a.c)].name);
-    return `<button class="opt" data-i="${i}" data-label="Armee wählen" ${a.mp <= 0 ? 'disabled' : ''}>
-      <span>${T('Armee %s · Feld %s/%s', i + 1, a.r, a.c)}<small>${note}</small></span>
-      <span class="cost">${mp(a)}</span></button>`;
-  }).join('');
-  sheet(`<h3>${T('Deine Armeen (%s)', mine.length)}</h3>
-    <p class="sub">${T('Angriffswert des Reiches: %s. Antippen wählt die Armee aus, danach ein markiertes Feld antippen.', powerOf(S, pi))}</p>${rows}`);
-  $('sheet-body').querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
-    const a = mine[+b.dataset.i];
-    ui.army = a; ui.sel = [a.r, a.c];
-    closeSheet(); redraw(); toast(T('Zielfeld antippen'));
-  });
-}
 
 /* Wie viele Menschen spielen mit? Nur dann lohnt die Anzeige, wer eine Technologie
    erforschen KÖNNTE – Bots kennen keine Verfügbarkeiten, sie würfeln frei aus dem Pool. */
@@ -2142,7 +2120,6 @@ function boot() {
   $('a-tech').onclick = techModal;
   $('a-found').onclick = toggleFoundMode;
   $('a-power').onclick = powerSheet;
-  $('a-army').onclick = armySheet;
   $('a-yields').onclick = toggleYields;
   $('a-info').onclick = worldModal;
   $('hud-feed').onclick = () => { if (!isAuto(P(S)) && !S.over) foodSheet(); };

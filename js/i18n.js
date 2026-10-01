@@ -368,7 +368,6 @@ const UI_EN = {
   'Macht': 'Power',
   'Forschen': 'Research',
   'Forschung': 'Research',
-  'Armeen': 'Armies',
   'Welt': 'World',
   'Protokoll': 'Log',
   'Zug beenden': 'End turn',
@@ -613,12 +612,8 @@ const UI_EN = {
     'Other empires',
   'Angriffswert %s':
     'Attack value %s',
-  'Angriffswert des Reiches: %s. Antippen wählt die Armee aus, danach ein markiertes Feld antippen.':
-    'Attack value of the empire: %s. Tap to select an army, then tap a highlighted tile.',
   'Armee':
     'Army',
-  'Armee %s · Feld %s/%s':
-    'Army %s · tile %s/%s',
   'Armee hier bewegen':
     'Move army from here',
   'Atomschlag auf dieses Feld':
@@ -659,10 +654,6 @@ const UI_EN = {
     'File not readable',
   'Davon aus %s bestritten':
     'Of that, %s covers',
-  'Deine Armeen':
-    'Your armies',
-  'Deine Armeen (%s)':
-    'Your armies (%s)',
   'Deine Armeen in Reichweite: %s · Angriffswert %s':
     'Your armies in range: %s · attack value %s',
   'Deine Weltwunder — Stufe 1: %s · Stufe 2: %s · Stufe 3: %s · nächstes Wunder %s Münzen':
@@ -677,8 +668,6 @@ const UI_EN = {
     'Move this army',
   'Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.':
     'This game runs without events and without wonders.',
-  'Du hast noch keine. Eigene Stadt antippen → Armee bauen (%s Münzen).':
-    'You have none yet. Tap one of your cities → Build army (%s coins).',
   'Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.':
     'Any technology of the same field from an earlier age, for free.',
   'Eisenbahn bauen':
@@ -833,8 +822,6 @@ const UI_EN = {
     'already used this round',
   'diese Runde schon geopfert':
     'already sacrificed this round',
-  'diese Runde schon gezogen':
-    'already moved this round',
   'diese Stadt hat schon zwei Wunder':
     'this city already has two wonders',
   'durch Atomwaffenproteste dauerhaft gesperrt':
