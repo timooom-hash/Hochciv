@@ -18,7 +18,10 @@
         Abwehr: alle spielen als KI bis zur Runde, dann wird ein Platz zum Menschen – seine
         Armeen stehen einen Zug vor der nächsten KI-Hauptstadt, mit dieser Macht. Die KI
         ist am Zug und sieht sie. Der Mensch zieht heran und kauft Macht (art=allin: alles,
-        art=knapp: gerade genug), zweimal. Gezählt: erster Treffer, gefallene Hauptstädte.
+        art=knapp: gerade genug), zweimal. Gezählt: erster Treffer, gefallene Hauptstädte,
+        was die KI vor und nach dem ersten Treffer je Zug in Macht und Armeen steckt (v79).
+        art=droh: er bleibt drei Züge lang einen Zug vor der Stadt stehen, hält seine Macht
+        und greift nie an – was kostet die bloße Drohung?
 
    n ist die Zahl der Partien (bei „stufen" die Zahl der Paare). Die Partien sind aus ihren
    Startwerten reproduzierbar: gleiche Befehlszeile, gleiche Zahlen.               */
@@ -132,20 +135,36 @@ if (modus === 'duell') {
     !(armyAt(S, nr, nc) && armyAt(S, nr, nc).owner === pi)).length;
   const mensch = (S, B, ziel) => {
     feedSources(S, B).forEach(x => coverPop(S, B, x.kind, x.have));
-    const rng = attackRange(S, B);
+    const rng = attackRange(S, B), droh = ART === 'droh';
+    const passt = d => droh ? d === rng + 1 : d <= rng;
     for (const a of armiesOf(S, B)) {
-      if (hexDistance(a.r, a.c, ziel.r, ziel.c) <= rng) continue;
-      const f = [...armyReach(S, a).keys()].map(unkey).filter(([r, c]) => !cityAt(S, r, c) && hexDistance(r, c, ziel.r, ziel.c) <= rng);
+      if (passt(hexDistance(a.r, a.c, ziel.r, ziel.c))) continue;
+      const f = [...armyReach(S, a).keys()].map(unkey).filter(([r, c]) => !cityAt(S, r, c) && passt(hexDistance(r, c, ziel.r, ziel.c)));
       if (!f.length) continue;
       f.sort((x, y) => offen(S, B, x[0], x[1]) - offen(S, B, y[0], y[1]));
       moveArmy(S, a, f[0][0], f[0][1]);
     }
     const n = attackersOn(S, B, ziel).length;
-    if (n && ART === 'allin') buyPower(S, B, Math.floor(available(S, B, 'coins', payOpts(S, B)) / powerPrice(S, B)));
+    if (droh) {
+      const fehlt = P0 - S.players[B].power;
+      if (fehlt > 0) buyPower(S, B, Math.min(fehlt, Math.floor(available(S, B, 'coins', payOpts(S, B)) / powerPrice(S, B))));
+    } else if (n && ART === 'allin') buyPower(S, B, Math.floor(available(S, B, 'coins', payOpts(S, B)) / powerPrice(S, B)));
     else if (n) { let k = 0; while (attackValue(S, B, n) <= defenseValue(S, ziel) && k++ < 100) if (buyPower(S, B, 1)) break; }
     citiesOf(S, B).forEach(c => growCity(S, B, c));
   };
-  let stellungen = 0, treffer = 0, fallen = 0;
+  // Was die KI in Macht und Armeen steckt (nur auf dem echten Spielstand des Verteidigers)
+  let wache = null, militaer = 0;
+  for (const fn of ['buyPower', 'buildArmy']) {
+    const orig = globalThis[fn];
+    globalThis[fn] = function (X, pi) {
+      if (!wache || X !== wache.S || pi !== wache.pi) return orig.apply(this, arguments);
+      const r0 = Object.assign({}, X.players[pi].res), out = orig.apply(this, arguments), r1 = X.players[pi].res;
+      militaer += (r0.coins - r1.coins) + (r0.sci - r1.sci) + (r0.food - r1.food);
+      return out;
+    };
+  }
+  const vor = { z: 0, m: 0 }, nach = { z: 0, m: 0 };
+  let stellungen = 0, treffer = 0, fallen = 0, techs = 0;
   for (let g = 0; g < N; g++) {
     const players = [];
     for (let i = 0; i < NP; i++) players.push(kiSitz(CIVK[(g + i) % 4], stufe, g, i));
@@ -182,18 +201,30 @@ if (modus === 'duell') {
     S.players[B].power = P0;
     stellungen++;
     let zuege = 0, hit = false;
+    const t0 = Object.keys(S.players[A].techs).length;
     guard = 0;
-    while (!S.over && guard++ < 20 && zuege < 2) {
+    while (!S.over && guard++ < 30 && zuege < (ART === 'droh' ? 3 : 2)) {
       const pi = S.cur;
-      if (pi === B) { mensch(S, B, ziel); zuege++; } else kiTurn(S, pi);
+      if (pi === B) { mensch(S, B, ziel); zuege++; }
+      else if (pi === A) {
+        const belagert = (S.sieges[B + '|' + ziel.id] || 0) >= 1;
+        militaer = 0; wache = { S, pi };
+        kiTurn(S, pi);
+        wache = null;
+        const x = belagert ? nach : hit ? null : vor;
+        if (x) { x.z++; x.m += militaer; }
+      } else kiTurn(S, pi);
       endTurn(S);
       if (pi === B && (S.sieges[B + '|' + ziel.id] || 0) >= 1) hit = true;
       if (ziel.owner !== A) break;
     }
+    techs += Object.keys(S.players[A].techs).length - t0;
     if (hit) treffer++;
     if (ziel.owner === B) fallen++;
   }
+  const je = x => x.z ? (x.m / x.z).toFixed(1) : '–';
   console.log(`Vorstoß ${NP} Reiche ab Runde ${R}, ${NA} Armeen mit Macht ${P0} (${ART}), KI ${stufe}: ${stellungen} Stellungen · erster Treffer ${treffer} · Hauptstadt fällt ${fallen}`);
+  console.log(`   Macht und Armeen je Zug der KI: vor dem ersten Treffer ${je(vor)} Münzen (${vor.z} Züge), danach ${je(nach)} (${nach.z} Züge) · Technologien der KI +${(techs / Math.max(1, stellungen)).toFixed(1)} je Stellung`);
 } else if (modus === 'selbst') {
   const n = +opt('reiche', 2), stufe = opt('stufe', 'schwer'), l = [];
   for (let g = 0; g < N; g++) {

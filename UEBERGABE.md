@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 1.10., `sw.js` v78)
+# Hochzeivilization — Projekt-Übergabe (Stand 1.10., `sw.js` v79)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v78)
+## Letzte Sitzungen auf einen Blick (v61 → v79)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -33,11 +33,13 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v76 | Machtringe aus **einem Teilstück je Punkt** (Verteidigung 1 gegen Angriff 2 = drei Stücke); über 60 Punkte nur der Anteil, bei 0 Punkten ein leerer Ring | Oberfläche |
 | v77 | **KI** als dritte Sitzart (Mensch / KI / Bot): spielt nach den Regeln für Menschen, drei Stufen, legt ihr Startplättchen selbst (`js/ki.js`). **Wirtschaftssieg „mehr als 2/3" und nicht in Runde 1.** `reachable` mit Heap (gleiches Ergebnis, schneller). Messwerkzeug `tools_ki.js` | KI + Regel + Tempo |
 | v78 | **KI-Stufen deutlich getrennt:** Leicht übersieht Möglichkeiten (`see`), rechnet ungenau und vergreift sich öfter, gibt aber aus, was es hat – im Duell etwa wie ein Prinz-Bot, Mittel wie König, Schwer wie David. **Abwehr gegen Vorstöße** (Rückmeldung des Autors): Verteidigung mit Macht im selben Paket, gegen Menschen mit dem entschlossenen Angreifer gerechnet – gefallene Hauptstädte im Test 32 → 20 von 187. Längster KI-Zug 1,5 → 0,7 s | KI + Tempo |
+| v79 | **Abwehr neu gewichtet** (Rückmeldung des Autors): vor dem ersten Treffer mild, im Ernstfall (laufende Belagerung) alles – Verteidigungstechnologien, Flanken, Armeen an die Stadt, Macht; die KI sieht jetzt, dass Armeen nicht stapeln (Plätze an der Stadt). Vorher ein Sechstel weniger Ausgaben (ein Drittel weniger Macht), nachher ein Sechstel mehr, Hauptstädte so oft gehalten wie v78. **Wissenschaft zuerst für die Forschung** (außer im Ernstfall). **Knopf „Armeen" entfernt** | KI + Oberfläche |
 
-Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitte „KI (v77)" und
-„KI-Stufen (v78)" unten, ausführlich in `ANNAHMEN.md`) und Punkt 14–16 der offenen Punkte
-(Wirtschaftssieg in Runde 2 im Duell, ob Leicht für Einsteiger passt, Rechenzeit auf dem
-iPad nicht gemessen) und 17 (Abwehr gegen Menschen nur gegen ein Skript gemessen).
+Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitte „KI (v77)",
+„KI-Stufen (v78)" und „Abwehr neu gewichtet (v79)" unten, ausführlich in `ANNAHMEN.md`) und
+Punkt 14–16 der offenen Punkte (Wirtschaftssieg in Runde 2 im Duell, ob Leicht für Einsteiger
+passt, Rechenzeit auf dem iPad nicht gemessen), 17 (Abwehr gegen Menschen nur gegen ein
+Skript gemessen) und 18 (Straßen im Bündel des Planers).
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
@@ -72,7 +74,7 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1220 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1207 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 416 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
@@ -81,16 +83,16 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 | `js/engine.js` | 1830 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1605 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
-| `js/ui.js` | 2253 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/ki.js` | 1729 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ui.js` | 2230 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 5491 | **1450 Assertions**, `node test.js` |
-| `smoke.js` | 2858 | **125 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 5612 | **1460 Assertions**, `node test.js` |
+| `smoke.js` | 2870 | **125 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
-| `tools_ki.js` | 213 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI (`node tools_ki.js duell 40 diff=david` …) |
+| `tools_ki.js` | 244 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI, nachgestellte Vorstöße samt Ausgaben vor/nach dem ersten Treffer (`node tools_ki.js duell 40 diff=david`, `… vorstoss 40 art=droh` …) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -118,9 +120,10 @@ Gedächtnis rekonstruieren.
   ohne Möglichkeit zu schummeln –, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie,
   und sie legt ihr Startplättchen verdeckt selbst. Stufen Leicht/Mittel/Schwer (`KI_LEVELS`
   in data.js, Werte `KI_PARAMS` in ki.js), gleiche Regeln auf jeder Stufe; seit v78
-  deutlich getrennt, im Duell etwa wie die Bots Prinz, König und David. Bots gibt es
-  weiter, das Tutorial spielt mit ihnen. Einzelheiten und Messungen in `ANNAHMEN.md`,
-  Abschnitte „KI: ein Gegner nach den Regeln für Menschen" und „KI-Stufen deutlich getrennt".
+  deutlich getrennt, im Duell (v79) Leicht zwischen den Bots Prinz und König, Mittel etwas
+  über König, Schwer etwas über David. Bots gibt es weiter, das Tutorial spielt mit ihnen. Einzelheiten und Messungen in `ANNAHMEN.md`,
+  Abschnitte „KI: ein Gegner nach den Regeln für Menschen", „KI-Stufen deutlich getrennt"
+  und „Abwehr: vorher leicht, im Ernstfall alles".
 - **Wirtschaftssieg (v77):** „mehr als 2/3" (vorher „mindestens"), und in Runde 1 gar nicht –
   beides Anweisung des Autors nach einem Fund der KI (Sieg in Runde 1 mit 4 von 5 im Duell).
 - **Eine Regelvariante.** Die früher „experimentell v2" genannten Regeln sind der Standard:
@@ -230,6 +233,48 @@ Gedächtnis rekonstruieren.
   wenn die Bedingung später wegfällt. **Gleichstand: Mensch vor Bot**; mehrere Menschen
   gleichauf teilen den Sieg. Barbaren gewinnen nie. Details in `ANNAHMEN.md`.
 - **Tutorial:** geführtes Übungsspiel in der normalen Oberfläche, 29 Schritte, 19 mit Aufgabe.
+
+### Abwehr neu gewichtet, Wissenschaft für die Forschung, kein Knopf „Armeen" (v79)
+
+Rückmeldung des Autors zu v78 (Schwer zu viert): zu viel Vorsorge, bevor eine Belagerung läuft,
+zu wenig, wenn sie läuft; im Ernstfall Verteidigungstechnologien, Flanken, Armeen neben die
+Stadt; die KI forsche viel zu langsam; der Knopf „Armeen" soll weg. Ausführlich in
+`ANNAHMEN.md`, Abschnitt „Abwehr: vorher leicht, im Ernstfall alles".
+
+- **Knopf „Armeen" entfernt** (`index.html`, `armySheet` in ui.js, Tutorial-Leiste, sieben
+  Übersetzungen, README). Armeen wählt man auf der Karte (Armee antippen → „Diese Armee
+  bewegen", in einer Stadt „Armee hier bewegen").
+- **Vorher mild, für alle** (`kiRisk`): auch gegen Menschen die Schätzung von v77; kann die KI
+  nach einem Treffer nachlegen, bleibt 2 % Rest-Gefahr (`KI_W.preFloor`).
+- **Im Ernstfall alles** (`K.emergency`: eine eigene Stadt hat Belagerungszähler 1): gegen
+  Menschen hart gerechnet, Gefahr linear (`kiSiegeChance`) – jeder Punkt zählt; Alchemie-
+  Pakete nur hier; bleibende Verteidigung zählt extra (`kiDefPerm`, `KI_W.defPerm` 8 je Punkt).
+- **Plätze an der Stadt** (`kiAttackSlots`): Armeen stapeln sich nicht – Angreifer brauchen
+  freie Felder in Reichweite, eigene Armeen nehmen ihnen welche weg. Seine Reichweiten dafür
+  ohne die Armeen der KI gerechnet (`kiEnemyInfo`), Pakete besetzen zuerst Felder, die er
+  erreichen könnte; was sie nach einem Treffer nachlegen kann, zählt nur so viele Helfer, wie
+  dann Platz haben (`kiRingRoom`).
+- **Wissenschaft gehört der Forschung** (`KI_W.sciReserve` 3): außerhalb des Ernstfalls zählt
+  Wissenschaft für alles andere dreifach.
+- **Gemessen** (Tabellen in `ANNAHMEN.md`): 399 nachgestellte Vorstöße, gepaart – Macht und
+  Armeen vor dem ersten Treffer 29,2 → 24,2 Münzen je Zug (Macht 16,3 → 10,6), danach
+  40,2 → 46,4; Verteidigungstechnologien im Ernstfall 19 → 29; Hauptstadt fällt 43 → 41
+  (alles in Macht) bzw. 40 → 42 (knapp) – so oft wie v78. Gegen die KI gleich (gepaart 76 : 80
+  in 156 Partien). Forschung gepaart nach Startwerten: Runde 4 +9 %, Runde 5 +12 %. Stufen
+  weiter getrennt (Schwer–Mittel 27 : 13, Mittel–Leicht 26 : 14, Schwer–Leicht 30 : 10 im
+  Duell); gegen Bots stärker (Leicht 55/80 gegen Prinz, Schwer 39/80 gegen David).
+- **Verworfen:** harte zweite Welle gegen Menschen schon vorher (mehr Vorsorge, mehr gefallene
+  Hauptstädte), Rest-Gefahr ohne Sprung, Armeen bewerten, die er flankieren kann (die KI kaufte
+  dann vorab Macht), mehr Wert je Technologie (kaum mehr Technologien).
+- **Werkzeug:** `node tools_ki.js vorstoss …` zeigt jetzt auch, was die KI vor und nach dem
+  ersten Treffer in Macht und Armeen steckt; `art=droh` misst die bloße Drohung.
+
+**Abgesichert:** `test.js` – Plätze an der Stadt (vier Angreifer, vier bzw. sechs eigene
+Nachbarn: zwei bzw. kein Platz, Angriff halbiert bzw. weg; wer schon steht, bleibt); im
+Ernstfall hält die Hauptstadt mit Armeen und Macht, vorher steckt die KI weniger hinein;
+bleibende Verteidigung zählt im Ernstfall extra und Stadtmauern werden erforscht; mit
+Reserve mehr Wissenschaft in die Forschung. `smoke.js` – Knopf und `armySheet` fehlen,
+Armeen wählt man auf der Karte.
 
 ### KI-Stufen deutlich getrennt, kürzere Züge (v78)
 
@@ -587,7 +632,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1450 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1460 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (125 Schritte), inklusive
@@ -709,8 +754,14 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   die direkt `Math.random` benutzt statt `d6`/`nextRand`, würde das umgehen. Und wer
   `S.evNext` ohne Orakel irgendwo liest, macht die Fairness-Prüfung in `test.js` rot.
 - **Die KI erwartet von Menschen mehr als von KI und Bots** (`kiDetermined` fragt
-  `kind === 'human'`, seit v78): gegen Menschen rechnet sie mit dem entschlossenen Angreifer.
-  Wer eine neue Sitzart einführt, entscheidet dort, wie die KI ihr begegnet.
+  `kind === 'human'`, seit v78): gegen Menschen rechnet sie mit dem entschlossenen Angreifer –
+  seit v79 nur im Ernstfall (laufende Belagerung), vorher mild wie gegen alle. Wer eine neue
+  Sitzart einführt, entscheidet dort, wie die KI ihr begegnet.
+- **Plätze an der Stadt hängen an „Armeen stapeln sich nicht"** (`kiAttackSlots`, seit v79):
+  jeder Angreifer braucht ein eigenes Feld in Reichweite. Die Reichweiten der Gegner werden
+  dafür ohne die Armeen der KI und ohne ihre eigenen gerechnet (`kiEnemyInfo`). Wer das
+  Stapeln oder das Durchziehen durch Armeen erlaubt, muss beides anpassen – sonst hält die KI
+  Städte für sicher, die es nicht sind.
 - **`kiMoveSig` muss alles enthalten, wovon `armyReach` abhängt** (seit v78). Der Planer
   merkt sich Reichweiten über Schritte, solange diese Signatur gleich bleibt (Armeen,
   Städte, Straßen, eigene Technologien, Wunder). Wer eine Bewegungsregel einführt, die an
@@ -850,6 +901,16 @@ Kampf-Aufruf bei Bots · Stadtfelder zählen als Straße/Eisenbahn · Armee in e
 anwählbar · Bot-Armeen nutzen Geländedistanz · Angriffswerte addieren sich · Reichweitensprung
 wirkt sofort · England kann Nahrung für Forschung ausgeben · Internet-Gratiskopie ·
 Navigation-Armeen halten nicht auf Wasser · v2-Tech-Labels · leeres Bot-Fenster (Log-Kappung).
+
+Aus der Sitzung v79:
+- **Angreifer ohne Platz gezählt (KI):** Jede Armee, die irgendein Feld an einer Stadt
+  erreicht, zählte als Angreifer – auch die fünfte an einer Stadt mit vier freien
+  Nachbarfeldern; dass eigene Armeen rund um die Stadt Plätze wegnehmen, sah die KI nicht.
+  Nicht wieder einführen – `kiAttackSlots`; der Test prüft vier Angreifer gegen vier bzw.
+  sechs eigene Nachbarn.
+- **`S.evNext` beim Kopieren berührt** (während der Arbeit gefunden, nie ausgeliefert):
+  `Object.assign({}, S, …)` liest jedes Feld, auch das vorgewürfelte Ereignis – der
+  Fairness-Test schlug an. Für eine Sicht auf S mit anderen Armeen `Object.create(S, …)`.
 
 Aus der Sitzung v76:
 - **Machtring ohne Punkt voll gezeichnet** (Armee mit Macht 0 sah aus wie in voller
@@ -1083,20 +1144,30 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Mindest-Weltbevölkerung (etwa 4 × Zahl der Reiche). **Entscheidung des Autors steht aus.**
 15. **Passt Leicht für Einsteiger? (v78)** Seit v78 sind die Stufen deutlich getrennt
    (Duell gepaart Schwer–Leicht 32 : 8, zu dritt und zu viert je 21 : 3) und an den Bots
-   geeicht: im Duell spielt Leicht etwa wie Prinz, Mittel wie König, Schwer wie David. Ob
-   das für Menschen stimmt, zeigt erst das Spielen – nachstellen in `KI_PARAMS`,
-   nachmessen mit `tools_ki.js stufen`. Im Duell wiegt zwischen Schwer und Mittel der
-   Startvorteil etwa so viel wie der Abstand der Stufen (beginnt Mittel, gewinnt es 11 von
-   20).
+   geeicht: im Duell spielte Leicht etwa wie Prinz, Mittel wie König, Schwer wie David. Die
+   Abwehr von v79 hilft allen Stufen gegen Bots (Leicht 55 statt 48 von 80 gegen Prinz,
+   Schwer 39 statt 34 gegen David) – Leicht liegt jetzt zwischen Prinz und König. Ob das für
+   Menschen stimmt, zeigt erst das Spielen – nachstellen in `KI_PARAMS`, nachmessen mit
+   `tools_ki.js stufen`. Im Duell wiegt zwischen Schwer und Mittel der Startvorteil etwa so
+   viel wie der Abstand der Stufen (beginnt Mittel, gewinnt es 11 von 20).
 16. **Rechenzeit der KI auf dem iPad nicht gemessen.** In Node (v78): Median um 20 ms je
    Zug, längster gemessener Zug 0,72 s (drei Reiche, KI gegen KI, Luftwaffe); zu viert und
-   im Duell höchstens 0,3 s. Das iPad dürfte zwei- bis fünfmal langsamer sein – Schätzung.
-17. **Abwehr gegen Menschen nur gegen ein Skript gemessen (v78).** Das Skript zieht heran
-   und kauft Macht; ein Mensch plant geschickter (Flanken, Ablenkung, Ziel wechseln). Noch
-   offen: vorsorgen, bevor jemand kommt (Stadtmauern, Armeen an der Hauptstadt) und ein
-   gezielter Gegenangriff – beides plant die KI nicht eigens. In gut jeder zehnten
-   nachgestellten Stellung fällt die Hauptstadt weiter, die angesehenen davon waren
-   wirtschaftlich verloren (Angreifer mit doppeltem Budget).
+   im Duell höchstens 0,3 s. v79 (Plätze an der Stadt kosten je Bewertung etwas): Median
+   20–35 ms, längster Zug in `test.js` 0,77 s, in den Messreihen der Stufen bis 0,7 s. Das
+   iPad dürfte zwei- bis fünfmal langsamer sein – Schätzung.
+17. **Abwehr gegen Menschen nur gegen ein Skript gemessen (v78, v79).** Das Skript zieht
+   heran und kauft Macht; ein Mensch plant geschickter (Flanken, Ablenkung, Ziel wechseln).
+   In gut jeder zehnten nachgestellten Stellung fällt die Hauptstadt weiter (v79 so oft wie
+   v78), die angesehenen davon waren wirtschaftlich verloren oder knapp. Seit v79 stellt die
+   KI Armeen neben die bedrohte Stadt, um Angreifern die Plätze zu nehmen – ohne Macht sind
+   sie leicht zu flankieren (bei bloßer Drohung 86 verlorene Armeen in 399 Stellungen, v78:
+   27). Sie dagegen zu bewerten, ließ die KI vorab Macht kaufen – verworfen, weil genau das
+   weg sollte. Ob der Autor lieber mehr Vorsorge oder mehr verlorene Armeen sieht, entscheidet
+   das Spielen.
+18. **Straßen fehlen im Bündel des Planers (bekannt seit v78, nicht angefasst).** `KI_BATCH`
+   in `js/ki.js` erwartet `road:`, die Kandidaten heißen aber `road1:`/`road2:`. Folge:
+   Straßen werden nicht gebündelt, und nach aufgebrauchtem Bewertungsbudget erwägt die KI
+   keine Straßen mehr. Die Korrektur ändert Partien und gehört gemessen.
 
 ## Arbeitsweise, die der Autor schätzt
 

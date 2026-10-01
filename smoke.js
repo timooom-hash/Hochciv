@@ -77,7 +77,7 @@ step('Tutorial: Übungsspiel startet in der Spieloberfläche', () => {
 });
 step('Tutorial: Schienen sperren alles außer dem vorgesehenen Schritt', () => {
   // Leseschritt 1: Aktionsleiste bis auf Nachschlagen gesperrt
-  const locked = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
+  const locked = ['a-tech', 'a-found', 'a-power', 'a-end'].filter(id => !$(id).disabled);
   if (locked.length) throw new Error('offene Knöpfe im Leseschritt: ' + locked.join(','));
   // Gründungsschritt: nur das goldene Feld reagiert
   G('tutMove')(1); G('tutMove')(1); G('tutMove')(1);
@@ -104,7 +104,7 @@ step('Tutorial: Leseschritte erlauben gar keine Aktion', () => {
   const open = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
   if (open.length) throw new Error('im Leseschritt anklickbar: ' + open.map(b => b.textContent.trim()).join(', '));
   G('closeSheet')();
-  const bar = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end'].filter(id => !$(id).disabled);
+  const bar = ['a-tech', 'a-found', 'a-power', 'a-end'].filter(id => !$(id).disabled);
   if (bar.length) throw new Error('Leiste im Leseschritt offen: ' + bar.join(', '));
   console.log('       Stadtblatt und Leiste im Leseschritt vollständig gesperrt');
   $('tut-prev').onclick();
@@ -132,7 +132,7 @@ step('Tutorial: in jedem Schritt ist nur das Vorgesehene anklickbar', () => {
       if (bad.length) problems.push((i + 1) + ' „' + t + '": Blatt offen auf ' + r + '/' + c + ': ' + bad);
       G('closeSheet')();
     }
-    for (const id of ['a-army', 'a-power']) {
+    for (const id of ['a-power']) {
       if ($(id).disabled) continue;
       $(id).onclick();
       const on = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled)
@@ -300,7 +300,7 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
 step('Tutorial: „Fertig" gibt das Spiel frei', () => {
   $('tut-next').onclick();
   if (!$('tut-panel').hidden) throw new Error('Panel bleibt stehen');
-  const locked = ['a-tech', 'a-found', 'a-power', 'a-army', 'a-end', 'a-yields'].filter(id => $(id).disabled);
+  const locked = ['a-tech', 'a-found', 'a-power', 'a-end', 'a-yields'].filter(id => $(id).disabled);
   if (locked.length) throw new Error('Leiste bleibt gesperrt: ' + locked.join(','));
   const S = G('S');
   if (S.over) throw new Error('Spiel schon entschieden');
@@ -477,11 +477,23 @@ step('Armee bauen, in der Stadt anwählen und bewegen', () => {
   if (army.r === cap.r && army.c === cap.c) throw new Error('Armee hat sich nicht bewegt');
   console.log('       Armee von ' + cap.r + '/' + cap.c + ' nach ' + army.r + '/' + army.c);
 });
-step('Armeeübersicht in der Leiste', () => {
-  $('a-army').onclick();
-  const n = $('sheet-body').querySelectorAll('[data-i]').length;
-  if (!n) throw new Error('Übersicht listet keine Armeen');
-  console.log('       ' + n + ' Armee(n) gelistet');
+step('Kein Knopf „Armeen" mehr (v79) – Armeen wählt man auf der Karte', () => {
+  if ($('a-army')) throw new Error('der Knopf „Armeen" ist noch da');
+  if (G('typeof armySheet') !== 'undefined') throw new Error('armySheet gibt es noch');
+  const knoepfe = [...$('screen-game').querySelectorAll('.actionbar button')].map(b => b.textContent.trim());
+  if (knoepfe.some(t => /Armee/.test(t))) throw new Error('Leiste: ' + knoepfe.join(', '));
+  // eine eigene Armee auf freiem Feld: antippen → „Diese Armee bewegen"
+  const S = G('S'), pi = S.cur;
+  if (AUTO(S.players[pi]) || S.over) return console.log('       kein menschlicher Zug – nur der Knopf geprüft');
+  const a = S.armies.find(x => x.owner === pi && !G('cityAt')(S, x.r, x.c) && x.mp > 0);
+  if (!a) return console.log('       Leiste ohne „Armeen" (' + knoepfe.length + ' Knöpfe), keine freie Armee zum Antippen');
+  G('tapHex')(a.r, a.c);
+  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Diese Armee bewegen/.test(x.textContent));
+  if (!b || b.disabled) throw new Error('Armee auf der Karte nicht anwählbar');
+  b.onclick();
+  if (G('ui').army !== a) throw new Error('Armee nicht ausgewählt');
+  G('ui').army = null; G('redraw')();
+  console.log('       Leiste: ' + knoepfe.join(' · ') + ' · Armee auf ' + a.r + '/' + a.c + ' über die Karte gewählt');
 });
 step('Welt-Ansicht zeigt Ereignis und Weltwunder', () => {
   const S = G('S');
@@ -1028,11 +1040,12 @@ step('Machtansicht: Ringe mit einem Teilstück je Punkt, nur solange das Machtbl
   if (G('ui').powerView || $('map').querySelector('[data-power]')) throw new Error('Ringe bleiben nach dem Schließen');
   $('a-power').onclick(); G('tapHex')(cap.r, cap.c);
   if ($('map').querySelector('[data-power]')) throw new Error('Ringe bleiben beim Feldblatt');
-  $('a-power').onclick(); $('a-army').onclick();
-  if ($('map').querySelector('[data-power]')) throw new Error('Ringe bleiben beim Armeeblatt');
+  $('a-power').onclick(); $('a-found').onclick();
+  if ($('map').querySelector('[data-power]')) throw new Error('Ringe bleiben im Gründungsmodus');
+  $('a-found').onclick();
   G('closeSheet')();
   console.log(`       Hauptstadt: Verteidigung ${st.def} gegen ${st.atk.map(a => a.v).join('+')} = ${stueckVorher} Stücke · ` +
-    `nach +5 Macht ${punkteNach} · 1 gegen 2 = drei Stücke · Schließen, Feld, Armeen beenden die Ansicht`);
+    `nach +5 Macht ${punkteNach} · 1 gegen 2 = drei Stücke · Schließen, Feld, Gründungsmodus beenden die Ansicht`);
 });
 step('Bürgerkrieg: Armee-Knopf ist mit Nahrung + Münzen bedienbar (gemeldeter Fehler)', () => {
   frischesSpiel();
@@ -2324,7 +2337,6 @@ step('Deutsche Reste im englischen Modus zählen (Ratsche)', () => {
   };
   sammle();
   G('techModal')(); sammle(); G('closeModal')();
-  $('a-army').onclick(); sammle(); G('closeSheet')();
   $('a-info').onclick(); sammle(); G('closeModal')();
   $('a-log').onclick(); sammle(); G('closeSheet')();
   G('rulesModal')(); sammle(); G('closeModal')();

@@ -5372,9 +5372,10 @@ for (const n of [2, 3, 4]) {
 }
 {
   // --- Abwehr gegen einen Vorstoß (v78): zwei Armeen eines Menschen stehen einen Zug vor der
-  //     Hauptstadt der KI, Stadtmauern gibt es nicht. Die KI muss den ersten Treffer
-  //     verhindern – Armeen neben die Stadt UND Macht dazu (bis v77 baute sie Armeen ohne
-  //     Macht oder flankierte eine und ließ die Stadt offen).
+  //     Hauptstadt der KI, Stadtmauern gibt es nicht. Das Reich ist klein: nach einem ersten
+  //     Treffer könnte es nicht genug nachlegen (v79: nur dann sorgt die KI vor). Sie muss
+  //     den ersten Treffer verhindern – Armeen neben die Stadt UND Macht dazu (bis v77 baute
+  //     sie Armeen ohne Macht oder flankierte eine und ließ die Stadt offen).
   const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'ki', kiLevel: 'schwer', ability: 'basis' }, { civ: 'england', kind: 'human' }] });
   S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
   S.cities.length = 0; S.armies.length = 0; S.sieges = {};
@@ -5394,6 +5395,126 @@ for (const n of [2, 3, 4]) {
   const nachher = kiAttackPotential(S, kiContext(S, 0).info.get(1), hs, true);
   eq(nachher <= defenseValue(S, hs), true, `nach dem Zug der KI hält die Hauptstadt jedem Angriff im nächsten Zug stand (${nachher} gegen ${defenseValue(S, hs)})`);
   eq(powerOf(S, 0) > 0 && armiesOf(S, 0).some(a => hexDistance(a.r, a.c, hs.r, hs.c) <= 1), true, '… mit Armeen neben der Stadt und Macht dazu');
+}
+/* Lage für die Abwehrtests ab v79: Grasland, die KI (Russland, Platz 0) mit Hauptstadt auf 5/5,
+   ein Mensch (England, Platz 1) weit im Osten. `gross`: vier Städte mehr – Einkommen genug,
+   um nach einem ersten Treffer nachzulegen. */
+function kiAbwehrLage(popKI, gross) {
+  const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'ki', kiLevel: 'schwer', ability: 'basis' }, { civ: 'england', kind: 'human' }] });
+  S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+  S.cities.length = 0; S.armies.length = 0; S.sieges = {};
+  const stadt = (owner, r, c, pop, cap) => { const x = { id: S.nextId++, owner, r, c, pop, cap, grown: 0, born: -1 }; S.cities.push(x); return x; };
+  const armee = (owner, r, c) => { const x = { id: S.nextId++, owner, r, c, mp: 0, born: -1 }; S.armies.push(x); return x; };
+  const hs = stadt(0, 5, 5, popKI, true); stadt(0, 1, 1, popKI, false);
+  if (gross) for (const [r, c] of [[1, 5], [1, 9], [9, 1], [9, 5]]) stadt(0, r, c, 6, false);
+  stadt(1, 5, 14, 4, true); stadt(1, 9, 12, 2, false);
+  S.cur = 0; S.players[0].avail = {};
+  const ring = neighbors(hs.r, hs.c);
+  const zwei = within(hs.r, hs.c, 2).filter(([r, c]) => hexDistance(r, c, hs.r, hs.c) === 2);
+  return { S, hs, armee, ring, zwei };
+}
+{
+  // --- Plätze an der Stadt (v79): Armeen stapeln sich nicht – jeder Angreifer braucht ein
+  //     eigenes freies Feld in Reichweite. Bis v78 zählte jede Armee, die irgendein Feld an
+  //     der Stadt erreicht; dass eigene Armeen rund um die Stadt Plätze wegnehmen, sah die KI
+  //     nicht (nachgestellt hielt sie eine Hauptstadt nur, wenn sie zufällig ein Nachbarfeld
+  //     besetzt hatte und der Mensch mit einer Armee weniger kam).
+  const { S, hs, armee, ring, zwei } = kiAbwehrLage(3);
+  [zwei[0], zwei[3], zwei[6], zwei[9]].forEach(([r, c]) => armee(1, r, c));
+  S.players[1].power = 4;
+  S.players[0].res = { sci: 0, food: 0, coins: 45 };
+  const info = kiContext(S, 0).info.get(1), hit = kiHits(S, info, hs);
+  const frei = kiAttackSlots(S, 1, hit), a1 = kiAttackWaves(S, info, hs, false).a1;
+  ring.slice(0, 4).forEach(([r, c]) => armee(0, r, c));
+  const zwei4 = kiAttackSlots(S, 1, hit), a1b = kiAttackWaves(S, info, hs, false).a1;
+  ring.slice(4).forEach(([r, c]) => armee(0, r, c));
+  const zu = kiAttackSlots(S, 1, hit);
+  eq([frei.m0, zwei4.m0, zu.m0], [4, 2, 0], 'vier Armeen kommen an die Stadt; vier eigene Nachbarn lassen zwei Plätze, sechs keinen');
+  eq([a1b * 2, kiAttackWaves(S, info, hs, false).a1], [a1, 0], `… und der größte Angriff halbiert sich (${a1} → ${a1b}) bzw. fällt weg`);
+  // Gegenprobe: wer schon an der Stadt steht, behält seinen Platz
+  S.armies = S.armies.filter(a => !(a.owner === 0 && a.r === ring[0][0] && a.c === ring[0][1]));
+  armee(1, ring[0][0], ring[0][1]);
+  const info2 = kiContext(S, 0).info.get(1);
+  eq(kiAttackSlots(S, 1, kiHits(S, info2, hs)).m0, 1, '… eine gegnerische Armee schon an der Stadt behält ihren Platz');
+}
+{
+  // --- Vorher leicht, im Ernstfall alles (v79, Rückmeldung des Autors): dieselben zwei
+  //     Armeen eines Menschen – einmal einen Zug vor der Hauptstadt, einmal daneben mit
+  //     laufender Belagerung. Das Reich kann nach einem ersten Treffer nachlegen.
+  const lauf = ernst => {
+    const { S, hs, armee, ring, zwei } = kiAbwehrLage(8, true);
+    if (ernst) { armee(1, ring[0][0], ring[0][1]); armee(1, ring[3][0], ring[3][1]); S.sieges['1|' + hs.id] = 1; }
+    else { armee(1, zwei[0][0], zwei[0][1]); armee(1, zwei[6][0], zwei[6][1]); }
+    S.players[1].power = 6;
+    S.players[0].res = { sci: 0, food: 0, coins: 50 };
+    const K = kiContext(S, 0), info = K.info.get(1);
+    let militaer = 0;
+    const _bp = buyPower, _ba = buildArmy;
+    buyPower = function (X, pi) { const b = X.players[pi].res.coins, r = _bp.apply(this, arguments); if (X === S) militaer += b - X.players[pi].res.coins; return r; };
+    buildArmy = function (X, pi) { const b = X.players[pi].res.coins, r = _ba.apply(this, arguments); if (X === S) militaer += b - X.players[pi].res.coins; return r; };
+    try { kiTurn(S, 0); } finally { buyPower = _bp; buildArmy = _ba; }
+    combatPhase(S, 0);
+    const danach = kiAttackWaves(S, kiContext(S, 0).info.get(1), hs, true).a1;
+    return { K, militaer, d: defenseValue(S, hs), danach, an: armiesOf(S, 0).filter(a => hexDistance(a.r, a.c, hs.r, hs.c) <= 1).length, macht: powerOf(S, 0) };
+  };
+  const v = lauf(false), e = lauf(true);
+  eq([v.K.emergency, e.K.emergency], [false, true], 'Ernstfall heißt: eine eigene Stadt wird schon belagert');
+  eq(e.danach <= e.d && e.an > 0 && e.macht > 0, true,
+    `im Ernstfall hält die Hauptstadt jedem Angriff im nächsten Zug stand (${e.danach} gegen ${e.d}), mit Armeen daneben und Macht`);
+  eq(v.militaer < e.militaer, true, `vorher steckt sie weniger in Macht und Armeen als im Ernstfall (${v.militaer} gegen ${e.militaer} Münzen)`);
+  // Die Rest-Gefahr, wenn sie nach einem Treffer nachlegen kann, ist klein
+  eq(KI_W.preFloor <= 0.02, true, 'Rest-Gefahr vor einem Treffer höchstens 2 %');
+}
+{
+  // --- Verteidigung, die bleibt (v79): im Ernstfall zählen Stadtmauern, Burgenbau und
+  //     Maschinengewehr dazu, dass sie auch in den Zügen danach wirken (gekaufte Macht
+  //     verfällt). Sonst ließ die KI eine bezahlbare Verteidigungstechnologie liegen, sobald
+  //     Macht den nächsten Angriff deckte – nachgestellt in 13 von 18 Fällen.
+  const lage = ernst => {
+    const { S, hs, armee, ring, zwei } = kiAbwehrLage(8, true);
+    if (ernst) { armee(1, ring[0][0], ring[0][1]); armee(1, ring[3][0], ring[3][1]); S.sieges['1|' + hs.id] = 1; }
+    else { armee(1, zwei[0][0], zwei[0][1]); armee(1, zwei[6][0], zwei[6][1]); }
+    S.players[1].power = 6;
+    S.players[0].res = { sci: 16, food: 0, coins: 50 };
+    S.players[0].avail = { stadtmauern: true, keramik: true, bewaesserung: true, schrift: true };
+    return { S, hs, K: kiContext(S, 0) };
+  };
+  const v = lage(false), e = lage(true);
+  const bonus = (x, k) => kiTechBonus(x.S, 0, k, x.K, baseIncome(x.S, 0));
+  eq([bonus(e, 'stadtmauern') - bonus(v, 'stadtmauern'), bonus(e, 'maschinengewehr') - bonus(v, 'maschinengewehr')],
+    [5 * KI_W.defPerm, 2 * e.hs.pop * KI_W.defPerm], 'im Ernstfall zählt jeder bleibende Punkt Verteidigung extra (Mauern +5, Maschinengewehr +2 je Bevölkerung)');
+  kiTurn(e.S, 0);
+  eq(!!e.S.players[0].techs.stadtmauern, true, '… und die belagerte KI erforscht die verfügbaren Stadtmauern');
+}
+{
+  // --- Wissenschaft gehört der Forschung (v79): mit Alchemie kann Wissenschaft Münzen
+  //     ersetzen; außerhalb des Ernstfalls zählt sie dafür dreifach (KI_W.sciReserve). In
+  //     einer Partie zu viert (Runde 3–6) forscht die KI damit mehr als ohne diese Reserve –
+  //     gemessen ging bis v78 zuweilen über die Hälfte der Wissenschaft an der Forschung
+  //     vorbei.
+  const S = newGame({ seed: 300, players: CIVS.map((c, i) => ({ civ: c.k, kind: 'ki', kiLevel: 'schwer', ability: c.abilities[i % 3].k })) });
+  let mit = 0, ohne = 0, zuege = 0, guard = 0;
+  const forschung = (X, pi) => {
+    let n = 0;
+    const _dr = doResearch;
+    doResearch = function (Y, pj) { const b = Y.players[pj].res.sci, r = _dr.apply(this, arguments); if (Y === X && pj === pi && !r) n += b - Y.players[pj].res.sci; return r; };
+    try { kiTurn(X, pi); } finally { doResearch = _dr; }
+    return n;
+  };
+  while (!S.over && guard++ < 200 && S.round <= 6) {
+    const pi = S.cur, p = S.players[pi];
+    if (S.round >= 3 && has(p, 'alchemie') && p.res.sci >= 20) {
+      const r0 = KI_W.sciReserve;
+      try {
+        mit += forschung(JSON.parse(JSON.stringify(S)), pi);
+        KI_W.sciReserve = 1;
+        ohne += forschung(JSON.parse(JSON.stringify(S)), pi);
+      } finally { KI_W.sciReserve = r0; }
+      zuege++;
+    }
+    kiTurn(S, pi); if (S.over) break; endTurn(S);
+  }
+  eq([zuege > 0, mit > ohne], [true, true], `mit Reserve mehr Wissenschaft in die Forschung (${mit} gegen ${ohne} in ${zuege} Zügen mit Alchemie)`);
 }
 {
   // --- Entschlossener Angreifer (Menschen): sein Budget enthält Alchemie, wenn er sie diesen

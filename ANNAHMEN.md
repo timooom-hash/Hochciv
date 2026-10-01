@@ -3031,3 +3031,154 @@ und Macht dazu; gegen Menschen rechnet sie entschlossen, gegen eine KI mild (auc
 laufender Belagerung); das Budget mit Alchemie ist das gewöhnliche plus die Wissenschaft
 nach den Kosten der Alchemie, ohne verfügbare Alchemie das gewöhnliche; die zwei Wellen
 nachgerechnet (7 und 14 mit vollem Budget, 20 und 10 ohne).
+
+## Abwehr: vorher leicht, im Ernstfall alles · Wissenschaft für die Forschung · kein Knopf „Armeen" (v79)
+
+**Anlass:** Rückmeldung des Autors zu v78 (Schwer, vier Reiche): Die KI steckt viel zu viel in
+Vorsorge, solange noch keine Belagerung läuft, und viel zu wenig, wenn sie läuft. Im Ernstfall
+soll sie Verteidigungstechnologien erforschen, die Angreifer flankieren, eigene Armeen neben
+die Stadt stellen. Außerdem forsche sie viel zu langsam. Und der Knopf „Armeen" unten soll
+ganz weg.
+
+### Knopf „Armeen" entfernt
+
+Knopf (`index.html`), `armySheet` (`js/ui.js`), sein Platz in der Tutorial-Leiste, sieben nur
+dort benutzte Übersetzungen und die Zeile im README. Armeen wählt man auf der Karte: eigene
+Armee antippen → „Diese Armee bewegen", in einer Stadt „Armee hier bewegen". `smoke.js` prüft,
+dass Knopf und Funktion fehlen, keine Leistenbeschriftung mehr „Armee" enthält und das Antippen
+weiter zum Bewegen führt.
+
+### Was schiefging (v78)
+
+1. **Vorsorge mit der harten Schätzung.** Gegen Menschen rechnete die KI schon vor dem ersten
+   Treffer mit dem entschlossenen Angreifer und kaufte Macht – die zu Beginn ihres nächsten
+   Zuges zur Hälfte verfällt –, auch wenn sie nach einem Treffer noch hätte nachlegen können.
+2. **Im Ernstfall verzagt.** Die Gefahr folgte einer steilen Kurve: reichte die mögliche
+   Verteidigung nicht ganz an den stärksten Angriff, brachte jeder Punkt fast nichts.
+3. **Plätze an der Stadt nicht gesehen.** Jede Armee, die irgendein Feld an der Stadt
+   erreicht, zählte als Angreifer – auch die fünfte bei vier freien Nachbarfeldern. Dass eigene
+   Armeen rund um die Stadt Plätze wegnehmen, sah die KI nicht. Nachgestellt hielt v78 manche
+   Hauptstadt nur, weil sie zufällig ein Nachbarfeld besetzt hatte und der Mensch deshalb mit
+   einer Armee weniger kam (zwei Treffer mit 20 Macht: eine Armee 20 gegen Verteidigung 21,
+   zwei wären 40 gewesen).
+4. **Verteidigungstechnologien liegen gelassen.** Deckte gekaufte Macht den nächsten Angriff,
+   war Maschinengewehr in der Bewertung nichts mehr wert – es wirkt aber auch in den Zügen
+   danach. Nachgestellt blieb in v78 in 9 von 16 Ernstfällen mit bezahlbarer
+   Verteidigungstechnologie diese liegen, mit der linearen Gefahr allein (unten) sogar in 13
+   von 18.
+5. **Wissenschaft in Münzen.** Mit Alchemie bezahlte der Planer Wachstum, Macht und Armeen mit
+   Wissenschaft (1:1), wo eine Technologie kaum schlechter gewesen wäre.
+
+### Geändert (`js/ki.js`)
+
+* **Vorher mild, für alle** (`kiRisk`): vor dem ersten Treffer gilt auch gegen Menschen die
+  milde Schätzung von v77. Kann die KI nach einem Treffer genug nachlegen, bleibt eine
+  Rest-Gefahr von 2 % (`KI_W.preFloor`, bis v78 5 %). Was sie nachlegen kann
+  (`kiDefensePotential`), zählt nur so viele eigene Armeen, wie neben der Stadt Platz haben,
+  wenn seine Angreifer dort stehen (`kiRingRoom`).
+* **Im Ernstfall alles** – eine eigene Stadt hat den Belagerungszähler 1 (`K.emergency`): gegen
+  Menschen die harte Schätzung, und die Gefahr sinkt linear zwischen dem, was ohnehin kommt
+  (seine Armeen mit der Macht nach dem Machtverlust), und allem, was er aufbringen kann
+  (`kiSiegeChance`). Jeder Punkt Verteidigung und jede weggeflankte Armee zählt. Pakete mit
+  Alchemie (Wissenschaft in Macht) gibt es nur noch hier, und Wissenschaft darf alles bezahlen.
+* **Plätze an der Stadt** (`kiAttackSlots`): größte Paarung Angreifer ↔ freies Feld in
+  Reichweite. Seine Reichweiten werden dafür ohne die Armeen der KI gerechnet – die ziehen ja
+  noch; welche Felder sie am Ende besetzt, zählt die Bewertung. Verteidigungspakete stellen
+  Armeen zuerst auf Felder, die er erreichen könnte.
+* **Verteidigung, die bleibt** (`kiDefPerm`): im Ernstfall je bleibendem Punkt an der
+  belagerten Stadt 8 dazu (`KI_W.defPerm`): Stadtmauern 5 Punkte, Maschinengewehr 2 je
+  Bevölkerung, Burgenbau die Macht (mindestens 2).
+* **Wissenschaft gehört der Forschung** (`KI_W.sciReserve` = 3): außerhalb des Ernstfalls
+  zählt Wissenschaft, die nicht in Forschung oder Kopieren geht, dreifach – erst wird
+  geforscht, was sich lohnt.
+
+### Gemessen
+
+**Nachgestellte Vorstöße, gepaart** – beide Fassungen spielen dieselben 399 Stellungen (195
+aus Partien des Stands vor der Abwehr von v78, 204 aus Partien von v79; 2 und 4 Reiche, Runde
+3–6, 2–4 Armeen mit Macht 2–8, einen Zug vor der Hauptstadt). Der Mensch zieht heran und kauft alles („allin") oder
+gerade genug („knapp"), zweimal; bei „Drohung" bleibt er drei Züge einen Zug vor der Stadt,
+hält seine Macht und greift nie an.
+
+| | v78 | v79 |
+|---|---|---|
+| Hauptstadt fällt (allin / knapp) | 43 / 40 | 41 / 42 |
+| erster Treffer | 184 | 157 |
+| Macht und Armeen je Zug **vor** dem ersten Treffer (Münzen) | 29,2 | 24,2 |
+| … davon Macht | 16,3 | 10,6 |
+| … **nach** dem ersten Treffer (allin / knapp) | 40,2 / 41,5 | 46,4 / 48,7 |
+| Verteidigungstechnologien im Ernstfall (allin) | 19 in 131 Zügen | 29 in 120 Zügen |
+| eigene Armeen in Reichweite der belagerten Stadt | 1,67 | 1,79 |
+| Technologien der KI in den zwei Zügen (allin) | +7,5 | +8,3 |
+| Drohung: Macht und Armeen je Zug (davon Macht) | 33,0 (18,4) | 29,2 (13,7) |
+| Drohung: Technologien in drei Zügen | +10,8 | +11,9 |
+
+Mit dem Werkzeug (`node tools_ki.js vorstoss 40 …`, Stellungen aus den eigenen Partien der
+jeweiligen Fassung, also nicht dieselben):
+
+| | erster Treffer / fällt v78 | v79 | Macht+Armeen vorher → nachher v78 | v79 |
+|---|---|---|---|---|
+| `reiche=4 runde=3 armeen=2 macht=2` | 20 / 3 (39) | 18 / 3 (39) | 16,9 → 26,3 | 13,9 → 30,8 |
+| `reiche=4 runde=4 armeen=3 macht=4` | 12 / 4 (34) | 14 / 5 (36) | 25,2 → 35,9 | 21,8 → 51,1 |
+| `… art=knapp` | 12 / 2 (34) | 14 / 4 (36) | 25,2 → 45,1 | 21,8 → 53,8 |
+| `reiche=2 runde=4 armeen=3 macht=4` | 15 / 0 (32) | 13 / 2 (31) | 38,4 → 47,3 | 25,1 → 54,9 |
+| `… art=droh` (drei Züge) | 0 / 0 (34) | 0 / 0 (36) | 27,8 | 26,8 |
+
+**Lesart:** Vorher gibt die KI ein Sechstel weniger aus (ein Drittel weniger Macht), nachher ein
+Sechstel mehr, und im Ernstfall erforscht sie die Verteidigung. Die Hauptstadt hält sie damit
+**so oft wie v78, nicht öfter**: gepaart 41 statt 43 bzw. 42 statt 40 von 399. Mit dem
+Werkzeug fielen 14 statt 9 von gut 140 – andere Stellungen je Fassung, bei so wenigen Fällen
+nicht von Zufall zu trennen (die gepaarten Reihen sind dafür die bessere Messung). Die
+angesehenen gefallenen Hauptstädte waren wie in v78 meist wirtschaftlich verloren oder knapp
+(Angriff 54 gegen Verteidigung 40 bei 3 Angreifern an einer Stadt mit 6 Nachbarfeldern).
+
+**Gegen die KI ändert sich nichts Messbares:** beide Fassungen in denselben Partien, Plätze
+gepaart getauscht – Duell 30 : 30 (60 Partien), zu dritt 23 : 25 (48), zu viert 23 : 25 (48).
+Ein „Mensch", der in Wahrheit mit der KI Schwer spielt, gewinnt zu viert 12 von 40 (fairer
+Anteil 10, v78: 7) – v79 begegnet Menschen vor dem ersten Treffer wie der KI.
+
+**Forschung:** Gepaart nach Startwerten (16 Partien zu viert mit einem „Mensch"-Platz,
+Technologien je Platz am Rundenende): Runde 3 +5 %, Runde 4 +9 %, Runde 5 +12 % gegenüber v78.
+In den ersten vier Runden ging die Wissenschaft schon in v78 zu rund 90 % in die Forschung;
+das Tempo hängt dort am Einkommen, nicht an der Verteilung. Verloren ging sie später und
+unter Druck – mit Alchemie in Macht. Die Reserve wirkt genau dort: in einer Partie zu viert
+(Startwert 300) flossen in den Zügen mit Alchemie 127 statt 105 Wissenschaft in die Forschung.
+
+**Stufen** (Endstand v79, gepaart wie in v78): Schwer–Mittel 27 : 13 (Duell, 40) und 17 : 7 (zu
+viert, 24), Mittel–Leicht 26 : 14 und 20 : 4, Schwer–Leicht 30 : 10. Gegen Bots im Duell (80):
+Leicht 55 gegen Prinz (v78: 48), Mittel 48 gegen König (45), Schwer 39 gegen David (34) und
+73 gegen Prinz (72); eine KI Schwer gegen drei David 8 von 48 (8). Die Abwehr hilft allen
+Stufen gegen Bots; Leicht liegt damit zwischen Prinz und König.
+
+**Verworfen:**
+* *Harte Schätzung der zweiten Welle gegen Menschen schon vorher* (nur sie, der erste Treffer
+  mild): mehr Vorsorge und mehr gefallene Hauptstädte (20 statt 16 bzw. 29 statt 25).
+* *Rest-Gefahr ohne Sprung* (die Kurve auch, wenn die Antwort reicht): gleich viele gefallene
+  Hauptstädte, etwas mehr Vorsorge.
+* *Armeen bewerten, die er wegflankieren kann* (halber Preis einer neuen): gegen die KI
+  gleich stark (30 : 30, 24 : 24), bei bloßer Drohung 14 % weniger verlorene Armeen – aber die
+  KI kaufte dann vorab Macht, um sie zu schützen, also genau die Vorsorge, die weg sollte.
+* *Mehr Wert je Technologie* (`KI_W.tech` 2,5, Reserve 4) oder je Wissenschaft im Einkommen
+  (1,25): kaum mehr Technologien (Runde 4 +1 %), gegen die KI gleich stark (25 : 23).
+
+### Was bleibt
+
+* Eigene Armeen neben der Stadt halten Angreifer fern, sind aber ohne Macht leicht zu
+  flankieren: bei bloßer Drohung verlor die KI in 399 Stellungen 86 Armeen (v78: 27; das
+  Skript flankiert nur nebenbei, ein Mensch gezielt).
+* Ob die KI sich gegen einen Menschen jetzt richtig verhält, zeigt erst das Spielen – das
+  Skript ist kein Mensch (Ablenkung, Ziel wechseln, gezieltes Flankieren).
+
+### Abgesichert
+
+`test.js`: vier Armeen kommen an eine Stadt mit sechs freien Nachbarfeldern; vier eigene
+Nachbarn lassen zwei Plätze, sechs keinen, und der größte Angriff halbiert sich bzw. fällt
+weg; eine Armee, die schon an der Stadt steht, behält ihren Platz. Ernstfall heißt laufende
+Belagerung; im Ernstfall hält die Hauptstadt jedem Angriff des nächsten Zuges stand, mit
+Armeen daneben und Macht; vorher steckt die KI in dieselbe Lage weniger hinein (25 gegen 40
+Münzen), die Rest-Gefahr ist höchstens 2 %. Im Ernstfall zählen Mauern +5 und Maschinengewehr
++2 je Bevölkerung extra, und die belagerte KI erforscht verfügbare Stadtmauern. Mit Reserve
+fließt mehr Wissenschaft in die Forschung als ohne (Partie zu viert, Züge mit Alchemie). Der
+Test von v78 (kleines Reich, zwei Armeen eines Menschen vor der Hauptstadt: sie sorgt vor,
+weil sie nach einem Treffer nicht nachlegen könnte) gilt weiter. `smoke.js`: der Knopf
+„Armeen" fehlt, Armeen wählt man auf der Karte.
