@@ -127,7 +127,7 @@ const kiCity = (S, id) => S.cities.find(c => c.id === id);
 function kiMove(X, a, r, c, cost) {
   if (!X.kiSim) return moveArmy(X, a, r, c);
   if (armyAt(X, r, c) || cityAt(X, r, c)) return 'Feld besetzt.';
-  a.mp -= cost || 0; a.r = r; a.c = c;
+  arriveAt(X, a, r, c, cost);          // wie moveArmy: in einer Kontrollzone endet die Bewegung
   spawnFreeArmies(X, a.owner);
   return null;
 }
@@ -1111,7 +1111,7 @@ function kiMilitaryCandidates(S, pi, K, memo) {
 const kiMoveSig = (S, pi) => {
   let r = 0, n = 0;
   for (const k in S.roads) { n++; r += S.roads[k]; }
-  return S.armies.map(a => a.id + ':' + a.r + ',' + a.c + ',' + a.mp).join(';') + '|' +
+  return S.armies.map(a => a.id + ':' + a.r + ',' + a.c + ',' + a.mp + (a.halted ? 'h' : '')).join(';') + '|' +
     S.cities.map(c => c.id + ':' + c.r + ',' + c.c + ',' + c.owner).join(';') + '|' + n + ',' + r + '|' +
     Object.keys(S.players[pi].techs).length + '|' + (S.wonders ? S.wonders.length : 0);
 };

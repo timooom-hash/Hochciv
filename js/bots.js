@@ -50,7 +50,7 @@ function botTurn(S, pi) {
   }
 
   // 4 Armeen bewegen: erst die abgestimmten Prioritäten 1–6, dann jede übrige für sich
-  for (const army of armiesOf(S, pi)) { army.mp = moveAllowance(S, pi); delete army.botDone; }
+  for (const army of armiesOf(S, pi)) { army.mp = moveAllowance(S, pi); delete army.botDone; delete army.halted; }
   botPlanArmies(S, pi);
   for (const army of armiesOf(S, pi)) {
     if (!army.botDone) botMoveArmy(S, pi, army);
@@ -188,7 +188,7 @@ function botOutOfCity(S, pi, tiles) {
    aber „stehen bleiben" muss eine Option sein – sonst räumt eine Armee, die schon
    genau richtig steht, ihren Platz und verschlechtert die Lage. */
 function botReach(S, pi, army) {
-  const reach = reachable(army.r, army.c, army.mp,
+  const reach = reachable(army.r, army.c, moveBudget(army),
     (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   const tiles = botOutOfCity(S, pi,
@@ -202,7 +202,7 @@ function botStep(S, pi, army, goal, why) {
   const { cost } = botReach(S, pi, army);
   const c = cost(goal);
   if (c == null) return false;
-  army.mp -= c; army.r = goal[0]; army.c = goal[1];
+  arriveAt(S, army, goal[0], goal[1], c);          // Kontrollzone: dort endet die Bewegung
   log(S, 'act', T('%s: Armee %s → %s/%s.', civOf(S.players[pi]).n, why, goal[0], goal[1]));
   return true;
 }
@@ -330,7 +330,7 @@ function botPlanArmies(S, pi) {
 }
 function botMoveArmy(S, pi, army) {
   const p = S.players[pi];
-  const reach = reachable(army.r, army.c, army.mp,
+  const reach = reachable(army.r, army.c, moveBudget(army),
     (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   // Zielfelder: nur solche, auf denen die Armee auch anhalten darf (kein Meer ohne
@@ -446,8 +446,7 @@ function botMoveArmy(S, pi, army) {
   }
 
   if (goal) {
-    army.mp -= cost(goal);
-    army.r = goal[0]; army.c = goal[1];
+    arriveAt(S, army, goal[0], goal[1], cost(goal));
     log(S, 'act', T('%s: Armee %s → %s/%s.', civOf(p).n, why, goal[0], goal[1]));
   }
 }

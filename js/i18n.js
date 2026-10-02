@@ -415,6 +415,19 @@ const UI_EN = {
   '%s: Armee %s → %s/%s.': '%s: army %s → %s/%s.',
   '%s: Armee gebaut (%s Münzen) – muss die Stadt noch verlassen.': '%s: army built (%s coins) – it still has to leave the city.',
   '%s: Armee zieht nach %s/%s.': '%s: army moves to %s/%s.',
+  'Kontrollzone – sie hält für diesen Zug an.': 'Zone of control – it stops for this turn.',
+  'Kontrollzone – die Armee hält für diesen Zug an.': 'Zone of control – the army stops for this turn.',
+  'Kontrollzone – hält bis zum nächsten Zug': 'zone of control – stopped until next turn',
+  'Bewegung %s': 'Movement %s',
+  'Nur in eigenem oder neutralem Gebiet.': 'Only in your own or neutral territory.',
+  'Schon vorhanden.': 'Already built.',
+  'Interner Fehler (%s): %s – das Spiel läuft weiter. Bitte melden.': 'Internal error (%s): %s – the game continues. Please report it.',
+  'Interner Fehler – das Spiel läuft weiter. Näheres im Protokoll.': 'Internal error – the game continues. Details in the log.',
+  'KI-Zug': 'AI turn',
+  'Bot-Zug': 'bot turn',
+  'Zugwechsel': 'change of turn',
+  'Zugbeginn': 'start of turn',
+  'Kampf': 'combat',
   '%s: Atomschlag auf %s/%s – %s Armee(n) zerstört.': '%s: nuclear strike on %s/%s – %s army/armies destroyed.',
   '%s: Barbaren mit Macht %s greifen die Stadt auf %s/%s an.': '%s: barbarians with power %s attack the city on %s/%s.',
   '%s: Beutezüge ergeben %s (%s) – gutgeschrieben zu Beginn der nächsten Runde.': '%s: raids yield %s (%s) – credited at the start of the next round.',
@@ -875,8 +888,24 @@ const UI_EN = {
     'Terrain yields per tile',
   'Grund':
     'Base',
-  'Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße.':
-    'Trade routes: every city of yours except the capital that is connected to it by an unbroken road yields +1 on all three yields – via a pure railway +2. Mixed routes count as road.',
+  'Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße. Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn.':
+    'Trade routes: every city of yours except the capital that is connected to it by an unbroken road yields +1 on all three yields – via a pure railway +2. Mixed routes count as road. The route may run through unclaimed and foreign territory; only a foreign city breaks it.',
+  'Bewegung, Straßen und Eisenbahn':
+    'Movement, roads and railways',
+  'Jede Armee hat je Zug 3 Bewegungspunkte (mit Panzerschiff 6, mit Luftwaffe 9); ein Schritt aufs Nachbarfeld kostet 1. Armeen ziehen nicht auf Städte und nicht auf andere Armeen. Eine Armee, die in einer Stadt entsteht, muss sie im selben Zug verlassen.':
+    'Each army has 3 movement points per turn (6 with Ironclad, 9 with Air force); a step to a neighbouring tile costs 1. Armies never move onto cities or onto other armies. An army that appears in a city must leave it in the same turn.',
+  'Straßen (ab Rad) und Eisenbahnen (ab Eisenbahn, auch ohne Rad) baust du, indem du ein Feld antippst – auf Land, in deinem Gebiet oder auf herrenlosen Feldern, nicht auf Städten. Straße 1 Münze, Eisenbahn 2 Münzen, auf einer Straße 1.':
+    'You build roads (from The wheel) and railways (from Railway, no wheel needed) by tapping a tile – on land, in your territory or on unclaimed tiles, not on cities. Road 1 coin, railway 2 coins, 1 on a road.',
+  'Ein Schritt kostet ½, wenn beide Felder mindestens eine Straße haben, und nichts, wenn beide eine Eisenbahn haben: Auf einem zusammenhängenden Eisenbahnnetz kommt eine Armee mit übriger Bewegung beliebig weit. Ein Stadtfeld zählt als Straße bzw. Eisenbahn, sobald ein Nachbarfeld eine hat. Straßen und Eisenbahnen gehören niemandem – auch gegnerische Armeen fahren darauf.':
+    'A step costs ½ when both tiles have at least a road, and nothing when both have a railway: along a connected railway network an army with movement left can go any distance. A city tile counts as road or railway as soon as a neighbouring tile has one. Roads and railways belong to no one – enemy armies use them too.',
+  'Kontrollzone (Schießpulver)':
+    'Zone of control (Gunpowder)',
+  'Mit Schießpulver hat jede deiner Armeen eine Kontrollzone: die sechs Felder ringsum, mit Raketentechnik auch den zweiten Ring. Mit Burgenbau gilt das auch für deine Städte.':
+    'With Gunpowder each of your armies has a zone of control: the six tiles around it, with Rocketry the second ring too. With Castles the same holds for your cities.',
+  'Eine fremde Armee, die ein Feld in einer Kontrollzone betritt, hält dort an: Ihre übrige Bewegung verfällt für diesen Zug, auch auf Straße und Eisenbahn. Durch eine Kontrollzone kommt sie also nicht hindurch – eine Straße oder Eisenbahn, die hindurchführt, ist für sie dort unterbrochen.':
+    'A foreign army that enters a tile in a zone of control stops there: its remaining movement is lost for this turn, on roads and railways too. So it cannot pass through a zone of control – a road or railway running through one is cut there for that army.',
+  'Eine Armee, die ihren Zug in einer Kontrollzone beginnt, darf heraus; betritt sie dabei wieder ein Feld einer Kontrollzone, hält sie dort an. Die Luftwaffe ignoriert Kontrollzonen. Handelsrouten unterbrechen sie nicht.':
+    'An army that starts its turn in a zone of control may move out; if it enters a zone-of-control tile again on the way, it stops there. The Air force ignores zones of control. They do not cut trade routes.',
   'Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen. Zwei Züge in Folge stärker → Stadt erobert.':
     'Combat: attack = power per army, defence = population + adjacent armies. Stronger two turns in a row → city captured.',
   'Kosten 10/20/30/40 … für das 1./2./3./4. Wunder. Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. Je Stadt zwei Wunder. Ein Wunder der Stufe 3 gewinnt zu Beginn des nächsten Zuges.':

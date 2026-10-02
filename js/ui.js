@@ -600,13 +600,19 @@ function tapHex(r, c) {
   ui.powerView = false;                 // ein Feld antippen beendet die Machtansicht
   if (ui.army) {
     if (ui.tut && !tutMoveOk(r, c)) return toast(T('Im Tutorial: ziehe die Armee auf das goldene Feld.'));
-    const e = moveArmy(S, ui.army, r, c);
-    if (e) { toast(e); } else { ui.army = null; ui.sel = [r, c]; redraw(); return; }
+    const army = ui.army;
+    const e = moveArmy(S, army, r, c);
+    if (e) { toast(e); } else {
+      ui.army = null; ui.sel = [r, c]; redraw();
+      // v80: wer in eine Kontrollzone zieht, hält an – das soll man sehen, nicht nur im Protokoll lesen
+      if (army.halted) toast(T('Kontrollzone – die Armee hält für diesen Zug an.'));
+      return;
+    }
   }
   ui.sel = [r, c]; redraw();
   if (ui.mode === 'found') foundSheet(r, c); else openTile(r, c);
 }
-function mp(a) { return 'Bewegung ' + String(a.mp).replace('.', ','); }
+function mp(a) { return T('Bewegung %s', LANG === 'de' ? String(a.mp).replace('.', ',') : String(a.mp)); }
 const Y_ICON = ['🔬', '🌾', '🪙'];
 const fmtY = y => y.map((n, i) => n + Y_ICON[i]).join(' ');
 const fmtGain = g => [g.sci, g.food, g.coins]
@@ -730,7 +736,8 @@ function openTile(r, c) {
     const owner = civOf(S.players[army.owner]);
     head = `<h3>${T('Armee')} · ${owner.n}</h3><p class="sub">${T('Angriffswert %s', powerOf(S, army.owner))} · ${mp(army)}</p>`;
     if (army.owner === pi)
-      btn('Diese Armee bewegen', T('erreichbare Felder werden markiert'), '',
+      btn('Diese Armee bewegen', army.halted ? T('Kontrollzone – hält bis zum nächsten Zug')
+        : T('erreichbare Felder werden markiert'), '',
         () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
   } else {
     if (has(p, 'kolonialismus')) {
@@ -1036,7 +1043,30 @@ function logModal() {
 }
 
 /* ------------------------------------------------------------------ Zugende & Bots */
+/* Der Zugwechsel darf nie hängen bleiben (v80). Gemeldet: nach den Zügen der KI blieb der
+   Bildschirm gesperrt; von Hand half nur, die Sperre aufzuheben und den Zug des Menschen zu
+   starten. Nachstellen ließ es sich nicht (Hunderte Partien über die echte Oberfläche, mit
+   und ohne wildes Tippen). Deshalb zweierlei:
+   · Ein Fehler in einem Zug oder beim Zugwechsel bricht den Ablauf nicht mehr ab. Er steht
+     im Protokoll und in der Konsole (UI_ERRORS für smoke.js), und es geht weiter.
+   · Die Sperre des KI-Blatts kann den Zug eines Menschen nicht überdauern (humanTurnStart),
+     „Zug beenden" wirkt nur im eigenen Zug, und dieselbe KI zieht nie zweimal (runBots). */
+const UI_ERRORS = [];
+function sicher(was, fn) {
+  try { return fn(); }
+  catch (e) {
+    const msg = (e && e.message) || String(e);
+    UI_ERRORS.push(was + ': ' + msg);
+    if (typeof console !== 'undefined' && console.error) console.error(e);
+    if (S) log(S, 'warn', T('Interner Fehler (%s): %s – das Spiel läuft weiter. Bitte melden.', T(was), msg));
+    toast(T('Interner Fehler – das Spiel läuft weiter. Näheres im Protokoll.'));
+    return undefined;
+  }
+}
 function endHumanTurn() {
+  // Nur im eigenen Zug und nie, solange das Blatt eines KI- oder Bot-Zugs offen ist: sonst
+  // liefe dessen Kampf ein zweites Mal, und der Zug spränge an seinem „Weiter" vorbei.
+  if (!S || S.over || isAuto(P(S)) || ui.botLock) return;
   // Harte Sperre: eine Armee, die noch in einer Stadt steht, verhindert das Zugende
   // ganz – da hilft kein Bestätigen, der Zustand ist schlicht ungültig.
   const stop = blockingIssues(S, S.cur);
@@ -1050,25 +1080,33 @@ function endHumanTurn() {
   ui.confirmedEnd = false; ui.army = null; ui.sel = null; ui.mode = null;
   closeSheet();
   const sinceSeq = S.logSeq || 0;
-  finishTurn(S);                       // Kampf und Siegprüfung
+  sicher('Kampf', () => finishTurn(S));                    // Kampf und Siegprüfung
   const fights = logSince(S, sinceSeq).filter(l => l.c === 'fight');
   redraw();
   if (S.over) return gameOver();
-  advanceTurn(S);
+  sicher('Zugwechsel', () => advanceTurn(S));
   redraw();
   runBots();
   if (fights.length) toast(fights[fights.length - 1].m);
 }
 /* Züge, die ohne Eingabe laufen: Bots nach den Bot-Regeln, die KI nach den Regeln für
    Menschen (kiTurn in js/ki.js). Beide enden gleich – Kampf und Sieg in finishTurn, dann
-   das Blatt mit dem, was passiert ist, und „Weiter". */
+   das Blatt mit dem, was passiert ist, und „Weiter".
+   Dieselbe KI zieht nie zweimal in einer Runde (S.autoPlayed, v80): gespeichert wird nach
+   ihrem Zug, „Weiter" kommt erst danach. Wurde die App dazwischen neu geladen (oder runBots
+   zweimal angestoßen), zog sie bis v79 noch einmal – samt zweitem Kampf. Jetzt zeigt das
+   Blatt nur wieder, was sie getan hat. */
 function runBots() {
   if (S.over) return gameOver();
   const p = P(S);
   if (!isAuto(p)) return humanTurnStart();
-  const sinceSeq = S.logSeq || 0;
-  if (p.kind === 'ki') kiTurn(S, S.cur); else botTurn(S, S.cur);
-  finishTurn(S);                       // Kampf des Bots bzw. der KI, einmal pro Zug
+  const done = !!S.autoPlayed && S.autoPlayed.cur === S.cur && S.autoPlayed.round === S.round;
+  const sinceSeq = done ? S.autoPlayed.seq : (S.logSeq || 0);
+  if (!done) {
+    S.autoPlayed = { cur: S.cur, round: S.round, seq: sinceSeq };
+    sicher(p.kind === 'ki' ? 'KI-Zug' : 'Bot-Zug', () => { if (p.kind === 'ki') kiTurn(S, S.cur); else botTurn(S, S.cur); });
+    sicher('Kampf', () => finishTurn(S));    // Kampf des Bots bzw. der KI, einmal pro Zug
+  }
   redraw();
   const entries = logSince(S, sinceSeq);
   const lines = entries.length
@@ -1078,15 +1116,21 @@ function runBots() {
   sheet(`<h3>${civOf(p).n} (${p.kind === 'ki' ? T('KI') : T('Bot')})</h3><p class="sub">${T('Runde %s', S.round)}</p>${lines}
     <button class="btn wide" id="bot-next">${T('Weiter')}</button>`);
   $('sheet').classList.add('locked');
-  $('bot-next').onclick = () => {
-    ui.botLock = false;
-    $('sheet').classList.remove('locked');
-    closeSheet();
-    if (S.over) return gameOver();
-    advanceTurn(S); redraw();
-    if (isAuto(P(S))) runBots();
-    else humanTurnStart();
-  };
+  $('bot-next').onclick = afterAutoTurn;
+}
+/* „Weiter" unter dem Blatt eines KI- oder Bot-Zugs. Ist schon ein Mensch am Zug (ein
+   zweites, verspätetes Antippen), wird nichts übersprungen. */
+function afterAutoTurn() {
+  ui.botLock = false;
+  $('sheet').classList.remove('locked');
+  closeSheet();
+  if (S.over) return gameOver();
+  if (!isAuto(P(S))) return humanTurnStart();
+  sicher('Zugwechsel', () => advanceTurn(S));
+  redraw();
+  if (S.over) return gameOver();
+  if (isAuto(P(S))) runBots();
+  else humanTurnStart();
 }
 /* ------------------------------------------------------------- Nochmal spielen
    Allein gegen Bots steht am Spielende ein zweiter, hervorgehobener Knopf: dieselbe
@@ -1428,18 +1472,27 @@ function freePickModal() {
     else closeModal();
   });
 }
-/* Nach jedem Zugwechsel auf einen Menschen: Ereignis melden, Defizit anbieten. */
+/* Nach jedem Zugwechsel auf einen Menschen: Ereignis melden, Defizit anbieten. Eine Sperre
+   aus dem Blatt eines KI- oder Bot-Zugs darf hier nicht mehr stehen (v80) – genau das war
+   der gemeldete Zustand: der Mensch am Zug, das Blatt gesperrt, „Weiter" ohne Wirkung. */
 function humanTurnStart() {
+  if (ui.botLock || $('sheet').classList.contains('locked')) {
+    ui.botLock = false;
+    $('sheet').classList.remove('locked');
+    closeSheet();
+  }
   redraw();
   const p = P(S);
   if (S.over) return gameOver();
   const ev = curEvent();
   toast(ev ? T('%s ist am Zug · Ereignis: %s', civOf(p).n, ev.n)
     : T('%s ist am Zug', civOf(p).n));
-  // Mit Gentechnik/Massenmedien gehört die Nahrungsrechnung zu Zugbeginn entschieden.
-  if (canFeed(p) && popOpen(ensureFoodState(S, S.cur)) > 0) foodSheet();
-  else if (p.foodDeficit > 0) toast(T('Nahrungsdefizit %s – Nahrung bleibt bei 0.', p.foodDeficit));
-  else if (freePick(p)) freePickModal();
+  sicher('Zugbeginn', () => {
+    // Mit Gentechnik/Massenmedien gehört die Nahrungsrechnung zu Zugbeginn entschieden.
+    if (canFeed(p) && popOpen(ensureFoodState(S, S.cur)) > 0) foodSheet();
+    else if (p.foodDeficit > 0) toast(T('Nahrungsdefizit %s – Nahrung bleibt bei 0.', p.foodDeficit));
+    else if (freePick(p)) freePickModal();
+  });
 }
 
 /* ------------------------------------------------ Einstellungen: Erweiterungsmodule
@@ -2171,6 +2224,11 @@ function startGameScreen() {
   if (isAuto(P(S))) setTimeout(runBots, 400);
   else setTimeout(humanTurnStart, 60);
 }
+/* Kurzregeln („Regeln & Technologien"). Die Abschnitte „Bewegung, Straßen und Eisenbahn"
+   und „Kontrollzone (Schießpulver)" kamen mit v81 dazu – Wortlaut vom Autor freigegeben
+   (2.10.); die Handelsrouten, vorher ein eigener Absatz, stehen jetzt im ersten davon.
+   Jede Aussage dort ist an der Regelmaschine geprüft (moveCost, buildRoad, tradeRoutes,
+   zocStop, arriveAt) – wer eine dieser Regeln ändert, ändert den Text mit. */
 function rulesModal() {
   modal(T('Kurzregeln'), `
     <p class="sub">${T('Zugablauf')}</p>
@@ -2185,7 +2243,15 @@ function rulesModal() {
     </ol>
     <p class="sub">${T('Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen. 2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.')}</p>
     <p class="sub">${T('Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik und Massenmedien heben die Grenze auf: zu Zugbeginn ernährt jede Münze drei Bevölkerung, jede Wissenschaft eine – höchstens bis zur Höhe dessen, was die Bevölkerung isst, also kein allgemeiner Umtausch. Gentechnik bringt zusätzlich Nahrung ins Einkommen: je vier Wissenschaft eine.')}</p>
-    <p class="sub">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße.')}</p>
+    <p class="sub">${T('Bewegung, Straßen und Eisenbahn')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Jede Armee hat je Zug 3 Bewegungspunkte (mit Panzerschiff 6, mit Luftwaffe 9); ein Schritt aufs Nachbarfeld kostet 1. Armeen ziehen nicht auf Städte und nicht auf andere Armeen. Eine Armee, die in einer Stadt entsteht, muss sie im selben Zug verlassen.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Straßen (ab Rad) und Eisenbahnen (ab Eisenbahn, auch ohne Rad) baust du, indem du ein Feld antippst – auf Land, in deinem Gebiet oder auf herrenlosen Feldern, nicht auf Städten. Straße 1 Münze, Eisenbahn 2 Münzen, auf einer Straße 1.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Ein Schritt kostet ½, wenn beide Felder mindestens eine Straße haben, und nichts, wenn beide eine Eisenbahn haben: Auf einem zusammenhängenden Eisenbahnnetz kommt eine Armee mit übriger Bewegung beliebig weit. Ein Stadtfeld zählt als Straße bzw. Eisenbahn, sobald ein Nachbarfeld eine hat. Straßen und Eisenbahnen gehören niemandem – auch gegnerische Armeen fahren darauf.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße. Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn.')}</p>
+    <p class="sub">${T('Kontrollzone (Schießpulver)')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Mit Schießpulver hat jede deiner Armeen eine Kontrollzone: die sechs Felder ringsum, mit Raketentechnik auch den zweiten Ring. Mit Burgenbau gilt das auch für deine Städte.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Eine fremde Armee, die ein Feld in einer Kontrollzone betritt, hält dort an: Ihre übrige Bewegung verfällt für diesen Zug, auch auf Straße und Eisenbahn. Durch eine Kontrollzone kommt sie also nicht hindurch – eine Straße oder Eisenbahn, die hindurchführt, ist für sie dort unterbrochen.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Eine Armee, die ihren Zug in einer Kontrollzone beginnt, darf heraus; betritt sie dabei wieder ein Feld einer Kontrollzone, hält sie dort an. Die Luftwaffe ignoriert Kontrollzonen. Handelsrouten unterbrechen sie nicht.')}</p>
     <p class="sub">${T('Geländeerträge je Feld')}</p>
     <table style="width:100%;font-size:13px;border-collapse:collapse">
       <tr style="color:var(--ink-soft);font-size:11px"><th align="left">${T('Feld')}</th><th>🔬</th><th>🌾</th><th>🪙</th></tr>

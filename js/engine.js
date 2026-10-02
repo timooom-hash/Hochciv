@@ -810,7 +810,7 @@ function beginTurn(S) {
   p.raidPending = 0;
   // Zustände zurücksetzen
   S.cities.forEach(c => { if (c.owner === S.cur) { c.grown = 0; c.freeUsed = 0; } });
-  S.armies.forEach(a => { if (a.owner === S.cur) a.mp = moveAllowance(S, S.cur); });
+  S.armies.forEach(a => { if (a.owner === S.cur) { a.mp = moveAllowance(S, S.cur); delete a.halted; } });
   spawnFreeArmies(S, S.cur);           // was letzte Runde nicht gestellt werden konnte
   p.copies = 0; p.nuked = false; p.backPicks = [];
 }
@@ -934,7 +934,7 @@ function tradeRoutes(S, pi) {
 }
 function armyReach(S, army) {
   const pi = army.owner;
-  const raw = reachable(army.r, army.c, army.mp,
+  const raw = reachable(army.r, army.c, moveBudget(army),
     (r, c) => canPass(S, pi, r, c) ? (zocStop(S, pi, r, c) ? 'stop' : true) : false,
     (r1, c1, r2, c2) => moveCost(S, r1, c1, r2, c2));
   // Felder, auf denen die Armee nicht anhalten darf (Meer ohne Panzerschiff/Luftwaffe),
@@ -950,12 +950,30 @@ function moveArmy(S, army, r, c) {
   const reach = armyReach(S, army);
   const k = key(r, c);
   if (!reach.has(k)) return T('Feld nicht erreichbar.');
-  army.mp -= reach.get(k);
-  army.r = r; army.c = c;
-  log(S, 'act', T('%s: Armee zieht nach %s/%s.', civOf(S.players[army.owner]).n, r, c));
+  const halt = arriveAt(S, army, r, c, reach.get(k));
+  log(S, 'act', T('%s: Armee zieht nach %s/%s.', civOf(S.players[army.owner]).n, r, c) +
+    (halt ? ' ' + T('Kontrollzone – sie hält für diesen Zug an.') : ''));
   spawnFreeArmies(S, army.owner);      // macht den Platz für die nächste Gratisarmee frei
   return null;
 }
+/* Eine Armee kommt auf (r, c) an. Wer dabei eine Kontrollzone betritt, hält für den Rest
+   des Zuges an (v80): die übrige Bewegung verfällt. Bis v79 endete dort nur der Weg – wer
+   die Armee danach noch einmal antippte, zog mit der übrigen Bewegung weiter, auf der
+   Eisenbahn (Kosten 0) beliebig oft und damit mitten durch die Kontrollzone (gemeldet vom
+   Autor). Wer seinen Zug in einer Kontrollzone BEGINNT, darf heraus – `reachable` nimmt das
+   Startfeld aus, und beginTurn gibt die volle Bewegung zurück. Rückgabe: true = angehalten.
+   Für Menschen, Bots und KI dieselbe Stelle (moveArmy, botStep/botMoveArmy, kiMove). */
+function arriveAt(S, army, r, c, cost) {
+  army.mp -= cost || 0;
+  army.r = r; army.c = c;
+  if (!zocStop(S, army.owner, r, c)) return false;
+  army.mp = 0;
+  army.halted = true;        // auch die Eisenbahn (Kosten 0) bringt sie nicht weiter
+  return true;
+}
+/* Bewegungsbudget für die Wegsuche: eine angehaltene Armee kommt nirgends mehr hin – auch
+   nicht über Eisenbahn, die nichts kostet und sonst mit 0 Bewegung noch befahrbar ist. */
+const moveBudget = a => a.halted ? -1 : a.mp;
 
 /* ------------------------------------------------------------ Aktionen */
 /* Wie oft eine Stadt pro Runde wachsen darf und wie oft davon kostenlos:
@@ -1368,9 +1386,9 @@ function buildRoad(S, pi, r, c, target) {
   const k = key(r, c);
   const mine = controlledTiles(S, pi).has(k) || S.cities.some(x => x.owner === pi && x.r === r && x.c === c);
   const foreign = S.players.some((_, i) => i !== pi && controlledTiles(S, i).has(k));
-  if (!mine && foreign) return 'Nur in eigenem oder neutralem Gebiet.';
+  if (!mine && foreign) return T('Nur in eigenem oder neutralem Gebiet.');
   const price = roadPrice(S, pi, r, c, target);
-  if (price == null) return 'Schon vorhanden.';
+  if (price == null) return T('Schon vorhanden.');
   if (!pay(S, pi, 'coins', price)) return T('Zu wenig Münzen.');
   S.roads[k] = target;
   log(S, 'act', T('%s: %s auf %s/%s (%s Münzen).', civOf(p).n, target === 2 ? T('Eisenbahn') : T('Straße'), r, c, price));
