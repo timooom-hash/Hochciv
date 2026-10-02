@@ -2792,6 +2792,63 @@ step('KI: Züge laufen über das Blatt mit „Weiter", dann ist wieder der Mensc
     throw new Error('eine KI-Armee steht noch in einer Stadt');
   console.log(`       ${n} KI-Züge · ` + kis.map(i => `${G('civOf')(S.players[i]).n}: ${Object.keys(S.players[i].techs).length} Techs, ${G('citiesOf')(S, i).length} Städte, ${G('popOf')(S, i)} Bev.`).join(', '));
 });
+/* Gesperrter Bildschirm (v80, gemeldet): der Mensch war am Zug, das Blatt eines KI-Zugs
+   aber noch gesperrt – „Weiter" ohne Wirkung, Sheet nicht zu schließen. Auslöser nicht
+   nachgestellt; geprüft wird, dass keiner der Wege dorthin mehr hängen bleibt. */
+const kiTisch = () => {
+  kiAufbau('vier', ['human', 'ki', 'ki', 'ki'], '0');
+  $('setup-start').value = '0'; $('setup-start').onchange();
+  $('setup-go').onclick();
+  return G('S');
+};
+step('Sperre: „Zug beenden" wirkt nicht, solange das Blatt eines KI-Zugs offen ist', () => {
+  const S = kiTisch();
+  $('a-end').onclick();                               // Mensch beendet, erste KI zieht
+  if (!G('ui').botLock || !$('bot-next')) throw new Error('kein gesperrtes KI-Blatt');
+  const cur = S.cur, laenge = S.log.length;
+  G('endHumanTurn')();                                // käme es doch durch: zweiter Kampf, Zug übersprungen
+  if (S.cur !== cur || S.log.length !== laenge) throw new Error('Zug beenden lief während des KI-Blatts');
+  while (AUTO(G('P')(S)) && !S.over && $('bot-next')) $('bot-next').onclick();
+});
+step('Sperre: beginnt der Zug des Menschen, ist ein übrig gebliebenes KI-Blatt weg', () => {
+  const S = kiTisch();
+  $('a-end').onclick();
+  // der gemeldete Zustand: Mensch am Zug, KI-Blatt noch gesperrt
+  let g = 0;
+  while (AUTO(G('P')(S)) && g++ < 8) G('advanceTurn')(S);
+  if (!G('ui').botLock || !$('sheet').classList.contains('locked')) throw new Error('Ausgangslage nicht hergestellt');
+  G('humanTurnStart')();
+  if (G('ui').botLock || $('sheet').classList.contains('locked') || $('sheet').classList.contains('open'))
+    throw new Error('die Sperre steht noch');
+  if ($('a-end').disabled) throw new Error('„Zug beenden" bleibt gesperrt');
+});
+step('Sperre: dieselbe KI zieht nicht zweimal (Neuladen mitten im KI-Blatt)', () => {
+  const S = kiTisch();
+  $('a-end').onclick();
+  const ki = S.cur;
+  const vorher = JSON.stringify(S.players[ki]) + S.armies.length + S.log.length;
+  const zeilen = $('sheet-body').querySelectorAll('.logline, details').length;
+  // wie nach einem Neuladen: derselbe Spielstand, runBots noch einmal
+  G('runBots')();
+  if (G('S').cur !== ki) throw new Error('der Zug ist weitergesprungen');
+  if (JSON.stringify(S.players[ki]) + S.armies.length + S.log.length !== vorher) throw new Error('die KI hat ein zweites Mal gezogen');
+  if ($('sheet-body').querySelectorAll('.logline, details').length !== zeilen) throw new Error('das Blatt zeigt nicht mehr, was sie getan hat');
+  while (AUTO(G('P')(S)) && !S.over && $('bot-next')) $('bot-next').onclick();
+});
+step('Sperre: ein Fehler im KI-Zug hält das Spiel nicht an – er steht im Protokoll', () => {
+  const S = kiTisch();
+  const echt = G('kiTurn');
+  window.__set('kiTurn', () => { throw new Error('Testfehler'); });
+  const ce = console.error; console.error = () => { };   // der absichtliche Fehler muss nicht in die Ausgabe
+  try { $('a-end').onclick(); }
+  finally { window.__set('kiTurn', echt); console.error = ce; }
+  if (!G('ui').botLock || !$('bot-next')) throw new Error('kein KI-Blatt nach dem Fehler');
+  if (!/Interner Fehler.*Testfehler/.test($('sheet-body').textContent)) throw new Error('der Fehler steht nicht im Blatt');
+  const fehler = G('UI_ERRORS').splice(0);
+  if (fehler.length !== 1) throw new Error('UI_ERRORS: ' + fehler.join(' | '));
+  while (AUTO(G('P')(S)) && !S.over && $('bot-next')) $('bot-next').onclick();
+  if (!S.over && AUTO(G('P')(S))) throw new Error('danach geht es nicht weiter');
+});
 step('KI: in der Legephase legt die KI selbst, gefragt wird nur der Mensch', () => {
   kiAufbau('duell', ['human', 'ki']);
   $('setup-go').onclick();
@@ -2863,6 +2920,71 @@ step('CIV_KEYS ist nach dem ganzen Durchlauf unverändert', () => {
   const ist = G('CIV_KEYS'), soll = G('CIVS').map(c => c.k);
   if (ist.join(',') !== soll.join(','))
     throw new Error('CIV_KEYS wurde verändert: ' + ist.join(',') + ' statt ' + soll.join(','));
+});
+
+/* Abgefangene Fehler im Zugablauf (sicher, v80) zählen hier mit: das Spiel läuft dann zwar
+   weiter, aber ein Fehler bleibt ein Fehler. */
+step('Kontrollzone: wer hineinzieht, hält an – Meldung, und das Blatt sagt warum (v80)', () => {
+  const S = kiTisch(), pi = S.cur, feind = (pi + 1) % S.players.length;
+  const nb = G('neighbors'), dist = G('hexDistance'), frei = (who, [r, c]) =>
+    G('canStop')(S, who, r, c) && G('TERRAIN')[G('terrainAt')(S, r, c)].land;
+  S.players[feind].techs.schiesspulver = true;
+  // Wache W, Ziel B daneben, Start A zwei Felder von W entfernt – alles freies Land
+  let lage = null;
+  for (let r = 0; r < 40 && !lage; r++) for (let c = 0; c < 40 && !lage; c++) {
+    if (!G('terrainAt')(S, r, c) || !frei(feind, [r, c])) continue;
+    for (const B of nb(r, c)) {
+      if (lage || !frei(pi, B)) continue;
+      const A = nb(...B).find(x => dist(x[0], x[1], r, c) === 2 && frei(pi, x));
+      if (A) lage = { W: [r, c], B, A };
+    }
+  }
+  if (!lage) throw new Error('keine passende Lage auf der Karte');
+  const a = { id: S.nextId++, owner: pi, r: lage.A[0], c: lage.A[1], mp: 3, born: 0 };
+  S.armies.push(a, { id: S.nextId++, owner: feind, r: lage.W[0], c: lage.W[1], mp: 0, born: 0 });
+  G('redraw')();
+  G('tapHex')(...lage.A);
+  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Diese Armee bewegen/.test(x.textContent));
+  if (!b || b.disabled) throw new Error('Armee nicht anwählbar');
+  b.onclick();
+  G('tapHex')(...lage.B);
+  if (a.r !== lage.B[0] || a.c !== lage.B[1]) throw new Error('Armee ist nicht ins Zielfeld gezogen');
+  if (!a.halted || a.mp !== 0) throw new Error('Armee hält in der Kontrollzone nicht an');
+  if (!/Kontrollzone/.test($('toast').textContent)) throw new Error('keine Meldung: ' + $('toast').textContent);
+  G('tapHex')(...lage.B);
+  const b2 = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Diese Armee bewegen/.test(x.textContent));
+  if (!b2 || !b2.disabled || !/Kontrollzone/.test(b2.textContent)) throw new Error('Blatt: ' + (b2 ? b2.textContent : 'kein Knopf'));
+  G('closeSheet')();
+  console.log('       Wache ' + lage.W + ', Start ' + lage.A + ', angehalten auf ' + lage.B + ' · „' + $('toast').textContent + '"');
+});
+step('Regelbogen: Bewegung, Straßen, Eisenbahn und Kontrollzone (v81), auch auf Englisch', () => {
+  G('rulesModal')();
+  const de = $('ov-body').textContent.replace(/\s+/g, ' ');
+  for (const t of ['Bewegung, Straßen und Eisenbahn', 'Kontrollzone (Schießpulver)',
+    'Eisenbahn 2 Münzen, auf einer Straße 1', 'Die Luftwaffe ignoriert Kontrollzonen'])
+    if (!de.includes(t)) throw new Error('fehlt: ' + t);
+  // nach dem Absatz zur Nahrung, vor den Geländeerträgen; die Handelsrouten genau einmal
+  const pos = ['Die Nahrungsproduktion', 'Bewegung, Straßen und Eisenbahn', 'Handelsrouten: jede eigene Stadt',
+    'Kontrollzone (Schießpulver)', 'Geländeerträge je Feld'].map(t => de.indexOf(t));
+  if (pos.some((x, i) => x < 0 || (i && x < pos[i - 1]))) throw new Error('Reihenfolge: ' + pos.join(','));
+  if (de.split('Handelsrouten: jede eigene Stadt').length !== 2) throw new Error('Handelsrouten nicht genau einmal');
+  G('closeModal')();
+  G('switchLang')('en');
+  try {
+    G('clearMissing')();
+    G('rulesModal')();
+    const en = $('ov-body').textContent.replace(/\s+/g, ' ');
+    for (const t of ['Movement, roads and railways', 'Zone of control (Gunpowder)', 'The Air force ignores zones of control'])
+      if (!en.includes(t)) throw new Error('fehlt auf Englisch: ' + t);
+    const fehlt = G('missingStrings')();
+    if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));
+    G('closeModal')();
+  } finally { G('switchLang')('de'); }
+  console.log('       zwei Abschnitte nach der Nahrung, deutsch und englisch vollständig');
+});
+step('kein abgefangener Fehler im Zugablauf', () => {
+  const f = G('UI_ERRORS');
+  if (f.length) throw new Error(f.join(' | '));
 });
 
 console.log(errors.length ? '\n' + errors.length + ' Fehler' : '\nOberfläche läuft fehlerfrei durch');

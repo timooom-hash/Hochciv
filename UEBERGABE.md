@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 1.10., `sw.js` v79)
+# Hochzeivilization — Projekt-Übergabe (Stand 2.10., `sw.js` v81)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v79)
+## Letzte Sitzungen auf einen Blick (v61 → v81)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -34,12 +34,15 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v77 | **KI** als dritte Sitzart (Mensch / KI / Bot): spielt nach den Regeln für Menschen, drei Stufen, legt ihr Startplättchen selbst (`js/ki.js`). **Wirtschaftssieg „mehr als 2/3" und nicht in Runde 1.** `reachable` mit Heap (gleiches Ergebnis, schneller). Messwerkzeug `tools_ki.js` | KI + Regel + Tempo |
 | v78 | **KI-Stufen deutlich getrennt:** Leicht übersieht Möglichkeiten (`see`), rechnet ungenau und vergreift sich öfter, gibt aber aus, was es hat – im Duell etwa wie ein Prinz-Bot, Mittel wie König, Schwer wie David. **Abwehr gegen Vorstöße** (Rückmeldung des Autors): Verteidigung mit Macht im selben Paket, gegen Menschen mit dem entschlossenen Angreifer gerechnet – gefallene Hauptstädte im Test 32 → 20 von 187. Längster KI-Zug 1,5 → 0,7 s | KI + Tempo |
 | v79 | **Abwehr neu gewichtet** (Rückmeldung des Autors): vor dem ersten Treffer mild, im Ernstfall (laufende Belagerung) alles – Verteidigungstechnologien, Flanken, Armeen an die Stadt, Macht; die KI sieht jetzt, dass Armeen nicht stapeln (Plätze an der Stadt). Vorher ein Sechstel weniger Ausgaben (ein Drittel weniger Macht), nachher ein Sechstel mehr, Hauptstädte so oft gehalten wie v78. **Wissenschaft zuerst für die Forschung** (außer im Ernstfall). **Knopf „Armeen" entfernt** | KI + Oberfläche |
+| v80 | **Gesperrter Bildschirm nach KI-Zügen** (gemeldet, nicht nachgestellt): der Zug eines Menschen beginnt immer ohne Sperre, „Zug beenden" wirkt nur im eigenen Zug, Fehler im Zugablauf stehen im Protokoll statt den Ablauf anzuhalten, dieselbe KI zieht nach einem Neuladen nicht noch einmal. **Eisenbahn durch Kontrollzonen** (gemeldet): wer eine Kontrollzone betritt, hält für den Rest des Zuges an – auch auf der Eisenbahn; Einblendung beim Anhalten, Grund am gesperrten Knopf | Fehler |
+| v81 | **Regelbogen:** Abschnitte „Bewegung, Straßen und Eisenbahn" (Bewegungspunkte, Bau und Preise, Kosten je Schritt, Handelsrouten) und „Kontrollzone (Schießpulver)" – Wortlaut vom Autor freigegeben, deutsch und englisch; `test.js` prüft jede Aussage an der Regelmaschine | Oberfläche |
 
 Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitte „KI (v77)",
 „KI-Stufen (v78)" und „Abwehr neu gewichtet (v79)" unten, ausführlich in `ANNAHMEN.md`) und
 Punkt 14–16 der offenen Punkte (Wirtschaftssieg in Runde 2 im Duell, ob Leicht für Einsteiger
 passt, Rechenzeit auf dem iPad nicht gemessen), 17 (Abwehr gegen Menschen nur gegen ein
-Skript gemessen) und 18 (Straßen im Bündel des Planers).
+Skript gemessen) und 18 (Straßen im Bündel des Planers). Seit v80 Punkt 19 (Auslöser des
+gesperrten Bildschirms unbekannt).
 
 Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
 der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
@@ -74,20 +77,20 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1207 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1236 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 416 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1830 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 1848 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 490 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ki.js` | 1729 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
-| `js/ui.js` | 2230 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/ui.js` | 2296 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 5612 | **1460 Assertions**, `node test.js` |
-| `smoke.js` | 2870 | **125 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 5742 | **1483 Assertions**, `node test.js` |
+| `smoke.js` | 2992 | **132 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -632,10 +635,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1460 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1483 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (125 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (132 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -757,6 +760,17 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   `kind === 'human'`, seit v78): gegen Menschen rechnet sie mit dem entschlossenen Angreifer –
   seit v79 nur im Ernstfall (laufende Belagerung), vorher mild wie gegen alle. Wer eine neue
   Sitzart einführt, entscheidet dort, wie die KI ihr begegnet.
+- **Jede Armeebewegung läuft über `arriveAt`** (seit v80): dort endet die Bewegung beim
+  Betreten einer Kontrollzone (`army.halted`, zurückgesetzt in `beginTurn` und zu Beginn
+  des Bot-Zugs). Wer Armeen anderswo direkt versetzt (`a.r = …`), umgeht die Regel – Bots,
+  KI-Kopien und `moveArmy` benutzen sie; die Wegsuche nimmt `moveBudget(a)`, nicht `a.mp`.
+- **Der Zugablauf fängt Fehler ab** (`sicher` in ui.js, seit v80): ein Fehler im Zug der KI,
+  im Kampf oder beim Zugwechsel steht im Protokoll, und das Spiel läuft weiter. Das darf
+  keine echten Fehler verstecken – `smoke.js` zählt `UI_ERRORS` als Fehler.
+- **Der Regelbogen beschreibt Bewegung, Straßen, Eisenbahn und Kontrollzone** (seit v81, im
+  Wortlaut des Autors): Bewegungspunkte, Baupreise, Kosten je Schritt, Handelswege, Reichweite
+  der Zone. Wer eine dieser Regeln ändert, ändert den Text in `rulesModal` (und `UI_EN`) mit –
+  der Block „Kurzregeln: Bewegung, Straßen, Eisenbahn, Kontrollzone" in `test.js` schlägt an.
 - **Plätze an der Stadt hängen an „Armeen stapeln sich nicht"** (`kiAttackSlots`, seit v79):
   jeder Angreifer braucht ein eigenes Feld in Reichweite. Die Reichweiten der Gegner werden
   dafür ohne die Armeen der KI und ohne ihre eigenen gerechnet (`kiEnemyInfo`). Wer das
@@ -901,6 +915,16 @@ Kampf-Aufruf bei Bots · Stadtfelder zählen als Straße/Eisenbahn · Armee in e
 anwählbar · Bot-Armeen nutzen Geländedistanz · Angriffswerte addieren sich · Reichweitensprung
 wirkt sofort · England kann Nahrung für Forschung ausgeben · Internet-Gratiskopie ·
 Navigation-Armeen halten nicht auf Wasser · v2-Tech-Labels · leeres Bot-Fenster (Log-Kappung).
+
+Aus der Sitzung v80:
+- **Eisenbahn durch die Kontrollzone (gemeldet):** Eine Kontrollzone beendete nur den Weg,
+  nicht die übrige Bewegung, und das Startfeld ist von ihr ausgenommen. Noch einmal
+  angetippt, zog die Armee weiter – auf der Eisenbahn (Schritt kostet 0) auch mit 0
+  Bewegung, beliebig oft. Nicht wieder einführen: jede Armeebewegung läuft über `arriveAt`
+  (Bewegung 0 und `army.halted` beim Betreten einer Zone); der Test fährt die Bahn ab.
+- **Dieselbe KI zog nach einem Neuladen ein zweites Mal** (beim Suchen gefunden): gespeichert
+  wird nach ihrem Zug, „Weiter" kommt danach. `S.autoPlayed` merkt sich, wer in dieser
+  Runde schon gezogen hat; `smoke.js` lädt mitten im KI-Blatt neu.
 
 Aus der Sitzung v79:
 - **Angreifer ohne Platz gezählt (KI):** Jede Armee, die irgendein Feld an einer Stadt
@@ -1094,7 +1118,9 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Wikinger-Beute) zählt aber weiter nur echte Armeen in Reichweite. Das Regelheft sagt
    nur „verteidigt die eigene Stadt". Eine Zeile, falls gewünscht.
 8. **Die Kontrollzone ist ein Halt, keine Mauer.** Wer ein Feld in Reichweite betritt,
-   bleibt stehen – im nächsten Zug darf er weiter. Eine Lücke von einem Feld in einer
+   bleibt stehen – im nächsten Zug darf er weiter. (Seit v80 hält er wirklich für den Rest
+   des Zuges an; vorher endete nur der Weg, und ein zweites Antippen zog weiter – gemeldet
+   für die Eisenbahn.) Eine Lücke von einem Feld in einer
    sonst geschlossenen Reihe ist deshalb passierbar, kostet aber je Kontrollzonenfeld einen
    ganzen Zug: vor der Reihe, in der Lücke, hinter der Reihe. Gemessen (ganze Zeile voller
    Wachen, nur ein Feld frei, Armee mit 3 Bewegung drei Zeilen davor): **vier Züge** bis
@@ -1168,6 +1194,19 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    in `js/ki.js` erwartet `road:`, die Kandidaten heißen aber `road1:`/`road2:`. Folge:
    Straßen werden nicht gebündelt, und nach aufgebrauchtem Bewertungsbudget erwägt die KI
    keine Straßen mehr. Die Korrektur ändert Partien und gehört gemessen.
+19. **Gesperrter Bildschirm nach KI-Zügen: Auslöser unbekannt (v80).** Gemeldet mit der
+   Abhilfe aus der Konsole (Sperre aufheben, `humanTurnStart()`). Nicht nachgestellt –
+   weder Zug um Zug noch mit zufälligem Tippen über die echte Oberfläche (zusammen gut 200
+   Partien). v80 macht den Ablauf robust (siehe Fragilitäten); kommt es wieder vor, steht
+   ein Fehler jetzt als „Interner Fehler (…)" im Protokoll – den Wortlaut brauchen wir.
+20. **Regelbogen zu Bewegung, Straßen, Eisenbahn und Kontrollzone – erledigt (v81).** Der
+   Autor hat den Entwurf unverändert freigegeben; damit gelten auch die zwei Punkte, die er
+   dabei bestätigen sollte, als Regel: Straßen gehören niemandem (jede Armee fährt auf jeder
+   Straße), und Kontrollzonen unterbrechen keine Handelsrouten.
+21. **KI-Züge über lange Eisenbahnen (bemerkt v80, nicht gemessen).** Für ihre eigenen
+   Angriffs- und Abwehrzüge sortiert die KI Armeen vorab nach Luftlinie aus (Bewegung +
+   Reichweite + 4, sobald es Straßen gibt); weiter entfernte Armeen, die eine lange Bahn
+   heranbrächte, erwägt sie nicht. Fremde Bedrohungen rechnet sie mit der echten Wegsuche.
 
 ## Arbeitsweise, die der Autor schätzt
 

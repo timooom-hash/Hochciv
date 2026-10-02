@@ -81,6 +81,10 @@ Weg ins Menü.
 Straßen laufen durch Städte hindurch: ein Stadtfeld zählt selbst als Straße oder
 Eisenbahn, sobald ein solches Feld daran grenzt.
 
+Kontrollzonen (Schießpulver): wer ein Feld neben einer fremden Armee betritt (mit
+Raketentechnik bis zwei Felder weit), hält für den Rest des Zuges an – auch auf der
+Eisenbahn. Wer seinen Zug in einer Kontrollzone beginnt, darf heraus.
+
 Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen.
 Bezahlt wird automatisch mit dem günstigsten Umrechnungskurs
 (2 Münzen = 1 Nahrung/Wissenschaft, mit England, Gilden, Alchemie usw. entsprechend besser).

@@ -846,6 +846,136 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(zocStop(S, 0, d1[0], d1[1]), false, 'Luftwaffe ignoriert Kontrollzonen');
 }
 
+/* ================= Eisenbahn durch die Kontrollzone (v80, gemeldeter Fehler)
+   Wer eine Kontrollzone betrat, hielt nur auf diesem Weg an. Danach noch einmal angetippt,
+   zog die Armee mit der übrigen Bewegung weiter – und auf der Eisenbahn (Kosten 0) auch mit
+   0 Bewegung, beliebig oft, mitten durch die Zone. Jetzt endet die Bewegung dort für den
+   ganzen Zug; im nächsten eigenen Zug darf die Armee wieder heraus.                   */
+{
+  const lage = (gunpowder, startInZone) => {
+    const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.cities.length = 0; S.armies.length = 0; S.sieges = {}; S.roads = {};
+    S.cities.push({ id: 900, owner: 0, r: 2, c: 2, pop: 3, cap: true, grown: 0, born: -1 });
+    S.cities.push({ id: 901, owner: 1, r: 10, c: 14, pop: 3, cap: true, grown: 0, born: -1 });
+    for (let c = 1; c <= 14; c++) S.roads[key(5, c)] = 2;              // Eisenbahn quer über Zeile 5
+    const a = { id: 910, owner: 0, r: 5, c: startInZone ? 7 : 1, mp: 3, born: -1 };
+    S.armies.push(a);
+    S.armies.push({ id: 911, owner: 1, r: 4, c: 6, mp: 3, born: -1 });  // Wache: 5/5 und 5/6 in der Zone
+    if (gunpowder) S.players[1].techs.schiesspulver = true;
+    S.cur = 0;
+    return { S, a };
+  };
+  { const { S, a } = lage(true);
+    const zone = [...armyReach(S, a).keys()].map(unkey).filter(([r, c]) => zocStop(S, 0, r, c));
+    eq(armyReach(S, a).has(key(5, 9)), false, 'die Eisenbahn endet für den Weg am ersten Feld der Zone (5/9 nicht erreichbar)');
+    const ein = zone.find(([r, c]) => r === 5 && c === 5);
+    eq(moveArmy(S, a, ein[0], ein[1]), null, 'in die Zone hinein darf sie (5/5)');
+    eq([a.mp, armyReach(S, a).size], [0, 0], '… dann ist die Bewegung für diesen Zug zu Ende – auch auf der Eisenbahn');
+    eq(!!moveArmy(S, a, 5, 12), true, '… ein zweites Antippen bringt sie nicht weiter (gemeldeter Fehler)');
+    eq(/Kontrollzone/.test(S.log[S.log.length - 1].m) || S.log.some(l => /Kontrollzone/.test(l.m)), true, 'das Protokoll sagt, warum');
+    S.cur = 1; advanceTurn(S);      // wieder Russland am Zug
+    eq([a.halted, a.mp > 0, armyReach(S, a).has(key(5, 4))], [undefined, true, true], 'im nächsten eigenen Zug darf sie wieder heraus');
+  }
+  { const { S, a } = lage(false);
+    moveArmy(S, a, 5, 5);
+    eq([a.mp, armyReach(S, a).has(key(5, 12))], [3, true], 'Gegenprobe ohne Schießpulver: keine Zone, die Eisenbahn bleibt frei');
+  }
+  { const { S, a } = lage(true, true);
+    // beginnt den Zug neben der Wache (5/7 liegt nicht in der Zone, 5/6 schon): wer in
+    // der Zone steht, darf heraus – über die Eisenbahn nach Osten kostenlos; nach Westen
+    // unterbricht das nächste Zonenfeld (5/5) die Bahn, 5/2 gibt es nur außen herum
+    a.r = 5; a.c = 6;
+    const R = armyReach(S, a);
+    eq([R.get(key(5, 12)), R.has(key(5, 5)), R.get(key(5, 2))], [0, true, 3],
+      'wer in der Zone beginnt, darf heraus – aber nicht über die Bahn durch das nächste Zonenfeld (westwärts nur außen herum)');
+    moveArmy(S, a, 5, 12);
+    eq(a.mp, 3, '… und wer sie verlässt, behält seine Bewegung');
+  }
+}
+
+/* ================= Kurzregeln: Bewegung, Straßen, Eisenbahn, Kontrollzone (v81)
+   Seit v81 stehen diese Regeln ausdrücklich im Regelbogen (Wortlaut vom Autor freigegeben).
+   Hier wird jede Aussage des Textes an der Regelmaschine nachgeprüft – ändert jemand eine
+   der Regeln, schlägt dieser Block an, und der Text in rulesModal muss mit.            */
+{
+  const leer = () => {
+    const S = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.cities.length = 0; S.armies.length = 0; S.sieges = {}; S.roads = {}; S.cur = 0;
+    return S;
+  };
+  const stadt = (S, owner, r, c, cap) => { const x = { id: S.nextId++, owner, r, c, pop: 2, cap: !!cap, grown: 0, born: -1 }; S.cities.push(x); return x; };
+  // „3 Bewegungspunkte (mit Panzerschiff 6, mit Luftwaffe 9)"
+  { const S = leer(), p = S.players[0], w = [moveAllowance(S, 0)];
+    p.techs.panzerschiff = true; w.push(moveAllowance(S, 0));
+    p.techs.luftwaffe = true; w.push(moveAllowance(S, 0));
+    eq(w, [3, 6, 9], 'Regelbogen: 3 Bewegungspunkte, mit Panzerschiff 6, mit Luftwaffe 9');
+  }
+  // „Eine Armee, die in einer Stadt entsteht, muss sie im selben Zug verlassen."
+  { const S = leer(), ct = stadt(S, 0, 4, 4, true);
+    S.players[0].res.coins = 20;
+    eq(buildArmy(S, 0, ct), null, 'Regelbogen: Armee in der Stadt gebaut …');
+    eq(blockingIssues(S, 0).length, 1, '… und der Zug endet erst, wenn sie heraus ist');
+  }
+  // „Straße 1 Münze, Eisenbahn 2 Münzen, auf einer Straße 1" · „auch ohne Rad" ·
+  // „auf Land, in deinem Gebiet oder auf herrenlosen Feldern"
+  { const S = leer(), p = S.players[0];
+    stadt(S, 0, 3, 3, true); stadt(S, 1, 8, 8, true);
+    p.res.coins = 20; p.techs.eisenbahn = true;
+    const kosten = [];
+    const bau = (r, c, z) => { const vor = p.res.coins, e = buildRoad(S, 0, r, c, z); kosten.push(e || vor - p.res.coins); };
+    bau(3, 4, 2);                  // Eisenbahn ohne Rad auf leerem Feld
+    bau(3, 5, 1);                  // Straße ohne Rad: geht nicht
+    p.techs.rad = true;
+    bau(3, 5, 1); bau(3, 5, 2);    // Straße, dann Eisenbahn darauf
+    eq(kosten, [2, 'Rad noch nicht erforscht.', 1, 1],
+      'Regelbogen: Eisenbahn 2 Münzen (auch ohne Rad), Straße braucht Rad und kostet 1, Eisenbahn auf einer Straße 1');
+    eq([buildRoad(S, 0, 6, 6, 1), !!buildRoad(S, 0, 8, 9, 1)], [null, true],
+      'Regelbogen: herrenloses Feld ja, Gebiet eines anderen Reichs nein');
+  }
+  // „Ein Schritt kostet ½ … nichts … Ein Stadtfeld zählt … gehören niemandem"
+  { const S = leer();
+    S.roads[key(3, 3)] = 1; S.roads[key(3, 4)] = 1; S.roads[key(3, 5)] = 2; S.roads[key(3, 6)] = 2;
+    eq([moveCost(S, 3, 3, 3, 4), moveCost(S, 3, 4, 3, 5), moveCost(S, 3, 5, 3, 6), moveCost(S, 3, 6, 3, 7)],
+      [0.5, 0.5, 0, 1], 'Regelbogen: Straße ½, gemischt ½, Eisenbahn 0, sonst 1');
+    stadt(S, 0, 3, 7);
+    eq(moveCost(S, 3, 6, 3, 7), 0, 'Regelbogen: ein Stadtfeld neben einer Eisenbahn zählt als Eisenbahn');
+    for (let c = 8; c <= 14; c++) S.roads[key(5, c)] = 2;
+    const g = { id: S.nextId++, owner: 1, r: 5, c: 8, mp: 1, born: -1 }; S.armies.push(g);
+    eq(armyReach(S, g).get(key(5, 14)), 0,
+      'Regelbogen: Straßen gehören niemandem – eine gegnerische Armee fährt die Eisenbahn bis ans Ende, mit übriger Bewegung beliebig weit');
+  }
+  // „Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn."
+  // „Handelsrouten unterbrechen sie [Kontrollzonen] nicht."
+  { const S = leer();
+    stadt(S, 0, 2, 2, true); stadt(S, 0, 2, 10); stadt(S, 1, 3, 6, true);
+    for (let c = 3; c <= 9; c++) S.roads[key(2, c)] = 2;
+    const fremd = [3, 4, 5, 6, 7, 8, 9].filter(c => controlledTiles(S, 1).has(key(2, c))).length;
+    eq([fremd > 0, tradeRoutes(S, 0).rail], [true, 1], 'Regelbogen: Handelsroute durch fremdes Gebiet zählt (reine Eisenbahn: +2)');
+    S.armies.push({ id: S.nextId++, owner: 1, r: 1, c: 7, mp: 0, born: -1 });
+    S.players[1].techs.schiesspulver = true;
+    const zone = [3, 4, 5, 6, 7, 8, 9].filter(c => zocStop(S, 0, 2, c)).length;
+    eq([zone > 0, tradeRoutes(S, 0).rail], [true, 1], 'Regelbogen: eine Kontrollzone auf dem Weg unterbricht die Handelsroute nicht');
+    stadt(S, 1, 2, 8);
+    eq(tradeRoutes(S, 0).count, 0, 'Regelbogen: eine fremde Stadt auf dem Weg unterbricht sie');
+  }
+  // „die sechs Felder ringsum, mit Raketentechnik auch den zweiten Ring. Mit Burgenbau gilt das
+  //  auch für deine Städte." · „Die Luftwaffe ignoriert Kontrollzonen."
+  { const S = leer(), o = S.players[1];
+    stadt(S, 1, 6, 8);
+    o.techs.burgenbau = true;
+    const z = () => [zocStop(S, 0, 6, 7), zocStop(S, 0, 6, 10)];
+    const ohne = z(); o.techs.schiesspulver = true; const mit = z();
+    o.techs.raketentechnik = true; const rakete = z();
+    eq([ohne, mit, rakete, hexDistance(6, 10, 6, 8)], [[false, false], [true, false], [true, true], 2],
+      'Regelbogen: Burgstadt nur mit Schießpulver eine Zone, ein Ring, mit Raketentechnik zwei');
+    eq(zocStop(S, 1, 6, 7), false, 'Regelbogen: die eigene Zone hält eigene Armeen nicht auf');
+    S.players[0].techs.luftwaffe = true;
+    eq(zocStop(S, 0, 6, 7), false, 'Regelbogen: die Luftwaffe ignoriert Kontrollzonen');
+  }
+}
+
 /* ================= Burgstädte halten Wache (v68, gemeldeter Fehler)
    Gemeldet aus einem 1-gegen-1: die Armeen des Bots liefen zwischen den eigenen Armeen
    und Burgstädten hindurch. Ursache: Burgenbau stellt eine unbewegliche Armee in jede

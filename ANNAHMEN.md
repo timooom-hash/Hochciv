@@ -3182,3 +3182,114 @@ fließt mehr Wissenschaft in die Forschung als ohne (Partie zu viert, Züge mit 
 Test von v78 (kleines Reich, zwei Armeen eines Menschen vor der Hauptstadt: sie sorgt vor,
 weil sie nach einem Treffer nicht nachlegen könnte) gilt weiter. `smoke.js`: der Knopf
 „Armeen" fehlt, Armeen wählt man auf der Karte.
+
+## Gesperrter Bildschirm nach KI-Zügen · Eisenbahn durch Kontrollzonen (v80)
+
+### Gesperrter Bildschirm (gemeldet)
+
+**Meldung:** Nach den Zügen der KI blieb der Bildschirm gesperrt. Weiter ging es nur von Hand
+in der Konsole: Sperre aufheben (`ui.botLock`, Klasse `locked`), Blatt schließen, neu
+zeichnen, `humanTurnStart()`. Der Mensch war also schon am Zug, das Blatt eines KI-Zugs aber
+noch gesperrt – „Weiter" ohne Wirkung, das Blatt nicht zu schließen.
+
+**Nicht nachgestellt.** Gesucht über die echte Oberfläche in jsdom: 60 Partien Zug um Zug
+(Mensch spielt über die Regelmaschine, drei KI, mit und ohne Erweiterungen) und gut 100 mit
+zufälligem Tippen (Felder, Armeen, alle Blätter, Macht, Forschung, Gründen, Nahrung, auch
+während die KI-Meldung offen ist) – kein Hänger, keine Ausnahme. In den Zustand führen nur
+zwei Wege: „Zug beenden", während das KI-Blatt offen ist (die Leiste ist dann gesperrt –
+denkbar nur über eine Eingabe, die das Gerät noch zustellt), oder ein Fehler mitten im
+Zugwechsel. Gegen beides und gegen einen unbekannten Dritten:
+
+* **„Zug beenden" wirkt nur im eigenen Zug** und nie bei offenem KI-Blatt. Sonst liefe der
+  Kampf der KI ein zweites Mal, und der Zug spränge an ihrem „Weiter" vorbei.
+* **Der Zug eines Menschen beginnt immer ohne Sperre** (`humanTurnStart` hebt eine übrig
+  gebliebene auf) – genau der gemeldete Zustand löst sich damit selbst.
+* **Ein Fehler hält das Spiel nicht mehr an** (`sicher`): in Zug der KI oder eines Bots,
+  im Kampf, im Zugwechsel und zu Zugbeginn wird er abgefangen, steht im Protokoll
+  („Interner Fehler (…): … – das Spiel läuft weiter. Bitte melden.") und in der Konsole,
+  und es geht weiter. `smoke.js` zählt solche Fehler (`UI_ERRORS`) als Fehler.
+* **Dieselbe KI zieht nie zweimal in einer Runde** (`S.autoPlayed`). Gefunden beim Suchen:
+  gespeichert wird nach ihrem Zug, „Weiter" kommt erst danach. Wurde die App dazwischen neu
+  geladen, zog sie noch einmal – samt zweitem Kampf, der eine Belagerung um einen Zähler
+  weiterbringen kann. Jetzt zeigt das Blatt nur wieder, was sie getan hat.
+* **Ein verspätetes zweites „Weiter"** überspringt keinen Menschen.
+
+Kommt es wieder vor, steht der Grund jetzt im Protokoll (☰ → „Protokoll" bzw. die Leiste).
+
+### Eisenbahn durch die Kontrollzone (gemeldet)
+
+**Meldung:** Mit mehrfachem Antippen derselben Armee kam man auf der Eisenbahn durch eine
+Kontrollzone. Erwartet: wer eine Kontrollzone betritt, dessen Bewegung endet ganz, und eine
+von einer Kontrollzone unterbrochene Bahn ist nicht befahrbar.
+
+**Ursache:** zweierlei. Eine Kontrollzone beendete nur den Weg, nicht die übrige Bewegung –
+und das Startfeld einer Armee ist von der Kontrollzone ausgenommen (wer seinen Zug darin
+beginnt, darf heraus). Noch einmal angetippt, zog die Armee also mit der übrigen Bewegung
+weiter. Und auf der Eisenbahn kostet ein Schritt nichts, also ging das auch mit 0 Bewegung,
+beliebig oft.
+
+**Jetzt** (`arriveAt` in engine.js, für Menschen, Bots und KI dieselbe Stelle): wer ein Feld
+in einer Kontrollzone betritt, hält für den Rest des Zuges an – Bewegung 0 und angehalten
+(`army.halted`), also auch keine kostenlosen Schritte auf der Eisenbahn mehr. Im nächsten
+eigenen Zug darf die Armee wieder heraus. Unverändert: eine Bahn, die durch eine
+Kontrollzone führt, endet für den Weg am ersten Feld der Zone; wer in der Zone beginnt,
+darf heraus, aber nicht durch das nächste Zonenfeld hindurch. Das entspricht dem, was hier
+schon unter 1 stand („halten an, sobald sie … betreten") und was Punkt 8 der offenen Punkte
+in der Übergabe beschreibt – nur hielt die Armee bisher nicht wirklich an.
+
+Auf dem Bildschirm: hält eine Armee an, meldet das eine Einblendung („Kontrollzone – die
+Armee hält für diesen Zug an."), und im Blatt der Armee steht am gesperrten Knopf „Diese
+Armee bewegen" der Grund („Kontrollzone – hält bis zum nächsten Zug"). Bisher stand das nur
+im Protokoll, und ein gesperrter Knopf ohne Grund sähe nach dem nächsten Fehler aus.
+Nebenbei übersetzt: „Bewegung 3" im Armeeblatt und zwei Meldungen beim Straßenbau („Nur in
+eigenem oder neutralem Gebiet.", „Schon vorhanden.") blieben auf Englisch deutsch.
+
+**Am Rand bemerkt:** Ohne Kontrollzone ließe die Regelmaschine eine Armee mit 0 Bewegung
+weiter Eisenbahn fahren (jeder Schritt kostet 0). Genutzt wird das nirgends: das Feldblatt
+bietet „Diese Armee bewegen" erst ab Bewegung über 0 an, Bots ziehen jede Armee einmal, die
+KI überspringt Armeen ohne Bewegung. Deshalb nicht angefasst.
+
+**Ebenfalls bemerkt, nicht geändert:** Für ihre eigenen Angriffs- und Abwehrzüge sortiert die
+KI Armeen vorab nach Luftlinie aus – Bewegung + Reichweite + 4, sobald es irgendwo Straßen
+gibt. Über eine lange Eisenbahn käme eine Armee weiter; solche Züge sieht die KI also nicht.
+Die Bedrohung durch FREMDE Armeen rechnet sie dagegen mit der echten Wegsuche (Eisenbahn und
+Kontrollzonen inklusive). Gemessen ist der Verlust nicht.
+
+### Abgesichert
+
+`test.js`: Eisenbahn quer über die Karte, eine Wache mit Schießpulver daneben – die Bahn
+endet für den Weg am ersten Zonenfeld; in die Zone hinein darf die Armee, danach ist ihre
+Bewegung zu Ende (auch auf der Bahn), ein zweites Antippen bringt sie nicht weiter, das
+Protokoll sagt warum; im nächsten eigenen Zug darf sie heraus; ohne Schießpulver keine Zone;
+wer in der Zone beginnt, darf heraus, aber nicht über die Bahn durch das nächste Zonenfeld,
+und wer sie verlässt, behält seine Bewegung. `smoke.js`: „Zug beenden" wirkt nicht bei
+offenem KI-Blatt; ein übrig gebliebenes gesperrtes KI-Blatt ist weg, sobald der Mensch am
+Zug ist; nach einem Neuladen mitten im KI-Blatt zieht die KI nicht noch einmal; ein Fehler im
+KI-Zug steht im Blatt, und das Spiel geht weiter; eine Armee, die über die Oberfläche in eine
+Kontrollzone zieht, hält an, die Einblendung sagt es, und ihr Blatt nennt den Grund. Nach
+allen Änderungen noch einmal 40 Partien mit zufälligem Tippen über die echte Oberfläche –
+ohne Hänger und ohne abgefangenen Fehler.
+
+## Regelbogen: Bewegung, Straßen, Eisenbahn, Kontrollzone (v81)
+
+Auf Wunsch des Autors stehen diese Regeln jetzt im Regelbogen („Regeln & Technologien"),
+nach dem Absatz zur Nahrung, in zwei Abschnitten: „Bewegung, Straßen und Eisenbahn" (darin
+der bisherige Absatz zu den Handelsrouten, um einen Satz ergänzt) und „Kontrollzone
+(Schießpulver)". Der Wortlaut wurde dem Autor vorher vorgelegt und unverändert freigegeben
+(deutsch und englisch). Er beschreibt die Regeln, wie die Regelmaschine sie umsetzt – auch
+zwei Auslegungen, die der Autor dabei ausdrücklich bestätigen sollte: **Straßen und
+Eisenbahnen gehören niemandem** (auch gegnerische Armeen fahren darauf, `S.roads` kennt
+keinen Besitzer) und **Kontrollzonen unterbrechen keine Handelsrouten** (`tradeRoutes`
+sperrt nur an fremden Städten).
+
+Die Kurztexte der drei Technologien (Rad „Straßen", Eisenbahn „Eisenbahn", Schießpulver
+„Kontrollzone") bleiben, wie sie sind – derselbe Text steht auf den Karten im Forschungsblatt.
+
+**Abgesichert:** `test.js` prüft jede Aussage des Textes an der Regelmaschine (Bewegungspunkte,
+Armee muss aus der Stadt, Preise und Gebiet beim Bau, Eisenbahn ohne Rad, Kosten je Schritt,
+Stadtfelder, fremde Armeen auf der eigenen Bahn, Handelsroute durch fremdes Gebiet und durch
+eine Kontrollzone, fremde Stadt unterbricht, Reichweite der Zone mit Raketentechnik,
+Burgstädte nur mit Schießpulver, eigene Zone, Luftwaffe). `smoke.js` öffnet den Bogen auf
+Deutsch und Englisch: beide Abschnitte an ihrem Platz, die Handelsrouten genau einmal, auf
+Englisch kein Satz ohne Übersetzung.
+
