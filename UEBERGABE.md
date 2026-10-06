@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 2.10., `sw.js` v81)
+# Hochzeivilization — Projekt-Übergabe (Stand 5.10., `sw.js` v82)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v81)
+## Letzte Sitzungen auf einen Blick (v61 → v82)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -36,6 +36,7 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v79 | **Abwehr neu gewichtet** (Rückmeldung des Autors): vor dem ersten Treffer mild, im Ernstfall (laufende Belagerung) alles – Verteidigungstechnologien, Flanken, Armeen an die Stadt, Macht; die KI sieht jetzt, dass Armeen nicht stapeln (Plätze an der Stadt). Vorher ein Sechstel weniger Ausgaben (ein Drittel weniger Macht), nachher ein Sechstel mehr, Hauptstädte so oft gehalten wie v78. **Wissenschaft zuerst für die Forschung** (außer im Ernstfall). **Knopf „Armeen" entfernt** | KI + Oberfläche |
 | v80 | **Gesperrter Bildschirm nach KI-Zügen** (gemeldet, nicht nachgestellt): der Zug eines Menschen beginnt immer ohne Sperre, „Zug beenden" wirkt nur im eigenen Zug, Fehler im Zugablauf stehen im Protokoll statt den Ablauf anzuhalten, dieselbe KI zieht nach einem Neuladen nicht noch einmal. **Eisenbahn durch Kontrollzonen** (gemeldet): wer eine Kontrollzone betritt, hält für den Rest des Zuges an – auch auf der Eisenbahn; Einblendung beim Anhalten, Grund am gesperrten Knopf | Fehler |
 | v81 | **Regelbogen:** Abschnitte „Bewegung, Straßen und Eisenbahn" (Bewegungspunkte, Bau und Preise, Kosten je Schritt, Handelsrouten) und „Kontrollzone (Schießpulver)" – Wortlaut vom Autor freigegeben, deutsch und englisch; `test.js` prüft jede Aussage an der Regelmaschine | Oberfläche |
+| v82 | **Kosten am Knopf: was tatsächlich abgeht** (Gründen für 10 🌾 mit 8 im Vorrat: „8🌾 4🪙"), Einstellung „Kosten ohne Umtausch anzeigen" für die alte Anzeige. **Ein Techtree:** der frühere alternative ist der Standard, das Häkchen im Aufbau ist weg; der alte gilt nur noch im Tutorial und in Partien von vor v82 | Oberfläche + Regel |
 
 Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitte „KI (v77)",
 „KI-Stufen (v78)" und „Abwehr neu gewichtet (v79)" unten, ausführlich in `ANNAHMEN.md`) und
@@ -77,25 +78,25 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1236 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1237 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 416 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `ALT_TECH_COSTS`/`techBase` (alternativer Techtree), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 424 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1848 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 1870 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ki.js` | 1729 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
-| `js/ui.js` | 2296 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
-| `js/tutorial.js` | 678 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 5742 | **1483 Assertions**, `node test.js` |
-| `smoke.js` | 2992 | **132 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `js/ui.js` | 2332 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/tutorial.js` | 680 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
+| `test.js` | 5779 | **1493 Assertions**, `node test.js` |
+| `smoke.js` | 3099 | **135 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
-| `tools_ki.js` | 244 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI, nachgestellte Vorstöße samt Ausgaben vor/nach dem ersten Treffer (`node tools_ki.js duell 40 diff=david`, `… vorstoss 40 art=droh` …) |
+| `tools_ki.js` | 246 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI, nachgestellte Vorstöße samt Ausgaben vor/nach dem ersten Treffer (`node tools_ki.js duell 40 diff=david`, `… vorstoss 40 art=droh` …) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -118,6 +119,18 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **Kosten am Knopf (v82).** Jeder Kostenknopf zeigt, was tatsächlich abgeht (`costText` →
+  `costPaid`, dieselbe Rechnung wie `payAll`): fehlt Nahrung oder Wissenschaft, steht der
+  Rest in Münzen bzw. was sonst einspringt daneben – „8🌾 4🪙" statt „10🌾". Wird nichts
+  umgetauscht oder reicht es gar nicht, steht der Preis wie bisher. Im Technologiebogen nur
+  auf erforschbaren Kacheln; die Karte im Gründungsmodus zeigt den Preis (Vergleich der
+  Plätze). Einstellung „Kosten ohne Umtausch anzeigen" (`prefs.listPrice`, Schlüssel
+  `hochciv.prefs`) stellt die Anzeige bis v81 wieder her.
+- **Ein Techtree (v82).** Die Kosten des früheren alternativen Techtrees stehen in `TECHS`;
+  das Häkchen im Aufbau ist weg. Der alte Techtree (`OLD_TECH_COSTS`, `S.oldTree`) gilt nur
+  im Tutorial und in Partien, die vor v82 mit ihm begonnen wurden (`migrateState`); dort
+  nennen Weltblatt und Regelbogen ihn, im Tutorial nicht. `tools_ki.js … alterbaum` spielt
+  zum Vergleich im alten.
 - **KI (v77).** Dritte Sitzart im Aufbau (Mensch / KI / Bot), ab Werk sind die Gegner KI.
   Sie spielt nach den Regeln für Menschen – nur über die Aktionen der Regelmaschine, also
   ohne Möglichkeit zu schummeln –, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie,
@@ -635,10 +648,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1483 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1493 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (132 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (135 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -788,9 +801,17 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   `hexOpposite`; Test: jeder Plan steht nach `canFlank`). Wer die Gründungs- oder
   Flankenregel ändert, sieht dort, ob die KI nachziehen muss.
 - **Technologiekosten immer über `techBase(S, t)`, nie über `t.c`** (seit v70). `t.c` sind
-  die Standardkosten; im alternativen Techtree weichen sechs davon ab. Wer eine neue Stelle
-  baut, die Kosten zeigt, vergleicht oder sortiert, und dort `t.c` nimmt, zeigt im
-  alternativen Techtree falsche Zahlen – auffallen würde das nur dort.
+  seit v82 die Kosten des einzigen Techtrees; im alten (Tutorial und Partien von vor v82,
+  `S.oldTree`) weichen neun davon ab. Wer eine neue Stelle baut, die Kosten zeigt,
+  vergleicht oder sortiert, und dort `t.c` nimmt, zeigt im Tutorial falsche Zahlen.
+- **`S.oldTree` steht in jedem neuen Spielstand, auch als `false`** (seit v82). Daran
+  erkennt `migrateState` einen Spielstand von vor v82 (dort hieß der Schalter andersherum
+  `altTree`). Wer Spielstände anders lädt als über „Spiel fortsetzen" und „Spielstand
+  laden", ruft `migrateState` selbst – sonst läuft eine alte Partie im falschen Techtree.
+- **Kosten am Knopf über `costText(Preis, alterText, opts)`** (seit v82): rechnet mit
+  `costPaid`, also derselben Rechnung wie das Bezahlen. Wer einen neuen Knopf mit Kosten
+  baut, gibt dieselben `opts` mit wie die Zahlung (`payOpts` bei Armee und Macht: im
+  Bürgerkrieg zahlt Nahrung mit) – sonst zeigt der Knopf etwas anderes, als abgeht.
 - **`CIV_KEYS` (js/civs.js) ist EINE Liste, kein frisches Array je Aufruf.** Der Aufbau
   schreibt an mehreren Stellen in Schlüssellisten (Doppelungen auflösen, Auslosung); wer
   dort die gemeinsame Liste nimmt statt `CIV_KEYS.slice()`, verbiegt sie für die ganze
@@ -1207,6 +1228,17 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Angriffs- und Abwehrzüge sortiert die KI Armeen vorab nach Luftlinie aus (Bewegung +
    Reichweite + 4, sobald es Straßen gibt); weiter entfernte Armeen, die eine lange Bahn
    heranbrächte, erwägt sie nicht. Fremde Bedrohungen rechnet sie mit der echten Wegsuche.
+22. **Tutorial im alten Techtree (v82, Anweisung des Autors: „bis ich ein besseres
+   Tutorialspiel liefere").** Kommt das neue Übungsspiel, fällt `oldTree: true` in
+   `tutorialSetup` weg. `OLD_TECH_COSTS` und `migrateState` bleiben, solange es Partien von
+   vor v82 geben kann; das Beispiel aus dem Regelheft in `test.js` (Griechenland, Schrift
+   kostet 0) rechnet ebenfalls im alten Techtree.
+23. **Längster KI-Zug im neuen Techtree (v82, nicht angefasst).** Im Zeittest von `test.js`
+   läuft eine Partie zu viert jetzt bis Runde 10 (24 Städte, 22 Armeen); der längste Zug
+   dort braucht auf dem jetzigen Testrechner 1,7–2,7 s (Grenze deshalb 3 s statt 2 s; der
+   Rechner selbst ist gut 1,5× langsamer als bis v81). Profil dieses Zuges: Bewertung über
+   `kiRisk` gut ein Drittel, `income` ein Viertel, davon `tradeRoutes` 13 % – ein Merker
+   für Handelsrouten je Spielstand wäre der erste Ansatz.
 
 ## Arbeitsweise, die der Autor schätzt
 

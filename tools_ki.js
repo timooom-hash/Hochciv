@@ -24,7 +24,9 @@
         und greift nie an – was kostet die bloße Drohung?
 
    n ist die Zahl der Partien (bei „stufen" die Zahl der Paare). Die Partien sind aus ihren
-   Startwerten reproduzierbar: gleiche Befehlszeile, gleiche Zahlen.               */
+   Startwerten reproduzierbar: gleiche Befehlszeile, gleiche Zahlen.
+   alterbaum (v82): die Partien laufen im alten Techtree (bis v81 Standard, heute nur noch
+   im Tutorial) – zum Vergleich mit Messungen von vor v82.                          */
 const fs = require('fs'), vm = require('vm');
 for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js',
   'js/expansion.js', 'js/bots.js', 'js/ki.js'])
@@ -43,7 +45,7 @@ const CIVK = CIVS.map(c => c.k);
 function partie(players, seed, start) {
   const cfg = {
     seed, players, duel: players.length === 2, events: flag('events'), eventMode: 'hard',
-    wonders: flag('wonders'), startPlayer: start,
+    wonders: flag('wonders'), startPlayer: start, oldTree: flag('alterbaum'),
   };
   const plan = tilePlan(players.map(p => p.civ), seed);
   const setup = rollSetup(Object.assign({}, cfg));
@@ -169,7 +171,7 @@ if (modus === 'duell') {
     const players = [];
     for (let i = 0; i < NP; i++) players.push(kiSitz(CIVK[(g + i) % 4], stufe, g, i));
     const seed = 700 + g;
-    const cfg = { seed, players, duel: NP === 2, startPlayer: g % NP };
+    const cfg = { seed, players, duel: NP === 2, startPlayer: g % NP, oldTree: flag('alterbaum') };
     const plan = tilePlan(players.map(p => p.civ), seed);
     const setup = rollSetup(Object.assign({}, cfg));
     plan.seats.forEach(seat => kiPlaceSeat(plan, seat, players[seat.idx], setup));

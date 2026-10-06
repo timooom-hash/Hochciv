@@ -2510,11 +2510,11 @@ step('Drei Reiche spielen auf der Plättchenkarte', () => {
     throw new Error('das große Dreieck hat nicht 135 Felder');
   console.log('       ' + S.map.name + ' · ' + S.map.rows.length + ' × ' + S.map.rows[0].length);
 });
-/* ============================================ Alternativer Techtree (v70)
-   Ein Häkchen im Aufbau. Angehakt rücken sechs Technologien der Antike und seit v74 drei
-   der Forschung in der Industrialisierung auf ihrer Leiter um – und genau so muss der
-   Bogen sie zeigen: in Kostenreihenfolge, mit den neuen Kosten. Das gilt auch für den
-   Bogen der Legephase und den Regelbogen. Ohne Häkchen bleibt alles wie gehabt. */
+/* ============================================ Techtree (v82)
+   Der frühere „alternative Techtree" ist der einzige: Mathematik 1 … Schrift 4,
+   Bewässerung 1 … Landwirtschaft 5, Chemie 11, Biologie 12, Wiss. Methode 15. Keine Zeile
+   mehr im Aufbau. Der alte (bis v81 Standard) lebt nur im Tutorial weiter – und in
+   Partien, die vor v82 mit ihm begonnen wurden. */
 // Spalten des Bogens: je Zeitalter vier (Forschung, Produktion, Militär, Spezial)
 const bogenSpalte = i => [...$('ov-body').querySelectorAll('.techgrid .techcol')[i].querySelectorAll('.tech')]
   .map(b => [b.querySelector('b').textContent, b.querySelector('.c').textContent]);
@@ -2547,62 +2547,47 @@ const feldKaufen = () => {
   delete p.techs.kolonialismus; S.bought[pi] = [];
   return [preis, bezahlt];
 };
-const ALT_FO = ['mathematik', 'astronomie', 'philosophie', 'schrift'];
-const ALT_PR = ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'];
-// v74: Forschung/Industrialisierung – Spalte 8 im Bogen (Zeitalter 2 × 4 Felder + Forschung)
-const ALT_FO2 = ['chemie', 'biologie', 'elektrizitaet', 'wiss_methode'];
-const STD_FO2 = ['wiss_methode', 'chemie', 'elektrizitaet', 'biologie'];
+const NEU_FO = ['mathematik', 'astronomie', 'philosophie', 'schrift'];
+const NEU_PR = ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'];
+// Forschung/Industrialisierung – Spalte 8 im Bogen (Zeitalter 2 × 4 Felder + Forschung)
+const NEU_FO2 = ['chemie', 'biologie', 'elektrizitaet', 'wiss_methode'];
+const ALT_FO = ['schrift', 'mathematik', 'astronomie', 'philosophie'];
+const ALT_PR = ['landwirtschaft', 'fischerei', 'rad', 'keramik', 'bewaesserung'];
+const ALT_FO2 = ['wiss_methode', 'chemie', 'elektrizitaet', 'biologie'];
 const vierReiche = () => {
   $('setup-mode').querySelector('[data-mode=vier]').onclick();
   $('setup-map').value = '0'; $('setup-map').onchange();
   $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
   [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
 };
-step('Alternativer Techtree: Zeile im Aufbau, ab Werk ohne Häkchen', () => {
+// Bogen öffnen, ohne dass Münzen für Wissenschaft einspringen: dann steht auf jeder Kachel
+// genau der Preis (v82 zeigt sonst, was tatsächlich abgeht – das prüft ein eigener Schritt).
+const bogenMitWissenschaft = () => {
+  const S = G('S'), p = S.players[S.cur], merk = Object.assign({}, p.res);
+  p.res.sci = 999; $('a-tech').onclick(); p.res = merk;
+};
+step('Techtree (v82): keine Zeile mehr im Aufbau', () => {
   $('m-new').onclick();
   vierReiche();
-  if ($('setup-alttree-row').hidden) throw new Error('die Zeile fehlt im Aufbau');
-  if ($('setup-alttree').checked) throw new Error('ab Werk angehakt');
-  if (!$('setup-alttree-hint').hidden) throw new Error('Hinweis ohne Häkchen sichtbar');
-  $('setup-alttree').checked = true; $('setup-alttree').onchange();
-  const hint = $('setup-alttree-hint');
-  if (hint.hidden) throw new Error('angehakt erscheint kein Hinweis');
-  for (const s of ['Mathematik 1', 'Astronomie 2', 'Philosophie 3', 'Schrift 4', 'Bewässerung 1', 'Landwirtschaft 5',
-    'Chemie 11', 'Biologie 12', 'Wissenschaftliche Methode 15'])
-    if (!hint.textContent.includes(s)) throw new Error('Hinweis nennt nicht „' + s + '": ' + hint.textContent);
-  // Der alternative Techtree unterscheidet sich nur in den Forschungskosten (v72)
-  if (/Kolonialismus|Kundschafterei/.test(hint.textContent)) throw new Error('Hinweis nennt mehr als Kosten: ' + hint.textContent);
-  console.log('       ' + hint.textContent);
+  if ($('setup-alttree-row') || $('setup-alttree')) throw new Error('die Zeile „Alternativer Techtree" steht noch im Aufbau');
+  if (/Techtree/i.test($('screen-setup').textContent)) throw new Error('der Aufbau nennt noch einen Techtree');
 });
-step('Alternativer Techtree: Zeile und Hinweis auf Englisch', () => {
-  G('switchLang')('en');                   // setupScreen läuft neu, der Hinweis mit
-  const zeile = $('setup-alttree-row').textContent.trim();
-  const hint = $('setup-alttree-hint').textContent;
-  const mathe = G('TECH_BY_KEY').mathematik.n;
-  G('switchLang')('de');
-  if (zeile !== 'Alternative tech tree') throw new Error('Zeile: ' + zeile);
-  if (!hint.startsWith('Different costs: ' + mathe + ' 1')) throw new Error('Hinweis: ' + hint);
-  if (/Colonialism|Scouting/.test(hint)) throw new Error('englischer Hinweis nennt mehr als Kosten: ' + hint);
-  if (!$('setup-alttree').checked) throw new Error('der Sprachwechsel nimmt das Häkchen weg');
-  console.log('       ' + zeile + ' · ' + hint);
-});
-step('Alternativer Techtree: der Bogen zeigt die Leitern nach den neuen Kosten', () => {
+step('Techtree: der Bogen zeigt die Leitern nach den Kosten des (einzigen) Techtrees', () => {
   $('setup-go').onclick();
   const S = G('S');
-  if (!S.altTree) throw new Error('der Schalter kommt nicht in der Partie an');
-  $('a-tech').onclick();
+  if (S.oldTree !== false || 'altTree' in S) throw new Error('neue Partie: oldTree ' + S.oldTree + ', altTree ' + S.altTree);
+  bogenMitWissenschaft();
   const fo = bogenSpalte(0), pr = bogenSpalte(1);
-  if (fo.map(x => x[0]).join(', ') !== techNamen(ALT_FO)) throw new Error('Forschung/Antike: ' + fo.map(x => x.join(' ')).join(', '));
-  if (pr.map(x => x[0]).join(', ') !== techNamen(ALT_PR)) throw new Error('Produktion/Antike: ' + pr.map(x => x.join(' ')).join(', '));
+  if (fo.map(x => x[0]).join(', ') !== techNamen(NEU_FO)) throw new Error('Forschung/Antike: ' + fo.map(x => x.join(' ')).join(', '));
+  if (pr.map(x => x[0]).join(', ') !== techNamen(NEU_PR)) throw new Error('Produktion/Antike: ' + pr.map(x => x.join(' ')).join(', '));
   // Auf der Kachel steht, was die Regelmaschine verlangt – und es steigt die Leiter hinauf
   const pi = S.cur;
   const soll = G('techsIn')(0, 0, S).map(t => String(G('techCost')(S, pi, t))).join();
   if (fo.map(x => x[1]).join() !== soll) throw new Error('Kachelkosten ' + fo.map(x => x[1]) + ' ≠ Rechnung ' + soll);
-  // v74: Forschung/Industrialisierung in der neuen Reihenfolge, mit den Kosten der Regelmaschine
   const fo2 = bogenSpalte(8);
-  if (fo2.map(x => x[0]).join(', ') !== techNamen(ALT_FO2))
+  if (fo2.map(x => x[0]).join(', ') !== techNamen(NEU_FO2))
     throw new Error('Forschung/Industrialisierung: ' + fo2.map(x => x.join(' ')).join(', '));
-  const soll2 = ALT_FO2.map(k => String(G('techCost')(S, pi, G('TECH_BY_KEY')[k]))).join();
+  const soll2 = NEU_FO2.map(k => String(G('techCost')(S, pi, G('TECH_BY_KEY')[k]))).join();
   if (fo2.map(x => x[1]).join() !== soll2) throw new Error('Kachelkosten ' + fo2.map(x => x[1]) + ' ≠ Rechnung ' + soll2);
   for (let s = 0; s < 16; s++) {
     const k = bogenSpalte(s).map(x => +x[1]).filter(n => !isNaN(n));
@@ -2616,12 +2601,12 @@ step('Alternativer Techtree: der Bogen zeigt die Leitern nach den neuen Kosten',
   console.log('       Produktion: ' + pr.map(x => x.join(' ')).join(', '));
   console.log('       Forschung/Industrialisierung: ' + fo2.map(x => x.join(' ')).join(', '));
 });
-step('Alternativer Techtree: Feld kaufen kostet im Aktionsblatt 3 Münzen', () => {
+step('Techtree: Feld kaufen kostet im Aktionsblatt 3 Münzen', () => {
   const [preis, bezahlt] = feldKaufen();
   if (preis !== '3🪙' || bezahlt !== 3) throw new Error(`Knopf ${preis}, bezahlt ${bezahlt}`);
   console.log('       Knopf ' + preis + ', abgebucht ' + bezahlt);
 });
-step('Alternativer Techtree: Regelbogen, Weltblatt und Protokoll nennen ihn', () => {
+step('Techtree: Regelbogen mit den Kosten, kein Hinweis auf einen anderen Techtree', () => {
   G('rulesModal')();
   const zeilen = [...$('ov-body').querySelectorAll('.rule-tech')]
     .map(d => [d.querySelector('b').textContent, d.querySelector('.c').textContent]);
@@ -2631,34 +2616,33 @@ step('Alternativer Techtree: Regelbogen, Weltblatt und Protokoll nennen ihn', ()
   if (kosten !== '4,1,5,1') throw new Error('Regelbogen zeigt ' + kosten);
   if (reihe.indexOf(K.mathematik.n) > reihe.indexOf(K.schrift.n)) throw new Error('Regelbogen: Schrift vor Mathematik');
   if (reihe.indexOf(K.bewaesserung.n) > reihe.indexOf(K.landwirtschaft.n)) throw new Error('Regelbogen: Landwirtschaft vor Bewässerung');
-  // v74: die drei der Industrialisierung mit ihren neuen Kosten und in dieser Reihenfolge
   const kosten2 = ['wiss_methode', 'chemie', 'biologie']
     .map(k => (zeilen.find(z => z[0] === K[k].n) || [])[1]).join();
   if (kosten2 !== '15,11,12') throw new Error('Regelbogen zeigt für Wiss. Methode/Chemie/Biologie ' + kosten2);
-  const pos = ALT_FO2.map(k => reihe.indexOf(K[k].n));
+  const pos = NEU_FO2.map(k => reihe.indexOf(K[k].n));
   if (pos.some((x, i) => x < 0 || (i && x < pos[i - 1]))) throw new Error('Regelbogen: Industrialisierung nicht nach Kosten');
-  if (!/alternative Techtree/.test($('ov-body').textContent)) throw new Error('kein Hinweis im Regelbogen');
+  if (/Techtree/.test($('ov-body').textContent)) throw new Error('Regelbogen nennt einen Techtree');
   G('closeModal')();
   $('a-info').onclick();
-  if (!/Alternativer Techtree · Mathematik 1/.test($('ov-body').textContent))
-    throw new Error('Weltblatt nennt den Techtree nicht');
+  if (/Techtree/.test($('ov-body').textContent)) throw new Error('Weltblatt nennt einen Techtree');
   G('closeModal')();
-  if (!/Alternativer Techtree/.test(G('S').log[0].m)) throw new Error('Protokollkopf: ' + G('S').log[0].m);
+  if (/Techtree/.test(G('S').log[0].m)) throw new Error('Protokollkopf: ' + G('S').log[0].m);
   console.log('       Regelbogen Schrift/Mathematik/Landwirtschaft/Bewässerung: ' + kosten +
     ' · Wiss. Methode/Chemie/Biologie: ' + kosten2);
 });
-step('Alternativer Techtree: „Nochmal spielen" behält ihn, alte Rezepte nicht', () => {
+step('Techtree: „Nochmal spielen" – auch ein Rezept aus v70–v81 mit altTree gibt den heutigen', () => {
   const rec = G('S').recipe;
-  if (!rec || rec.altTree !== true) throw new Error('das Rezept kennt den Schalter nicht');
+  if (!rec || 'altTree' in rec) throw new Error('das Rezept trägt noch einen Schalter');
   G('startFromRecipe')(rec);
-  if (!G('S').altTree) throw new Error('die neue Partie läuft im Standard');
-  const alt = JSON.parse(JSON.stringify(rec)); delete alt.altTree;       // Rezept aus v69
-  G('startFromRecipe')(alt);
-  if (G('S').altTree) throw new Error('ein altes Rezept schaltet den alternativen Techtree ein');
+  if (G('S').oldTree !== false) throw new Error('die neue Partie läuft im alten Techtree');
+  for (const schalter of [false, true]) {
+    const alt = JSON.parse(JSON.stringify(rec)); alt.altTree = schalter;       // Rezept aus v70–v81
+    G('startFromRecipe')(alt);
+    if (G('S').oldTree !== false) throw new Error('Rezept mit altTree ' + schalter + ': alter Techtree');
+  }
 });
-step('Alternativer Techtree: auch der Bogen in der Legephase – und die Partie danach', () => {
+step('Techtree: auch der Bogen in der Legephase – und die Partie danach', () => {
   $('m-new').onclick();
-  if (!$('setup-alttree').checked) throw new Error('das Häkchen geht beim Wiederöffnen verloren');
   $('setup-mode').querySelector('[data-mode=duell]').onclick();       // Duell: immer Plättchen
   $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
   $('setup-list').children[1].querySelector('[data-kind="bot"]').onclick();
@@ -2666,42 +2650,165 @@ step('Alternativer Techtree: auch der Bogen in der Legephase – und die Partie 
   if (!$('screen-place').classList.contains('show')) throw new Error('keine Legephase');
   $('pl-tech').onclick();
   const fo = bogenSpalte(0).map(x => x[0]).join(', ');
-  if (fo !== techNamen(ALT_FO)) throw new Error('Legephase: ' + fo);
+  if (fo !== techNamen(NEU_FO)) throw new Error('Legephase: ' + fo);
   const fo2 = bogenSpalte(8).map(x => x[0]).join(', ');
-  if (fo2 !== techNamen(ALT_FO2)) throw new Error('Legephase, Industrialisierung: ' + fo2);
+  if (fo2 !== techNamen(NEU_FO2)) throw new Error('Legephase, Industrialisierung: ' + fo2);
   G('closeModal')();
   const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
   const gut = frei.indexOf(true);
   G('plTap')(rcs[gut][0], rcs[gut][1]);
   G('placeConfirm')(); G('placeConfirm')();
   if (!$('screen-game').classList.contains('show')) throw new Error('das Spiel beginnt nicht');
-  if (!G('S').altTree) throw new Error('nach dem Legen läuft die Partie im Standard');
+  if (G('S').oldTree !== false) throw new Error('nach dem Legen läuft die Partie im alten Techtree');
   console.log('       Legephase: ' + fo);
 });
-step('Alternativer Techtree: ohne Häkchen wieder der Standard', () => {
+step('Alter Techtree: eine Partie von v81 läuft mit ihm weiter – Bogen, Regelbogen und Weltblatt sagen es', () => {
   $('m-new').onclick();
-  $('setup-alttree').checked = false; $('setup-alttree').onchange();
-  if (!$('setup-alttree-hint').hidden) throw new Error('Hinweis bleibt nach dem Abhaken');
   vierReiche();
   $('setup-go').onclick();
-  if (G('S').altTree) throw new Error('die Partie läuft trotzdem im alternativen Techtree');
-  $('a-tech').onclick();
-  const fo = bogenSpalte(0).map(x => x[0]).join(', ');
-  const pr = bogenSpalte(1).map(x => x[0]).join(', ');
+  // Spielstand wie aus v81 im damaligen Standard: kein oldTree, altTree false
+  const v81 = JSON.parse(JSON.stringify(G('S')));
+  delete v81.oldTree; v81.altTree = false;
+  G('store')('hochciv.save', v81);
+  G('show')('screen-menu');
+  $('m-continue').onclick();
+  const S = G('S');
+  if (S.oldTree !== true || 'altTree' in S) throw new Error('geladen: oldTree ' + S.oldTree + ', altTree ' + S.altTree);
+  bogenMitWissenschaft();
+  const fo = bogenSpalte(0).map(x => x[0]).join(', '), pr = bogenSpalte(1).map(x => x[0]).join(', ');
   const fo2 = bogenSpalte(8).map(x => x[0]).join(', ');
-  const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
   G('closeModal')();
-  if (ko !== 'Für 3 Münzen Feld kaufen' || ku !== 'Tech kopieren (2× Kosten in Münzen)')
-    throw new Error('Standard: ' + ko + ' · ' + ku);
-  const [preis, bezahlt] = feldKaufen();
-  if (preis !== '3🪙' || bezahlt !== 3) throw new Error(`Standard: Knopf ${preis}, bezahlt ${bezahlt}`);
-  if (fo !== techNamen(['schrift', 'mathematik', 'astronomie', 'philosophie'])) throw new Error('Forschung: ' + fo);
-  if (pr !== techNamen(['landwirtschaft', 'fischerei', 'rad', 'keramik', 'bewaesserung'])) throw new Error('Produktion: ' + pr);
-  if (fo2 !== techNamen(STD_FO2)) throw new Error('Forschung/Industrialisierung: ' + fo2);
+  if (fo !== techNamen(ALT_FO) || pr !== techNamen(ALT_PR) || fo2 !== techNamen(ALT_FO2))
+    throw new Error('Bogen: ' + [fo, pr, fo2].join(' | '));
   G('rulesModal')();
-  if (/alternative Techtree/.test($('ov-body').textContent)) throw new Error('Regelbogen meldet ihn im Standard');
+  const regeln = $('ov-body').textContent;
   G('closeModal')();
+  if (!/noch der alte Techtree/.test(regeln)) throw new Error('kein Hinweis im Regelbogen');
+  $('a-info').onclick();
+  const welt = $('ov-body').textContent;
+  G('closeModal')();
+  if (!/Alter Techtree · Schrift 1, Mathematik 2/.test(welt)) throw new Error('Weltblatt nennt ihn nicht');
+  // auf Englisch ebenso
+  G('switchLang')('en');
+  $('a-info').onclick();
+  const weltEn = $('ov-body').textContent;
+  G('closeModal')();
+  G('switchLang')('de');
+  if (!/Old tech tree · /.test(weltEn)) throw new Error('englisches Weltblatt: ' + weltEn.slice(0, 120));
   console.log('       Forschung: ' + fo);
+});
+step('Alter Techtree: das Tutorial läuft mit ihm – ohne Hinweis für Neulinge', () => {
+  G('tutorialStart')();
+  const S = G('S');
+  if (S.oldTree !== true) throw new Error('Tutorial im neuen Techtree');
+  bogenMitWissenschaft();
+  const fo = bogenSpalte(0).map(x => x[0]).join(', ');
+  G('closeModal')();
+  if (fo !== techNamen(ALT_FO)) throw new Error('Tutorial-Bogen: ' + fo);
+  G('rulesModal')();
+  const regeln = $('ov-body').textContent;
+  G('closeModal')();
+  if (/Techtree/.test(regeln)) throw new Error('der Regelbogen erwähnt im Tutorial einen Techtree');
+  G('tutorialQuit')();
+  console.log('       Tutorial: ' + fo);
+});
+
+/* ============================================ Kosten am Knopf (v82)
+   Ab Werk zeigen die Knöpfe, was tatsächlich abgeht: Gründen für 10 Nahrung mit 8 im
+   Vorrat zeigt „8🌾 4🪙". In den Einstellungen („Kosten ohne Umtausch anzeigen") wieder
+   nur der Preis. Reicht es nicht oder wird nichts umgetauscht, steht der Preis da. */
+step('Kosten (v82): das Beispiel des Autors – 10 Nahrung mit 8 im Vorrat zeigt 8🌾 4🪙', () => {
+  $('m-new').onclick(); vierReiche(); $('setup-go').onclick();
+  const S = G('S'), p = S.players[S.cur], kt = G('costText');
+  if (G('prefs').listPrice) throw new Error('ab Werk ist „Kosten ohne Umtausch" angehakt');
+  p.res = { sci: 0, food: 8, coins: 10 };
+  const fall = [
+    [kt({ food: 10 }, '10🌾'), '8🌾 4🪙', 'Beispiel des Autors'],
+    [kt({ food: 8 }, '8🌾'), '8🌾', 'genug Nahrung: der Preis'],
+    [kt({ food: 13 }, '13🌾'), '8🌾 10🪙', 'alle Münzen'],
+    [kt({ food: 14 }, '14🌾'), '14🌾', 'reicht nicht: der Preis'],
+    [kt({ food: 2, coins: 3 }, '2🌾 3🪙'), '2🌾 3🪙', 'Wachstum ohne Umtausch'],
+  ];
+  p.res = { sci: 0, food: 1, coins: 10 };
+  fall.push([kt({ food: 2, coins: 3 }, '2🌾 3🪙'), '1🌾 5🪙', 'Wachstum: fehlende Nahrung in Münzen, dazu die Münzkosten']);
+  p.res = { sci: 1, food: 0, coins: 10 };
+  fall.push([kt({ sci: 3 }, '3'), '1🔬 4🪙', 'Forschung: fehlende Wissenschaft in Münzen']);
+  const falsch = fall.filter(([ist, soll]) => ist !== soll);
+  if (falsch.length) throw new Error(falsch.map(([ist, soll, was]) => `${was}: „${ist}" statt „${soll}"`).join(' · '));
+  // Die Anzeige ist dieselbe Rechnung wie das Bezahlen – und lässt den Vorrat in Ruhe
+  p.res = { sci: 0, food: 8, coins: 10 };
+  const bez = G('costPaid')(S, S.cur, { food: 10 });
+  if (JSON.stringify(p.res) !== JSON.stringify({ sci: 0, food: 8, coins: 10 })) throw new Error('die Vorschau hat bezahlt');
+  G('pay')(S, S.cur, 'food', 10);
+  if (p.res.food !== 8 - bez.food || p.res.coins !== 10 - bez.coins) throw new Error('Bezahlen weicht von der Anzeige ab');
+  // Einstellung: wieder nur der Preis
+  G('prefs').listPrice = true;
+  p.res = { sci: 0, food: 8, coins: 10 };
+  const alt = kt({ food: 10 }, '10🌾');
+  G('prefs').listPrice = false;
+  if (alt !== '10🌾') throw new Error('mit „Kosten ohne Umtausch": ' + alt);
+  console.log('       ' + fall.map(([ist, , was]) => was.split(':')[0] + ' ' + ist).join(' · '));
+});
+step('Kosten: Gründungsblatt, Karte, Bogen und Stadtblatt zeigen, was abgeht', () => {
+  const S = G('S'), pi = S.cur, p = S.players[pi], cap = G('capitalOf')(S, pi);
+  // Ein Platz, der mehr Nahrung kostet als da ist, aber mit Münzen bezahlbar bleibt
+  p.res = { sci: 0, food: 2, coins: 60 };
+  const plaetze = G('within')(cap.r, cap.c, 7).filter(([r, c]) => !G('foundSiteError')(S, pi, r, c));
+  const ziel = plaetze.find(([r, c]) => G('foundCost')(S, pi, r, c) > 2);
+  if (!ziel) throw new Error('kein Platz, der mehr als 2 Nahrung kostet');
+  const kosten = G('foundCost')(S, pi, ziel[0], ziel[1]);
+  const soll = `2🌾 ${(kosten - 2) * 2}🪙`;
+  $('a-found').onclick();
+  // Die Karte bleibt beim Preis – sie dient dem Vergleich der Plätze
+  const mark = $('map').querySelector(`[data-rc="${ziel[0]}/${ziel[1]}"][data-found]`);
+  if (mark.getAttribute('data-found') !== 'ja' || mark.nextSibling.textContent !== String(kosten))
+    throw new Error('Karte: ' + mark.getAttribute('data-found') + ' ' + mark.nextSibling.textContent + ' statt ja ' + kosten);
+  G('tapHex')(ziel[0], ziel[1]);
+  const knopf = $('sheet-body').querySelector('[data-label="Hier gründen"]');
+  if (knopf.querySelector('.cost').textContent !== soll) throw new Error('Gründungsblatt: ' + knopf.querySelector('.cost').textContent + ' statt ' + soll);
+  // Mit der Einstellung: der Preis am Knopf
+  G('prefs').listPrice = true;
+  G('tapHex')(ziel[0], ziel[1]);
+  const alt = $('sheet-body').querySelector('[data-label="Hier gründen"] .cost').textContent;
+  G('prefs').listPrice = false;
+  if (alt !== kosten + '🌾') throw new Error('ohne Umtausch: ' + alt);
+  G('closeSheet')(); $('a-found').onclick();
+  // Bogen: eine verfügbare Technologie, die mehr kostet als die Wissenschaft im Vorrat
+  p.res = { sci: 1, food: 0, coins: 60 };
+  const t = G('researchable')(S, pi).find(x => x.k !== 'singularitaet' && G('techCost')(S, pi, x) > 1);
+  if (!t) throw new Error('keine passende Technologie verfügbar');
+  const tk = G('techCost')(S, pi, t);
+  $('a-tech').onclick();
+  const kachel = [...$('ov-body').querySelectorAll('.techgrid .tech')].find(b => b.querySelector('b').textContent === t.n);
+  const tsoll = `1🔬 ${(tk - 1) * 2}🪙`;
+  if (kachel.querySelector('.c').textContent !== tsoll) throw new Error('Bogen: ' + kachel.querySelector('.c').textContent + ' statt ' + tsoll);
+  // nicht verfügbare Kacheln behalten den Preis – dort wäre die Rechnung hypothetisch
+  const gesperrt = [...$('ov-body').querySelectorAll('.techgrid .tech.locked .c')].map(x => x.textContent);
+  if (!gesperrt.length || gesperrt.some(x => !/^\d+$/.test(x))) throw new Error('gesperrte Kacheln: ' + gesperrt.slice(0, 5).join(', '));
+  G('closeModal')();
+  // Stadtblatt: Wachstum mit zu wenig Nahrung
+  p.res = { sci: 0, food: 0, coins: 60 };
+  const preis = G('growPrice')(S, pi, cap);
+  G('tapHex')(cap.r, cap.c);
+  const wachsen = $('sheet-body').querySelector('[data-label="Bevölkerung wachsen"] .cost').textContent;
+  const wsoll = preis.food ? `${preis.food * 2 + preis.coins}🪙` : `${preis.coins}🪙`;
+  G('closeSheet')();
+  if (!wachsen.endsWith(wsoll) || /🌾/.test(wachsen)) throw new Error('Wachsen: ' + wachsen + ' statt ' + wsoll);
+  console.log(`       Gründen ${kosten}🌾 → ${soll} · ${t.n} ${tk} → ${tsoll} · Wachsen ${preis.food}🌾 ${preis.coins}🪙 → ${wachsen}`);
+});
+step('Kosten: die Einstellung „Kosten ohne Umtausch anzeigen" – ab Werk aus, gemerkt', () => {
+  G('show')('screen-options'); G('optionsScreen')();
+  const box = $('opt-listprice');
+  if (!box || box.checked) throw new Error('Häkchen fehlt oder ist ab Werk gesetzt');
+  box.checked = true; box.onchange();
+  if (!G('prefs').listPrice || !(G('load')('hochciv.prefs') || {}).listPrice) throw new Error('nicht gemerkt');
+  box.checked = false; box.onchange();
+  if (G('prefs').listPrice || (G('load')('hochciv.prefs') || {}).listPrice) throw new Error('Abhaken nicht gemerkt');
+  G('switchLang')('en');
+  const zeile = box.closest('label').textContent.trim();
+  G('switchLang')('de');
+  if (zeile !== 'Show costs without exchange') throw new Error('englisch: ' + zeile);
+  G('show')('screen-game');
 });
 
 step('Karteneditor zeigt Felder außerhalb der Karte', () => {

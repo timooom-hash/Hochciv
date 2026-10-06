@@ -52,6 +52,11 @@
       <input type="checkbox" id="opt-wonders"></label>
     <p class="hint">Städte können Weltwunder bauen, vier zusätzliche Technologien kommen
       in den Bogen. Ein Weltwunder der Stufe 3 gewinnt das Spiel.</p>
+    <label class="row"><span>Kosten ohne Umtausch anzeigen</span>
+      <input type="checkbox" id="opt-listprice"></label>
+    <p class="hint">Ab Werk steht an jedem Knopf, was du tatsächlich zahlst: fehlt Nahrung
+      oder Wissenschaft, zahlen Münzen den Rest – Gründen für 10 Nahrung mit 8 im Vorrat
+      zeigt 8 🌾 4 🪙. Angehakt steht dort wie früher nur der Preis selbst.</p>
   </div>
 </section>
 
@@ -85,9 +90,6 @@
       <select id="setup-evmode"></select></label>
     <label class="row" id="setup-wonders-row" hidden><span>Mit Weltwundern</span>
       <input type="checkbox" id="setup-wonders"></label>
-    <label class="row" id="setup-alttree-row"><span>Alternativer Techtree</span>
-      <input type="checkbox" id="setup-alttree"></label>
-    <p class="hint" id="setup-alttree-hint" hidden></p>
     <label class="row" id="setup-kilevel-row"><span>KI-Stufe (alle KI)</span>
       <select id="setup-kilevel"></select></label>
     <p class="hint" id="setup-ki-hint">Die KI spielt nach denselben Regeln wie ein Mensch:

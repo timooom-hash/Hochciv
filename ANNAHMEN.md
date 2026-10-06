@@ -3293,3 +3293,91 @@ Burgstädte nur mit Schießpulver, eigene Zone, Luftwaffe). `smoke.js` öffnet d
 Deutsch und Englisch: beide Abschnitte an ihrem Platz, die Handelsrouten genau einmal, auf
 Englisch kein Satz ohne Übersetzung.
 
+## Kosten am Knopf: was tatsächlich abgeht · ein Techtree (v82)
+
+**Anweisung des Autors (5.10.):** Kosten so anzeigen, wie sie tatsächlich anfallen – Gründen
+für 10 Nahrung mit nur 8 Nahrung im Vorrat zeigt 8 Nahrung und 4 Münzen. Das ist die neue
+Vorgabe; die alte Anzeige bleibt als Häkchen in den Einstellungen. Außerdem: der
+alternative Techtree wird der Standard, der alte und das Häkchen im Aufbau fallen weg – nur
+das Tutorial behält den alten, bis der Autor ein besseres Übungsspiel liefert.
+
+### Kosten am Knopf
+
+* **Gerechnet von der Regelmaschine:** `costPaid(S, pi, Preis, opts)` (engine.js) bezahlt auf
+  Probe mit `payAll` und stellt alles wieder her – dieselbe Rechnung wie beim echten
+  Bezahlen, mit allen Kursen (Gilden, England, Alchemie, Computertechnik, Hungersnot,
+  Bürgerkrieg über `payOpts`). Die Oberfläche (`costText` in ui.js) formatiert nur: erst die
+  Arten des Preises, dann was einspringt – „8🌾 4🪙", „1🔬 4🪙", „1🌾 5🪙".
+* **Wo:** Gründungsblatt, Wachsen, Armee, Macht, Weltwunder (Stadt- und Wunderblatt),
+  Straße/Eisenbahn, Feld kaufen, Kopieren und die Kacheln im Technologiebogen.
+* **Wann der Preis stehen bleibt (Auslegung):** wenn nichts umgetauscht wird (dann sind
+  beide gleich – auch die Zahl ohne Zeichen im Bogen bleibt), wenn es gar nicht reicht
+  (dann ginge nichts ab; der Preis sagt, was fehlt), im Bogen auf Kacheln, die man gerade
+  nicht erforschen kann (dort wäre die Rechnung hypothetisch), und **auf der Karte im
+  Gründungsmodus** – sie dient dem Vergleich der Plätze, und mit wenig Nahrung stünde sonst
+  auf fast jedem Platz dieselbe Nahrungszahl. Erst probiert: Plätze, die teils in Münzen
+  bezahlt würden, mit einem Ring in Münzfarbe – in der Sichtprobe war das bei wenig Nahrung
+  fast jeder Platz, und die Kostenkreise verschwammen mit den Münzchips der Erträge.
+  Verworfen.
+* **Einstellung „Kosten ohne Umtausch anzeigen"** (Einstellungen im Hauptmenü, ab Werk aus,
+  `hochciv.prefs`): überall wieder genau der Text bis v81.
+* **Tutorial:** Die Aufgaben sind so gebaut, dass der Vorrat genau reicht – an den Knöpfen,
+  die das Tutorial verlangt, steht deshalb der Preis wie im Text (geprüft: der ganze
+  Durchlauf über die Oberfläche mitgeschrieben, keine Abweichung an einem Zielknopf). Andere
+  Kacheln im Bogen zeigen, was sie mit Münzen kosten würden, wie im Spiel.
+
+### Ein Techtree
+
+* Die Kosten des früheren alternativen Techtrees (v70/v74) stehen jetzt direkt in `TECHS`:
+  Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5 ·
+  Chemie 11, Biologie 12, Wissenschaftliche Methode 15. Die Liste behält ihre alte
+  Reihenfolge – wo Code sie der Reihe nach durchgeht, ändert sich so nichts.
+* Der alte Techtree heißt `OLD_TECH_COSTS`, eine Partie trägt ihn als `S.oldTree`.
+  `newGame` setzt den Schalter immer (auch `false`); nur das Tutorial setzt ihn auf `true`.
+* **Spielstände von vor v82** (Auslegung): eine laufende Partie behält ihren Techtree –
+  mitten im Spiel Kosten und Leitern zu tauschen, wäre unfair. `migrateState` übersetzt beim
+  Fortsetzen und beim Laden einer Datei: `altTree: true` → heutiger Standard, `false` oder
+  fehlend (vor v70) → alter Techtree. In solchen Partien nennen Weltblatt und Regelbogen den
+  alten Techtree; im Tutorial nicht (für Neulinge nur verwirrend).
+* „Nochmal spielen" startet immer im heutigen Techtree, auch nach einer alten Partie oder mit
+  einem Rezept, das noch `altTree` trägt.
+* Weg: Häkchen und Hinweis im Aufbau, `altTreeRow`, der Zusatz im Protokollkopf, vier
+  Übersetzungen.
+
+### Gemessen: die KI im neuen Techtree
+
+Die KI rechnet mit den Kosten der Regelmaschine, an ihr ist nichts geändert. Gegenprobe mit
+`tools_ki.js` (neu: Schalter `alterbaum`), gleiche Startwerte, beide Techtrees: Duell KI
+Schwer gegen David 28 bzw. 27 von 60 (heute bzw. alt), eine KI Schwer gegen drei David 11
+bzw. 12 von 90. Kein messbarer Unterschied.
+
+### Was sich in den Tests verschoben hat
+
+* Das Beispiel aus dem Regelheft (Griechenland: Schrift kostet 0, Biologie mit
+  Wissenschaftlicher Methode 6) rechnet mit den alten Kosten – es läuft jetzt im alten
+  Techtree. Die Abzüge auf die heutigen Kosten prüft der Block „Techtree".
+* KI, „Wissenschaft gehört der Forschung" (v79): Startwert 303 statt 300. Im heutigen
+  Techtree kommt die KI mit 300 nur zweimal mit Alchemie an die gemessene Stelle, beide Male
+  ohne Unterschied; mit 303 sechsmal (225 statt 188 Wissenschaft in die Forschung). Über die
+  Startwerte 300–307 zusammen: 393 statt 356 (heute), 1140 statt 928 (alter Techtree).
+* KI-Zeittest: Grenze 3 s statt 2 s. Der Testrechner ist seit dieser Sitzung langsamer
+  (dieselben Partien im alten Techtree: längster Zug 0,97 s statt 0,54–0,65 s), und im
+  heutigen Techtree läuft eine dieser Partien bis Runde 10 mit 24 Städten und 22 Armeen –
+  längster Zug dort 1,7–2,7 s (Übergabe, offener Punkt 23).
+
+### Abgesichert
+
+`test.js`: die neun Kosten in `TECHS` und in `OLD_TECH_COSTS`, Leitern beider Techtrees,
+alle übrigen Leitern gleich, keine Zeitaltergrenze überschritten, Kosten mit Griechenland und
+Wissenschaftlicher Methode, Forschen mit 3 bzw. 4 Wissenschaft, Kopierpreise (Spionage,
+Kundschafterei), Kolonialismus in beiden, Vorabwurf im Plättchenmodus, `migrateState` für
+Spielstände vor v70, aus v70–v81 (beide Schalterstellungen) und aus v82, das Tutorial im
+alten Techtree, je zehn Bot-Partien in beiden. `smoke.js`: keine Zeile mehr im Aufbau, Bogen
+und Regelbogen im heutigen Techtree, kein Hinweis auf einen anderen, „Nochmal spielen" auch
+aus alten Rezepten, Legephase, eine Partie aus v81 läuft im alten weiter (Bogen, Regelbogen,
+Weltblatt, auch englisch), das Tutorial im alten ohne Hinweis. Kosten: das Beispiel des
+Autors und weitere Fälle über `costText`, die Vorschau bezahlt nichts und stimmt mit dem
+Bezahlen überein, Gründungsblatt, Karte (Preis), Bogen (nur erforschbare Kacheln), Stadtblatt,
+die Einstellung (ab Werk aus, gemerkt, englisch). Sichtprobe in Chromium: Gründungsblatt,
+Bogen, Stadtblatt, Einstellungen.
+
