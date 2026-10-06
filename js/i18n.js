@@ -320,6 +320,9 @@ const UI_EN = {
   'Modul: Weltwunder': 'Module: wonders',
   'Städte können Weltwunder bauen, vier zusätzliche Technologien kommen in den Bogen. Ein Weltwunder der Stufe 3 gewinnt das Spiel.':
     'Cities can build wonders, and four extra technologies join the sheet. A level 3 wonder wins the game.',
+  'Kosten ohne Umtausch anzeigen': 'Show costs without exchange',
+  'Ab Werk steht an jedem Knopf, was du tatsächlich zahlst: fehlt Nahrung oder Wissenschaft, zahlen Münzen den Rest – Gründen für 10 Nahrung mit 8 im Vorrat zeigt 8 🌾 4 🪙. Angehakt steht dort wie früher nur der Preis selbst.':
+    'By default every button shows what you actually pay: if food or science runs short, coins pay the rest – founding for 10 food with 8 in stock shows 8 🌾 4 🪙. Ticked, it shows only the price itself, as before.',
 
   /* --- Aufbau */
   'Aufbau': 'Setup',
@@ -332,9 +335,8 @@ const UI_EN = {
   'Mit Ereignissen': 'With events',
   'Ereignisstärke': 'Event strength',
   'Mit Weltwundern': 'With wonders',
-  'Alternativer Techtree': 'Alternative tech tree',
-  'Andere Kosten: %s': 'Different costs: %s',
-  'In dieser Partie gilt der alternative Techtree.': 'This game uses the alternative tech tree.',
+  'Alter Techtree': 'Old tech tree',
+  'In dieser Partie gilt noch der alte Techtree.': 'This game still uses the old tech tree.',
   'Schwierigkeit (alle Bots)': 'Difficulty (all bots)',
   'Startspieler*in': 'Starting player',
   'Spiel beginnen': 'Start game',
@@ -390,7 +392,6 @@ const UI_EN = {
   ' und ': ' and ',
   ' · Mensch vor Bot': ' · human before bot',
   ' · Weltwunder': ' · wonders',
-  ' · Alternativer Techtree': ' · alternative tech tree',
   ' – Nahrung bleibt bei 0.': ' – food stays at 0.',
   ' – bei mehreren Ansprüchen geht der Sieg an den Menschen.': ' – with several claims the win goes to the human.',
   ' – die Bevölkerung kann aus Wissenschaft/Münzen versorgt werden.': ' – the population can be fed from science/coins.',

@@ -136,8 +136,9 @@ function newGame(cfg) {
     // Erweiterungen: Ereignisse und Weltwunder werden im Aufbau zugeschaltet
     ev: cfg.events ? { mode: cfg.eventMode === 'easy' ? 'easy' : 'hard' } : null,
     wo: !!cfg.wonders,
-    // Alternativer Techtree (v70): andere Grundkosten, siehe ALT_TECH_COSTS / techBase
-    altTree: !!cfg.altTree,
+    // Alter Techtree (bis v81 der Standard, seit v82 nur im Tutorial): OLD_TECH_COSTS / techBase.
+    // Steht immer im Spielstand – auch false –, daran erkennt migrateState neue Spielstände.
+    oldTree: !!cfg.oldTree,
     event: null, evNext: null, nukeBan: false,
     wonders: [], wpool: { 1: [], 2: [], 3: [] }, wgone: [],
     players: ordered.map(pc => ({
@@ -153,8 +154,7 @@ function newGame(cfg) {
   log(S, 'head', 'Neues Spiel — ' + (S.duel ? '1 gegen 1: ' : '') +
     S.players.map(p => civOf(p).n + kindTag(p)).join(', ') +
     ` · ${S.map.name}` +
-    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : '') +
-    (S.altTree ? T(' · Alternativer Techtree') : ''));
+    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : ''));
 
   /* Aufbau 3: Starttechnologien der Antike auswürfeln. Im Plättchenmodus ist das schon
      VOR der Legephase geschehen (rollSetup) – dann wird das Ergebnis übernommen, sonst
@@ -193,7 +193,7 @@ function newGame(cfg) {
 /* ------------------------------------------------------------ Technologien */
 function techCost(S, pi, tech) {
   const p = S.players[pi];
-  let c = techBase(S, tech);          // Grundkosten dieser Partie (alternativer Techtree)
+  let c = techBase(S, tech);          // Grundkosten dieser Partie (im Tutorial der alte Techtree)
   const age = tech.k === 'singularitaet' ? 4 : tech.age;
   if (tech.k === 'singularitaet' && kremlBuilt(S)) c += KREML_SURCHARGE;
   if (p.civ === 'griechenland' && isAbil(p, 'basis')) c -= (age + 1);   // 1/2/3/4/5 je Zeitalter
@@ -230,6 +230,17 @@ function rollAvailability(S, pi, field, age) {
    ja noch nicht, und für diese Würfe spielt sie keine Rolle. Das Ergebnis geht als
    cfg.avail / cfg.wpool in die echte Partie, damit dort nicht neu gewürfelt wird.
    Zurück kommt es NACH PLATZ, in der Reihenfolge von cfg.players. */
+/* Spielstände von vor v82 (gespeichert oder als Datei geladen). Bis v81 stand dort
+   S.altTree: true für den Techtree, der heute Standard ist, false oder gar nichts (vor v70)
+   für den alten. Eine laufende Partie behält ihren Techtree – mitten im Spiel die Kosten
+   und Leitern zu tauschen, wäre unfair. Neue Spielstände tragen S.oldTree immer (auch
+   false), deshalb ändert ein zweiter Aufruf nichts. */
+function migrateState(S) {
+  if (!S) return S;
+  if (S.oldTree === undefined) S.oldTree = !S.altTree;
+  delete S.altTree;
+  return S;
+}
 function rollSetup(cfg) {
   const probe = newGame(Object.assign({}, cfg, { map: cfg.map || DEFAULT_MAP }));
   const avail = [];
@@ -616,6 +627,17 @@ function affordAll(S, pi, cost, opts) {
   const ok = payAll(S, pi, cost, opts);
   p.res = backup;
   return ok;
+}
+/* Was eine Zahlung TATSÄCHLICH kostet (v82, für die Anzeige): payAll auf Probe, danach
+   steht alles wieder wie vorher. Zurück kommt, was von jedem Vorrat abginge – Gründen für
+   10 Nahrung mit 8 Nahrung im Vorrat: { food: 8, coins: 4, sci: 0 } –, oder null, wenn es
+   nicht reicht. Dieselbe Rechnung wie beim Bezahlen, also nie eine andere Antwort. */
+function costPaid(S, pi, cost, opts) {
+  const p = S.players[pi], backup = Object.assign({}, p.res);
+  const ok = payAll(S, pi, cost, opts);
+  const out = ok ? { sci: backup.sci - p.res.sci, food: backup.food - p.res.food, coins: backup.coins - p.res.coins } : null;
+  p.res = backup;
+  return out;
 }
 
 /* --------------------------------------------- Nahrungsgrenze und Städte füttern

@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v81';
+const APP_VERSION = 'v82';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -37,30 +37,37 @@ const CITY_YIELD = [1, -1, 1];
 
 /* ---------------------------------------------------------------- Technologien */
 // f = Feld, c = Kosten, e = Effekttext, k = Effekt-Schlüssel für die Engine
+/* Grundkosten (c) sind seit v82 die des früheren „alternativen Techtrees" (v70/v74,
+   Anweisung des Autors): Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 ·
+   Bewässerung 1, Landwirtschaft 5 · Chemie 11, Biologie 12, Wissenschaftliche Methode 15.
+   Die alten Werte gibt es nur noch im Tutorial (OLD_TECH_COSTS). Die Reihenfolge dieser
+   Liste ist bewusst die alte geblieben – die Leiter im Bogen kommt aus techsIn (nach
+   Kosten sortiert), und wo Code die Liste der Reihe nach durchgeht, bleibt so alles,
+   wie es war (auch im Tutorial). */
 const TECHS = [
   // Forschung
-  { k: 'schrift', n: 'Schrift', f: 0, c: 1, e: 'Je Bevölkerung: +1 Wissenschaft' },
-  { k: 'mathematik', n: 'Mathematik', f: 0, c: 2, e: 'Wald: +1 Wissenschaft' },
-  { k: 'astronomie', n: 'Astronomie', f: 0, c: 3, e: 'Meer: +1 Wissenschaft' },
-  { k: 'philosophie', n: 'Philosophie', f: 0, c: 4, e: '+1 beim Auswürfeln von Techverfügbarkeit' },
+  { k: 'schrift', n: 'Schrift', f: 0, c: 4, e: 'Je Bevölkerung: +1 Wissenschaft' },
+  { k: 'mathematik', n: 'Mathematik', f: 0, c: 1, e: 'Wald: +1 Wissenschaft' },
+  { k: 'astronomie', n: 'Astronomie', f: 0, c: 2, e: 'Meer: +1 Wissenschaft' },
+  { k: 'philosophie', n: 'Philosophie', f: 0, c: 3, e: '+1 beim Auswürfeln von Techverfügbarkeit' },
   { k: 'papier', n: 'Papier', f: 0, c: 6, e: 'Grasland: +1 Wissenschaft' },
   { k: 'alchemie', n: 'Alchemie', f: 0, c: 8, e: '1:1 Wissenschaft → Münzen' },
   { k: 'buchdruck', n: 'Buchdruck', f: 0, c: 9, e: 'Fluss: +1 Wissenschaft' },
   { k: 'universitaet', n: 'Universitätswesen', f: 0, c: 10, e: 'Je Bevölkerung: +1 Wissenschaft' },
-  { k: 'wiss_methode', n: 'Wissenschaftliche Methode', f: 0, c: 11, e: 'Techkosten −2/−4/−6/−8/−10 (je Zeitalter)' },
-  { k: 'chemie', n: 'Chemie', f: 0, c: 12, e: 'Gebirge: +1 Wissenschaft' },
+  { k: 'wiss_methode', n: 'Wissenschaftliche Methode', f: 0, c: 15, e: 'Techkosten −2/−4/−6/−8/−10 (je Zeitalter)' },
+  { k: 'chemie', n: 'Chemie', f: 0, c: 11, e: 'Gebirge: +1 Wissenschaft' },
   { k: 'elektrizitaet', n: 'Elektrizität', f: 0, c: 13, e: 'Wald: +1 Wissenschaft' },
-  { k: 'biologie', n: 'Biologie', f: 0, c: 15, e: 'Grasland: +1 Wissenschaft' },
+  { k: 'biologie', n: 'Biologie', f: 0, c: 12, e: 'Grasland: +1 Wissenschaft' },
   { k: 'computertechnik', n: 'Computertechnik', f: 0, c: 17, e: '1:1 Münzen → Wissenschaft' },
   { k: 'gentechnik', n: 'Gentechnik', f: 0, c: 18, e: 'Je vier Wissenschaft eine Nahrung; füttert auch 1:1' },
   { k: 'raumfahrt', n: 'Raumfahrt', f: 0, c: 19, wo: true, e: 'Bei jedem Wunderbau eine Technologie gratis' },
   { k: 'ki', n: 'Künstliche Intelligenz', f: 0, c: 20, e: 'Wald: +1 Wissenschaft' },
   // Produktion
-  { k: 'landwirtschaft', n: 'Landwirtschaft', f: 1, c: 1, e: 'Grasland: +1 Nahrung' },
+  { k: 'landwirtschaft', n: 'Landwirtschaft', f: 1, c: 5, e: 'Grasland: +1 Nahrung' },
   { k: 'fischerei', n: 'Fischerei', f: 1, c: 2, e: 'Meer: +1 Nahrung' },
   { k: 'rad', n: 'Rad', f: 1, c: 3, e: 'Straßen' },
   { k: 'keramik', n: 'Keramik', f: 1, c: 4, e: 'Bevölkerung 2× pro Runde wachsen lassen' },
-  { k: 'bewaesserung', n: 'Bewässerung', f: 1, c: 5, e: 'Gebirge: +1 Nahrung' },
+  { k: 'bewaesserung', n: 'Bewässerung', f: 1, c: 1, e: 'Gebirge: +1 Nahrung' },
   { k: 'segeln', n: 'Segeln', f: 1, c: 7, e: 'Meer: +1 Nahrung' },
   { k: 'muehlentechnik', n: 'Mühlentechnik', f: 1, c: 8, e: 'Fluss: +1 Münze' },
   { k: 'baukraene', n: 'Baukräne', f: 1, c: 9, wo: true, e: 'Weltwunder kosten 2/4/6/8/… weniger' },
@@ -143,27 +150,28 @@ const SINGULARITY = {
   k: 'singularitaet', n: 'Singularität', c: SINGULARITY_BASE,
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
 };
-/* Alternativer Techtree (v70, Anweisung des Autors): im Aufbau je Partie zuschaltbar,
-   steht dann als S.altTree im Spielstand. Andere Grundkosten für neun Technologien: sechs
-   der Antike (v70) und drei der Forschung in der Industrialisierung (v74) – sie rücken
-   damit auf der Leiter ihres Feldes um. Alles andere bleibt: Wirkung, Feld und Zeitalter.
-   Das Zeitalter kommt weiter aus den Standardkosten (t.age); ein Test hält fest, dass
-   keiner dieser Werte die Zeitaltergrenze überschreitet. */
-const ALT_TECH_COSTS = {
-  mathematik: 1, astronomie: 2, philosophie: 3, schrift: 4,     // Forschung, Antike
-  chemie: 11, biologie: 12, wiss_methode: 15,                   // Forschung, Industrialisierung (v74)
-  bewaesserung: 1, landwirtschaft: 5,                           // Produktion, Antike
+/* Der alte Techtree (bis v81 der Standard) – seit v82 nur noch im Tutorial (Anweisung des
+   Autors: „bis ich ein besseres Tutorialspiel liefere"). Er unterscheidet sich vom
+   heutigen nur in den Grundkosten dieser neun Technologien; Wirkung, Feld und Zeitalter
+   sind gleich. Eine Partie trägt ihn als S.oldTree. Bis v81 hieß der Schalter andersherum
+   S.altTree (der heutige Standard war zuschaltbar) – migrateState übersetzt alte
+   Spielstände, eine laufende Partie behält ihren Techtree. Ein Test hält fest, dass keiner
+   dieser Werte die Zeitaltergrenze überschreitet (t.age kommt aus c). */
+const OLD_TECH_COSTS = {
+  schrift: 1, mathematik: 2, astronomie: 3, philosophie: 4,     // Forschung, Antike
+  wiss_methode: 11, chemie: 12, biologie: 15,                   // Forschung, Industrialisierung
+  landwirtschaft: 1, bewaesserung: 5,                           // Produktion, Antike
 };
 /* Kolonialismus und Kundschafterei (v72, Anweisung des Autors; gilt in beiden Techtrees –
-   der alternative unterscheidet sich nur in den Forschungskosten). Die Techtexte in TECHS
-   und DATA_EN nennen dieselben Zahlen; ein Test hält beides zusammen. */
+   sie unterscheiden sich nur in den Forschungskosten). Die Techtexte in TECHS und DATA_EN
+   nennen dieselben Zahlen; ein Test hält beides zusammen. */
 const COLONY_COST = 3;       // Kolonialismus: Münzen je Feld (bis v71: 5)
 const SCOUTING_RATE = 2;     // Kundschafterei: × Grundkosten, in Münzen (bis v71: 3)
 /* Grundkosten einer Technologie IN DIESER PARTIE, vor allen Vergünstigungen (Griechenland,
    Wissenschaftliche Methode). Ohne Spielstand – Tabellen, Regelbogen aus dem Menü – die
    Standardkosten. Wer irgendwo Kosten braucht, nimmt diese Funktion, nicht t.c. */
 function techBase(S, t) {
-  return S && S.altTree && ALT_TECH_COSTS[t.k] != null ? ALT_TECH_COSTS[t.k] : t.c;
+  return S && S.oldTree && OLD_TECH_COSTS[t.k] != null ? OLD_TECH_COSTS[t.k] : t.c;
 }
 // Techs je Feld und Zeitalter, nach den Kosten der Partie sortiert (billigere zuerst).
 // Das ist die Leiter im Technologiebogen; Würfe auf „die n-te Technologie" zählen ebenso.

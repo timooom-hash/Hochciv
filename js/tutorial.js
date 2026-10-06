@@ -574,8 +574,10 @@ function tutorialSetup(opts) {
   const kurz = !!(opts && opts.kurz);
   ui = { sel: null, army: null, mode: null, botTimer: null,
     tut: { i: 0, seen: {}, die: 0, kurz } };
+  // oldTree: das Tutorial läuft (vorerst) im alten Techtree – Anweisung des Autors (v82),
+  // bis ein neues Übungsspiel kommt. Texte, Würfe und Aufgaben sind auf ihn zugeschnitten.
   S = newGame({
-    seed: TUT_SEED, map: MAP_ORIGINAL, startPlayer: 0,
+    seed: TUT_SEED, map: MAP_ORIGINAL, startPlayer: 0, oldTree: true,
     players: [
       { civ: 'russland', kind: 'human', ability: 'basis' },
       { civ: 'griechenland', kind: 'bot', diff: 'david' },

@@ -246,6 +246,9 @@ function foundMarksAll(g, S2, pi) {
       }));
       continue;
     }
+    /* Die Karte zeigt auch seit v82 den Preis, nicht was tatsächlich abgeht: sie dient dem
+       Vergleich der Plätze, und mit wenig Nahrung im Vorrat stünde sonst auf fast jedem
+       Platz dieselbe Nahrungszahl. Was wirklich abgeht, sagt das Gründungsblatt. */
     const cost = foundCost(S2, pi, r, c), knapp = food < cost;
     const col = knapp ? '#b3321f' : '#2a2721';
     g.appendChild(svgEl('circle', {
@@ -615,6 +618,28 @@ function tapHex(r, c) {
 function mp(a) { return T('Bewegung %s', LANG === 'de' ? String(a.mp).replace('.', ',') : String(a.mp)); }
 const Y_ICON = ['🔬', '🌾', '🪙'];
 const fmtY = y => y.map((n, i) => n + Y_ICON[i]).join(' ');
+/* Kosten am Knopf (v82, Wunsch des Autors). Ab Werk steht dort, was TATSÄCHLICH abgeht:
+   Gründen für 10 Nahrung mit 8 im Vorrat zeigt „8🌾 4🪙", weil die fehlenden 2 Nahrung
+   in Münzen bezahlt werden. Gerechnet von costPaid – derselben Rechnung, mit der
+   bezahlt wird (Gilden, England, Alchemie, Bürgerkrieg … stecken also schon drin).
+   `alt` ist der Text, der bis v81 dastand. Er bleibt, wenn
+   · nichts umgetauscht wird (dann sind beide gleich, und Knöpfe wie Kacheln behalten ihr
+     gewohntes Bild – auch die Zahl ohne Zeichen im Technologiebogen),
+   · es gar nicht reicht (dann ginge nichts ab; der Preis selbst sagt, was fehlt),
+   · in den Einstellungen „Kosten ohne Umtausch anzeigen" angehakt ist (prefs).
+   Reihenfolge: erst die Arten des Preises, dann was einspringt.
+   Im Technologiebogen nur auf Kacheln, die man jetzt erforschen könnte – auf den übrigen
+   wäre die Rechnung hypothetisch. Die Karte im Gründungsmodus zeigt weiter den Preis. */
+const COST_ICON = { sci: '🔬', food: '🌾', coins: '🪙' };
+function costText(cost, alt, opts) {
+  if (prefs.listPrice || !S || S.over) return alt;
+  const paid = costPaid(S, S.cur, cost, opts);
+  if (!paid) return alt;
+  const eigen = COST_ORDER.filter(k => cost[k] > 0);
+  if (COST_ORDER.every(k => (paid[k] || 0) === (cost[k] || 0))) return alt;
+  const reihe = eigen.concat(['food', 'coins', 'sci'].filter(k => !eigen.includes(k)));
+  return reihe.filter(k => paid[k] > 0).map(k => paid[k] + COST_ICON[k]).join(' ') || alt;
+}
 const fmtGain = g => [g.sci, g.food, g.coins]
   .map((n, i) => (n > 0 ? '+' : '') + n + Y_ICON[i]).join(' ');
 /* Was eine Stadt auf diesem Feld dem Reich einbrächte – nur dort, wo der Platz taugt
@@ -644,7 +669,7 @@ function foundSheet(r, c) {
     settleFact(r, c) +
     `<button class="opt" id="${id}" data-label="Hier gründen" ${err ? 'disabled' : ''}>` +
     `<span>${T('Hier gründen')}<small>${err || T('Grundkosten + Distanz zur Hauptstadt (über passierbare Felder)')}</small></span>` +
-    `<span class="cost">${cost === Infinity ? '—' : cost + '🌾'}</span></button>`);
+    `<span class="cost">${cost === Infinity ? '—' : costText({ food: cost }, cost + '🌾')}</span></button>`);
   if (ui.tut) tutGateSheet(r, c);
   $(id).onclick = () => {
     const e = foundCity(S, pi, r, c);
@@ -700,7 +725,7 @@ function openTile(r, c) {
           act(() => growCity(S, pi, city, 'free')));
       const pc = growPrice(S, pi, city);
       const perr = canGrowPaid(S, pi, city);
-      btn('Bevölkerung wachsen', perr || T('auf %s', city.pop + 1), `${pc.food}🌾 ${pc.coins}🪙`,
+      btn('Bevölkerung wachsen', perr || T('auf %s', city.pop + 1), costText(pc, `${pc.food}🌾 ${pc.coins}🪙`),
         act(() => growCity(S, pi, city, 'paid')), !!perr);
       if (S.wo) {
         const wcost = wonderCost(S, pi);
@@ -708,14 +733,14 @@ function openTile(r, c) {
         const any = availableWonders(S).some(w => !canBuildWonder(S, pi, city, w.k));
         btn('Weltwunder bauen', full ? T('diese Stadt hat schon zwei Wunder')
           : any ? T('%s/2 in dieser Stadt', wondersInCity(S, city).length)
-            : T('nichts baubar (Münzen oder Stufenregel)'), `${wcost}🪙`,
+            : T('nichts baubar (Münzen oder Stufenregel)'), costText({ coins: wcost }, `${wcost}🪙`),
           () => wonderSheet(city), full || !any);
       }
       const ac = armyCost(S, pi);
       // payOpts, nicht die nackte Münzprüfung: im Bürgerkrieg zählt auch Nahrung mit.
       const civil = payOpts(S, pi).foodOk;
       btn('Armee bauen', civil ? T('Bürgerkrieg: auch mit Nahrung zahlbar')
-        : T('muss die Stadt noch verlassen'), `${ac}🪙`,
+        : T('muss die Stadt noch verlassen'), costText({ coins: ac }, `${ac}🪙`, payOpts(S, pi)),
         act(() => buildArmy(S, pi, city)),
         available(S, pi, 'coins', payOpts(S, pi)) < ac || !!armyAt(S, r, c));
       if (slaveryUsable(p))
@@ -742,7 +767,8 @@ function openTile(r, c) {
   } else {
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
-      btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n, `${COLONY_COST}🪙`,
+      btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n,
+        costText({ coins: COLONY_COST }, `${COLONY_COST}🪙`),
         act(() => buyTile(S, pi, r, c)), owned);
     }
   }
@@ -771,7 +797,7 @@ function openTile(r, c) {
     } else ziele.forEach(z => {
       btn(z === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
         z === 2 ? T('Bewegung kostenlos · Handelsroute +2') : T('Bewegung ½ Punkt · Handelsroute +1'),
-        roadPrice(S, pi, r, c, z) + '🪙',
+        costText({ coins: roadPrice(S, pi, r, c, z) }, roadPrice(S, pi, r, c, z) + '🪙'),
         () => doRoad(r, c, z), available(S, pi, 'coins') < roadPrice(S, pi, r, c, z));
     });
   }
@@ -880,7 +906,7 @@ function techBoardHTML(S, pi, opts) {
         const state = owned ? 'owned'
           : avail ? (plain ? 'avail' : can ? 'avail afford' : 'avail costly') : 'locked';
         grid += `<button class="tech ${state}${dead ? ' obsolete' : ''}"
-          ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : cost}</span>
+          ${can ? `data-tech="${t.k}"` : 'disabled'}><span class="c">${owned ? '✓' : avail && !plain ? costText({ sci: cost }, String(cost)) : cost}</span>
           <b>${t.n}</b><span class="eff">${eff}</span>${ownerMarks(S, t.k, pi)}</button>`;
       }
       grid += '</div>';
@@ -893,7 +919,7 @@ function techBoardHTML(S, pi, opts) {
     : sing ? (plain ? 'avail' : singCan ? 'avail afford' : 'avail costly') : 'locked';
   grid += `<button class="tech ${singState}" style="margin-top:10px"
       ${singCan ? 'data-tech="singularitaet"' : 'disabled'}>
-      <span class="c">${sc}</span><b>${SINGULARITY.n}</b><span class="eff">${SINGULARITY.e}</span></button>`;
+      <span class="c">${sing && !plain && !p.techs.singularitaet ? costText({ sci: sc }, String(sc)) : sc}</span><b>${SINGULARITY.n}</b><span class="eff">${SINGULARITY.e}</span></button>`;
   return grid;
 }
 function techModal() {
@@ -934,7 +960,7 @@ function techModal() {
       if (o.paidCoins != null)
         buttons.push(`<button class="tech avail ${available(S, pi, 'coins') >= o.paidCoins
           ? 'afford' : 'costly'}" data-copy="${o.tech.k}" data-mode="paid">
-          <span class="c">${o.paidCoins}🪙</span><b>${o.tech.n}</b>
+          <span class="c">${costText({ coins: o.paidCoins }, `${o.paidCoins}🪙`)}</span><b>${o.tech.n}</b>
           <span class="eff">${techEffect(o.tech, S)}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
       // Gratiskopie: dieselbe Kachel wie jede andere, mit der Wirkung der Technologie.
       // Dass es die Internet-Kopie ist, sagen schon „gratis" und die Überschrift.
@@ -985,7 +1011,7 @@ function powerSheet() {
   [1, 5, maxN].forEach((n, i) => {
     if (n <= 0 || (i === 2 && maxN <= 5)) return;
     h += `<button class="opt" data-n="${n}" data-label="+${n} Macht"><span>${T('+%s Macht', n)}${i === 2 ? `<small>${T('alles ausgeben')}</small>` : ''}</span>
-      <span class="cost">${n * price}🪙</span></button>`;
+      <span class="cost">${costText({ coins: n * price }, `${n * price}🪙`, payOpts(S, pi))}</span></button>`;
   });
   if (maxN <= 0) h += `<p class="sub">${T('Nicht genug Münzen.')}</p>`;
   sheet(h, { power: true });
@@ -1202,7 +1228,8 @@ function startFromRecipe(rec) {
     startPlayer: rec.start === 'zufall' ? Math.floor(Math.random() * players.length)
       : Math.min(players.length - 1, Math.max(0, +rec.start || 0)),
     events: rec.events, eventMode: rec.eventMode, wonders: rec.wonders,
-    altTree: !!rec.altTree,       // Rezepte vor v70 kennen ihn nicht: Standard
+    // Ein Rezept aus v70–v81 kann noch altTree tragen – egal: jede neue Partie läuft seit
+    // v82 im (einzigen) Techtree, auch „Nochmal spielen" nach einer alten Partie.
   };
   // Vom alten Spiel darf nichts stehen bleiben: gesperrtes Bot-Blatt, offenes Fenster,
   // die Schnipsel des letzten Sieges. endTutorialPanel setzt ui zurück, auch botLock.
@@ -1312,8 +1339,8 @@ function worldModal() {
         <span class="civ-a">${a ? `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`
         : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
     }).join('') + '</div>';
-  if (S.altTree)
-    h += `<p class="sub" style="margin-top:12px">${T('Alternativer Techtree')} · ${altTreeText()}</p>`;
+  if (oldTreeShown())
+    h += `<p class="sub" style="margin-top:12px">${T('Alter Techtree')} · ${oldTreeText()}</p>`;
   if (S.ev) {
     const ev = curEvent();
     h += ev
@@ -1368,7 +1395,7 @@ function wonderSheet(city) {
     const err = canBuildWonder(S, pi, city, w.k);
     return `<button class="opt" data-w="${w.k}" ${err ? 'disabled' : ''}>
       <span>${w.n}<small>${T('Stufe %s', w.lvl)} · ${w.e}${err ? ' · ' + err : ''}</small></span>
-      <span class="cost">${cost}🪙</span></button>`;
+      <span class="cost">${costText({ coins: cost }, `${cost}🪙`)}</span></button>`;
   }).join('');
   sheet(h + (rows || `<p class="sub">${T('Keine Wunder verfügbar.')}</p>`));
   $('sheet-body').querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
@@ -1515,6 +1542,15 @@ function loadModules() {
   const o = load(OPT_KEY) || {};
   MODULES.forEach(m => { modules[m.k] = !!o[m.k]; });
 }
+/* Anzeige (v82): „Kosten ohne Umtausch anzeigen" – ab Werk aus, dann zeigen die Knöpfe,
+   was tatsächlich abgeht (costText). Geräteweit gemerkt, ändert am Spiel nichts. Eigener
+   Schlüssel, damit die Module ihr gespeichertes Objekt behalten, wie es war. */
+const PREF_KEY = 'hochciv.prefs';
+const prefs = { listPrice: false };
+function loadPrefs() {
+  const o = load(PREF_KEY) || {};
+  prefs.listPrice = !!o.listPrice;
+}
 function optionsScreen() {
   MODULES.forEach(m => {
     const box = $(m.box);
@@ -1524,6 +1560,9 @@ function optionsScreen() {
       store(OPT_KEY, modules);
     };
   });
+  const lp = $('opt-listprice');
+  lp.checked = prefs.listPrice;
+  lp.onchange = () => { prefs.listPrice = lp.checked; store(PREF_KEY, prefs); };
 }
 /* Zeilen abgeschalteter Module aus dem Aufbau nehmen – und ihr Häkchen löschen. Ohne das
    Löschen könnte ein Modul, das jemand einmal eingeschaltet und angehakt hat, nach dem
@@ -1538,21 +1577,19 @@ function applyModules() {
 }
 // Die Ereignisstärke gehört zu den Ereignissen und hängt an deren Häkchen.
 function evmodeRow() { $('setup-evmode-row').hidden = !$('setup-events').checked; }
-/* Alternativer Techtree (v70): ein Häkchen je Partie. Kein Modul – die Zeile steht immer im
-   Aufbau, ab Werk ohne Häkchen. Angehakt nennt der Hinweis darunter die geänderten Kosten.
-   Der Text kommt aus ALT_TECH_COSTS, damit Aufbau, Weltblatt und Regeln nicht veralten. */
-function altTreeText() {
+/* Der alte Techtree (bis v81 Standard) ist seit v82 nicht mehr wählbar – die Zeile im Aufbau
+   ist weg. Er lebt nur im Tutorial weiter und in Partien, die vor v82 mit ihm begonnen
+   wurden (migrateState). Für solche Partien nennen Weltblatt und Regelbogen ihn; im
+   Tutorial nicht, dort wäre der Hinweis für Neulinge nur verwirrend. Der Text kommt aus
+   OLD_TECH_COSTS, damit er nicht veraltet. */
+function oldTreeText() {
   return FIELDS.map((fn, f) => {
-    const liste = Object.keys(ALT_TECH_COSTS).map(k => TECH_BY_KEY[k]).filter(t => t.f === f)
-      .sort((a, b) => ALT_TECH_COSTS[a.k] - ALT_TECH_COSTS[b.k]);
-    return liste.length ? liste.map(t => `${t.n} ${ALT_TECH_COSTS[t.k]}`).join(', ') + ` (${fn})` : '';
+    const liste = Object.keys(OLD_TECH_COSTS).map(k => TECH_BY_KEY[k]).filter(t => t.f === f)
+      .sort((a, b) => OLD_TECH_COSTS[a.k] - OLD_TECH_COSTS[b.k]);
+    return liste.length ? liste.map(t => `${t.n} ${OLD_TECH_COSTS[t.k]}`).join(', ') + ` (${fn})` : '';
   }).filter(Boolean).join(' · ');
 }
-function altTreeRow() {
-  const an = $('setup-alttree').checked;
-  $('setup-alttree-hint').hidden = !an;
-  $('setup-alttree-hint').textContent = an ? T('Andere Kosten: %s', altTreeText()) : '';
-}
+const oldTreeShown = () => !!(S && S.oldTree && !ui.tut);
 
 /* ------------------------------------------------------------------ Aufbau */
 // 'vier' = alle vier Reiche, 'drei' = drei Reiche, 'duell' = 1 gegen 1
@@ -1599,8 +1636,6 @@ function setupScreen() {
   $('setup-kilevel').innerHTML = KI_LEVELS.map(x =>
     `<option value="${x.k}"${x.k === KI_DEFAULT_LEVEL ? ' selected' : ''}>${x.n}</option>`).join('');
   $('setup-events').onchange = evmodeRow;
-  $('setup-alttree').onchange = altTreeRow;
-  altTreeRow();
   // Erweiterungsmodule: was in den Einstellungen aus ist, steht hier nicht zur Wahl
   applyModules();
   // Der gewählte Modus bleibt erhalten, wenn man den Aufbau erneut öffnet
@@ -1737,7 +1772,6 @@ function setupRecipe(mapPick, startWahl) {
     mode: setupMode, mapPick, start: startWahl,
     events: $('setup-events').checked, eventMode: $('setup-evmode').value,
     wonders: $('setup-wonders').checked,
-    altTree: $('setup-alttree').checked,
     players: setupConfig(),
   };
 }
@@ -1963,7 +1997,7 @@ function placeTechView() {
   if (!seat) return toast(T('Alle Plättchen liegen schon.'));
   const pl = st.cfg.players[seat.idx] || {};
   const V = newGame({
-    seed: 1, map: DEFAULT_MAP, wonders: st.cfg.wonders, altTree: st.cfg.altTree,
+    seed: 1, map: DEFAULT_MAP, wonders: st.cfg.wonders,
     players: [{ civ: seat.civ, kind: 'human', ability: pl.ability }],
     avail: [st.setup.avail[seat.idx]], wpool: st.setup.wpool,
   });
@@ -2125,6 +2159,7 @@ function boot() {
   langRow();
   customMap = load('hochciv.map');
   loadModules();
+  loadPrefs();
   const saved = load('hochciv.save');
   $('m-continue').hidden = !saved;
   bootTexts();
@@ -2138,9 +2173,10 @@ function boot() {
   $('tut-quit').onclick = () => tutorialQuit();
   $('m-editor').onclick = () => { show('screen-editor'); editorScreen(); };
   $('m-rules').onclick = () => rulesModal();
-  $('m-continue').onclick = () => { endTutorialPanel(); S = load('hochciv.save'); startGameScreen(); };
+  // migrateState: Spielstände von vor v82 behalten ihren Techtree (S.altTree → S.oldTree)
+  $('m-continue').onclick = () => { endTutorialPanel(); S = migrateState(load('hochciv.save')); startGameScreen(); };
   $('m-load').onclick = () => upload(txt => {
-    try { endTutorialPanel(); S = JSON.parse(txt); saveGame(); startGameScreen(); toast(T('Spielstand geladen')); }
+    try { endTutorialPanel(); S = migrateState(JSON.parse(txt)); saveGame(); startGameScreen(); toast(T('Spielstand geladen')); }
     catch { toast(T('Datei nicht lesbar')); }
   });
   document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => show('screen-menu'));
@@ -2161,7 +2197,7 @@ function boot() {
       startPlayer: startWahl === 'zufall'
         ? Math.floor(Math.random() * players.length) : +startWahl,
       events: recipe.events, eventMode: recipe.eventMode,
-      wonders: recipe.wonders, altTree: recipe.altTree,
+      wonders: recipe.wonders,
     };
     endTutorialPanel();
     // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.
@@ -2270,7 +2306,7 @@ function rulesModal() {
     <p style="font-size:13px;margin:4px 0">${T('Zu Rundenbeginn wird gewürfelt: Zeile, dann Spalte. Hart trifft jede Runde, leicht etwa jede zweite. Bots sind nie betroffen.')}</p>
     <p class="sub">${T('Alle Technologien')}</p>
     <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
-    ${S && S.altTree ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt der alternative Techtree.')}</p>` : ''}
+    ${oldTreeShown() ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt noch der alte Techtree.')}</p>` : ''}
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);
