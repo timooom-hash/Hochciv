@@ -22,7 +22,7 @@ const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 // Im Browser teilen sich <script>-Tags den globalen Gültigkeitsbereich; eval nicht.
 // Deshalb alles zusammen auswerten und einen Zugriffspunkt für den Test anhängen.
-const src = ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/tutorial.js', 'js/ui.js']
+const src = ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/marathon.js', 'js/tutorial.js', 'js/ui.js']
   .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
 window.eval(src + '\n;window.__get = n => eval(n); window.__set = (n, v) => eval(n + "=v");'
   + '\n;window.__runAuto = i => { TUT_STEPS[i].auto(); redraw(); };');
@@ -2869,7 +2869,14 @@ step('KI: Aufbau bietet Mensch, KI und Bot – Gegner sind ab Werk die KI', () =
 step('KI: Züge laufen über das Blatt mit „Weiter", dann ist wieder der Mensch dran', () => {
   kiAufbau('vier', ['human', 'ki', 'ki', 'ki'], '0');
   $('setup-start').value = '0'; $('setup-start').onchange();
+  // Ohne Ereignisse (v83): Die Häkchen aus den Modulschritten stehen hier noch, und ein
+  // Ereignis der ersten Runde lässt eine KI zu Recht untätig (gemessen: 23 von 600 ersten
+  // KI-Zügen, in v82 mit denselben Startwerten genauso) – unten wird aber geprüft, dass jede
+  // gehandelt hat. Der Schritt prüft den Ablauf mit „Weiter", nicht die Ereignisse.
+  const mitEreignis = $('setup-events').checked;
+  $('setup-events').checked = false; $('setup-events').onchange();
   $('setup-go').onclick();
+  $('setup-events').checked = mitEreignis; $('setup-events').onchange();
   const S = G('S');
   if (AUTO(G('P')(S))) throw new Error('das Spiel beginnt nicht beim Menschen');
   const mensch = S.cur;
@@ -3089,6 +3096,115 @@ step('Regelbogen: Bewegung, Straßen, Eisenbahn und Kontrollzone (v81), auch auf
   } finally { G('switchLang')('de'); }
   console.log('       zwei Abschnitte nach der Nahrung, deutsch und englisch vollständig');
 });
+/* ============================================ Marathon (v83)
+   Aufbau → Zufallskarte → Draft mit Karte und Starttechnologien → Spiel. */
+const marathonAufbau = kinds => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=marathon]').onclick();
+  [...$('setup-list').children].forEach((x, i) => x.querySelector(`[data-kind="${kinds[i]}"]`).onclick());
+  $('setup-start').value = '0'; $('setup-start').onchange();
+};
+step('Marathon (v83): im Aufbau vier Reiche, keine Karten- und Fähigkeitswahl, dafür der Hinweis', () => {
+  marathonAufbau(['human', 'ki', 'bot', 'ki']);
+  if ($('setup-list').children.length !== 4) throw new Error($('setup-list').children.length + ' Plätze');
+  if (!$('setup-map-row').hidden) throw new Error('Kartenwahl sichtbar');
+  if ($('setup-marathon-hint').hidden) throw new Error('kein Hinweis');
+  const civs = [...$('setup-list').children].map(x => x.dataset.civ);
+  if (new Set(civs).size !== 4) throw new Error('Zivilisationen doppelt: ' + civs);
+  if ([...$('setup-list').querySelectorAll('[data-abil]')].some(x => !x.closest('label').hidden)) throw new Error('Fähigkeitswahl sichtbar');
+  if (!/gedraftet/.test($('setup-list').children[0].querySelector('.abil').textContent)) throw new Error('Platzhinweis fehlt');
+  // zurück zu „Vier Reiche": alles wieder da
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  if (!$('setup-marathon-hint').hidden || $('setup-list').querySelector('[data-abil]').closest('label').hidden) throw new Error('Vier Reiche: Rest vom Marathon');
+});
+step('Marathon: Draft – Karte, Starttechnologien, Vorrat 2n + 1, Schlange, die KI wählt selbst', () => {
+  marathonAufbau(['human', 'ki', 'bot', 'ki']);
+  $('setup-go').onclick();
+  if (!$('screen-draft').classList.contains('show')) throw new Error('kein Draft');
+  const st = G('draftState'), V = st.V, D = st.D;
+  if (!V.marathon || V.map.rows.length !== 24 || V.map.rows[0].length !== 36) throw new Error('keine Marathonkarte');
+  if ($('dr-map').querySelectorAll('[data-r]').length !== 24 * 36) throw new Error('Karte nicht gezeichnet');
+  if ((D.pool.length + D.at) !== 7) throw new Error('Vorrat ' + (D.pool.length + D.at) + ' statt 7 (drei draftende Reiche)');
+  // die Liste nennt jedes Reich mit Starttechnologien
+  const reiche = $('dr-players').querySelectorAll('.dr-pl');
+  if (reiche.length !== 4) throw new Error(reiche.length + ' Reiche in der Liste');
+  V.players.forEach((p, i) => {
+    const t = G('TECHS').find(x => p.avail[x.k]);
+    if (t && !$('dr-players').textContent.includes(t.n)) throw new Error('Starttechnologie fehlt: ' + t.n);
+  });
+  // bis der Mensch dran ist, haben die KI gewählt; der Mensch tippt
+  let guard = 0;
+  while (!G('draftDone')(D) && guard++ < 20) {
+    const cur = G('draftCurrent')(D);
+    if (V.players[cur].kind !== 'human') throw new Error('eine KI wartet auf Eingabe');
+    const b = [...$('dr-pool').querySelectorAll('[data-ab]')].find(x => !x.disabled);
+    b.onclick();
+  }
+  if (!G('draftDone')(D)) throw new Error('Draft endet nicht');
+  if ($('dr-go').hidden) throw new Error('kein „Spiel beginnen"');
+  const bot = V.players.findIndex(p => p.kind === 'bot');
+  if (D.picks[bot].length) throw new Error('der Bot hat gewählt');
+  const gewaehlt = V.players.map((p, i) => D.picks[i].length);
+  if (gewaehlt.filter(n => n === 2).length !== 3) throw new Error('Wahlen: ' + gewaehlt);
+  // Der Bogen jedes Reichs zeigt die Marathonkosten – ohne Rabatt einer Fähigkeit, denn
+  // während des Drafts hat noch niemand eine (auch Griechenland nicht seine Grundfähigkeit).
+  const papier = G('TECH_BY_KEY').papier;
+  const soll = G('techBase')(V, papier);
+  if (soll !== papier.c * G('MARATHON_TECH_FACTOR')[papier.age]) throw new Error('Marathonkosten falsch berechnet');
+  for (const b of $('dr-players').querySelectorAll('[data-bogen]')) {
+    b.onclick();
+    const k = [...$('ov-body').querySelectorAll('.tech')].find(x => x.querySelector('b').textContent === papier.n);
+    const ist = k && k.querySelector('.c').textContent.trim();
+    G('closeModal')();
+    if (ist !== String(soll)) throw new Error(`Bogen ${G('civOf')(V.players[+b.dataset.bogen]).n}: Papier ${ist} statt ${soll}`);
+  }
+  // auf der Draftkarte steht noch keine Armee (Wikinger-Grundfähigkeit ist noch nicht vergeben)
+  if (V.armies.length) throw new Error('Armee auf der Draftkarte');
+  console.log('       ' + V.players.map((p, i) => G('civOf')(p).n + ': ' + D.picks[i].map(id => G('abilById')(id).n).join('+')).join(' · '));
+});
+step('Marathon: das Spiel beginnt mit genau dieser Karte und den gedrafteten Fähigkeiten', () => {
+  const st = G('draftState'), V = st.V, D = st.D;
+  $('dr-go').onclick();
+  const S = G('S');
+  if (!$('screen-game').classList.contains('show')) throw new Error('kein Spiel');
+  if (!S.marathon || JSON.stringify(S.map.rows) !== JSON.stringify(V.map.rows)) throw new Error('andere Karte');
+  const falsch = S.players.filter((p, i) => JSON.stringify(G('abilitiesOf')(p)) !== JSON.stringify(D.picks[i]));
+  if (falsch.length) throw new Error('Fähigkeiten weichen ab');
+  // Kopfzeile des Menschen nennt beide Fähigkeiten
+  while (AUTO(G('P')(S)) && !S.over && $('bot-next')) $('bot-next').onclick();
+  const ich = S.cur;
+  const namen = G('abilInfos')(S.players[ich]).map(a => a.n);
+  if (namen.length !== 2 || !namen.every(n => $('hud-name').textContent.includes(n))) throw new Error('Kopfzeile: ' + $('hud-name').textContent);
+  // Regelbogen: Hinweis und umgerechnete Kosten
+  G('rulesModal')();
+  const regeln = $('ov-body').textContent;
+  G('closeModal')();
+  if (!/Marathon: Technologien kosten/.test(regeln) || !regeln.includes(String(G('techBase')(S, G('SINGULARITY'))))) throw new Error('Regelbogen ohne Marathon');
+  if (!/Marathon/.test(S.log[0].m) || !S.log.some(l => /Fähigkeiten/.test(l.m))) throw new Error('Protokoll nennt Marathon oder Draft nicht');
+  // Speichern und Fortsetzen behält alles
+  G('saveGame')();
+  G('show')('screen-menu'); $('m-continue').onclick();
+  const L = G('S');
+  if (!L.marathon || JSON.stringify(G('abilitiesOf')(L.players[ich])) !== JSON.stringify(D.picks[ich])) throw new Error('nach dem Fortsetzen anders');
+  console.log('       ' + $('hud-name').textContent + ' · ' + S.map.name);
+});
+step('Marathon: „Nochmal spielen" führt wieder in den Draft, mit neuer Karte', () => {
+  const S = G('S'), alt = JSON.stringify(S.map.rows);
+  G('startFromRecipe')(S.recipe);
+  if (!$('screen-draft').classList.contains('show')) throw new Error('kein Draft');
+  if (JSON.stringify(G('draftState').V.map.rows) === alt) throw new Error('dieselbe Karte');
+});
+step('Marathon: der Draft auf Englisch', () => {
+  G('switchLang')('en');
+  try {
+    G('drawDraft')();
+    const txt = $('screen-draft').textContent;
+    if (!/Empires in turn order/.test(txt) || !/Starting technologies/.test(txt)) throw new Error('nicht übersetzt: ' + txt.slice(0, 160));
+    if (/Starttechnologien|Reiche in Zugfolge|wählt Fähigkeit/.test(txt)) throw new Error('deutsche Reste');
+  } finally { G('switchLang')('de'); }
+  G('show')('screen-menu');
+});
+
 step('kein abgefangener Fehler im Zugablauf', () => {
   const f = G('UI_ERRORS');
   if (f.length) throw new Error(f.join(' | '));

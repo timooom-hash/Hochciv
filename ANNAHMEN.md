@@ -3381,3 +3381,291 @@ Bezahlen überein, Gründungsblatt, Karte (Preis), Bogen (nur erforschbare Kache
 die Einstellung (ab Werk aus, gemerkt, englisch). Sichtprobe in Chromium: Gründungsblatt,
 Bogen, Stadtblatt, Einstellungen.
 
+
+## Kriegerkultur mit Burgenbau · Wirtschaftssieg zu Rundenbeginn · Marathon (v83)
+
+**Anweisung des Autors (9.10.):**
+1. Die Kriegerkultur der Wikinger soll mit Burgen wirken: nach Burgenbau bringt jede Stadt
+   Macht.
+2. Der Wirtschaftssieg wird gegen die Bevölkerung zu Beginn der Runde gezählt, nicht während
+   des Zuges – in einer Runde ist die Weltbevölkerung im Nenner für alle Reiche dieselbe.
+3. Ein Spielmodus **Marathon** für vier Reiche: Zufallskarte, viermal so groß wie die
+   Europakarte; Startplätze mit Nahrung + ½ Münzen ≥ 4, immer – auch mit Russlands Start mit
+   zwei Bevölkerung; Technologien Antike ×2, Mittelalter ×3, Industrialisierung ×4,
+   Moderne ×5, Singularität ×2,5. Vor dem Start sehen alle die Karte und die
+   Starttechnologien jedes Reichs und draften dann ihre Fähigkeiten: je zwei, in
+   Schlangenreihenfolge, aus (2 × Spieler) + 1 – der Letzte wählt aus zweien. Zufällig
+   gezogen, dieselbe darf mehrfach vorkommen.
+4. Prüfen, dass die KI den Marathon spielt; KI-Messreihen für die Änderungen am normalen
+   Spiel.
+
+### Kriegerkultur mit Burgenbau
+
+* **Regel:** +2 Macht je eigener Armee, mit Burgenbau zusätzlich +2 je eigener Stadt.
+  Auslegung von „each city should add power": genau so viel wie eine Armee – mit Burgenbau
+  steht in jeder Stadt eine unbewegliche Armee, die verteidigt, flankiert und eine
+  Kontrollzone wirft wie eine echte (`warriorUnits` in engine.js). Für die **Baukosten**
+  weiterer Armeen zählt sie nicht, dort bleiben es die echten Armeen.
+* Text auf dem Bogen: „Jede eigene Armee gibt +2 Macht – mit Burgenbau auch jede eigene
+  Stadt" (`data/civs.json`, englisch in `DATA_EN`).
+* **KI:** rechnet den Zuschlag mit, auch mit geplanten Armeen (`kiPowerBonus` über
+  `warriorUnits`), und bewertet Burgenbau mit Kriegerkultur höher (`kiTechBonus`: +1,5 je
+  Stadt, dazu der Zuschlag in der Verteidigungsrechnung).
+* **Gemessen** (KI Schwer, Plättchenkarte, ohne Module, je 40 Partien auf denselben
+  Startwerten; Werkzeug im Arbeitsordner der Sitzung, nicht im Paket):
+
+  | Reihe | v82 | v83 | v83 ohne die Burgen-Wirkung |
+  |---|---|---|---|
+  | 4 KI, Wikinger mit Kriegerkultur: Siege der Wikinger | 12 | **17** | 12 |
+  | … davon Burgenbau erforscht | 13 | 20 | 15 |
+  | … größter Machtzuschlag im Mittel | 4,8 | 7,9 | 4,8 |
+  | Duell Wikinger (Kriegerkultur) gegen KI: Siege der Wikinger | 19 | **22** | 17 |
+  | … größter Machtzuschlag im Mittel | 7,3 | 12,8 | 7,8 |
+
+  Die Gegenprobe läuft mit dem Code von v83, nur ohne die Städte in `warriorUnits` – der
+  Anstieg kommt also von der Burgen-Wirkung (zu viert 12 → 17, im Duell 17 → 22), nicht von
+  der Änderung am Wirtschaftssieg. Zu viert gewinnen die Wikinger mit Kriegerkultur jetzt 17
+  von 40 Partien, bei gleich starken Reichen wären es 10 (Schätzung der Unsicherheit bei 40
+  Partien: etwa ± 6).
+
+### Wirtschaftssieg zu Rundenbeginn
+
+* **Auslegung:** gezählt wird mit der eigenen Bevölkerung **und** der Weltbevölkerung zu
+  Beginn der Runde, geprüft gleich dort – für alle Reiche, in Zugfolge ab dem Startspieler,
+  ab Runde 2 (`markRoundStart`, `victoryOwn`, `victoryWorld`). Ein Anspruch fällt also zu
+  Beginn einer Runde; wie jeder Anspruch endet das Spiel am Ende dieser Runde, und alle
+  anderen haben die ganze Runde für einen eigenen Anspruch (dann Punktvergleich) oder einen
+  Militärsieg.
+* **Die wörtliche Lesart verworfen:** nur den Nenner auf den Rundenbeginn festzuhalten und
+  die eigene Bevölkerung weiter laufend am Ende des eigenen Zuges zu zählen. Dann zählt das
+  eigene Wachstum im Zug oben schon, unten noch nicht – im Duell reicht in Runde 2 eine
+  Gründung und ein Wachstum (Welt 3 zu Rundenbeginn, Schwelle über 3/4 · 3 = 2,25, also
+  genügen 3 eigene). Gemessen: KI-Duelle 40 von 40 mit Wirtschaftssieg, 38 davon in Runde 2;
+  KI gegen David ebenso 40 von 40, alle in Runde 2. Wer die wörtliche Lesart doch will: eine
+  Zeile in `checkVictory` (`mine = popOf(S, pi)`) und die Prüfung zurück ans Zugende.
+* **Weggefallen:** die Prüfung am Ende jedes Zuges (`finishTurn`) und die Nachprüfung aller
+  am Rundenende (`resolveClaims`; sie gab es, damit der Vergleich nicht an der
+  Sitzreihenfolge hing – das leistet jetzt die gemeinsame Prüfung zu Rundenbeginn). Die KI
+  prüft in ihren Probezügen nicht mehr; sie bewertet weiter ihren Anteil am Ende ihres
+  Zuges – das ist, was zu Beginn der nächsten Runde zählt, solange niemand mehr etwas ändert.
+* **Anzeige:** Die Kopfzeile zeigt weiter den laufenden Stand (also den, der zu Beginn der
+  nächsten Runde zählen wird); der Regelbogen sagt „geprüft zu Beginn jeder Runde ab Runde
+  2, für alle mit der Bevölkerung von dort". Das Tutorial (alter Techtree, feste Partie)
+  sagt nichts zum Zeitpunkt und bleibt unverändert.
+* **Gemessen** (je 40 Partien, KI Schwer, gleiche Startwerte, Plättchenkarte, ohne Module):
+
+  | Reihe | v82 | v83 |
+  |---|---|---|
+  | Duell KI gegen KI | Wirtschaft 26, Militär 9, Forschung 5 · Endrunde Median 5 · Startspieler gewinnt 32 | Militär 19, Forschung 12, Wirtschaft 9 · Median 7 · Startspieler 29 |
+  | … davon Wirtschaftssieg in Runde 2 | 7 | 0 |
+  | Duell KI gegen David | Militär 18, Forschung 12, Wirtschaft 10 · Median 6 · KI gewinnt 20 | Militär 23, Forschung 16, Wirtschaft 1 · Median 6 · KI gewinnt 20 |
+  | 4 KI | Militär 33, Forschung 6, Wirtschaft 1 · Median 6 | Militär 33, Forschung 7 · Median 6 (37 von 40 Partien gleich) |
+  | Duell Wikinger (Kriegerkultur) gegen KI | Wirtschaft 17, Militär 15, Forschung 8 | Militär 31, Wirtschaft 5, Forschung 4 |
+
+  Von den 26 Wirtschaftssiegen des KI-Duells in v82 gewinnt in v83 23-mal dasselbe Reich
+  (8-mal weiter wirtschaftlich, sonst militärisch oder über die Forschung; meist eine Runde
+  später, die sieben früheren Siege in Runde 2 eine bis sechs Runden später), 3-mal ein
+  anderes. Der Wirtschaftssieg wird im Duell deutlich seltener, und der **Wirtschaftssieg in
+  Runde 2** (Übergabe, offener Punkt 14) kommt nicht mehr vor: zu Beginn von Runde 2 haben
+  beide genau einen Zug gehabt.
+
+### Fähigkeiten als Liste
+
+Bis v82 hatte ein Reich genau eine Fähigkeit seiner Zivilisation (`p.ability`). Im Marathon
+hat es zwei gedraftete, auch fremde – Russland mit Handelsreich tauscht 1:1. Deshalb:
+
+* `abilitiesOf(p)` liefert Schlüssel „Zivilisation:Fähigkeit", aus `p.drafted` (Marathon)
+  oder aus Zivilisation und `p.ability` (sonst); Bots und Barbaren haben keine.
+* Grundfähigkeiten heißen bei allen Zivilisationen `basis` und werden immer **mit der
+  Zivilisation** geprüft: `hasAbil(p, 'griechenland', 'basis')`. `isAbil(p, k)` bleibt für die
+  eindeutigen Schlüssel und wirft bei `'basis'` – ein Test sucht den Quelltext danach ab.
+* Doppelt wirkt nichts doppelt (Liste, keine Zählung). Wachstumskosten mit zwei Fähigkeiten:
+  der größere Faktor (Kolonisten ×2), Fruchtbarkeit streicht weiter die Nahrung – beide
+  zusammen: keine Nahrung, doppelte Münzen.
+* Kopfzeile, Weltblatt und Protokoll nennen alle Fähigkeiten eines Reichs.
+
+### Marathon
+
+**Karte** (`js/marathon.js`): 24 × 36 Felder – die Originalkarte hat 12 × 18, viermal die
+Fläche. Höhenfeld aus Wertrauschen (drei Oktaven), zum Rand hin abfallend; die tiefsten 30 %
+werden Meer, Landstücke bis 3 Felder Inseln, Binnenseen bis 2 Felder Fluss. Gebirge entlang
+eines „geknickten" Rauschens (Kämme statt Klumpen, oberste 13 % des Landes), Flüsse von den
+Gebirgsrändern bergab bis Meer oder Fluss (bis 8 % der Karte), Wald nach eigenem Rauschen
+(etwa 15 %), ein paar Inseln im offenen Meer (gut 2 %). Gemessen über 100 Karten: Meer 28 %,
+Grasland 38 %, Wald 15 %, Gebirge 9 %, Fluss 8 %, Insel 2 % – nah an der Originalkarte.
+Erzeugung rund 5 ms.
+
+**Hauptstädte:** je Kartenviertel eine, im Umkreis von 6 Feldern um dessen Mitte, nicht
+direkt am Rand, mindestens 14 Felder voneinander entfernt, mit mindestens 30 Landfeldern im
+Umkreis von 4. Erlaubt nur, wo **Nahrung + ½ Münzen ≥ 4** im ersten Zug:
+
+* **Auslegung von „immer, auch mit Russlands Start mit zwei Bevölkerung":** gerechnet für
+  den ungünstigsten Fall – Hauptstadt mit **2 Bevölkerung** (Siedlertrecks lässt sich
+  draften, und jede Bevölkerung kostet 1 Nahrung und bringt 1 Münze, zusammen −½), ohne
+  Technologien und ohne Ertragsfähigkeit. Mit 1 Bevölkerung ist es immer ½ mehr.
+* Unter allen erlaubten Vierergruppen die, deren schwächste Hauptstadt am besten dasteht
+  (Startertrag, gedeckelt bei 8, und Land ringsum) – so fair wie möglich. Welcher Platz
+  welches Viertel bekommt, ist Zufall.
+* Gemessen über 100 Karten: höchstens 3 Anläufe (findet sich keine Aufstellung, wird mit dem
+  nächsten Startwert neu erzeugt), kleinster Abstand 14, Startertrag im Median 5,5.
+
+**Technologien:** `techBase` multipliziert die Grundkosten: Antike ×2, Mittelalter ×3,
+Industrialisierung ×4, Moderne ×5, Singularität ×2,5 (250). Rabatte (Griechenland,
+Wissenschaftliche Methode) ziehen danach ab, der Kreml-Zuschlag kommt danach dazu (nicht
+mit vervielfacht). Kopieren zahlt die Marathonkosten. Regelbogen und Technologiebogen zeigen
+die umgerechneten Zahlen, der Regelbogen mit einem Satz dazu.
+
+**Draft:**
+
+* Nach dem Aufbau wird die Karte erzeugt und die Starttechnologien werden ausgewürfelt (wie
+  im Plättchenmodus vorab, `rollSetup`). Der Draftbildschirm zeigt die ganze Karte mit allen
+  Hauptstädten (die des Wählenden hervorgehoben), den Vorrat und die Reiche in Zugfolge –
+  je Reich die gewählten Fähigkeiten, den Ertrag der Hauptstadt im ersten Zug und die
+  Starttechnologien, dazu ein Knopf **Bogen** für den Technologiebogen mit Marathonkosten.
+* **Während des Drafts hat niemand eine Fähigkeit** (`draftView`): Bogen und Ertrag zeigen
+  die Werte ohne. Die erste Fassung zeigte Griechenland mit dem Rabatt seiner Grundfähigkeit,
+  Russland mit Taiga und die Gratisarmee der Wikinger auf der Karte – alles Fähigkeiten, die
+  erst noch gedraftet werden (gefunden beim Smoke-Test des Bogens).
+* **Vorrat:** 2n + 1 Fähigkeiten, zufällig aus allen zwölf gezogen, mit Zurücklegen –
+  dieselbe kann mehrfach im Vorrat liegen. **Reihenfolge:** Zugfolge ab dem Startspieler,
+  dann rückwärts (1-2-3-4-4-3-2-1); der Letzte wählt aus den letzten zwei, eine bleibt liegen.
+* **Auslegung: n = Reiche, die draften.** Bots haben nach den Bot-Regeln keine Fähigkeiten;
+  sie draften nicht, und der Vorrat richtet sich nach den übrigen (mit einem Bot 7 statt 9).
+* **Auslegung: keine Fähigkeit doppelt im eigenen Reich,** solange es noch etwas anderes
+  gibt – doppelt wirkt sie nicht doppelt. Liegt nur noch Doppeltes, darf man es nehmen.
+* Fremde Fähigkeiten wirken bei jeder Zivilisation, die eigene Grundfähigkeit hat ein Reich
+  nur, wenn es sie draftet (Wikinger ohne Seefahrer: keine Gratisarmee).
+* Mehrere Menschen wählen nacheinander am selben Bildschirm; die KI wählt, sobald sie dran
+  ist. Danach **Spiel beginnen**: die Partie entsteht mit genau dieser Karte, diesen
+  Starttechnologien und den gedrafteten Fähigkeiten (`p.drafted`, im Spielstand).
+* „Nochmal spielen" führt wieder in den Draft, mit neuer Karte. Der Draft selbst wird nicht
+  gespeichert – wer die App mittendrin schließt, beginnt den Marathon neu.
+
+**Wahl der KI** (`kiDraftPick`): Grundwert je Fähigkeit (`KI_DRAFT_BASE`) plus Karte um die
+eigene Hauptstadt (Wald für Taiga, Küste für Seemacht, Land für Siedlertrecks und
+Kolonisten), +1,5 für eine zweite Wikinger-Kriegsfähigkeit, +1 für Kolonisten mit
+Fruchtbarkeit; was sie schon hat, ist ihr nichts wert. Die Grundwerte sind **gemessen**:
+40 Marathonpartien mit vier KI (Schwer), jedes Reich mit zwei zufällig zugeteilten
+Fähigkeiten, Sieger gezählt; dazu ein bedingtes Logit (wer gewinnt, gegeben die Fähigkeiten
+aller vier), damit eine Fähigkeit nicht von ihrem Partner profitiert.
+
+| Fähigkeit | Siege / Partien | Logit-Stärke |
+|---|---|---|
+| Kolonisten (England) | **21 / 27** | **+3,7** |
+| Handelsreich (England) | 10 / 27 | +0,8 |
+| Kriegerkultur (Wikinger) | 9 / 30 | +0,6 |
+| Freie Forschung (Griechenland) | 6 / 22 | +0,6 |
+| Seefahrer (Wikinger) | 6 / 24 | +0,2 |
+| Günstige Forschung (Griechenland) | 9 / 38 | −0,3 |
+| Rückschau (Griechenland) | 3 / 24 | −0,6 |
+| Seemacht (England) | 2 / 19 | −0,8 |
+| Taiga (Russland) | 3 / 20 | −0,9 |
+| Siedlertrecks (Russland) | 5 / 28 | −0,9 |
+| Beutezüge (Wikinger) | 4 / 34 | −0,9 |
+| Fruchtbarkeit (Russland) | 2 / 27 | −1,5 |
+
+Eindeutig ist nur **Kolonisten**: 21 Siege in 27 Partien, wo bei gleicher Stärke ein Viertel
+zu erwarten wäre. Auf der großen Karte mit teurer Forschung ist Gründen ohne Grundkosten
+offenbar das Stärkste, was es gibt – jedenfalls so, wie die KI spielt (ob Menschen das
+genauso ausnutzen, ist nicht gemessen). Die übrigen liegen dicht beieinander und sind auf 40
+Partien unsicher; die Grundwerte folgen der gemessenen Reihenfolge, etwas zur Mitte gezogen
+(Kolonisten 15, Handelsreich 8, Kriegerkultur und Freie Forschung 7,5, Seefahrer 6,5,
+Günstige Forschung 5, Rückschau 4,5, Beutezüge 3,5, Siedlertrecks und Fruchtbarkeit 2,5,
+Seemacht 2, Taiga 1). Taiga, Seemacht und Siedlertrecks bekommen von der Karte im Mittel
++2,8, +2,4 und +1,5 dazu (120 Hauptstädte) – gemessen war der Wert samt Karte. Bis zur
+Messung standen Schätzungen da (Freie Forschung 9, Fruchtbarkeit und Siedlertrecks 8,
+Kolonisten 7) – die KI hätte Kolonisten oft liegen lassen.
+
+**Die KI spielt den Marathon** (ganze Partien mit Draft, vier Reiche):
+
+* **56 ganze Partien, alle ohne Fehler und mit einem Sieg zu Ende** (Runde 4 bis 12): 8 mit
+  vier KI Schwer samt Draft der KI, 4 mit zwei KI Mittel und zwei Bots (König), 4 mit vier
+  KI Leicht, dazu die 40 Partien der Draftmessung (vier KI Schwer, Fähigkeiten zugeteilt).
+  Siegarten zusammen: Militär 29, Forschung 23, Wirtschaft 4 – die KI forscht also trotz der
+  höheren Kosten bis zur Singularität, gründet auf der großen Karte reichlich (in den 8
+  Partien der KI Schwer am Ende 3 bis 21 Städte je Reich, mit Kolonisten 23 bis 58) und
+  erobert Hauptstädte.
+* **Zugzeit** (8 Partien KI Schwer, Endfassung, allein auf dem Testrechner): Median je
+  Partie 0,1–0,4 s, 90 % der Züge unter 1,0–2,0 s, längster Zug je Partie 1,2–6,5 s – der
+  längste in einer Partie mit 83 Städten auf der Karte, 56 davon in einem Reich. Die
+  Tempo-Änderungen (unten) kürzen die langsamsten Züge um 10–30 %. Auf dem iPad nicht
+  gemessen.
+* Mit den gemessenen Grundwerten draftet die KI Kolonisten, sobald sie im Vorrat liegt: in
+  den 8 Partien lag sie viermal im Vorrat, und viermal gewann, wer sie hatte (einmal zwei
+  Reiche mit Kolonisten – gewonnen hat eines davon).
+
+### Tempo der KI auf großen Karten
+
+Im Marathon stehen zur Mitte der Partie 50 und mehr Städte auf der Karte (bis über 80, ein
+Reich mit Kolonisten allein bis 58). Der längste Zug einer Partie dauerte auf dem
+Testrechner bis 10 s. Profile der zwei
+langsamsten Züge: im einen das Einkommen 41 % (davon die Handelsrouten 26 %) und die
+Bewertung der Siedelplätze 26 %, im anderen – ein Reich mit über 50 Städten, viele ohne
+Anschluss – die Straßenpläne 25 %. Drei Änderungen, **alle ohne andere Ergebnisse**:
+
+* `tradeRoutes`: Städte einmal in eine Tabelle statt je Feld zweimal `cityAt` über alle
+  Städte, die Wegstufe je Feld nur einmal.
+* `settleGain(S, pi, r, c, before)`: die KI rechnet das Einkommen ohne die neue Stadt einmal
+  je Bewertung der Siedelplätze statt einmal je Platz.
+* `kiRoadPlans`: dieselbe Stadttabelle, und die Warteschlange des Dijkstra in Fächern je
+  Entfernung (`kiRoadQueue`) statt vor jeder Entnahme alles zu sortieren. Damit dieselben
+  Wege herauskommen, gibt die Schlange die Felder in **genau** der Reihenfolge des
+  sortierten Feldes heraus, auch bei gleicher Entfernung; die naheliegende Vorrangschlange
+  (Entfernung, dann Zeitpunkt des Einreihens) tut das nicht – in 309 von 400 Zufallsfolgen
+  anders, weil ein Feld, dessen Entfernung sinkt, im sortierten Feld hinter die schon
+  wartenden rückt.
+
+Geprüft: dieselben Endstände (ganzer Spielstand samt Protokoll) mit und ohne die Änderungen
+über 20 ganze Partien (8 im Marathon mit gemischten Stufen, einem Bot, Ereignissen und
+Wundern; 12 zu viert auf der Plättchenkarte, die Hälfte mit Modulen); `test.js` vergleicht
+die Handelsrouten über eine ganze Marathonpartie mit der Fassung bis v82, den Ertrag beim
+Siedeln mit und ohne vorab gerechnetes Einkommen und die Schlange mit dem sortierten Feld an
+400 Zufallsfolgen. Gemessen an den vier langsamsten Zügen zweier Marathonpartien, jeder
+einzeln, je zwei Läufe, allein auf dem Rechner: 10,0 → 7,4 s, 6,0 → 4,3 s, 4,4 → 3,7 s und
+2,9 → 2,65 s – 10 bis 30 % weniger. Was bleibt, steht in der Übergabe (offener Punkt 24).
+
+### Was sich in den Tests verschoben hat
+
+* Siegschwellen und Spielende prüfen den Wirtschaftssieg über `markRoundStart` statt über
+  `checkVictory` am Zugende. Der Fall „Russland erfüllt die Schwelle erst nach dem Anspruch
+  der Wikinger und kommt am Rundenende in den Vergleich" gilt nicht mehr: seit v83 kommt
+  Russland erst zu Beginn der nächsten Runde dran – da ist das Spiel schon aus, die Wikinger
+  gewinnen.
+* KI-Tests mit festen Startwerten (Flankenpläne, Reichweiten-Merker, Wissenschaft für die
+  Forschung) hängen am Spielverlauf. Mit der wörtlichen Lesart endeten ihre Partien in
+  Runde 2 und es gab nichts mehr zu prüfen; mit der umgesetzten laufen sie wie vorher
+  (Flankenpläne 28, Vergleiche der Reichweiten 6653, Wissenschaft in die Forschung 225
+  gegen 188).
+* `smoke.js`, Schritt „KI: Züge laufen über das Blatt": schaltet Ereignisse für diesen
+  Schritt ab. Die Häkchen aus den Modulschritten standen dort noch, und ein Ereignis der
+  ersten Runde lässt eine KI zu Recht untätig – gemessen in 23 von 600 ersten KI-Zügen, mit
+  v82 auf denselben Startwerten genauso; der Schritt prüft aber, dass jede KI gehandelt hat.
+  Vorher ein seltener Zufallsfehler, beim Lauf für v83 einmal aufgetreten.
+
+### Abgesichert
+
+`test.js`: Siegschwellen über `markRoundStart`; Wirtschaftssieg zu Rundenbeginn (Nenner die
+ganze Runde derselbe, Anspruch zu Beginn der nächsten Runde vor dem ersten Zug, gezählt mit
+der Bevölkerung von dort, kein Anspruch am Zugende, wer bis zum Rundenbeginn wieder fällt,
+meldet nichts an); Spielende (Anspruch zu Rundenbeginn, Militärsieg schlägt ihn, keine
+Nachprüfung am Rundenende). Kriegerkultur mit Burgenbau (Armee + zwei Städte = +6, Baukosten
+unberührt, die KI rechnet gleich – auch mit geplanten Armeen –, Burgenbau allein gibt
+nichts, die KI schätzt Burgenbau mit Kriegerkultur höher). Fähigkeiten als Liste (normal
+eine, Bots keine, `hasAbil`/`isAbil`, `isAbil(…, 'basis')` wirft und steht nirgends im
+Quelltext, fremde Fähigkeiten wirken, die eigene Grundfähigkeit fehlt ohne Draft, doppelt
+wirkt einfach, Kolonisten mit Fruchtbarkeit). Marathon: 40 Karten (Größe, vier Hauptstädte,
+Startertrag ≥ 4 mit der echten Regelmaschine und Siedlertrecks bei allen, Abstand ≥ 14,
+Geländeanteile, höchstens 5 Anläufe, gleicher Startwert gleiche Karte), Technologiekosten
+×2–×5 und 250, Rabatte danach, Kopierpreise; Draft (Vorrat 2n + 1, Schlange ab dem
+Startspieler, aus allen zwölf, Doppeltes im Vorrat möglich, niemand wählt außer der Reihe,
+der Letzte aus zwei, Doppeltes im eigenen Reich nur ohne Alternative, Bots draften nicht),
+Draftansicht ohne Fähigkeiten, die Partie danach mit denselben Starttechnologien und
+Hauptstädten; eine ganze Marathonpartie mit vier KI (zu Ende ohne Fehler, kein Zug über 8 s,
+Handelsrouten wie bis v82, Ertrag beim Siedeln mit vorab gerechnetem Einkommen); die
+Warteschlange des Straßenplans gegen das sortierte Feld. `smoke.js`: Aufbau des Marathons
+(vier Plätze, keine Karten- und Fähigkeitswahl, Hinweis, zurück zu „Vier Reiche"), Draft
+(Karte 24 × 36, Vorrat 7 mit einem Bot, Reiche mit Starttechnologien, die KI wählt selbst,
+der Mensch tippt, der Bot wählt nicht, jeder Bogen zeigt die Marathonkosten ohne Rabatt,
+keine Armee auf der Draftkarte), Spielbeginn (dieselbe Karte, dieselben Fähigkeiten,
+Kopfzeile mit beiden, Regelbogen mit Hinweis und umgerechneten Kosten, Protokoll, Speichern
+und Fortsetzen), „Nochmal spielen" in einen neuen Draft, der Draft auf Englisch.

@@ -30,11 +30,11 @@ sonst behalten installierte Geräte die alte Fassung.
 | Einstellungen | Im Hauptmenü: die Erweiterungsmodule **Ereignisse** und **Weltwunder** zuschalten. Ab Werk sind beide aus und fehlen im Aufbau ganz; eingeschaltet steht dort wieder das Häkchen und entscheidet je Partie. Dazu **Kosten ohne Umtausch anzeigen** (ab Werk aus, siehe Kosten) |
 | Kosten (v82) | Jeder Knopf zeigt, was **tatsächlich** abgeht: fehlt Nahrung oder Wissenschaft, steht dort auch der Rest in Münzen (bzw. was sonst einspringt) – Gründen für 10 Nahrung mit 8 im Vorrat zeigt **8🌾 4🪙**. Reicht es gar nicht oder wird nichts umgetauscht, steht der Preis selbst da. Im Technologiebogen gilt das für die Kacheln, die man gerade erforschen kann; die Karte im Gründungsmodus zeigt weiter den Preis (zum Vergleichen). Mit **Kosten ohne Umtausch anzeigen** in den Einstellungen wie bis v81 überall nur der Preis |
 | Techtree (v82) | Seit v82 gibt es einen Techtree – den früheren „alternativen": Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5 · in der Forschung der Industrialisierung Chemie 11, Biologie 12, Wissenschaftliche Methode 15. Das Häkchen im Aufbau ist weg. Der alte (Schrift 1, Mathematik 2 … Landwirtschaft 1, Bewässerung 5, Wiss. Methode 11, Chemie 12, Biologie 15) gilt nur noch im **Tutorial** und in Partien, die vor v82 mit ihm begonnen wurden – dort nennen Weltblatt und Regelbogen ihn. Quelle: die Kosten in `TECHS`, die alten in `OLD_TECH_COSTS` (`js/data.js`) |
-| Spielart | „Vier Reiche“, „Drei Reiche“ oder „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) |
+| Spielart | „Vier Reiche“, „Drei Reiche“, „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) oder **„Marathon“** (v83: vier Reiche auf einer großen Zufallskarte, teurere Technologien, Fähigkeiten im Draft – siehe unten) |
 | Mensch / KI / Bot | Je Platz im Aufbau. Die **KI** spielt nach den Regeln für Menschen: sie bezahlt alles, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie, und sie legt ihr Startplättchen verdeckt selbst. Stufe Leicht/Mittel/Schwer für alle KI gemeinsam – gleiche Regeln, nur übersieht und verrechnet sich die leichtere Stufe öfter; im Duell gemessen Leicht zwischen den Bots Prinz und König, Mittel etwas über König, Schwer etwas über David. **Bots** spielen nach den Bot-Regeln (Würfelproben, Macht = Bevölkerung) und haben ihre eigene Schwierigkeit. Ab Werk sind die Gegner KI |
 | Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen. Bei ausgelostem Reich steht die Fähigkeit zwangsläufig ebenfalls auf Zufall |
 | Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
-| Fähigkeit sehen | Die eigene Fähigkeit steht in der Kopfzeile neben dem Reichsnamen; das Weltblatt (ⓘ) listet alle Reiche mit Fähigkeit und Wirkung |
+| Fähigkeit sehen | Die eigene Fähigkeit steht in der Kopfzeile neben dem Reichsnamen; das Weltblatt (ⓘ) listet alle Reiche mit Fähigkeit und Wirkung. Im Marathon stehen dort beide gedrafteten |
 | Karte | Originalkarte, Große Karte, **Plättchenkarte** (die Zufallskarte) oder eigene aus dem Editor |
 | Plättchenkarte | Zufallskarte aus Dreiecken zu 15 Feldern. Vor dem Spiel legt jedes Reich verdeckt sein eigenes Startdreieck: Lage wählen (drei), Hauptstadt setzen. Dann wird aufgedeckt. **Rötlich umrandet** sind Startfelder, bei denen ein anderes Feld – auch in einer anderen Lage – von einem Ertrag mehr und von keinem weniger bringt |
 | **Welt** | Ereignis dieser Runde, eigene und fremde Weltwunder, verfügbarer Wunder-Pool |
@@ -53,7 +53,11 @@ sonst behalten installierte Geräte die alte Fassung.
 
 Ein **Militärsieg** (fremde Hauptstadt erobert) endet das Spiel auf der Stelle.
 Der **Wirtschaftssieg** verlangt mehr als 2/3 der Weltbevölkerung (im Duell mehr als 3/4,
-mit Theologie oder Vereinten Nationen weniger) und ist in Runde 1 nicht möglich.
+mit Theologie oder Vereinten Nationen weniger). Seit v83 wird er **zu Beginn jeder Runde**
+geprüft, ab Runde 2, für alle Reiche mit der Bevölkerung von genau diesem Moment – eigene
+und Weltbevölkerung. Was im Lauf einer Runde wächst oder fällt, zählt erst zu Beginn der
+nächsten; so gilt in einer Runde für alle derselbe Nenner. Die Kopfzeile zeigt den
+laufenden Stand, also das, was zu Beginn der nächsten Runde zählen wird.
 **Wirtschafts-, Forschungs- und Kultursieg** werden angemeldet: die Runde wird noch zu
 Ende gespielt, die Kopfzeile zeigt dann „letzte Runde". Erfüllen mehrere Reiche in
 derselben Runde eine Bedingung, entscheiden am Rundenende Punkte:
@@ -151,6 +155,36 @@ Neue Plättchen kommen in `js/tiles.js`, `TILE_POOL` – fünf Zeilen zu 5/4/3/2
 Meer nur am Rand liegt und dass die drei mittigen Felder Land sind und jedes davon im
 ersten Zug mindestens 4 Nahrung bringt.
 
+## Marathon (v83)
+
+Ein eigener Spielmodus im Aufbau (**Marathon**), immer vier Reiche – Mensch, KI oder Bot je
+Platz, jede Zivilisation einmal.
+
+* **Karte:** zufällig erzeugt, 24 × 36 Felder – viermal die Originalkarte (12 × 18).
+  Höhenrauschen mit Meer am Rand und den tiefsten 30 % als Meer, Gebirgskämme, Flüsse von
+  den Bergen bergab, Wald nach eigenem Rauschen, ein paar Inseln (Anteile ähnlich der
+  Originalkarte). Je Kartenviertel eine Hauptstadt, mindestens 14 Felder voneinander
+  entfernt, jede mit **Nahrung + ½ Münzen ≥ 4** im ersten Zug – gerechnet mit 2
+  Bevölkerung (falls jemand Siedlertrecks draftet) und ohne Technologien. Unter den
+  erlaubten Aufstellungen die, deren schwächste Hauptstadt am besten dasteht.
+* **Technologien** kosten je Zeitalter das Doppelte (Antike), Dreifache (Mittelalter),
+  Vierfache (Industrialisierung) und Fünffache (Moderne), die Singularität das 2,5-Fache
+  (250). Rabatte (Griechenland, Wissenschaftliche Methode) ziehen danach ab; Kopieren zahlt
+  die Marathonkosten. Regelbogen und Technologiebogen zeigen die umgerechneten Zahlen.
+* **Draft der Fähigkeiten:** Vor dem ersten Zug sehen alle die Karte, jede Hauptstadt mit
+  ihrem Ertrag und die ausgewürfelten Starttechnologien jedes Reichs (Knopf **Bogen**).
+  Dann wählt jedes Reich in Schlangenreihenfolge (Zugfolge ab dem Startspieler, dann
+  rückwärts: 1-2-3-4-4-3-2-1) zwei Fähigkeiten aus einem Vorrat von 2n + 1 – bei vier
+  Wählenden neun. Der Vorrat wird zufällig aus allen zwölf Fähigkeiten gezogen, dieselbe
+  kann mehrfach darin liegen; der Letzte wählt aus den letzten zwei. Fremde Fähigkeiten
+  wirken wie eigene (Russland mit Handelsreich tauscht 1:1). Eine, die man schon hat, darf
+  man nur nehmen, wenn nichts anderes übrig ist – doppelt wirkt sie nicht doppelt.
+  **Bots draften nicht** (nach den Bot-Regeln haben sie keine Fähigkeiten); sitzt einer am
+  Tisch, ist der Vorrat 2 · 3 + 1 = 7. Die KI wählt selbst.
+* Während des Drafts hat noch niemand eine Fähigkeit – Bogen und Hauptstadtertrag zeigen
+  deshalb die Werte ohne (kein griechischer Rabatt, keine Gratisarmee).
+* „Nochmal spielen" führt wieder in den Draft, mit neuer Karte.
+
 ## Tutorial
 
 Beim Öffnen kommt eine Frage: **schon Erfahrung mit Spielen wie Civilization?**
@@ -206,6 +240,11 @@ Die Reihenfolge in der JSON ist die **Anzeigereihenfolge** (Aufbau, Regelbogen),
 `order` die **Zugreihenfolge** im Spiel. Was die JSON nicht enthält, sind die Regeln: eine
 neue Alternativfähigkeit braucht zusätzlich Code in `js/engine.js`, der ihren Schlüssel
 über `isAbil(p, '…')` prüft – der Test meldet eine Fähigkeit, die nirgends geprüft wird.
+Grundfähigkeiten heißen bei allen Zivilisationen `basis` und werden deshalb immer mit der
+Zivilisation geprüft: `hasAbil(p, 'russland', 'basis')` (seit v83 – im Marathon kann jedes
+Reich jede Fähigkeit draften). Neue Fähigkeiten kommen automatisch in den Draft
+(`ALL_ABILITIES`); die KI wählt sie mit dem Grundwert 0, bis sie einen in `KI_DRAFT_BASE`
+(`js/marathon.js`) bekommt.
 Englische Namen und Wirkungstexte kommen in `js/i18n.js` unter `DATA_EN.civ` und
 `DATA_EN.abil`.
 
@@ -254,6 +293,7 @@ js/tiles.js           Dreiecksplättchen: Vorrat, Formen, Legephase, Kartenbau
 js/engine.js          Regeln: Einkommen, Aktionen, Kampf, Sieg
 js/bots.js            Bot-Züge nach den Bot-Regeln
 js/ki.js              KI-Züge nach den Regeln für Menschen
+js/marathon.js        Marathon: Kartengenerator, Hauptstädte, Draft, Draftwahl der KI
 js/ui.js              Karte, Gesten, Aktionsblätter, Editor
 sw.js                 Offline-Cache
 ANNAHMEN.md           wo die Regeln offen sind und wie hier entschieden wurde

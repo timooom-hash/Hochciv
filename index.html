@@ -71,6 +71,7 @@
       <button data-mode="vier" class="on">Vier Reiche</button>
       <button data-mode="drei">Drei Reiche</button>
       <button data-mode="duell">1 gegen 1</button>
+      <button data-mode="marathon">Marathon</button>
     </div>
     <div id="setup-list"></div>
     <label class="row" id="setup-map-row"><span>Karte</span>
@@ -80,6 +81,11 @@
       Theologie 7/10, mit Vereinten Nationen 2/3).</p>
     <p class="hint" id="setup-tile-hint" hidden>Plättchenkarte: die offenen Dreiecke liegen
       gleich, das eigene legt jede*r selbst – Lage wählen, Hauptstadt setzen, verdeckt.</p>
+    <p class="hint" id="setup-marathon-hint" hidden>Marathon: vier Reiche auf einer
+      Zufallskarte, viermal so groß wie die Originalkarte. Technologien kosten je Zeitalter
+      das Zwei- bis Fünffache, die Singularität das 2,5-Fache. Vor dem ersten Zug sehen alle
+      die Karte und die Starttechnologien und draften dann ihre Fähigkeiten: je zwei, in
+      Schlangenreihenfolge.</p>
     <p class="hint" id="setup-double-hint" hidden>Hier darf jeder Platz frei wählen, auch
       zweimal dieselbe Zivilisation (mit gleicher oder anderer Fähigkeit). Doppelte
       bekommen Ziffern und eine eigene Farbe. Auf den festen Karten sitzt jede
@@ -170,6 +176,23 @@
   </div>
 </section>
 
+<!-- ------------------------------------------------- Marathon: Fähigkeiten draften -->
+<section id="screen-draft" class="screen">
+  <header class="bar">
+    <button class="icon-btn" data-back>‹</button>
+    <h2 id="dr-title">Marathon · Fähigkeiten draften</h2>
+  </header>
+  <div class="draft-layout">
+    <div id="dr-host"><svg id="dr-map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <aside class="draft-side">
+      <p class="hint" id="dr-note"></p>
+      <div id="dr-pool"></div>
+      <div id="dr-players"></div>
+      <button class="btn primary wide" id="dr-go" hidden>Spiel beginnen</button>
+    </aside>
+  </div>
+</section>
+
 <!-- ------------------------------------------------------------------ Karteneditor -->
 <section id="screen-editor" class="screen">
   <header class="bar">
@@ -201,6 +224,7 @@
 <script src="js/expansion.js"></script>
 <script src="js/bots.js"></script>
 <script src="js/ki.js"></script>
+<script src="js/marathon.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/ui.js"></script>
 </body>

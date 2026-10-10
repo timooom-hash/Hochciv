@@ -29,7 +29,7 @@
    im Tutorial) – zum Vergleich mit Messungen von vor v82.                          */
 const fs = require('fs'), vm = require('vm');
 for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js',
-  'js/expansion.js', 'js/bots.js', 'js/ki.js'])
+  'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/marathon.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'), { filename: f });
 
 const jetzt = () => Number(process.hrtime.bigint()) / 1e6;

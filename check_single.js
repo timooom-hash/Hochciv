@@ -40,5 +40,19 @@ w.eval(`(() => {
 const T = w.eval('S');
 console.log('Plättchenkarte:', T.map.name, T.map.rows.length + 'x' + T.map.rows[0].length,
   '|', $('map').querySelectorAll('[data-r]').length, 'Felder |', T.cities.length, 'Hauptstädte');
+// Marathon (v83): Zufallskarte, Draft mit der KI, dann das Spiel
+w.eval("closeModal(); show('screen-setup'); setupScreen();");
+w.eval("$('setup-mode').querySelector('[data-mode=marathon]').onclick(); $('setup-go').onclick()");
+w.eval(`(() => {
+  let n = 0;
+  while (!draftDone(draftState.D) && n++ < 20)
+    [...$('dr-pool').querySelectorAll('[data-ab]')].find(b => !b.disabled).onclick();
+  $('dr-go').onclick();
+})()`);
+const M = w.eval('S');
+console.log('Marathon:', M.map.name, '|', $('map').querySelectorAll('[data-r]').length, 'Felder |',
+  M.players.map(p => w.eval('abilitiesOf')(p).length).join('/'), 'Fähigkeiten je Reich');
+if (!M.marathon || M.players.some(p => w.eval('abilitiesOf')(p).length !== 2))
+  { console.log('FEHLER: Marathon startet nicht mit gedrafteten Fähigkeiten'); process.exit(1); }
 console.log('Fehler:', errs.length ? errs : 'keine');
 process.exit(errs.length?1:0);

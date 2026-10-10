@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 5.10., `sw.js` v82)
+# Hochzeivilization — Projekt-Übergabe (Stand 9.10., `sw.js` v83)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v82)
+## Letzte Sitzungen auf einen Blick (v61 → v83)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -37,6 +37,13 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v80 | **Gesperrter Bildschirm nach KI-Zügen** (gemeldet, nicht nachgestellt): der Zug eines Menschen beginnt immer ohne Sperre, „Zug beenden" wirkt nur im eigenen Zug, Fehler im Zugablauf stehen im Protokoll statt den Ablauf anzuhalten, dieselbe KI zieht nach einem Neuladen nicht noch einmal. **Eisenbahn durch Kontrollzonen** (gemeldet): wer eine Kontrollzone betritt, hält für den Rest des Zuges an – auch auf der Eisenbahn; Einblendung beim Anhalten, Grund am gesperrten Knopf | Fehler |
 | v81 | **Regelbogen:** Abschnitte „Bewegung, Straßen und Eisenbahn" (Bewegungspunkte, Bau und Preise, Kosten je Schritt, Handelsrouten) und „Kontrollzone (Schießpulver)" – Wortlaut vom Autor freigegeben, deutsch und englisch; `test.js` prüft jede Aussage an der Regelmaschine | Oberfläche |
 | v82 | **Kosten am Knopf: was tatsächlich abgeht** (Gründen für 10 🌾 mit 8 im Vorrat: „8🌾 4🪙"), Einstellung „Kosten ohne Umtausch anzeigen" für die alte Anzeige. **Ein Techtree:** der frühere alternative ist der Standard, das Häkchen im Aufbau ist weg; der alte gilt nur noch im Tutorial und in Partien von vor v82 | Oberfläche + Regel |
+| v83 | **Kriegerkultur mit Burgenbau:** +2 Macht auch je eigener Stadt. **Wirtschaftssieg zu Rundenbeginn:** eigene und Weltbevölkerung von dort, geprüft dort für alle (kein Wirtschaftssieg in Runde 2 im Duell mehr). **Marathon:** vier Reiche, Zufallskarte 24 × 36, Hauptstädte mit Nahrung + ½ Münzen ≥ 4, Technologien ×2/×3/×4/×5 (Singularität ×2,5), Fähigkeiten im Schlangen-Draft aus 2n + 1 (`js/marathon.js`); Fähigkeiten als Liste (`abilitiesOf`, `hasAbil`). die langsamsten KI-Züge auf großen Karten 10–30 % kürzer (Handelsrouten, Siedelplätze, Straßenpläne – gleiche Ergebnisse) | Regel + Modus + KI |
+
+Neu in v83: die ersten vier Punkte unter „Was das Spiel heute kann", ausführlich in
+`ANNAHMEN.md` (Abschnitt „Kriegerkultur mit Burgenbau · Wirtschaftssieg zu Rundenbeginn ·
+Marathon (v83)"), sechs neue Fragilitäten und die offenen Punkte 24–28 (KI-Zugzeit im
+Marathon, Kolonisten im Marathon, Kriegerkultur zu viert, Draft nicht gespeichert, die
+getroffenen Auslegungen); Punkt 14 ist damit erledigt.
 
 Neu seit v77 (auf v76 des Autors aufgesetzt): die **KI** (Abschnitte „KI (v77)",
 „KI-Stufen (v78)" und „Abwehr neu gewichtet (v79)" unten, ausführlich in `ANNAHMEN.md`) und
@@ -66,7 +73,7 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
   Danach `npm install jsdom --no-fund --no-audit` — für `smoke.js` und `check_single.js` nötig.
   Am besten im **Elternordner** (`cd /home/claude`): Node findet es dort über die
   Verzeichnissuche, und `node_modules` kann gar nicht erst ins Paket rutschen (so in v69).
-- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (33 Dateien),
+- **Deliverables in `/mnt/user-data/outputs/`:** Ordner `hochzeivilization/` (34 Dateien),
   `hochzeivilization.zip`, und `hochzeivilization-einzeldatei.html` — Letzteres ist, was der
   Autor tatsächlich aufs iPad lädt.
 - **Wichtig beim Paketieren:** `node_modules` und `package*.json` ausschließen
@@ -78,21 +85,22 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1237 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1260 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 424 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 436 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1870 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 1939 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1729 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
-| `js/ui.js` | 2332 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/ki.js` | 1799 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/marathon.js` | 301 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
+| `js/ui.js` | 2438 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 680 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 5779 | **1493 Assertions**, `node test.js` |
-| `smoke.js` | 3099 | **135 Schritte** durch die echte UI via jsdom, `node smoke.js` |
-| `build_single.py` / `check_single.js` | 21 / 45 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
+| `test.js` | 6096 | **1551 Assertions**, `node test.js` |
+| `smoke.js` | 3215 | **140 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `build_single.py` / `check_single.js` | 21 / 59 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
@@ -119,6 +127,23 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **Marathon (v83).** Spielart im Aufbau, immer vier Reiche: Zufallskarte 24 × 36
+  (`marathonMap`), je Viertel eine Hauptstadt mit Nahrung + ½ Münzen ≥ 4 im ersten Zug –
+  gerechnet mit 2 Bevölkerung –, mindestens 14 Felder auseinander. Technologien kosten
+  ×2/×3/×4/×5 je Zeitalter, die Singularität ×2,5 (`techBase`, `S.marathon`). Vor dem ersten
+  Zug ein Draft (`screen-draft`): Karte, Ertrag jeder Hauptstadt, Starttechnologien samt
+  Bogen; jedes Reich wählt zwei Fähigkeiten in Schlangenreihenfolge aus 2n + 1 zufällig
+  gezogenen (mit Zurücklegen), n = Reiche außer Bots. Die KI wählt nach gemessenen
+  Grundwerten (`KI_DRAFT_BASE`). Gedraftetes steht als `p.drafted` im Spielstand.
+- **Fähigkeiten als Liste (v83).** `abilitiesOf(p)` → Schlüssel „Zivilisation:Fähigkeit";
+  Grundfähigkeiten (`basis`) immer mit `hasAbil(p, civ, 'basis')`, die übrigen mit
+  `isAbil(p, k)`; `abilInfos(p)` für die Anzeige. Ohne Draft genau eine wie bisher.
+- **Wirtschaftssieg zu Rundenbeginn (v83).** Gezählt mit eigener und Weltbevölkerung zu
+  Beginn der Runde (`S.roundPops`, `S.roundPop`), geprüft dort für alle in Zugfolge
+  (`markRoundStart`); nicht mehr am Zugende, keine Nachprüfung am Rundenende. Die
+  Kopfzeile zeigt den laufenden Stand.
+- **Kriegerkultur mit Burgenbau (v83).** +2 Macht je Armee und, mit Burgenbau, je eigener
+  Stadt (`warriorUnits`); die Baukosten weiterer Armeen zählen nur echte Armeen.
 - **Kosten am Knopf (v82).** Jeder Kostenknopf zeigt, was tatsächlich abgeht (`costText` →
   `costPaid`, dieselbe Rechnung wie `payAll`): fehlt Nahrung oder Wissenschaft, steht der
   Rest in Münzen bzw. was sonst einspringt daneben – „8🌾 4🪙" statt „10🌾". Wird nichts
@@ -648,10 +673,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1493 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1551 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (135 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (140 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -849,6 +874,28 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Stelle, die Würfe verbraucht, verschiebt sich der ganze Ablauf — dann die Textstellen
   prüfen, die Bot-Verhalten beschreiben, und ggf. eine neue Würfelfolge suchen (in `test.js`
   ist der Ablauf zweimal auf Gleichheit gepinnt).
+- **Fähigkeiten nur über `abilitiesOf`/`hasAbil`/`isAbil` prüfen, nie über `p.ability`**
+  (seit v83). Im Marathon steht die Wahl in `p.drafted`, und ein Reich kann fremde
+  Fähigkeiten haben. Grundfähigkeiten heißen überall `basis` – `isAbil(p, 'basis')` wirft,
+  und `test.js` sucht den Quelltext danach ab. Wer eine Fähigkeit mit Zahlwirkung baut,
+  bedenkt, dass zwei zusammenkommen können (Vorbild: `growPrice` nimmt den größeren Faktor).
+- **Der Wirtschaftssieg hängt an `markRoundStart`** (seit v83): es hält die Bevölkerung zu
+  Rundenbeginn fest (`S.roundPop`, `S.roundPops`) und prüft dort alle. Wer einen neuen Weg
+  baut, eine Runde zu beginnen, ruft es mit (`newGame`, `advanceTurn`). Tests, die die
+  Bevölkerung direkt setzen, rufen danach `markRoundStart` – `checkVictory` allein rechnet mit
+  dem festgehaltenen Stand. Spielstände von vor v83 haben ihn nicht; dann zählt bis zum
+  nächsten Rundenbeginn der laufende (`victoryOwn`/`victoryWorld`).
+- **Eine neue JS-Datei muss in sieben Listen** (zuletzt `js/marathon.js`): `index.html`,
+  `sw.js`, `build_single.py`, `smoke.js`, `test.js` (Lade- und Übersetzungsliste),
+  `tools_ki.js` – sonst fehlt sie offline, in der Einzeldatei oder in den Prüfprogrammen.
+- **Der Draft zeigt eine Partie ohne Fähigkeiten** (`draftView`, seit v83). Wer in `newGame`
+  etwas an Fähigkeiten hängt, sieht es dort nicht – richtig so, gedraftet ist ja noch
+  nichts. Die echte Partie entsteht in `draftGo` neu aus `cfg` (gleiche Karte, gleiche Würfe
+  über `cfg.avail`/`cfg.wpool`, gleicher Startwert).
+- **Der Draftbildschirm dreht sich mit wie das Spiel** (`TURN_SCREENS`): er zeigt die Karte.
+- **`tradeRoutes` rechnet mit einer eigenen Stadttabelle** (seit v83, Tempo): wer ändert, wie
+  Städte Wege sperren oder als Straße zählen, ändert es dort mit – `effectiveRoad` allein
+  reicht nicht. `test.js` vergleicht über eine ganze Marathonpartie mit der Fassung bis v82.
 
 ### Gründungskosten (geändert in v51)
 
@@ -1184,11 +1231,9 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    zieht er in `botPlanArmies` (b) „verteidigen" nachträglich zur Stadt – die eben
    gebildete Flanke ist dann wieder offen. Der Test legt den Partner deshalb auch neben die
    Stadt. Lösung wäre, Flankenpartner in (a) mit zu belegen; Balancefrage, nicht angefasst.
-14. **Wirtschaftssieg in Runde 2 im Duell (v77).** Seit Runde 1 gesperrt ist, rückt das
-   Muster eine Runde nach hinten: 5 von 30 Duellen KI gegen KI endeten in Runde 2 mit einem
-   Wirtschaftssieg, der Startspieler gewann 18 von 30. Zu dritt 1 von 30, zu viert keins.
-   Mögliche Abhilfen, je eine Zeile in `checkVictory`: Sperre bis Runde 2 (oder 3), oder eine
-   Mindest-Weltbevölkerung (etwa 4 × Zahl der Reiche). **Entscheidung des Autors steht aus.**
+14. **Wirtschaftssieg in Runde 2 im Duell (v77) – erledigt mit v83.** Seit der Wirtschaftssieg
+   mit der Bevölkerung zu Rundenbeginn zählt, haben zu Beginn von Runde 2 beide Reiche genau
+   einen Zug gehabt: 0 von 40 KI-Duellen enden in Runde 2 (v82: 7 von 40).
 15. **Passt Leicht für Einsteiger? (v78)** Seit v78 sind die Stufen deutlich getrennt
    (Duell gepaart Schwer–Leicht 32 : 8, zu dritt und zu viert je 21 : 3) und an den Bots
    geeicht: im Duell spielte Leicht etwa wie Prinz, Mittel wie König, Schwer wie David. Die
@@ -1239,6 +1284,37 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Rechner selbst ist gut 1,5× langsamer als bis v81). Profil dieses Zuges: Bewertung über
    `kiRisk` gut ein Drittel, `income` ein Viertel, davon `tradeRoutes` 13 % – ein Merker
    für Handelsrouten je Spielstand wäre der erste Ansatz.
+   v83: `tradeRoutes` mit Stadttabelle, das Einkommen vor dem Siedeln einmal je Bewertung
+   (`settleGain(…, before)`), Straßenpläne mit Fächer-Schlange – gleiche Ergebnisse, die
+   langsamsten Marathon-Züge 10–30 % kürzer (Punkt 24).
+24. **KI-Zugzeit im Marathon (v83).** Auf der großen Karte stehen zur Mitte der Partie 50 und
+   mehr Städte (ein Reich mit Kolonisten allein bis 58). Gemessen (8 Partien KI Schwer, nach
+   den Tempo-Änderungen, allein auf dem Testrechner): Median je Partie 0,1–0,4 s, 90 % der
+   Züge unter 1–2 s, längster Zug je Partie 1,2–6,5 s; der längste in einer Partie mit 83
+   Städten. Dieselben Züge einzeln vor und nach den Tempo-Änderungen: 10,0 → 7,4 s,
+   6,0 → 4,3 s, 4,4 → 3,7 s, 2,9 → 2,65 s. Auf dem iPad nicht gemessen. Was im Profil danach
+   bleibt: Einkommen je Bewertung (Gebiet, Handelsrouten) knapp 30 %, `kiRisk` 17 %,
+   Gründungskosten über die Wegsuche 13 %, Straßenpläne 14 %. Grenze in `test.js` 8 s.
+25. **Kolonisten im Marathon (v83, gemessen, nicht angefasst).** In 40 Marathonpartien mit
+   vier KI und zufällig zugeteilten Fähigkeiten gewann, wer Kolonisten hatte, 21 von 27 –
+   bei gleicher Stärke wäre es ein Viertel. Auf der großen Karte mit teurer Forschung ist
+   Gründen ohne Grundkosten offenbar das Stärkste. Ob Menschen das genauso ausnutzen, ist
+   nicht gemessen; eine Balancefrage für den Autor (etwa Kolonisten im Marathon schwächer,
+   oder höchstens einmal im Vorrat).
+26. **Kriegerkultur zu viert (v83, gemessen).** Mit Burgenbau gewinnen die Wikinger mit
+   Kriegerkultur 17 von 40 KI-Partien zu viert (v82: 12, gleich stark wären 10). Gewollt war
+   die Stärkung; ob es so viel sein soll, entscheidet das Spielen.
+27. **Der Draft wird nicht gespeichert (v83).** Wer die App mitten im Draft schließt, beginnt
+   den Marathon neu („Spiel fortsetzen" führt dann in die vorige Partie). Der Draft dauert
+   Sekunden bis wenige Minuten; gespeichert wird ab dem ersten Zug.
+28. **Getroffene Auslegungen (v83) – zum Ändern angeboten.** (a) Wirtschaftssieg: eigene
+   **und** Weltbevölkerung zu Rundenbeginn, geprüft dort; die wörtliche Lesart (nur der
+   Nenner fest) ließ jedes KI-Duell in Runde 2 enden. (b) Kriegerkultur: +2 je Stadt, wie
+   eine Armee. (c) Draft: n = Reiche außer Bots (Bots haben keine Fähigkeiten). (d) Keine
+   Fähigkeit doppelt im eigenen Reich, solange anderes übrig ist. (e) Startertrag mit 2
+   Bevölkerung gerechnet, ohne Technologien. (f) Der Kreml-Zuschlag auf die Singularität
+   (+50) wird im Marathon nicht vervielfacht. (g) Das Tutorial erklärt den Zeitpunkt des
+   Wirtschaftssiegs nicht (alter Techtree, feste Partie, bleibt bis zum neuen Übungsspiel).
 
 ## Arbeitsweise, die der Autor schätzt
 

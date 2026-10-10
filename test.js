@@ -1,6 +1,6 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/tutorial.js'])
+for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/marathon.js', 'js/tutorial.js'])
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
 let fails = 0;
@@ -2715,6 +2715,258 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   }
 }
 
+/* ============================ Fähigkeiten als Liste (v83, für den Marathon-Draft)
+   Ein Reich hat normal genau eine Fähigkeit seiner Zivilisation; im Marathon zwei
+   gedraftete, auch fremde. Grundfähigkeiten heißen überall 'basis' und werden deshalb
+   immer mit der Zivilisation geprüft (hasAbil). */
+{
+  const zwei = (civ, drafted) => newGame({ seed: 7, players: [{ civ, kind: 'human', drafted }, { civ: 'wikinger', kind: 'bot' }] });
+  const R = newGame({ seed: 7, players: [{ civ: 'russland', kind: 'human', ability: 'siedler' }, { civ: 'england', kind: 'bot' }] });
+  const ru = R.players.findIndex(p => p.civ === 'russland'), bo = 1 - ru;
+  eq([abilitiesOf(R.players[ru]), abilitiesOf(R.players[bo])], [['russland:siedler'], []], 'normal: eine Fähigkeit, Bots keine');
+  eq([hasAbil(R.players[ru], 'russland', 'siedler'), isAbil(R.players[ru], 'siedler'), hasAbil(R.players[ru], 'russland', 'basis')],
+    [true, true, false], 'hasAbil mit Zivilisation, isAbil für eindeutige Schlüssel');
+  let wirft = false;
+  try { isAbil(R.players[ru], 'basis'); } catch { wirft = true; }
+  eq(wirft, true, "isAbil(p, 'basis') ist mehrdeutig und wirft");
+  // gedraftet: fremde Fähigkeiten wirken bei jeder Zivilisation
+  const E = zwei('england', ['wikinger:basis', 'russland:siedler']);
+  const ei = E.players.findIndex(p => p.civ === 'england');
+  eq([armiesOf(E, ei).length, capitalOf(E, ei).pop], [1, 2], 'England mit Seefahrer und Siedlertrecks: Gratisarmee und Hauptstadt mit 2');
+  eq(abilInfos(E.players[ei]).map(a => a.n), ['Seefahrer', 'Siedlertrecks'], 'abilInfos nennt beide');
+  eq(hasAbil(E.players[ei], 'england', 'basis'), false, 'die eigene Grundfähigkeit hat England dann nicht');
+  const G = zwei('griechenland', ['england:basis', 'wikinger:armeemacht']);
+  const gi = G.players.findIndex(p => p.civ === 'griechenland');
+  eq([rates(G, gi).coinsToFood, rates(G, gi).foodToCoins], [1, 1], 'Griechenland mit Handelsreich: 1:1');
+  eq(techCost(G, gi, TECH_BY_KEY.papier), 6, '… und ohne die griechische Grundfähigkeit kein Rabatt');
+  const W = zwei('wikinger', ['griechenland:basis', 'griechenland:basis']);
+  const wi = W.players.findIndex(p => p.kind === 'human');
+  eq(techCost(W, wi, TECH_BY_KEY.papier), 4, 'doppelt gedraftet wirkt einfach (Papier 6 − 2, nicht − 4)');
+  eq(armiesOf(W, wi).length, 0, 'Wikinger ohne Seefahrer: keine Gratisarmee');
+  const K = zwei('russland', ['england:gruenden', 'russland:wachstum']);
+  const ki = K.players.findIndex(p => p.civ === 'russland');
+  eq(growPrice(K, ki, capitalOf(K, ki)), { food: 0, coins: 2 }, 'Kolonisten und Fruchtbarkeit zusammen: keine Nahrung, doppelte Münzen');
+  // keine Prüfung der Grundfähigkeit ohne Zivilisation mehr im Quelltext
+  const quelle = ['engine', 'expansion', 'bots', 'ki', 'marathon', 'ui']
+    .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8')).join('\n');
+  eq((quelle.match(/isAbil\([^)]*'basis'\)/g) || []).length, 0, "kein isAbil(…, 'basis') mehr im Quelltext");
+}
+
+/* ============================ Marathon (v83, Anweisung des Autors)
+   Vier Reiche, Zufallskarte 24 × 36 (viermal die Europakarte), jede Hauptstadt mit
+   Nahrung + ½ Münzen ≥ 4 auch mit 2 Bevölkerung, Technologien ×2/×3/×4/×5, Singularität
+   ×2,5, Fähigkeiten im Snake-Draft aus 2n + 1. */
+{
+  // --- Karte und Hauptstädte, über viele Startwerte
+  const anteil = {}, schwach = [];
+  let felder = 0, abstand = 99, versuche = 0, falsch = [];
+  for (let seed = 1; seed <= 40; seed++) {
+    const m = marathonMap(seed);
+    versuche = Math.max(versuche, m.tries);
+    if (m.rows.length !== MARATHON_ROWS || m.rows.some(z => z.length !== MARATHON_COLS)) falsch.push(seed + ' Größe');
+    m.rows.forEach(z => [...z].forEach(t => { anteil[t] = (anteil[t] || 0) + 1; felder++; }));
+    const cs = m.capitals;
+    if (cs.length !== 4) falsch.push(seed + ' Hauptstädte ' + cs.length);
+    for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) abstand = Math.min(abstand, hexDistance(cs[i].r, cs[i].c, cs[j].r, cs[j].c));
+    // mit der echten Regelmaschine: alle mit Siedlertrecks (Hauptstadt 2 Bevölkerung)
+    const S = newGame({ seed, map: m, marathon: true,
+      players: CIVS.map(c => ({ civ: c.k, kind: 'human', drafted: ['russland:siedler', 'wikinger:kampfertrag'] })) });
+    S.players.forEach((p, i) => {
+      const y = income(S, i);
+      if (capitalOf(S, i).pop !== 2) falsch.push(seed + ' Bevölkerung');
+      if (y.food + y.coins / 2 < 4) schwach.push(`${seed}/${p.civ}: ${y.food} + ${y.coins}/2`);
+    });
+  }
+  const pz = k => Math.round(100 * (anteil[k] || 0) / felder);
+  eq(falsch, [], 'Marathonkarte: 24 × 36, vier Hauptstädte');
+  eq(schwach, [], 'jede Hauptstadt: Nahrung + ½ Münzen ≥ 4 im ersten Zug, auch mit 2 Bevölkerung (40 Karten)');
+  eq(abstand >= MARATHON_MIN_DIST, true, `Hauptstädte mindestens ${MARATHON_MIN_DIST} Felder auseinander (kleinster Abstand ${abstand})`);
+  eq([pz('M') >= 24 && pz('M') <= 34, pz('G') >= 30, pz('W') >= 11, pz('B') >= 6, pz('F') >= 5, pz('I') >= 1], [true, true, true, true, true, true],
+    `Gelände wie auf der Originalkarte (Meer ${pz('M')} %, Grasland ${pz('G')} %, Wald ${pz('W')} %, Gebirge ${pz('B')} %, Fluss ${pz('F')} %, Insel ${pz('I')} %)`);
+  eq(versuche <= 5, true, `höchstens 5 Anläufe je Karte (${versuche})`);
+  eq(JSON.stringify(marathonMap(12)), JSON.stringify(marathonMap(12)), 'derselbe Startwert, dieselbe Karte');
+  eq(marathonStartYield(['GGG', 'GGG', 'GGG'], 1, 1), { sci: 2, food: 4, coins: 2 },
+    'Startertrag mit 2 Bevölkerung: sechs Grasland = 6 Nahrung − 2, Münzen 0 + 2');
+
+  // --- Technologiekosten
+  const M = newGame({ seed: 3, map: marathonMap(3), marathon: true, players: CIVS.map(c => ({ civ: c.k, kind: 'human', drafted: ['england:basis', 'russland:basis'] })) });
+  const N = newGame({ seed: 3, players: CIVS.map(c => ({ civ: c.k, kind: 'human', ability: 'gratistech' })) });
+  const k4 = ['mathematik', 'papier', 'chemie', 'computertechnik'].map(k => TECH_BY_KEY[k]);
+  eq(k4.map(t => techCost(M, 0, t)), k4.map((t, i) => techCost(N, 0, t) * [2, 3, 4, 5][i]),
+    'Marathon: Antike ×2, Mittelalter ×3, Industrialisierung ×4, Moderne ×5');
+  eq([techCost(M, 0, SINGULARITY), techCost(N, 0, SINGULARITY)], [250, 100], 'Singularität ×2,5 (250 statt 100)');
+  const gr = M.players.findIndex(p => p.civ === 'griechenland');
+  M.players[gr].drafted = ['griechenland:basis', 'russland:basis'];
+  eq(techCost(M, gr, TECH_BY_KEY.papier), 6 * 3 - 2, 'Rabatte ziehen danach ab (Papier 18 − 2)');
+  M.players[gr].techs.spionage = true;
+  ['schrift', 'papier'].forEach(k => { M.players[(gr + 1) % 4].techs[k] = true; });
+  eq(['schrift', 'papier'].map(k => copyableTechs(M, gr).find(o => o.tech.k === k).paidCoins), [8, 18],
+    'Kopieren zahlt die Grundkosten des Marathons (Schrift 4 × 2, Papier 6 × 3)');
+
+  // --- Draft
+  const V = newGame({ seed: 4, map: marathonMap(4), marathon: true, startPlayer: 2,
+    players: CIVS.map(c => ({ civ: c.k, kind: 'ki', kiLevel: 'schwer' })) });
+  const D = draftNew(V, 11);
+  const reihe = [];
+  for (let i = 0; i < V.players.length; i++) reihe.push((V.startIdx + i) % V.players.length);
+  eq([D.pool.length, D.order], [9, reihe.concat(reihe.slice().reverse())], 'Vorrat 2 × 4 + 1, Schlange ab dem Startspieler (1-2-3-4-4-3-2-1)');
+  eq(D.pool.every(id => ALL_ABILITIES.includes(id)) && ALL_ABILITIES.length === 12, true, 'gezogen aus allen zwölf Fähigkeiten');
+  let doppelt = false;
+  for (let s2 = 0; s2 < 40 && !doppelt; s2++) { const P = draftNew(V, s2).pool; doppelt = new Set(P).size < P.length; }
+  eq(doppelt, true, 'dieselbe Fähigkeit kann mehrfach im Vorrat liegen');
+  const optionen = [];
+  let vorgedraengelt = 0;
+  while (!draftDone(D)) {
+    const pi = draftCurrent(D);
+    optionen.push(D.pool.length);
+    if (draftPick(D, (pi + 1) % 4, D.pool[0]) !== T('Nicht am Zug.')) vorgedraengelt++;
+    const id = kiDraftPick(V, D, pi);
+    if (draftPick(D, pi, id)) throw new Error('KI wählt Ungültiges: ' + id);
+  }
+  eq(vorgedraengelt, 0, 'wer nicht am Zug ist, wählt nicht');
+  eq([optionen[optionen.length - 1], D.pool.length], [2, 1], 'der Letzte wählt aus zwei, eine bleibt liegen');
+  eq(Object.values(D.picks).every(p => p.length === 2 && new Set(p).size === 2), true, 'jede KI hat zwei verschiedene');
+  // gibt es nur noch, was man schon hat, darf man es nehmen
+  const Z = { pool: ['wikinger:armeemacht', 'wikinger:armeemacht'], order: [0, 0], at: 1, picks: { 0: ['wikinger:armeemacht'], 1: [], 2: [], 3: [] } };
+  eq([draftOptions(Z, 0), draftPick(Z, 0, 'wikinger:armeemacht')], [['wikinger:armeemacht'], null], 'nur Doppeltes übrig: erlaubt');
+  const Y = { pool: ['wikinger:armeemacht', 'russland:basis'], order: [0, 0], at: 1, picks: { 0: ['wikinger:armeemacht'], 1: [], 2: [], 3: [] } };
+  eq(draftOptions(Y, 0), ['russland:basis'], 'sonst nicht');
+  // Bots draften nicht
+  const B = newGame({ seed: 4, map: marathonMap(4), marathon: true,
+    players: CIVS.map((c, i) => ({ civ: c.k, kind: i === 1 ? 'bot' : 'human' })) });
+  const DB = draftNew(B, 5);
+  eq([DB.pool.length, DB.order.length, DB.order.some(pi => B.players[pi].kind === 'bot')], [7, 6, false],
+    'mit einem Bot: Vorrat 2 × 3 + 1, sechs Wahlen, der Bot wählt nicht');
+  // Die KI wählt nach der Karte: Taiga gewinnt bei viel Wald gegen eine schwache Wahl
+  const vi = 0, cap = capitalOf(V, vi);
+  const wald = within(cap.r, cap.c, 5).filter(([r, c]) => terrainAt(V, r, c) === 'W').length;
+  eq(kiDraftValue(V, vi, 'russland:basis', []) > KI_DRAFT_BASE['russland:basis'], wald > 0,
+    'Taiga zählt den Wald um die eigene Hauptstadt');
+  eq(kiDraftValue(V, vi, 'wikinger:armeemacht', ['wikinger:armeemacht']) < 0, true, 'Doppeltes ist der KI nichts wert');
+}
+
+/* Warteschlange des Straßenplans (v83, Tempo): gibt die Felder in genau der Reihenfolge
+   heraus wie bis v82 das Feld, das vor jeder Entnahme stabil sortiert wurde – sonst bauten
+   die KI andere Wege. Zufallsfolgen aus Entnehmen, Neuentdecken und Senken (Schritte 0–2
+   wie im Straßenplan, je Entnahme jedes Feld höchstens einmal). */
+{
+  let anders = 0, entnommen = 0;
+  for (let lauf = 0; lauf < 400; lauf++) {
+    const rnd = mapRng(900 + lauf);
+    const dA = new Map(), dB = new Map(), q = [], Q = kiRoadQueue(dB), start = [];
+    let next = 1 + Math.floor(rnd() * 6);
+    for (let i = 0; i < next; i++) { dA.set('k' + i, 0); dB.set('k' + i, 0); q.push('k' + i); start.push('k' + i); }
+    Q.start(start);
+    const fertig = new Set();
+    for (let schritt = 0; schritt < 80; schritt++) {
+      let kA;
+      while (q.length) {                                  // so wie bis v82: sortieren, erstes nehmen
+        q.sort((a, b) => dA.get(a) - dA.get(b));
+        const k = q.shift();
+        if (!fertig.has(k)) { kA = k; break; }            // Doppelte änderten nichts
+      }
+      const kB = Q.pop();
+      if (kA !== kB) { anders++; break; }
+      if (kA === undefined) break;
+      fertig.add(kA); entnommen++;
+      const dk = dA.get(kA), diesmal = new Set();
+      for (let j = Math.floor(rnd() * 7); j > 0; j--) {
+        const k = rnd() < 0.45 ? 'k' + (next++) : 'k' + Math.floor(rnd() * next);
+        if (fertig.has(k) || diesmal.has(k)) continue;
+        diesmal.add(k);
+        const nd = dk + Math.floor(rnd() * 3);
+        if (!dA.has(k)) { dA.set(k, nd); dB.set(k, nd); q.push(k); Q.add(k); }
+        else if (nd < dA.get(k)) { Q.lower(k, dB.get(k)); dA.set(k, nd); dB.set(k, nd); q.push(k); }
+      }
+    }
+  }
+  eq([anders, entnommen > 5000], [0, true], `Straßenplan: Schlange in Fächern = stabil sortiertes Feld (${entnommen} Entnahmen)`);
+}
+
+/* --- Marathon: eine ganze Partie mit vier KI, Draft inklusive (verifiziert, dass die KI den
+   Modus spielt – Karte, teure Technologien, zwei Fähigkeiten je Reich). */
+{
+  const seed = 5000;
+  const players = CIVS.map(c => ({ civ: c.k, kind: 'ki', kiLevel: 'schwer' }));
+  const cfg = { seed, players, marathon: true, map: marathonMap(seed), startPlayer: 0 };
+  const setup = rollSetup(cfg);
+  Object.assign(cfg, { avail: setup.avail, wpool: setup.wpool });
+  const V = draftView(cfg);
+  // Während des Drafts hat niemand eine Fähigkeit: kein Rabatt, keine Gratisarmee, Hauptstadt 1
+  const gv = V.players.findIndex(p => p.civ === 'griechenland');
+  eq([V.players.every(p => abilitiesOf(p).length === 0), V.armies.length, V.cities.map(x => x.pop),
+    techCost(V, gv, TECH_BY_KEY.papier)], [true, 0, [1, 1, 1, 1], techBase(V, TECH_BY_KEY.papier)],
+  'Draftansicht ohne Fähigkeiten (Griechenland ohne Rabatt, Wikinger ohne Armee)');
+  const D = draftNew(V, seed + 1);
+  while (!draftDone(D)) { const pi = draftCurrent(D); draftPick(D, pi, kiDraftPick(V, D, pi)); }
+  V.players.forEach((p, i) => { cfg.players[p.slot].drafted = D.picks[i]; });
+  const S = newGame(cfg);
+  eq(S.players.every(p => abilitiesOf(p).length === 2), true, 'Marathon: jede KI spielt mit zwei gedrafteten Fähigkeiten');
+  eq(JSON.stringify(V.players.map(p => p.avail)), JSON.stringify(S.players.map(p => p.avail)),
+    'im Spiel stehen genau die Starttechnologien, die beim Draft zu sehen waren');
+  eq(JSON.stringify(S.players.map((_, i) => [capitalOf(S, i).r, capitalOf(S, i).c])),
+    JSON.stringify(V.players.map((_, i) => [capitalOf(V, i).r, capitalOf(V, i).c])), '… und die Hauptstädte an denselben Plätzen');
+  /* Handelsrouten wie bis v82 gerechnet (je Feld cityAt und effectiveRoad) – seit v83 rechnet
+     tradeRoutes mit einer Stadttabelle schneller; das Ergebnis muss gleich bleiben. */
+  const routenAlt = (X, pi) => {
+    const o = { count: 0, bonus: 0, rail: 0, road: 0 };
+    const cap = capitalOf(X, pi);
+    if (!cap) return o;
+    const others = citiesOf(X, pi).filter(c => !c.cap);
+    if (!others.length || !Object.keys(X.roads || {}).length) return o;
+    const erreichbar = min => {
+      const seen = new Set(), stack = [];
+      if (effectiveRoad(X, cap.r, cap.c) < min) return seen;
+      seen.add(key(cap.r, cap.c)); stack.push([cap.r, cap.c]);
+      while (stack.length) {
+        const [r, c] = stack.pop();
+        for (const [nr, nc] of neighbors(r, c)) {
+          const k = key(nr, nc);
+          if (seen.has(k) || !terrainAt(X, nr, nc)) continue;
+          if (effectiveRoad(X, nr, nc) < min) continue;
+          const ct = cityAt(X, nr, nc);
+          if (ct && ct.owner !== pi) continue;
+          seen.add(k); stack.push([nr, nc]);
+        }
+      }
+      return seen;
+    };
+    const bahn = erreichbar(2), weg = erreichbar(1);
+    for (const city of others) {
+      const k = key(city.r, city.c);
+      if (bahn.has(k)) { o.rail++; o.bonus += 2; } else if (weg.has(k)) { o.road++; o.bonus += 1; }
+    }
+    o.count = o.rail + o.road;
+    return o;
+  };
+  let guard = 0, langsam = 0, err = null, routen = 0, routenAnders = [], gainAnders = 0;
+  try {
+    while (!S.over && guard++ < 400) {
+      const t0 = Date.now();
+      kiTurn(S, S.cur);
+      langsam = Math.max(langsam, Date.now() - t0);
+      if (S.over) break;
+      endTurn(S);
+      S.players.forEach((_, pi) => {
+        const a = tradeRoutes(S, pi), b = routenAlt(S, pi);
+        routen += a.count;
+        if (JSON.stringify(a) !== JSON.stringify(b)) routenAnders.push(`R${S.round}/${pi}`);
+      });
+      // settleGain mit vorab gerechnetem Einkommen = ohne (die KI rechnet es einmal je Zug)
+      const cap = capitalOf(S, S.cur);
+      if (cap) {
+        const vorher = income(S, S.cur);
+        for (const [r, c] of within(cap.r, cap.c, 2))
+          if (JSON.stringify(settleGain(S, S.cur, r, c, vorher)) !== JSON.stringify(settleGain(S, S.cur, r, c))) gainAnders++;
+      }
+    }
+  } catch (e) { err = e.message; }
+  eq([err, !!S.over], [null, true], `die Partie läuft ohne Fehler zu Ende (${S.over ? S.over.how.split(' (')[0] : 'offen'} in Runde ${S.round})`);
+  eq(langsam < 8000, true, `kein KI-Zug über 8 s auf der großen Karte (längster ${langsam} ms)`);
+  eq([routenAnders, routen > 0], [[], true], `Handelsrouten schnell gerechnet = wie bis v82 (${routen} Routen über die Partie)`);
+  eq(gainAnders, 0, 'Ertrag beim Siedeln mit vorab gerechnetem Einkommen = ohne');
+}
+
 /* ==================================================== 1 gegen 1 */
 /* Die eigene Duellkarte gibt es nicht mehr – im Duell wird immer die Plättchenkarte aus
    sechs Dreiecken gelegt. Geprüft wird sie im Plättchen-Abschnitt; hier bleiben die
@@ -2767,22 +3019,53 @@ const duellKarte = (civA, civB, seed) => {
   });
   const a = capitalOf(S, 0), b = capitalOf(S, 1);
   S.round = 2;                               // in Runde 1 gibt es keinen Wirtschaftssieg (v77)
+  // seit v83 geprüft zu Rundenbeginn (markRoundStart), mit der Bevölkerung von dort
   a.pop = 3; b.pop = 1;                     // genau 3/4
-  checkVictory(S, 0);
+  markRoundStart(S);
   eq(S.claims.length, 0, 'genau 3/4 reicht nicht (strikt größer)');
   a.pop = 4;                                 // 4/5 > 3/4
-  checkVictory(S, 0);
+  markRoundStart(S);
   eq(S.claims.map(c => c.pi), [0], 'über 3/4 wird der Sieg angemeldet');
   // im Vier-Reiche-Spiel hätte 3/4 schon gereicht – dort gilt „mehr als 2/3" (seit v77
   // strikt wie alle anderen Schwellen; bis v74 genügten genau 2/3)
   const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
   N.round = 2;
   N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = genau 2/3
-  checkVictory(N, 0);
+  markRoundStart(N);
   eq(N.claims.length, 0, 'ohne Duell reichen genau 2/3 nicht mehr (mehr als 2/3, v77)');
   N.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
-  checkVictory(N, 0);
+  markRoundStart(N);
   eq(N.claims.map(c => c.pi), [0], 'mehr als 2/3 wird angemeldet');
+}
+/* Wirtschaftssieg zu Rundenbeginn (v83, Anweisung des Autors): gezählt wird gegen die
+   Bevölkerung zu Beginn der Runde – für alle Reiche derselbe Nenner. Umgesetzt mit eigener
+   und Weltbevölkerung von dort, geprüft zu Rundenbeginn für alle. */
+{
+  const S = newGame({ seed: 77, startPlayer: 0,
+    players: ['russland', 'griechenland', 'england', 'wikinger'].map(k => ({ civ: k, kind: 'human' })) });
+  endTurn(S); endTurn(S); endTurn(S); endTurn(S);                 // Runde 2 beginnt
+  eq([S.round, S.cur, S.roundPop, S.roundPops], [2, 0, 4, [1, 1, 1, 1]], 'zu Rundenbeginn: Welt 4, je Reich 1');
+  // Griechenland (zweiter am Zug) wächst im eigenen Zug weit über 2/3
+  endTurn(S);
+  const g = capitalOf(S, 1);
+  g.pop = 9;                                                      // 9 von 12 > 2/3 – aber erst jetzt
+  const nenner = [];
+  for (let i = 0; i < 3; i++) { nenner.push(victoryWorld(S)); endTurn(S); }
+  eq(nenner, [4, 4, 4], 'der Nenner bleibt die ganze Runde derselbe, für jedes Reich');
+  eq(S.claims.length, 1, 'zu Beginn von Runde 3 geprüft: Griechenland meldet an');
+  eq([S.round, S.cur, S.claims[0].pi, S.claims[0].round], [3, 0, 1, 3],
+    '… bevor in Runde 3 jemand zieht – das Spiel endet am Ende von Runde 3');
+  eq(/9 von 12 Weltbevölkerung/.test(S.claims[0].how), true, 'gezählt mit der Bevölkerung zu Rundenbeginn (9 von 12)');
+  // Wer im eigenen Zug über die Schwelle wächst, hat damit noch nicht angemeldet
+  const T2 = newGame({ seed: 77, startPlayer: 0,
+    players: ['russland', 'griechenland', 'england', 'wikinger'].map(k => ({ civ: k, kind: 'human' })) });
+  for (let i = 0; i < 4; i++) endTurn(T2);
+  capitalOf(T2, 0).pop = 9;                                      // Russland wächst im Zug
+  endTurn(T2);
+  eq(T2.claims.length, 0, 'am Ende des eigenen Zugs wird nichts angemeldet (seit v83)');
+  capitalOf(T2, 0).pop = 2;                                      // … und verliert es wieder
+  for (let i = 0; i < 3; i++) endTurn(T2);
+  eq([T2.round, T2.claims.length], [3, 0], 'zu Rundenbeginn zählt, was dann ist: kein Anspruch');
 }
 /* Kein Wirtschaftssieg in Runde 1 (v77, Anweisung des Autors). Vorher reichte dem
    Startspieler eine Gründung und ein Wachstum: im Duell 4 von 5, zu dritt 4 von 6 – und
@@ -2884,6 +3167,36 @@ const duellKarte = (civA, civB, seed) => {
   beginTurn(S);
   eq(S.players[0].power, 1, 'Machtverlust rechnet mit 6 (halbiert 3) auf die eigene Macht');
   eq(powerOf(S, 0), 3, 'der Armeezuschlag bleibt erhalten');
+}
+
+/* Kriegerkultur mit Burgenbau (v83, Anweisung des Autors): mit Burgenbau steht in jeder Stadt
+   eine unbewegliche Armee – sie zählt für Kriegerkultur wie eine echte, +2 Macht je Stadt.
+   Für die Baukosten weiterer Armeen zählt sie nicht. */
+{
+  const S = mkA('wikinger', 'armeemacht');
+  const cap = capitalOf(S, 0), sp = spotBy(S, cap);
+  S.armies.push({ id: 90, owner: 0, r: sp[0], c: sp[1], mp: 0, born: 0 });
+  S.cities.push({ id: 91, owner: 0, r: cap.r + 3, c: cap.c, pop: 1, cap: false, grown: 0, born: -1 });
+  eq(powerOf(S, 0), 2, 'ohne Burgenbau: nur die Armee (+2)');
+  S.players[0].techs.burgenbau = true;
+  eq([powerBonus(S, 0), powerOf(S, 0)], [6, 6], 'mit Burgenbau: Armee + zwei Städte = +6');
+  eq(armyCost(S, 0), 10, 'die Stadtarmeen zählen nicht für die Baukosten (zweite Armee 10)');
+  eq(kiPowerBonus(S, 0, 1), 6, 'die KI rechnet genauso (eine Armee, zwei Städte)');
+  eq(kiPowerBonus(S, 0, 3), 10, '… und mit geplanten Armeen (drei Armeen, zwei Städte)');
+  // die Stadt verteidigt mit dem ganzen Machtwert – der Zuschlag steckt darin
+  const vorher = S.players[0].power;
+  S.players[0].power = 4;
+  eq(powerOf(S, 0), 10, 'Machtwert = eigene Macht 4 + Zuschlag 6');
+  S.players[0].power = vorher;
+  // ohne Kriegerkultur bringt Burgenbau keinen Zuschlag
+  const B = mkA('wikinger', 'basis');
+  B.players[0].techs.burgenbau = true;
+  eq(powerBonus(B, 0), 0, 'Burgenbau allein gibt keinen Zuschlag');
+  // die KI schätzt Burgenbau mit Kriegerkultur höher
+  const K = kiContext(S, 0), K2 = kiContext(B, 0);
+  delete S.players[0].techs.burgenbau;
+  eq(kiTechBonus(S, 0, 'burgenbau', K, baseIncome(S, 0)) > kiTechBonus(B, 0, 'burgenbau', K2, baseIncome(B, 0)), true,
+    'die KI bewertet Burgenbau mit Kriegerkultur höher');
 }
 
 /* Wikinger "Beutezüge": Angriffswert − Verteidigungswert je Ziel, Auszahlung nächste Runde */
@@ -4553,8 +4866,9 @@ for (const n of [2, 3, 4]) {
   {
     const S = mkEnd();
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
+    markRoundStart(S);                             // so steht es zu Beginn von Runde 2 (v83)
+    eq(S.claims.map(c => c.pi), [0], 'zu Rundenbeginn angemeldet');
     eq(finishTurn(S), null, 'der Wirtschaftssieg beendet den Zug nicht');
-    eq(S.claims.map(c => c.pi), [0], 'er ist aber angemeldet');
     eq([S.over, S.endRound], [null, 2], 'Ende ist für Runde 2 vorgemerkt');
     advanceTurn(S);
     eq([S.over, S.cur, S.round], [null, 1, 2], 'Griechenland ist regulär am Zug');
@@ -4569,6 +4883,7 @@ for (const n of [2, 3, 4]) {
   {
     const S = mkEnd();
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
+    markRoundStart(S);
     finishTurn(S);
     eq(S.claims.length, 1, 'Anspruch steht');
     capitalOf(S, 0).pop = 1;                       // Bedingung fällt weg
@@ -4584,7 +4899,8 @@ for (const n of [2, 3, 4]) {
     // Russland: Wirtschaftssieg, wenig Technologien
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     S.players[0].techs = { rad: true };
-    finishTurn(S);                                  // Anspruch Russland
+    markRoundStart(S);                              // Anspruch Russland zu Rundenbeginn
+    finishTurn(S);
     // Griechenland: Forschungssieg, dafür viele Technologien
     const g = S.players[1];
     techPool(S).forEach(t => { if (t.k !== 'singularitaet') g.techs[t.k] = true; });
@@ -4734,7 +5050,7 @@ for (const n of [2, 3, 4]) {
   {
     const S = mkEnd();
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
-    finishTurn(S);
+    markRoundStart(S);                              // zu Rundenbeginn angemeldet (v83)
     eq(S.claims.map(c => c.pi), [0], 'Russland hat angemeldet');
     // Griechenland erobert die russische Hauptstadt
     const cap = capitalOf(S, 0), att = S.players[1];
@@ -4746,16 +5062,17 @@ for (const n of [2, 3, 4]) {
     eq([S.over.winner, S.over.military], [1, true], 'und gewinnt für den Angreifer');
     eq(S.over.score, undefined, 'ohne Punktvergleich');
   }
-  // --- Am Rundenende wird noch einmal für alle geprüft
+  // --- Bis v82 wurde am Rundenende noch einmal für alle geprüft. Seit v83 zählt der
+  //     Wirtschaftssieg zu Rundenbeginn: wer erst im Lauf der Runde über die Schwelle
+  //     wächst, kommt am Ende dieser Runde nicht mehr in den Vergleich.
   {
     const S = mkEnd();
     // Wikinger (letzter im Zug) melden an; Russland erfüllt die Schwelle erst danach
     claimVictory(S, 3, 'Kultursieg (Weltwunder der Stufe 3)');
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     for (let i = 0; i < 4; i++) endTurn(S);
-    eq(S.claims.map(c => c.pi).sort(), [0, 3],
-      'Russland kommt am Rundenende noch in den Vergleich');
-    eq(!!S.over, true, 'und das Spiel ist zu Ende');
+    eq(S.claims.map(c => c.pi), [3], 'Russland kommt am Rundenende nicht mehr dazu (v83)');
+    eq([!!S.over, S.over && S.over.winner], [true, 3], 'das Spiel ist zu Ende, die Wikinger gewinnen');
   }
   // --- Ausgeschiedene Reiche gewinnen nicht; verfällt der letzte Anspruch, geht es weiter
   {
@@ -4955,7 +5272,7 @@ for (const n of [2, 3, 4]) {
      die Flaggen direkt aus LANGS, ohne T(). Die Zahl darf sinken, nicht steigen. */
   {
     const norm = x => x.replace(/\s+/g, ' ');
-    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ki', 'ui', 'tutorial']
+    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ki', 'marathon', 'ui', 'tutorial']
       .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8'))
       .concat(fs.readFileSync(__dirname + '/index.html', 'utf8')).join('\n');
     const heu = norm(quellen);
