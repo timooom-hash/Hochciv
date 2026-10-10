@@ -151,11 +151,12 @@ function kiPowerAfterDecay(S, pi) {
   const loss = Math.min(p.power, Math.ceil(powerOf(S, pi) / kiDecayDiv(p)));
   return p.power - loss;
 }
-// Machtzuschlag (Kriegerkultur, Zeusstatue) bei n Armeen
+// Machtzuschlag (Kriegerkultur, Zeusstatue) bei n Armeen – mit Burgenbau zählen bei
+// Kriegerkultur auch die Städte (warriorUnits, wie powerBonus)
 function kiPowerBonus(S, pi, n) {
   const p = S.players[pi];
   let b = 0;
-  if (isAbil(p, 'armeemacht')) b += 2 * n;
+  if (isAbil(p, 'armeemacht')) b += 2 * warriorUnits(S, pi, n);
   if (hasWonder(S, pi, 'zeus')) b += 3;
   return b;
 }
@@ -163,7 +164,7 @@ function kiPowerBonus(S, pi, n) {
 function kiArmyCostNth(S, pi, k) {
   const p = S.players[pi];
   let n = armiesOf(S, pi).length + k;
-  if (p.civ === 'wikinger' && isAbil(p, 'basis')) n = Math.max(0, n - 1);
+  if (hasAbil(p, 'wikinger', 'basis')) n = Math.max(0, n - 1);
   const mult = has(p, 'nationalismus') ? 2 : has(p, 'demokratie') ? 4 : 5;
   return mult * n;
 }
@@ -550,7 +551,9 @@ function kiTechBonus(S, pi, k, K, y) {
     case 'stahl': case 'panzer': return 1 + 0.25 * p.power;
     // Im Ernstfall zählt dazu, dass sie bleiben (kiDefPerm) – gekaufte Macht verfällt
     case 'stadtmauern': return 4 + 1.5 * cities + kiDefPerm(K, () => 5);
-    case 'burgenbau': return 4 + cities + kiDefPerm(K, () => Math.max(2, p.power));
+    // Kriegerkultur (v83): mit Burgenbau gibt jede Stadt dauerhaft +2 Macht
+    case 'burgenbau': return 4 + cities + (isAbil(p, 'armeemacht') ? 1.5 * cities : 0) +
+      kiDefPerm(K, () => Math.max(2, p.power + (isAbil(p, 'armeemacht') ? 2 * cities : 0)));
     case 'maschinengewehr': return 3 + cities + kiDefPerm(K, c => 2 * c.pop);
     case 'schiesspulver': return 3;
     case 'taktik': return 3;
@@ -727,7 +730,8 @@ function kiVictory(S, pi, K) {
   }
   let v = 0;
   if ((S.claims || []).some(c => c.pi === pi)) v += K.vGame * 0.7;
-  // Wirtschaftssieg: Anteil an der Schwelle, steil zum Ende hin
+  // Wirtschaftssieg: Anteil an der Schwelle, steil zum Ende hin. Geprüft wird zu Beginn
+  // der nächsten Runde (v83); der aktuelle Anteil ist dafür die beste Schätzung.
   const w = worldPop(S);
   if (w > 0) {
     const o = victoryOption(S, p);
@@ -795,7 +799,7 @@ function kiWonderValue(S, pi, K) {
    (Belagerungen, Flankieren, Wirtschaftssieg), dann kiValue. So sieht die Bewertung, was
    eine Aktion am Zugende auslöst. X wird dabei verändert – nur mit Kopien aufrufen. */
 function kiScore(X, pi, K) {
-  if (!X.over) { combatPhase(X, pi); if (!X.over) checkVictory(X, pi); }
+  if (!X.over) combatPhase(X, pi);      // Wirtschaftssieg: erst zu Rundenbeginn (v83)
   return kiValue(X, pi, K);
 }
 const kiValueAfterCombat = (S, pi, K, seed) => kiScore(kiClone(S, seed), pi, K);
@@ -920,6 +924,7 @@ function kiSitesAll(S, pi, K) {
   const n = citiesOf(S, pi).length;
   const base = n * (n + 1) / 2;
   const out = [];
+  const vorher = income(S, pi);           // für jeden Platz dasselbe (v83, Tempo)
   for (const [k, dd] of dist) {
     const [r, c] = unkey(k);
     const t = terrainAt(S, r, c);
@@ -931,7 +936,7 @@ function kiSitesAll(S, pi, K) {
     const ohneStadt = isAbil(p, 'gruenden'), ohneWeg = has(p, 'kartografie');
     let cost = ohneStadt && ohneWeg ? Math.min(base, dd) : ohneStadt ? dd : ohneWeg ? base : base + dd;
     cost = Math.max(1, cost);
-    const g = settleGain(S, pi, r, c);
+    const g = settleGain(S, pi, r, c, vorher);
     // Nutzen: Ertrag über den Horizont
     const v = K.H * (K.w.sci * g.sci + K.w.food * Math.max(g.food, -1) + K.w.coins * g.coins);
     out.push({ r, c, cost, v });
@@ -947,6 +952,55 @@ const kiSiteKey = (S, pi) => S.cities.length + '|' +
    der Hauptstadt (Dijkstra, Kosten = Felder ohne Straße). Nur auf eigenem oder neutralem
    Land, nie auf Meer – so wie buildRoad es erlaubt. Mit Eisenbahn zusätzlich der Ausbau
    einer bestehenden Verbindung. */
+/* Warteschlange des Straßenplans (v83, Tempo). Bis v82 stand dort ein Feld, das vor jeder
+   Entnahme stabil nach Entfernung sortiert wurde (q.sort, dann q.shift). Diese Schlange gibt
+   die Felder in GENAU derselben Reihenfolge heraus – auch bei gleicher Entfernung –, damit
+   die KI dieselben Wege baut, nur ohne jedes Mal alles zu sortieren:
+   · Fächer je Entfernung, jedes in der Reihenfolge, die das sortierte Feld hätte.
+   · Sinkt die Entfernung eines wartenden Feldes, rückt es beim nächsten „Sortieren" hinter
+     die Felder, die schon in seinem neuen Fach liegen – unter mehreren solchen zuerst die aus
+     dem niedrigeren alten Fach (sie standen im sortierten Feld weiter vorn).
+   · Neu entdeckte Felder kommen danach, in der Reihenfolge ihres Eintreffens.
+   Doppelte Einträge, die das alte Feld beim Senken mitschleppte, entfallen: sie kamen erst
+   nach dem ersten heraus und änderten nichts mehr. test.js prüft die Gleichheit mit dem
+   sortierten Feld an Zufallsfolgen und über ganze Partien. */
+function kiRoadQueue(dist) {
+  const fach = [];
+  let gesenkt = new Map(), neu = [];
+  const f = d => fach[d] || (fach[d] = { a: [], h: 0 });
+  return {
+    start(keys) { for (const k of keys) f(dist.get(k)).a.push(k); },
+    add(k) { neu.push(k); },
+    lower(k, alt) { gesenkt.set(k, alt); },
+    pop() {
+      if (gesenkt.size) {
+        const alte = [...new Set(gesenkt.values())].sort((x, y) => x - y);
+        const nach = new Map();
+        for (const e of alte) {
+          const b = fach[e], bleibt = [];
+          for (let i = b.h; i < b.a.length; i++) {
+            const k = b.a[i];
+            if (gesenkt.get(k) === e) {
+              const d = dist.get(k);
+              if (!nach.has(d)) nach.set(d, []);
+              nach.get(d).push(k);
+            } else bleibt.push(k);
+          }
+          b.a = bleibt; b.h = 0;
+        }
+        for (const [d, ks] of nach) for (const k of ks) f(d).a.push(k);
+        gesenkt = new Map();
+      }
+      for (const k of neu) f(dist.get(k)).a.push(k);
+      neu = [];
+      for (let d = 0; d < fach.length; d++) {
+        const b = fach[d];
+        if (b && b.h < b.a.length) return b.a[b.h++];
+      }
+      return undefined;
+    },
+  };
+}
 function kiRoadPlans(S, pi) {
   const p = S.players[pi];
   const cap = capitalOf(S, pi);
@@ -963,6 +1017,22 @@ function kiRoadPlans(S, pi) {
   const plans = [];
   const tr = tradeRoutes(S, pi);
   const target = has(p, 'eisenbahn') ? 2 : 1;
+  /* Tempo (v83, große Karten mit vielen Städten): Städte einmal in eine Tabelle (statt je
+     Feld cityAt über alle Städte), Wegstufe je Feld einmal (wie effectiveRoad), und die
+     Warteschlange des Dijkstra in Fächern statt sortiert (`kiRoadQueue`). Alles liefert
+     dasselbe wie vorher – auch bei gleicher Entfernung dieselbe Reihenfolge, also dieselben
+     Wege. */
+  const stadtAt = new Map();
+  for (const ct of S.cities) { const k = key(ct.r, ct.c); if (!stadtAt.has(k)) stadtAt.set(k, ct); }
+  const stufe = new Map();
+  const weg = (r, c, k) => {
+    let l = stufe.get(k);
+    if (l !== undefined) return l;
+    l = S.roads[k] || 0;
+    if (stadtAt.has(k)) for (const [nr, nc] of neighbors(r, c)) l = Math.max(l, roadLevel(S, nr, nc));
+    stufe.set(k, l);
+    return l;
+  };
   for (const lvl of target === 2 ? [1, 2] : [1]) {
     // Netz der Hauptstadt auf dieser Stufe
     const net = new Set();
@@ -973,8 +1043,8 @@ function kiRoadPlans(S, pi) {
         for (const [nr, nc] of neighbors(r, c)) {
           const k = key(nr, nc);
           if (net.has(k) || !terrainAt(S, nr, nc)) continue;
-          if (effectiveRoad(S, nr, nc) < lvl) continue;
-          const ct = cityAt(S, nr, nc);
+          if (weg(nr, nc, k) < lvl) continue;
+          const ct = stadtAt.get(k);
           if (ct && ct.owner !== pi) continue;
           net.add(k); st.push([nr, nc]);
         }
@@ -983,27 +1053,27 @@ function kiRoadPlans(S, pi) {
     for (const city of citiesOf(S, pi)) {
       if (city.cap || net.has(key(city.r, city.c))) continue;
       // Dijkstra vom Netz aus: Feld kostet (lvl − vorhandene Stufe), Städte sind frei
-      const dist = new Map(), prev = new Map(), q = [];
-      for (const k of net) { dist.set(k, 0); q.push(k); }
-      if (!net.size) { dist.set(key(cap.r, cap.c), 0); q.push(key(cap.r, cap.c)); }
+      const dist = new Map(), prev = new Map(), q = kiRoadQueue(dist), start = [];
+      for (const k of net) { dist.set(k, 0); start.push(k); }
+      if (!net.size) { dist.set(key(cap.r, cap.c), 0); start.push(key(cap.r, cap.c)); }
+      q.start(start);
       const goal = key(city.r, city.c);
       let found = null;
-      while (q.length) {
-        q.sort((a, b) => dist.get(a) - dist.get(b));
-        const k = q.shift();
+      for (let k = q.pop(); k !== undefined; k = q.pop()) {
         const dk = dist.get(k);
         if (k === goal) { found = dk; break; }
         if (dk > 8) break;
         const [r, c] = unkey(k);
         for (const [nr, nc] of neighbors(r, c)) {
           const nk = key(nr, nc);
-          const ct = cityAt(S, nr, nc);
+          const ct = stadtAt.get(nk);
           let step;
           if (ct) { if (ct.owner !== pi) continue; step = 0; }
           else if (!buildable(nr, nc)) continue;
           else step = Math.max(0, lvl - roadLevel(S, nr, nc)) > 0 ? (lvl === 2 && roadLevel(S, nr, nc) === 0 ? 2 : 1) : 0;
           const nd = dk + step;
-          if (!dist.has(nk) || nd < dist.get(nk)) { dist.set(nk, nd); prev.set(nk, k); q.push(nk); }
+          if (!dist.has(nk)) { dist.set(nk, nd); prev.set(nk, k); q.add(nk); }
+          else if (nd < dist.get(nk)) { q.lower(nk, dist.get(nk)); dist.set(nk, nd); prev.set(nk, k); }
         }
       }
       if (found == null || found === 0) continue;

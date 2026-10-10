@@ -68,7 +68,7 @@ const DATA_EN = {
     wikinger: {
       basis: ['Seafarers', 'Free army at the start; one army does not count towards army build costs'],
       kampfertrag: ['Raids', 'An army next to an enemy army or city yields 1 science, food and coin per point of superiority'],
-      armeemacht: ['Warrior culture', 'Each of your armies grants +2 power'],
+      armeemacht: ['Warrior culture', 'Each of your armies grants +2 power – with Castles each of your cities as well'],
     },
   },
   tech: {
@@ -335,6 +335,29 @@ const UI_EN = {
   'Mit Ereignissen': 'With events',
   'Ereignisstärke': 'Event strength',
   'Mit Weltwundern': 'With wonders',
+  'Marathon': 'Marathon',
+  'Marathon: vier Reiche auf einer Zufallskarte, viermal so groß wie die Originalkarte. Technologien kosten je Zeitalter das Zwei- bis Fünffache, die Singularität das 2,5-Fache. Vor dem ersten Zug sehen alle die Karte und die Starttechnologien und draften dann ihre Fähigkeiten: je zwei, in Schlangenreihenfolge.':
+    'Marathon: four empires on a random map four times the size of the original map. Technologies cost two to five times as much depending on the age, the Singularity 2.5 times. Before the first turn everyone sees the map and the starting technologies and then drafts their abilities: two each, in snake order.',
+  'Fähigkeiten werden vor dem ersten Zug gedraftet – je zwei, auch fremde.': 'Abilities are drafted before the first turn – two each, from any civilisation.',
+  'Marathon · Fähigkeiten draften': 'Marathon · draft abilities',
+  'Marathonkarte (%s × %s)': 'Marathon map (%s × %s)',
+  'Nicht am Zug.': 'Not your turn.',
+  'Diese Fähigkeit liegt nicht zur Wahl.': 'This ability is not available.',
+  'Alle haben gewählt – die Partie kann beginnen.': 'Everyone has chosen – the game can begin.',
+  '%s wählt Fähigkeit %s von 2 (Wahl %s von %s, Schlangenreihenfolge).': '%s chooses ability %s of 2 (pick %s of %s, snake order).',
+  'Zur Wahl': 'Available',
+  'Reiche in Zugfolge': 'Empires in turn order',
+  'Bot – ohne Fähigkeiten': 'bot – no abilities',
+  'noch keine Fähigkeit': 'no ability yet',
+  'Bogen': 'Techs',
+  'Hauptstadt im ersten Zug, ohne Fähigkeiten: %s': 'Capital in the first turn, without abilities: %s',
+  'Starttechnologien: %s': 'Starting technologies: %s',
+  '%s · Starttechnologien': '%s · starting technologies',
+  'Ausgewürfelt vor dem Draft – im Spiel steht genau das hier. Kosten ohne Fähigkeiten.': 'Rolled before the draft – this is exactly what the game will have. Costs without abilities.',
+  'Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität das 2,5-Fache – die Kosten hier sind schon umgerechnet.':
+    'Marathon: technologies cost two, three, four and five times as much depending on the age, the Singularity 2.5 times – the costs shown here already include that.',
+  ' · Marathon': ' · marathon',
+  '%s: Fähigkeiten %s.': '%s: abilities %s.',
   'Alter Techtree': 'Old tech tree',
   'In dieser Partie gilt noch der alte Techtree.': 'This game still uses the old tech tree.',
   'Schwierigkeit (alle Bots)': 'Difficulty (all bots)',
@@ -921,8 +944,8 @@ const UI_EN = {
     'Resources only count for the current turn – only power carries over. 2 coins count as 1 food or 1 science.',
   'Sieg':
     'Victory',
-  'Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; ab Runde 2) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).':
-    'Victory: Singularity · more than %s of the world population (UN %s, Theology %s; from round 2) · an enemy capital · a level 3 wonder. Except for a military victory the game only ends at the end of the round; if several claim it, points decide (population + wonders + technologies).',
+  'Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; geprüft zu Beginn jeder Runde ab Runde 2, für alle mit der Bevölkerung von dort) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).':
+    'Victory: Singularity · more than %s of the world population (UN %s, Theology %s; checked at the start of every round from round 2, for everyone with the population at that moment) · an enemy capital · a level 3 wonder. Except for a military victory the game only ends at the end of the round; if several claim it, points decide (population + wonders + technologies).',
   'Stadt (je Bevölkerung)':
     'City (per population)',
   'Weltwunder (Erweiterung)':

@@ -70,7 +70,7 @@ function setBarHeight() {
    Gedreht wird NUR der Spielbildschirm. Menü, Aufbau, Editor und die Regelseite haben
    keine feste Karte, die Platz in der Breite bräuchte – dort wäre der Zwang lästig.
    Deshalb hängt html.turn am aktiven Bildschirm und wird aus show() nachgeführt. */
-const TURN_SCREENS = ['screen-game', 'screen-place'];
+const TURN_SCREENS = ['screen-game', 'screen-place', 'screen-draft'];
 function turnWanted() { return !load('hochciv.noturn'); }
 function onTurnScreen() {
   return TURN_SCREENS.some(id => { const el = $(id); return el && el.classList.contains('show'); });
@@ -537,12 +537,14 @@ function redraw() {
   $('hud-sym').style.borderColor = civ.color;
   // Neben dem Reichsnamen steht die Fähigkeit – ausgelost oder gewählt, hier sieht man,
   // was man hat. Bots haben keine.
-  const abil = abilInfo(p);
+  // Im Marathon (v83) zwei gedraftete – beide stehen da
+  const abils = abilInfos(p);
   $('hud-name').innerHTML = esc(civ.n) + (p.kind === 'bot' ? T(' · Bot') : p.kind === 'ki' ? T(' · KI') : '') +
-    (abil ? `<span class="hud-abil" title="${esc(abil.e)}">${esc(abil.n)}</span>` : '');
+    abils.map(a => `<span class="hud-abil" title="${esc(a.e)}">${esc(a.n)}</span>`).join('');
   const ev = curEvent();
   // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
-  // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet.
+  // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet. Der aktuelle Stand:
+  // geprüft wird er seit v83 zu Beginn der nächsten Runde.
   const mine = popOf(S, S.cur), all = worldPop(S);
   const pct = all > 0 ? Math.round((mine / all) * 100) : 0;
   // Ist ein Sieg angemeldet, läuft die Runde noch zu Ende – das muss in der Kopfzeile
@@ -1237,6 +1239,8 @@ function startFromRecipe(rec) {
   $('sheet').classList.remove('locked');
   closeModal(); closeSheet();
   const schnipsel = $('confetti'); if (schnipsel) schnipsel.remove();
+  // Marathon: neue Karte, neuer Draft
+  if (rec.mode === 'marathon') return startMarathon(cfg);
   // Plättchenkarte: erst legen alle ihr Startdreieck neu, dann beginnt das Spiel.
   if (frei) return startPlacement(cfg);
   cfg.map = rec.mapPick === 'eigene' ? (customMap || DEFAULT_MAP)
@@ -1332,11 +1336,11 @@ function worldModal() {
   // Stelle, an der man in Ruhe nachliest, was man (und die anderen) bekommen hat.
   let h = `<p class="sub">${T('Die Reiche')}</p><div class="civ-list">` +
     S.players.filter(x => x.kind !== 'barbar').map((x, i) => {
-      const c = civOf(x), a = abilInfo(x);
+      const c = civOf(x), as = abilInfos(x);
       return `<div class="civ-row${i === pi ? ' self' : ''}">
         <span class="civ-chip" style="border-color:${c.color};color:${c.color}">${SYM[c.sym]}</span>
         <span class="civ-n">${esc(c.n)}${x.dead ? ' · ' + T('ausgeschieden') : ''}</span>
-        <span class="civ-a">${a ? `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`
+        <span class="civ-a">${as.length ? as.map(a => `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`).join('')
         : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
     }).join('') + '</div>';
   if (oldTreeShown())
@@ -1611,7 +1615,16 @@ function mapOptions() {
    Duellmodus (dort gibt es die festen Karten nicht) die Wahl nicht still umstellt. */
 let setupMapWanted = '0';
 function fillMapSelect() {
-  const sel = $('setup-map'), opts = mapOptions();
+  const sel = $('setup-map');
+  // Marathon (v83): immer eine neue Zufallskarte – keine Wahl, dafür der Hinweis
+  const marathon = setupMode === 'marathon';
+  $('setup-marathon-hint').hidden = !marathon;
+  if (marathon) {
+    $('setup-map-row').hidden = true;
+    $('setup-tile-hint').hidden = true; $('setup-double-hint').hidden = true;
+    return;
+  }
+  const opts = mapOptions();
   sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
   sel.value = opts.some(o => o[0] === setupMapWanted) ? setupMapWanted : opts[0][0];
   // Im Duell gibt es nur die Plättchenkarte – dann bleibt die Zeile weg statt einer
@@ -1628,7 +1641,7 @@ function fillMapSelect() {
 // Auf der Plättchenkarte darf jeder Platz frei wählen, auch dieselbe Zivilisation
 // mehrfach – auf den festen Karten sitzt jede Zivilisation genau einmal (feste
 // Startsterne, ein Stern je Reich).
-const freieCivWahl = () => setupMapWanted === 'plaettchen';
+const freieCivWahl = () => setupMode !== 'marathon' && setupMapWanted === 'plaettchen';
 function setupScreen() {
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
@@ -1706,6 +1719,9 @@ function renderSlots() {
     list.appendChild(d);
     const sela = d.querySelector('[data-abil]');
     if (alt[i] && abils.some(a => a.k === alt[i].abil)) sela.value = alt[i].abil;
+    // Marathon (v83): Fähigkeiten werden vor dem ersten Zug gedraftet, hier gibt es keine Wahl
+    const marathon = setupMode === 'marathon';
+    sela.closest('label').hidden = marathon;
     const note = d.querySelector('.abil');
     const paint = () => {
       const kind = d.querySelector('[data-kind].on').dataset.kind;
@@ -1714,8 +1730,9 @@ function renderSlots() {
       sela.disabled = kind === 'bot' || zufall;
       const a = abils.find(x => x.k === sela.value) || abils[0];
       note.textContent = kind === 'bot' ? T('Bots erhalten keine Zivilisationsfähigkeit.')
-        : zufall ? T('Zivilisation und Fähigkeit werden beim Spielstart ausgelost.')
-          : (a.e || T('Wird beim Spielstart ausgelost.'));
+        : marathon ? T('Fähigkeiten werden vor dem ersten Zug gedraftet – je zwei, auch fremde.')
+          : zufall ? T('Zivilisation und Fähigkeit werden beim Spielstart ausgelost.')
+            : (a.e || T('Wird beim Spielstart ausgelost.'));
       kindRows();
     };
     sela.onchange = paint;
@@ -2063,6 +2080,92 @@ function placeGo() {
   startGameScreen();
 }
 
+/* ------------------------------------------------- Marathon: Fähigkeiten draften (v83)
+   Nach dem Aufbau entsteht die Karte, die Starttechnologien werden ausgewürfelt (rollSetup,
+   wie vor der Legephase) – und eine Vorschau-Partie zeigt beides: Karte mit Hauptstädten und
+   für jedes Reich, was es zu Beginn erforschen kann. Dann wird gedraftet (Regeln in
+   js/marathon.js). Die KI wählt sofort, wenn sie dran ist; Menschen tippen. Alles ist offen –
+   anders als in der Legephase gibt es nichts zu verbergen, also auch keine Übergabe.
+   „Spiel beginnen" startet die echte Partie mit genau dieser Karte, diesen
+   Starttechnologien und den gedrafteten Fähigkeiten. */
+let draftState = null;
+function startMarathon(cfg) {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  cfg = Object.assign({}, cfg, { seed, marathon: true, map: marathonMap(seed) });
+  const setup = rollSetup(cfg);
+  cfg.avail = setup.avail; cfg.wpool = setup.wpool;
+  const V = draftView(cfg);          // dieselbe Partie, noch ohne Fähigkeiten
+  draftState = { cfg, V, D: draftNew(V, seed + 1) };
+  show('screen-draft');
+  draftAdvance();
+}
+function draftAdvance() {
+  const st = draftState;
+  while (!draftDone(st.D) && st.V.players[draftCurrent(st.D)].kind === 'ki') {
+    const pi = draftCurrent(st.D);
+    draftPick(st.D, pi, kiDraftPick(st.V, st.D, pi));
+  }
+  drawDraft();
+}
+function drawDraft() {
+  const st = draftState, V = st.V, D = st.D, cur = draftCurrent(D);
+  const capCur = cur != null ? capitalOf(V, cur) : null;
+  drawMap($('dr-map'), V.map, { state: V, tutHl: capCur ? [[capCur.r, capCur.c]] : [] });
+  const name = i => { const c = civOf(V.players[i]); return `${SYM[c.sym]} <b>${esc(c.n)}</b>`; };
+  $('dr-note').innerHTML = draftDone(D)
+    ? T('Alle haben gewählt – die Partie kann beginnen.')
+    : T('%s wählt Fähigkeit %s von 2 (Wahl %s von %s, Schlangenreihenfolge).', name(cur),
+      D.picks[cur].length + 1, D.at + 1, D.order.length);
+  const opts = cur != null ? draftOptions(D, cur) : [];
+  $('dr-pool').innerHTML = draftDone(D) ? '' : `<p class="sub">${T('Zur Wahl')}</p>` +
+    D.pool.map(id => {
+      const a = abilById(id), civ = CIV_BY_KEY[a.civ];
+      return `<button class="dr-ab" data-ab="${id}" ${opts.includes(id) ? '' : 'disabled'}>
+        <span class="dr-civ">${SYM[civ.sym]} ${esc(civ.n)}</span><b>${esc(a.n)}</b><small>${esc(a.e)}</small></button>`;
+    }).join('');
+  // Reiche in Zugfolge: gewählte Fähigkeiten, Startertrag der Hauptstadt, Starttechnologien
+  const reihe = V.players.map((_, k) => (V.startIdx + k) % V.players.length);
+  $('dr-players').innerHTML = `<p class="sub">${T('Reiche in Zugfolge')}</p>` + reihe.map(i => {
+    const p = V.players[i], y = income(V, i);
+    const techs = TECHS.filter(t => p.avail[t.k] && techActive(V, t)).map(t => t.n).join(', ') || '—';
+    const picks = p.kind === 'bot' ? T('Bot – ohne Fähigkeiten')
+      : D.picks[i].length ? D.picks[i].map(id => esc(abilById(id).n)).join(' · ') : T('noch keine Fähigkeit');
+    return `<div class="dr-pl${i === cur ? ' now' : ''}">
+      <h4>${name(i)}${kindTag(p) ? `<small>${esc(kindTag(p))}</small>` : ''}
+        <button class="btn small ghost" data-bogen="${i}">${T('Bogen')}</button></h4>
+      <p class="dr-picks">${picks}</p>
+      <p>${T('Hauptstadt im ersten Zug, ohne Fähigkeiten: %s', fmtY([y.sci, y.food, y.coins]))}</p>
+      <p>${T('Starttechnologien: %s', esc(techs))}</p></div>`;
+  }).join('');
+  $('dr-go').hidden = !draftDone(D);
+  $('dr-pool').querySelectorAll('[data-ab]').forEach(b => b.onclick = () => draftChoose(b.dataset.ab));
+  $('dr-players').querySelectorAll('[data-bogen]').forEach(b => b.onclick = () => draftTechView(+b.dataset.bogen));
+  $('dr-go').onclick = draftGo;
+}
+function draftChoose(id) {
+  const st = draftState, cur = draftCurrent(st.D);
+  if (cur == null) return;
+  const e = draftPick(st.D, cur, id);
+  if (e) return toast(e);
+  draftAdvance();
+}
+// Der Technologiebogen eines Reichs, wie er zu Beginn aussieht – mit den Kosten des Marathons
+function draftTechView(i) {
+  const V = draftState.V;
+  modal(T('%s · Starttechnologien', civOf(V.players[i]).n),
+    `<p class="sub">${T('Ausgewürfelt vor dem Draft – im Spiel steht genau das hier. Kosten ohne Fähigkeiten.')}</p>` + techBoardHTML(V, i, { plain: true }));
+  $('overlay').classList.add('wide');
+}
+function draftGo() {
+  const st = draftState;
+  if (!st || !draftDone(st.D)) return;
+  const players = st.cfg.players.map(pc => Object.assign({}, pc));
+  st.V.players.forEach((p, i) => { if (p.kind !== 'bot') players[p.slot].drafted = st.D.picks[i].slice(); });
+  draftState = null;
+  S = newGame(Object.assign({}, st.cfg, { players }));
+  startGameScreen();
+}
+
 /* ------------------------------------------------------------------ Karteneditor */
 function editorScreen() {
   editMap = JSON.parse(JSON.stringify(currentMap()));
@@ -2200,6 +2303,8 @@ function boot() {
       wonders: recipe.wonders,
     };
     endTutorialPanel();
+    // Marathon: Zufallskarte, dann sehen alle Karte und Starttechnologien und draften
+    if (setupMode === 'marathon') return startMarathon(cfg);
     // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.
     if (pick === 'plaettchen') return startPlacement(cfg);
     cfg.map = pick === 'eigene' ? customMap : MAPS[+pick];
@@ -2273,7 +2378,7 @@ function rulesModal() {
       <li>${T('Macht halbiert sich (aufgerundet).')}</li>
       <li>${T('Aktionen in beliebiger Reihenfolge, beliebig oft.')}</li>
       <li>${T('Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen. Zwei Züge in Folge stärker → Stadt erobert.')}</li>
-      <li>${T('Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; ab Runde 2) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
+      <li>${T('Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; geprüft zu Beginn jeder Runde ab Runde 2, für alle mit der Bevölkerung von dort) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
         victoryLabels(!!(S && S.duel)).base, victoryLabels(!!(S && S.duel)).un,
         victoryLabels(!!(S && S.duel)).theologie)}</li>
     </ol>
@@ -2307,6 +2412,7 @@ function rulesModal() {
     <p class="sub">${T('Alle Technologien')}</p>
     <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
     ${oldTreeShown() ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt noch der alte Techtree.')}</p>` : ''}
+    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität das 2,5-Fache – die Kosten hier sind schon umgerechnet.')}</p>` : ''}
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);
@@ -2315,7 +2421,7 @@ function rulesModal() {
           `<div class="rule-tech"><span class="c">${techBase(S, t)}</span><b>${t.n}</b><i>${techEffect(t, S)}</i></div>`).join('');
       }).join('')).join('')}
     <p class="rule-field">${T('Sieg')}</p>
-    <div class="rule-tech"><span class="c">${SINGULARITY.c}</span><b>${SINGULARITY.n}</b>
+    <div class="rule-tech"><span class="c">${techBase(S, SINGULARITY)}</span><b>${SINGULARITY.n}</b>
       <i>${SINGULARITY.e}</i></div>`);
 }
 function download(name, text) {

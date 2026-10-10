@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v82';
+const APP_VERSION = 'v83';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -167,11 +167,23 @@ const OLD_TECH_COSTS = {
    nennen dieselben Zahlen; ein Test hält beides zusammen. */
 const COLONY_COST = 3;       // Kolonialismus: Münzen je Feld (bis v71: 5)
 const SCOUTING_RATE = 2;     // Kundschafterei: × Grundkosten, in Münzen (bis v71: 3)
+/* Marathon (v83, Anweisung des Autors; Karte und Draft in js/marathon.js): Karte viermal so
+   groß wie die Europakarte (Originalkarte 12 × 18), Technologien je Zeitalter ×2/×3/×4/×5,
+   die Singularität ×2,5. Vergünstigungen (Griechenland, Wissenschaftliche Methode) ziehen
+   danach ihre festen Beträge ab, der Kreml schlägt seine 50 auf. */
+const MARATHON_ROWS = 24, MARATHON_COLS = 36;
+const MARATHON_TECH_FACTOR = [2, 3, 4, 5];
+const MARATHON_SING_FACTOR = 2.5;
+const MARATHON_MIN_START = 4;      // Nahrung + ½ Münzen der Hauptstadt im ersten Zug, mit 2 Bevölkerung
+const MARATHON_MIN_DIST = 14;      // Mindestabstand der Hauptstädte (Originalkarte: 7 auf halber Breite)
 /* Grundkosten einer Technologie IN DIESER PARTIE, vor allen Vergünstigungen (Griechenland,
    Wissenschaftliche Methode). Ohne Spielstand – Tabellen, Regelbogen aus dem Menü – die
-   Standardkosten. Wer irgendwo Kosten braucht, nimmt diese Funktion, nicht t.c. */
+   Standardkosten. Wer irgendwo Kosten braucht, nimmt diese Funktion, nicht t.c. Gilt auch
+   für die Singularität (SINGULARITY, ohne Zeitalter). */
 function techBase(S, t) {
-  return S && S.oldTree && OLD_TECH_COSTS[t.k] != null ? OLD_TECH_COSTS[t.k] : t.c;
+  const c = S && S.oldTree && OLD_TECH_COSTS[t.k] != null ? OLD_TECH_COSTS[t.k] : t.c;
+  if (!(S && S.marathon)) return c;
+  return t.k === 'singularitaet' ? c * MARATHON_SING_FACTOR : c * MARATHON_TECH_FACTOR[t.age];
 }
 // Techs je Feld und Zeitalter, nach den Kosten der Partie sortiert (billigere zuerst).
 // Das ist die Leiter im Technologiebogen; Würfe auf „die n-te Technologie" zählen ebenso.

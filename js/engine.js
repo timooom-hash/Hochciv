@@ -43,6 +43,24 @@ const citiesOf = (S, pi) => S.cities.filter(x => x.owner === pi);
 const armiesOf = (S, pi) => S.armies.filter(x => x.owner === pi);
 const popOf = (S, pi) => citiesOf(S, pi).reduce((a, x) => a + x.pop, 0);
 const worldPop = S => S.cities.reduce((a, x) => a + x.pop, 0);
+/* Wirtschaftssieg zu Rundenbeginn (v83, Anweisung des Autors): gezählt wird gegen die
+   Bevölkerung zu Beginn der Runde, nicht gegen die während eines Zuges – so ist der Nenner
+   für alle Reiche einer Runde derselbe. Ausgelegt als: eigene Bevölkerung UND
+   Weltbevölkerung zu Rundenbeginn, geprüft gleich dort (markRoundStart) für alle Reiche in
+   Zugfolge. Nur den Nenner festzuhalten und die eigene Bevölkerung laufend zu zählen, hieße:
+   das eigene Wachstum im Zug zählt oben, aber nicht unten – gemessen endeten so alle 40
+   KI-Duelle in Runde 2 mit dem Wirtschaftssieg (ANNAHMEN, v83). */
+const victoryWorld = S => S.roundPop != null ? S.roundPop : worldPop(S);
+const victoryOwn = (S, pi) => S.roundPops && S.roundPops[pi] != null ? S.roundPops[pi] : popOf(S, pi);
+function markRoundStart(S) {
+  S.roundPop = worldPop(S);
+  S.roundPops = S.players.map((_, i) => popOf(S, i));
+  if (S.over || S.round <= 1) return;
+  for (let k = 0; k < S.players.length; k++) {
+    const pi = ((S.startIdx || 0) + k) % S.players.length, p = S.players[pi];
+    if (!p.dead && canWin(p)) checkVictory(S, pi);
+  }
+}
 const capitalOf = (S, pi) => citiesOf(S, pi).find(x => x.cap);
 const roadLevel = (S, r, c) => S.roads[key(r, c)] || 0;
 /* Auf Plättchenkarten darf dieselbe Zivilisation mehrfach am Tisch sitzen. Damit die
@@ -74,22 +92,37 @@ function capitalSpot(map, p) {
   return caps[p.civ] || null;
 }
 
-/* Zivilisationsfähigkeit des Reiches ('basis' oder eine der Alternativen).
-   Bots und die neutrale Barbarenfraktion haben KEINE Fähigkeit. */
-function abilityOf(p) {
-  if (!p || p.kind === 'bot' || p.kind === 'barbar') return null;
-  return p.ability || 'basis';
+/* Fähigkeiten eines Reiches als Liste von Schlüsseln „Zivilisation:Fähigkeit".
+   Normalerweise genau eine: die im Aufbau gewählte seiner Zivilisation (p.ability –
+   'basis' oder eine der Alternativen). Im Marathon (v83) zwei gedraftete, auch fremde
+   und auch zweimal dieselbe (p.drafted). Bots und die neutrale Barbarenfraktion haben
+   KEINE Fähigkeit.
+   Die Grundfähigkeiten heißen bei allen Reichen 'basis' – geprüft werden sie deshalb immer
+   mit der Zivilisation (hasAbil). Die Alternativen haben eindeutige Schlüssel, für sie
+   genügt isAbil. Doppelt gedraftet wirkt eine Fähigkeit nur einfach. */
+function abilitiesOf(p) {
+  if (!p || p.kind === 'bot' || p.kind === 'barbar') return [];
+  if (Array.isArray(p.drafted)) return p.drafted;
+  return [p.civ + ':' + (p.ability || 'basis')];
 }
-function isAbil(p, k) { return abilityOf(p) === k; }
-/* Die Fähigkeit eines Reiches als Objekt {k, n, e} – für die Anzeige. Bots haben keine.
+function hasAbil(p, civ, k) { return abilitiesOf(p).includes(civ + ':' + k); }
+function isAbil(p, k) {
+  if (k === 'basis') throw new Error('Grundfähigkeiten heißen überall basis – mit Zivilisation prüfen: hasAbil');
+  return abilitiesOf(p).some(a => a.slice(a.indexOf(':') + 1) === k);
+}
+// Eine Fähigkeit als Objekt {k, n, e, civ} aus ihrem Schlüssel „Zivilisation:Fähigkeit"
+function abilById(id) {
+  const [ck, k] = String(id).split(':');
+  const civ = CIV_BY_KEY[ck];
+  const a = civ && civ.abilities.find(x => x.k === k);
+  return a ? Object.assign({}, a, { civ: ck, id }) : null;
+}
+/* Die Fähigkeiten eines Reiches als Objekte – für die Anzeige. Bots haben keine.
    Wichtig, seit sich Zivilisation und Fähigkeit auslosen lassen: wer würfeln lässt, muss
-   im Spiel nachsehen können, was er bekommen hat. */
-function abilInfo(p) {
-  const k = abilityOf(p);
-  if (!k) return null;
-  const civ = CIV_BY_KEY[p.civ];
-  return (civ && civ.abilities.find(a => a.k === k)) || null;
-}
+   im Spiel nachsehen können, was er bekommen hat. abilInfo gibt die erste (normal die
+   einzige), abilInfos alle. */
+function abilInfos(p) { return abilitiesOf(p).map(abilById).filter(Boolean); }
+function abilInfo(p) { return abilInfos(p)[0] || null; }
 
 /* Machtwert: Bots haben immer ihre Gesamtbevölkerung als Macht.
    Zuschläge (Wikinger "Kriegerkultur", Zeusstatue) erhöhen den Machtwert,
@@ -97,9 +130,16 @@ function abilInfo(p) {
 function powerBonus(S, pi) {
   const p = S.players[pi];
   let b = 0;
-  if (isAbil(p, 'armeemacht')) b += 2 * armiesOf(S, pi).length;   // 2 Macht je Armee
+  if (isAbil(p, 'armeemacht')) b += 2 * warriorUnits(S, pi, armiesOf(S, pi).length);
   if (hasWonder(S, pi, 'zeus')) b += 3;
   return b;
+}
+/* Kriegerkultur (Wikinger): +2 Macht je Armee. Seit v83 (Anweisung des Autors) zählt mit
+   Burgenbau auch jede eigene Stadt – dort steht die unbewegliche Armee, die verteidigt,
+   flankiert und Kontrollzonen hält wie eine echte. Für die Baukosten weiterer Armeen
+   zählt sie weiter nicht. `n` = Zahl der echten Armeen (die KI rechnet mit geplanten). */
+function warriorUnits(S, pi, n) {
+  return n + (has(S.players[pi], 'burgenbau') ? citiesOf(S, pi).length : 0);
 }
 function powerOf(S, pi) {
   const p = S.players[pi];
@@ -139,12 +179,16 @@ function newGame(cfg) {
     // Alter Techtree (bis v81 der Standard, seit v82 nur im Tutorial): OLD_TECH_COSTS / techBase.
     // Steht immer im Spielstand – auch false –, daran erkennt migrateState neue Spielstände.
     oldTree: !!cfg.oldTree,
+    // Marathon (v83): große Zufallskarte, teurere Technologien, gedraftete Fähigkeiten
+    marathon: !!cfg.marathon,
     event: null, evNext: null, nukeBan: false,
     wonders: [], wpool: { 1: [], 2: [], 3: [] }, wgone: [],
     players: ordered.map(pc => ({
       civ: pc.civ, kind: pc.kind, diff: pc.diff || 'prinz', name: pc.name || null,
       roman: pc.roman || null, color: pc.color || null, slot: cfg.players.indexOf(pc),
       ability: pc.kind === 'bot' ? 'basis' : (pc.ability || 'basis'),
+      // Marathon (v83): zwei gedraftete Fähigkeiten, Schlüssel „Zivilisation:Fähigkeit"
+      drafted: pc.kind !== 'bot' && Array.isArray(pc.drafted) ? pc.drafted.slice() : null,
       // KI (js/ki.js): spielt nach den Regeln für Menschen, nur die Stufe kommt dazu
       kiLevel: pc.kind === 'ki' ? (pc.kiLevel || KI_DEFAULT_LEVEL) : null,
       power: 0, techs: {}, avail: {}, res: { sci: 0, food: 0, coins: 0 },
@@ -154,7 +198,12 @@ function newGame(cfg) {
   log(S, 'head', 'Neues Spiel — ' + (S.duel ? '1 gegen 1: ' : '') +
     S.players.map(p => civOf(p).n + kindTag(p)).join(', ') +
     ` · ${S.map.name}` +
-    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : ''));
+    (S.ev ? ` · Ereignisse (${S.ev.mode === 'easy' ? 'leicht' : 'hart'})` : '') + (S.wo ? T(' · Weltwunder') : '') +
+    (S.marathon ? T(' · Marathon') : ''));
+  // Marathon: wer welche Fähigkeiten gedraftet hat, steht gleich im Protokoll
+  if (S.marathon) S.players.forEach(p => {
+    if (abilitiesOf(p).length) log(S, 'info', T('%s: Fähigkeiten %s.', civOf(p).n, abilInfos(p).map(a => a.n).join(' + ')));
+  });
 
   /* Aufbau 3: Starttechnologien der Antike auswürfeln. Im Plättchenmodus ist das schon
      VOR der Legephase geschehen (rollSetup) – dann wird das Ergebnis übernommen, sonst
@@ -179,13 +228,14 @@ function newGame(cfg) {
     S.cities.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], pop: startPop, cap: true, grown: 0, born: 0 });
     // Wikinger: kostenlose Armee am Start. Sie erscheint IN der Hauptstadt, genau wie
     // eine gebaute – und muss sie im ersten Zug verlassen (born = aktuelle Runde).
-    if (p.civ === 'wikinger' && isAbil(p, 'basis'))
+    if (hasAbil(p, 'wikinger', 'basis'))
       S.armies.push({ id: S.nextId++, owner: i, r: pos[0], c: pos[1], mp: 0, born: S.round });
   });
   if (S.wo) initWonderPools(S, cfg.wpool);
   S.startIdx = startIdx;      // Rundenwechsel und Ereignis hängen am Startspieler
   S.cur = startIdx;
   startRound(S);          // Ereignis der ersten Runde
+  markRoundStart(S);          // Nenner des Wirtschaftssiegs für diese Runde (victoryWorld)
   beginTurn(S);
   return S;
 }
@@ -196,7 +246,7 @@ function techCost(S, pi, tech) {
   let c = techBase(S, tech);          // Grundkosten dieser Partie (im Tutorial der alte Techtree)
   const age = tech.k === 'singularitaet' ? 4 : tech.age;
   if (tech.k === 'singularitaet' && kremlBuilt(S)) c += KREML_SURCHARGE;
-  if (p.civ === 'griechenland' && isAbil(p, 'basis')) c -= (age + 1);   // 1/2/3/4/5 je Zeitalter
+  if (hasAbil(p, 'griechenland', 'basis')) c -= (age + 1);   // 1/2/3/4/5 je Zeitalter
   if (has(p, 'wiss_methode')) c -= 2 * (age + 1);        // -2/-4/-6/-8/-10
   return Math.max(0, c);
 }
@@ -354,7 +404,7 @@ function tileYield(S, pi, t) {
     case 'W':
       if (has(p, 'mathematik')) add(0, 1); if (has(p, 'elektrizitaet')) add(0, 1); if (has(p, 'ki')) add(0, 1);
       if (has(p, 'kunstduenger')) add(1, 1);
-      if (p.civ === 'russland' && isAbil(p, 'basis')) add(1, 1); break;
+      if (hasAbil(p, 'russland', 'basis')) add(1, 1); break;
     case 'B':
       if (has(p, 'chemie')) add(0, 1); if (has(p, 'bewaesserung')) add(1, 1); break;
     case 'F':
@@ -540,8 +590,10 @@ function income(S, pi) {
    Rechnet am echten Spielstand, also inklusive Fähigkeiten, Wundern und Ereignissen,
    und berücksichtigt automatisch, dass sich Umland überlappen kann. Der eine
    Bevölkerungspunkt isst dabei schon mit. Verändert den Spielstand nicht. */
-function settleGain(S, pi, r, c) {
-  const before = income(S, pi);
+// `before` (v83, Tempo): das Einkommen ohne die neue Stadt, falls schon gerechnet – die KI
+// bewertet viele Plätze nacheinander, und es ist für alle dasselbe.
+function settleGain(S, pi, r, c, before) {
+  before = before || income(S, pi);
   const fake = { id: -999, owner: pi, r, c, pop: 1, cap: false, grown: 0, born: -1 };
   S.cities.push(fake);
   let after;
@@ -557,7 +609,7 @@ function settleGain(S, pi, r, c) {
    opts.foodOk: Bürgerkrieg erlaubt in dieser Runde, Armeen/Macht mit Nahrung zu zahlen. */
 function rates(S, pi, opts) {
   const p = S.players[pi];
-  const eng = p.civ === 'england' && isAbil(p, 'basis');
+  const eng = hasAbil(p, 'england', 'basis');
   const hungry = evActive(S, pi, 'hungersnot');
   let coinsToFood = eng || has(p, 'gilden') ? 1 : 2;
   if (hungry) coinsToFood = eng ? 1 : (has(p, 'gilden') ? 2 : 4);
@@ -928,17 +980,32 @@ function tradeRoutes(S, pi) {
   const others = citiesOf(S, pi).filter(c => !c.cap);
   if (!others.length || !Object.keys(S.roads || {}).length) return out;
 
+  /* Tempo (v83, Marathonkarte): Städte einmal in eine Tabelle statt je Feld zweimal die
+     ganze Liste durchzugehen (cityAt, effectiveRoad), und die Wegstufe je Feld nur einmal
+     ausrechnen – beide Suchen fragen dieselben Felder. Ergebnis wie vorher: `weg` ist
+     effectiveRoad, `stadt` liefert wie cityAt die erste Stadt auf dem Feld. */
+  const stadt = new Map();
+  for (const ct of S.cities) { const k = key(ct.r, ct.c); if (!stadt.has(k)) stadt.set(k, ct); }
+  const stufe = new Map();
+  const weg = (r, c, k) => {
+    let lvl = stufe.get(k);
+    if (lvl !== undefined) return lvl;
+    lvl = S.roads[k] || 0;
+    if (stadt.has(k)) for (const [nr, nc] of neighbors(r, c)) lvl = Math.max(lvl, roadLevel(S, nr, nc));
+    stufe.set(k, lvl);
+    return lvl;
+  };
   const erreichbar = min => {
     const seen = new Set(), stack = [];
-    if (effectiveRoad(S, cap.r, cap.c) < min) return seen;
+    if (weg(cap.r, cap.c, key(cap.r, cap.c)) < min) return seen;
     seen.add(key(cap.r, cap.c)); stack.push([cap.r, cap.c]);
     while (stack.length) {
       const [r, c] = stack.pop();
       for (const [nr, nc] of neighbors(r, c)) {
         const k = key(nr, nc);
         if (seen.has(k) || !terrainAt(S, nr, nc)) continue;
-        if (effectiveRoad(S, nr, nc) < min) continue;
-        const ct = cityAt(S, nr, nc);
+        if (weg(nr, nc, k) < min) continue;
+        const ct = stadt.get(k);
         if (ct && ct.owner !== pi) continue;          // fremde Stadt sperrt den Weg
         seen.add(k); stack.push([nr, nc]);
       }
@@ -1023,7 +1090,7 @@ function paidGrowthAvailable(S, pi, city) {
 const GROW_ABIL_FACTOR = { gruenden: 2 };
 function growPrice(S, pi, city) {
   const p = S.players[pi];
-  const f = GROW_ABIL_FACTOR[abilityOf(p)] || 1;
+  const f = abilitiesOf(p).reduce((m, a) => Math.max(m, GROW_ABIL_FACTOR[a.slice(a.indexOf(':') + 1)] || 1), 1);
   return {
     food: isAbil(p, 'wachstum') ? 0 : city.pop * f,
     coins: has(p, 'dampfmaschine') ? 0 : city.pop * f,
@@ -1309,7 +1376,7 @@ function foundCity(S, pi, r, c) {
 function armyCost(S, pi) {
   const p = S.players[pi];
   let n = armiesOf(S, pi).length + 1;
-  if (p.civ === 'wikinger' && isAbil(p, 'basis')) n = Math.max(0, n - 1);   // eine Armee zählt nicht mit
+  if (hasAbil(p, 'wikinger', 'basis')) n = Math.max(0, n - 1);   // eine Armee zählt nicht mit
   const mult = has(p, 'nationalismus') ? 2 : has(p, 'demokratie') ? 4 : 5;
   return mult * n;
 }
@@ -1709,7 +1776,8 @@ function techEffect(t, S) {
 function checkVictory(S, pi) {
   if (S.over) return S.over;
   if (S.round <= 1) return S.over;
-  const p = S.players[pi], w = worldPop(S), mine = popOf(S, pi);
+  // eigene und Weltbevölkerung zu Rundenbeginn (v83) – gerufen aus markRoundStart
+  const p = S.players[pi], w = victoryWorld(S), mine = victoryOwn(S, pi);
   const o = victoryOption(S, p);
   const enough = o.strict ? mine > w * o.frac : mine >= w * o.frac;
   if (w > 0 && enough && S.cities.length > 1)
@@ -1762,10 +1830,9 @@ const isHumanPlayer = p => !!p && p.kind !== 'bot' && p.kind !== 'barbar';
 function resolveClaims(S) {
   if (S.over) return true;
   if (S.endRound == null || S.round < S.endRound) return false;
-  // Letzte Gelegenheit: wessen Zug in dieser Runde schon vorbei war, als der erste
-  // Anspruch kam, wird hier noch einmal geprüft – sonst hinge der Vergleich an der
-  // Sitzreihenfolge.
-  S.players.forEach((p, i) => { if (!p.dead && canWin(p)) checkVictory(S, i); });
+  // Bis v82 wurde hier der Wirtschaftssieg aller noch einmal geprüft (sonst hing der
+  // Vergleich an der Sitzreihenfolge). Seit v83 prüft markRoundStart alle zugleich zu
+  // Rundenbeginn – hier gäbe es nichts Neues mehr.
   // Ausgeschiedene Reiche (keine Stadt mehr) können nicht gewinnen. Die Vorgabe
   // schützt nur vor dem Wegfallen der *Siegbedingung*, nicht vor dem Untergang.
   const live = (S.claims || []).filter(c =>
@@ -1844,7 +1911,8 @@ function pendingWarnings(S, pi) {
 function finishTurn(S) {
   if (S.over) return S.over;
   combatPhase(S, S.cur);
-  checkVictory(S, S.cur);
+  // Der Wirtschaftssieg wird seit v83 nicht mehr am Zugende geprüft, sondern zu Beginn der
+  // Runde für alle (markRoundStart) – mit der Bevölkerung von dort.
   return S.over;
 }
 function advanceTurn(S) {
@@ -1858,6 +1926,7 @@ function advanceTurn(S) {
     if (S.cur === first) {
       if (resolveClaims(S)) return S.over;
       S.round++; startRound(S);
+      markRoundStart(S);           // nach dem Ereignis: so steht die Welt zu Rundenbeginn da
     }
     guard++;
   } while (S.players[S.cur].dead && guard < 20);
