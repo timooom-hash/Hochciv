@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v83';
+const APP_VERSION = 'v84';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -40,6 +40,8 @@ const CITY_YIELD = [1, -1, 1];
 /* Grundkosten (c) sind seit v82 die des früheren „alternativen Techtrees" (v70/v74,
    Anweisung des Autors): Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 ·
    Bewässerung 1, Landwirtschaft 5 · Chemie 11, Biologie 12, Wissenschaftliche Methode 15.
+   Seit v84 (Anweisung des Autors) außerdem Stadtmauern 2, Eisenverarbeitung 4,
+   Belagerungsmaschinen 5 (vorher 5, 2, 4).
    Die alten Werte gibt es nur noch im Tutorial (OLD_TECH_COSTS). Die Reihenfolge dieser
    Liste ist bewusst die alte geblieben – die Leiter im Bogen kommt aus techsIn (nach
    Kosten sortiert), und wo Code die Liste der Reihe nach durchgeht, bleibt so alles,
@@ -82,9 +84,9 @@ const TECHS = [
   { k: 'robotik', n: 'Robotik', f: 1, c: 19, e: 'Je Bevölkerung: +1 Münze' },
   // Militär
   { k: 'taktik', n: 'Taktik', f: 2, c: 1, e: 'Flankieren von zwei beliebigen Positionen' },
-  { k: 'eisenverarbeitung', n: 'Eisenverarbeitung', f: 2, c: 2, e: '4 Münzen = 1 Macht' },
-  { k: 'belagerung', n: 'Belagerungsmaschinen', f: 2, c: 4, e: '+5 Angriff gegen Städte' },
-  { k: 'stadtmauern', n: 'Stadtmauern', f: 2, c: 5, e: 'Städte haben +5 Verteidigung' },
+  { k: 'eisenverarbeitung', n: 'Eisenverarbeitung', f: 2, c: 4, e: '4 Münzen = 1 Macht' },
+  { k: 'belagerung', n: 'Belagerungsmaschinen', f: 2, c: 5, e: '+5 Angriff gegen Städte' },
+  { k: 'stadtmauern', n: 'Stadtmauern', f: 2, c: 2, e: 'Städte haben +5 Verteidigung' },
   { k: 'burgenbau', n: 'Burgenbau', f: 2, c: 7, e: 'Städte enthalten unbewegliche Armee' },
   { k: 'stahl', n: 'Stahl', f: 2, c: 8, e: 'Machtverlust = 1/3' },
   { k: 'militaerlogistik', n: 'Militärlogistik', f: 2, c: 6, wo: true, e: '+1 Bewegungsweite je eigenem Weltwunder' },
@@ -101,7 +103,7 @@ const TECHS = [
   { k: 'navigation', n: 'Navigation', f: 3, c: 1, e: 'Bewegung über Meer' },
   { k: 'demokratie', n: 'Demokratie', f: 3, c: 3, e: 'Armeekosten = 4 × Anzahl' },
   { k: 'wallfahrt', n: 'Wallfahrt', f: 3, c: 4, wo: true, e: 'Je eigenem Weltwunder +3 auf alle Erträge' },
-  { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 10 Münzen · wird in der Moderne obsolet' },
+  { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 7 Münzen · wird in der Moderne obsolet' },
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
   { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (2× Kosten in Münzen)' },
   { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 8, e: 'Hauptstadt produziert doppelt' },
@@ -110,7 +112,7 @@ const TECHS = [
   { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten = 2 × Anzahl' },
   { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
   { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 13, e: 'Kein Bevölkerungsverlust beim Erobern' },
-  { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 3 Münzen Feld kaufen' },
+  { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen' },
   { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Eine Münze ernährt drei Bevölkerung' },
   { k: 'un', n: 'Vereinte Nationen', f: 3, c: 17, e: '>1/2 der Bevölkerung zum Sieg' },
   { k: 'oekologie', n: 'Ökologie', f: 3, c: 18, e: 'Städte: +1 auf alle Erträge / 2 Bevölkerung (abrunden)' },
@@ -139,6 +141,7 @@ const THEOLOGY_FRAC = 3 / 5;       // mit Theologie
 const UN_FRAC = 1 / 2;             // mit Vereinte Nationen
 const BOT_RESEARCH_TWICE = true;
 const SLAVERY_OBSOLETE_IN_MODERN = true;
+const SLAVERY_COINS = 7;     // Sklaverei: Münzen je geopferter Bevölkerung (bis v83: 10)
 
 const TECH_BY_KEY = {};
 TECHS.forEach(t => { TECH_BY_KEY[t.k] = t; });
@@ -152,8 +155,9 @@ const SINGULARITY = {
 };
 /* Der alte Techtree (bis v81 der Standard) – seit v82 nur noch im Tutorial (Anweisung des
    Autors: „bis ich ein besseres Tutorialspiel liefere"). Er unterscheidet sich vom
-   heutigen nur in den Grundkosten dieser neun Technologien; Wirkung, Feld und Zeitalter
-   sind gleich. Eine Partie trägt ihn als S.oldTree. Bis v81 hieß der Schalter andersherum
+   heutigen nur in den Grundkosten dieser zwölf Technologien (die drei militärischen seit
+   v84: das Tutorial behält seine Kosten und damit seinen festen Ablauf); Wirkung, Feld und
+   Zeitalter sind gleich. Eine Partie trägt ihn als S.oldTree. Bis v81 hieß der Schalter andersherum
    S.altTree (der heutige Standard war zuschaltbar) – migrateState übersetzt alte
    Spielstände, eine laufende Partie behält ihren Techtree. Ein Test hält fest, dass keiner
    dieser Werte die Zeitaltergrenze überschreitet (t.age kommt aus c). */
@@ -161,6 +165,7 @@ const OLD_TECH_COSTS = {
   schrift: 1, mathematik: 2, astronomie: 3, philosophie: 4,     // Forschung, Antike
   wiss_methode: 11, chemie: 12, biologie: 15,                   // Forschung, Industrialisierung
   landwirtschaft: 1, bewaesserung: 5,                           // Produktion, Antike
+  eisenverarbeitung: 2, belagerung: 4, stadtmauern: 5,          // Militär, Antike (bis v83 Standard)
 };
 /* Kolonialismus und Kundschafterei (v72, Anweisung des Autors; gilt in beiden Techtrees –
    sie unterscheiden sich nur in den Forschungskosten). Die Techtexte in TECHS und DATA_EN
@@ -168,12 +173,16 @@ const OLD_TECH_COSTS = {
 const COLONY_COST = 3;       // Kolonialismus: Münzen je Feld (bis v71: 5)
 const SCOUTING_RATE = 2;     // Kundschafterei: × Grundkosten, in Münzen (bis v71: 3)
 /* Marathon (v83, Anweisung des Autors; Karte und Draft in js/marathon.js): Karte viermal so
-   groß wie die Europakarte (Originalkarte 12 × 18), Technologien je Zeitalter ×2/×3/×4/×5,
-   die Singularität ×2,5. Vergünstigungen (Griechenland, Wissenschaftliche Methode) ziehen
-   danach ihre festen Beträge ab, der Kreml schlägt seine 50 auf. */
+   groß wie die Europakarte (Originalkarte 12 × 18), Technologien je Zeitalter ×2/×3/×4/×5.
+   Vergünstigungen (Griechenland, Wissenschaftliche Methode) ziehen danach ihre festen
+   Beträge ab, der Kreml schlägt seine 50 auf.
+   Seit v84 (Anweisung des Autors): Singularität 300 (v83: 2,5-fach, also 250), höchstens
+   fünf Gründungen je Zug, Militärsieg erst mit der zweiten eroberten Hauptstadt. */
 const MARATHON_ROWS = 24, MARATHON_COLS = 36;
 const MARATHON_TECH_FACTOR = [2, 3, 4, 5];
-const MARATHON_SING_FACTOR = 2.5;
+const MARATHON_SINGULARITY = 300;
+const MARATHON_MAX_FOUNDS = 5;      // neue Städte je Zug
+const MARATHON_CAPITALS = 2;        // eroberte Hauptstädte für den Militärsieg
 const MARATHON_MIN_START = 4;      // Nahrung + ½ Münzen der Hauptstadt im ersten Zug, mit 2 Bevölkerung
 const MARATHON_MIN_DIST = 14;      // Mindestabstand der Hauptstädte (Originalkarte: 7 auf halber Breite)
 /* Grundkosten einer Technologie IN DIESER PARTIE, vor allen Vergünstigungen (Griechenland,
@@ -183,7 +192,7 @@ const MARATHON_MIN_DIST = 14;      // Mindestabstand der Hauptstädte (Originalk
 function techBase(S, t) {
   const c = S && S.oldTree && OLD_TECH_COSTS[t.k] != null ? OLD_TECH_COSTS[t.k] : t.c;
   if (!(S && S.marathon)) return c;
-  return t.k === 'singularitaet' ? c * MARATHON_SING_FACTOR : c * MARATHON_TECH_FACTOR[t.age];
+  return t.k === 'singularitaet' ? MARATHON_SINGULARITY : c * MARATHON_TECH_FACTOR[t.age];
 }
 // Techs je Feld und Zeitalter, nach den Kosten der Partie sortiert (billigere zuerst).
 // Das ist die Leiter im Technologiebogen; Würfe auf „die n-te Technologie" zählen ebenso.

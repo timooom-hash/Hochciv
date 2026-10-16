@@ -302,10 +302,12 @@ function kiEnemyInfo(S, e, pi) {
     info.reach.set(a.id, kiReachKeys(S0, e, a.r, a.c, mp));
     info.armies.push({ id: a.id, r: a.r, c: a.c });
   }
+  const botHome = capitalOf(S, e) || citiesOf(S, e)[0];
   for (const ct of citiesOf(S, e)) {
     if (armyAt(S, ct.r, ct.c)) continue;
-    // Bots bauen nur in der Hauptstadt, und nur mit Glück
-    if (info.bot && !ct.cap) continue;
+    // Bots bauen nur in der Hauptstadt (ohne Hauptstadt in ihrer ersten Stadt, wie botTurn),
+    // und nur mit Glück
+    if (info.bot && ct !== botHome) continue;
     info.cityReach.push({ id: ct.id, r: ct.r, c: ct.c, keys: kiReachKeys(S0, e, ct.r, ct.c, mp) });
   }
   if (info.bot) {
@@ -360,15 +362,51 @@ function kiHits(S, info, city) {
    die fünfte an einer Stadt mit vier freien Nachbarfeldern. Dass eigene Armeen rund um die
    Stadt Plätze wegnehmen, sah die KI nicht; nachgestellt hielt sie eine Hauptstadt nur dann,
    wenn sie zufällig ein Nachbarfeld besetzt hatte und der Mensch mit einer Armee weniger kam. */
-function kiAttackSlots(S, e, hit) {
+/* Belegung eines Spielstands (v84, Tempo): Städte und Armeen je Feld und je Id, einmal je
+   kiRisk statt je Feld eine Suche über alle Städte und Armeen (im Marathon zur Mitte der
+   Partie 50 Städte und mehr). Wie cityAt, armyAt, kiCity und kiArmy jeweils das erste
+   Vorkommen. Gilt nur, solange S sich nicht ändert – deshalb nur in kiRisk gebaut und von
+   dort durchgereicht; ohne `occ` suchen die Funktionen wie bisher. */
+function kiOccupancy(S) {
+  const city = new Map(), army = new Map(), cityId = new Map(), armyId = new Map();
+  for (const c of S.cities) {
+    const k = key(c.r, c.c);
+    if (!city.has(k)) city.set(k, c);
+    if (!cityId.has(c.id)) cityId.set(c.id, c);
+  }
+  for (const a of S.armies) {
+    const k = key(a.r, a.c);
+    if (!army.has(k)) army.set(k, a);
+    if (!armyId.has(a.id)) armyId.set(a.id, a);
+  }
+  return { city, army, cityId, armyId };
+}
+function kiAttackSlots(S, e, hit, occ) {
   if (!hit.armies.size && !hit.cities.size) return { m0: 0, mAll: 0, nC: 0, free: 0 };
   const free = new Set();
+  let sig = '';
   for (const t of hit.ring) {
-    if (cityAt(S, t.r, t.c)) continue;
-    const a = armyAt(S, t.r, t.c);
-    if (a && a.owner !== e) continue;
-    free.add(t.k);
+    if (occ ? occ.city.has(t.k) : cityAt(S, t.r, t.c)) { sig += '0'; continue; }
+    const a = occ ? occ.army.get(t.k) : armyAt(S, t.r, t.c);
+    if (a && a.owner !== e) { sig += '0'; continue; }
+    free.add(t.k); sig += '1';
   }
+  /* Merker (v84, Tempo): das Ergebnis hängt nur an den freien Feldern und daran, welche
+     seiner Armeen und Städte noch stehen – innerhalb eines Zuges der KI (hit gilt je Zug)
+     wiederholt sich das bei fast jeder bewerteten Möglichkeit. */
+  const lebt = [], seine = [];
+  for (const [id] of hit.armies) {
+    const a = occ ? occ.armyId.get(id) : kiArmy(S, id);
+    lebt.push(!!(a && a.owner === e));
+  }
+  for (const [id] of hit.cities) {
+    const ct = occ ? occ.cityId.get(id) : kiCity(S, id);
+    seine.push(!!(ct && ct.owner === e));
+  }
+  sig += '|' + lebt.map(Number).join('') + '|' + seine.map(Number).join('');
+  const memo = hit.memo || (hit.memo = new Map());
+  const alt = memo.get(sig);
+  if (alt) return alt;
   const owner = new Map();   // Feld → Knoten (Armee oder Stadt), der es belegt
   const place = (node, seen) => {
     for (const k of node.tiles) {
@@ -379,19 +417,18 @@ function kiAttackSlots(S, e, hit) {
     }
     return false;
   };
-  let m0 = 0;
-  for (const [id, tiles] of hit.armies) {
-    const a = kiArmy(S, id);
-    if (a && a.owner === e && place({ tiles }, new Set())) m0++;
-  }
+  let m0 = 0, i = 0;
+  for (const [, tiles] of hit.armies) if (lebt[i++] && place({ tiles }, new Set())) m0++;
   let mAll = m0, nC = 0;
-  for (const [id, tiles] of hit.cities) {
-    const ct = kiCity(S, id);
-    if (!ct || ct.owner !== e) continue;
+  i = 0;
+  for (const [, tiles] of hit.cities) {
+    if (!seine[i++]) continue;
     nC++;
     if (place({ tiles }, new Set())) mAll++;
   }
-  return { m0, mAll, nC, free: free.size };
+  const res = { m0, mAll, nC, free: free.size };
+  memo.set(sig, res);
+  return res;
 }
 function kiAttackPotential(S, info, city, hard) { return kiAttackWaves(S, info, city, hard).a1; }
 /* Rechnet die KI mit einem entschlossenen Angreifer? Gegen Menschen ja: sie sehen eine
@@ -411,9 +448,9 @@ const kiDetermined = (S, info, city) => info.human;
    Wer zweimal alles in Macht steckt, kommt auf gut das Anderthalbfache – mit der groben
    Schätzung verließ sich die KI auf eine Antwort nach dem ersten Treffer, die es nicht gab
    (ANNAHMEN.md „Abwehr gegen Vorstöße"). */
-function kiAttackWaves(S, info, city, hard) {
+function kiAttackWaves(S, info, city, hard, slIn) {
   const e = info.e;
-  const sl = kiAttackSlots(S, e, kiHits(S, info, city));
+  const sl = slIn || kiAttackSlots(S, e, kiHits(S, info, city));
   const nE = sl.m0, nC = sl.nC;
   // Angreifer mit m neuen Armeen – höchstens so viele, wie Felder frei sind
   const fit = m => Math.min(nE + m, sl.mAll);
@@ -491,13 +528,15 @@ function kiDefensePotential(S, oi, city, budgetIn, room) {
 
 /* Felder in Reichweite der eigenen Stadt, auf denen eine Armee stehen kann (Land, keine
    Stadt, keine Armee eines Dritten) – Platz für eigene Helfer und seine Angreifer zusammen. */
-function kiRingRoom(S, pi, city, e) {
+function kiRingRoom(S, pi, city, e, occ) {
   let n = 0;
   for (const [r, c] of within(city.r, city.c, projectRange(S, pi))) {
     if (r === city.r && c === city.c) continue;
     const t = terrainAt(S, r, c);
-    if (!t || isOff(t) || !TERRAIN[t].land || TERRAIN[t].block || cityAt(S, r, c)) continue;
-    const a = armyAt(S, r, c);
+    if (!t || isOff(t) || !TERRAIN[t].land || TERRAIN[t].block) continue;
+    const k = occ ? key(r, c) : null;
+    if (occ ? occ.city.has(k) : cityAt(S, r, c)) continue;
+    const a = occ ? occ.army.get(k) : armyAt(S, r, c);
     if (a && a.owner !== pi && a.owner !== e) continue;
     n++;
   }
@@ -627,9 +666,9 @@ function kiCityValue(S, pi, city, K) {
      danach nicht genug nachlegen kann (kiDefensePotential gegen seinen zweiten Angriff).
      Kann man es, bleibt nur eine kleine Rest-Gefahr (KI_W.preFloor). */
 const kiSig = x => 1 / (1 + Math.exp(-x));
-function kiAttackMin(S, info, city) {
+function kiAttackMin(S, info, city, slIn) {
   const e = info.e;
-  const n = kiAttackSlots(S, e, kiHits(S, info, city)).m0;
+  const n = (slIn || kiAttackSlots(S, e, kiHits(S, info, city))).m0;
   if (!n) return 0;
   const pw = info.bot ? info.powerNow : info.afterDecay + kiPowerBonus(S, e, armiesOf(S, e).length);
   return kiAttackPer(S, e, pw) * n;
@@ -656,36 +695,43 @@ function kiSiegeChance(aMax, aMin, d) {
    (fällt sie, ist die Partie verloren; kiValue rechnet sie mit dem Wert des Spiels). */
 function kiRisk(S, pi, K, myBudget) {
   let risk = 0, pCap = 0;
+  const occ = kiOccupancy(S);          // einmal je Bewertung (v84, Tempo)
   for (const city of citiesOf(S, pi)) {
     const d = defenseValue(S, city);
-    let pCity = 0;
+    let pCity = 0, pCapW = 0;
     for (const e of K.enemies) {
       const info = K.info.get(e);
       if (!info || S.players[e].dead) continue;
       const siege = (S.sieges[e + '|' + city.id] || 0) >= 1;
+      // Plätze an der Stadt einmal je Stadt und Gegner – Wellen und Mindestangriff fragten
+      // bis v83 jeder für sich dasselbe (v84, Tempo)
+      const sl = kiAttackSlots(S, e, kiHits(S, info, city), occ);
       let pc;
       if (siege) {
         // Ernstfall: der zweite Treffer entscheidet. Gegen Menschen mit dem entschlossenen
         // Angreifer gerechnet, gleich verteilt zwischen aMin und aMax (kiSiegeChance)
-        const w = kiAttackWaves(S, info, city, kiDetermined(S, info, city));
-        pc = w.a1 <= d ? 0 : kiSiegeChance(w.a1, kiAttackMin(S, info, city), d);
+        const w = kiAttackWaves(S, info, city, kiDetermined(S, info, city), sl);
+        pc = w.a1 <= d ? 0 : kiSiegeChance(w.a1, kiAttackMin(S, info, city, sl), d);
       } else {
         // Vorher (v79): für alle die milde Schätzung wie bis v77. Mit der harten gegen
         // Menschen (v78) steckte die KI zu viel in Vorsorge, solange nur gedroht wurde.
-        const w = kiAttackWaves(S, info, city, false);
+        const w = kiAttackWaves(S, info, city, false, sl);
         if (w.a1 <= d) continue;
-        const pNow = kiCaptureChance(w.a1, kiAttackMin(S, info, city), d);
+        const pNow = kiCaptureChance(w.a1, kiAttackMin(S, info, city, sl), d);
         // erster Treffer: danach bleibt ein Zug zum Nachlegen – gegen seine zweite Welle, und
         // die Felder, auf denen dann seine Angreifer stehen, sind für eigene Helfer verloren
-        const resp = kiDefensePotential(S, pi, city, myBudget, kiRingRoom(S, pi, city, e) - w.n1);
+        const resp = kiDefensePotential(S, pi, city, myBudget, kiRingRoom(S, pi, city, e, occ) - w.n1);
         const pNoResp = w.a2 <= resp ? K.w.preFloor : kiSig((w.a2 - resp) / Math.max(1.5, 0.12 * w.a2) - 0.5);
         pc = pNow * pNoResp * (city.cap ? 0.8 : 0.5);
       }
       if (!pc) continue;
       pCity = 1 - (1 - pCity) * (1 - pc);
+      // Marathon (v84): verloren ist die Partie erst, wenn es die zweite Hauptstadt dieses
+      // Gegners wäre – vorher zählt der Fall mit seinem Anteil am Militärsieg (die Hälfte)
+      if (city.cap) pCapW = 1 - (1 - pCapW) * (1 - pc * kiCapitalShare(S, S.players[e]));
     }
     if (!pCity) continue;
-    if (city.cap) pCap = 1 - (1 - pCap) * (1 - pCity);
+    if (city.cap) pCap = 1 - (1 - pCap) * (1 - pCapW);
     else risk += kiCityValue(S, pi, city, K) * K.lvl.defend * pCity;
   }
   return { cities: risk, pCap: Math.min(1, pCap * K.lvl.defend) };
@@ -695,6 +741,9 @@ function kiRisk(S, pi, K, myBudget) {
    gegen die beste Antwort des Gegners (kiDefensePotential) und mit dem, was man selbst im
    nächsten Zug aufbringen kann. Eroberungen selbst sieht die Bewertung direkt: die Stadt
    gehört dann einem, oder das Spiel ist gewonnen. */
+/* Anteil am Militärsieg, den die nächste eroberte Hauptstadt bringt: 1 im normalen Spiel,
+   im Marathon (zwei Hauptstädte, v84) die Hälfte – oder alles, wenn schon eine genommen ist. */
+const kiCapitalShare = (S, p) => Math.min(1, (capitalsTaken(p) + 1) / capitalsToWin(S));
 function kiOffense(S, pi, K, myBudget) {
   let v = 0;
   const me = S.players[pi];
@@ -716,7 +765,7 @@ function kiOffense(S, pi, K, myBudget) {
       if (theirMax > powerOf(S, pi) && atk > 0) aMax = kiAttackPer(S, pi, pw) * (atk - 1);
     }
     const pCap = aMax <= 0 ? 0 : kiSig((aMax - dMax) / Math.max(1.5, 0.12 * Math.max(aMax, dMax)) + 0.3);
-    const value = city.cap && owner.kind !== 'barbar' ? K.vGame : kiCityValue(S, pi, city, K) * 0.8;
+    const value = city.cap && owner.kind !== 'barbar' ? K.vGame * kiCapitalShare(S, me) : kiCityValue(S, pi, city, K) * 0.8;
     v += pCap * value * K.lvl.strike;
   }
   return v;
@@ -730,6 +779,8 @@ function kiVictory(S, pi, K) {
   }
   let v = 0;
   if ((S.claims || []).some(c => c.pi === pi)) v += K.vGame * 0.7;
+  // Marathon (v84): jede eroberte Hauptstadt ist ein Schritt zum Militärsieg
+  if (capitalsToWin(S) > 1) v += K.vGame * capitalsTaken(p) / capitalsToWin(S);
   // Wirtschaftssieg: Anteil an der Schwelle, steil zum Ende hin. Geprüft wird zu Beginn
   // der nächsten Runde (v83); der aktuelle Anteil ist dafür die beste Schätzung.
   const w = worldPop(S);
@@ -844,7 +895,8 @@ function kiCandidates(S, pi, K, memo, billig) {
     else if (canFeed(p) && paidGrowthAvailable(S, pi, city) && !growBlockReason(S, pi, city))
       add(() => T('Stadt wächst'), X => { kiFeedFor(X, pi, growPrice(X, pi, kiCity(X, id)).food); return growCity(X, pi, kiCity(X, id), 'paid'); }, 'grow:' + id);
   }
-  // --- Städte gründen: die besten erreichbaren Plätze
+  // --- Städte gründen: die besten erreichbaren Plätze (Marathon: höchstens fünf je Zug)
+  if (!(S.marathon && foundedThisTurn(S, pi) >= MARATHON_MAX_FOUNDS))
   for (const s of kiSites(S, pi, K, memo).slice(0, 6)) {
     add(() => T('gründet eine Stadt auf %s/%s', s.r, s.c), X => {
       if (canFeed(X.players[pi])) kiFeedFor(X, pi, foundCost(X, pi, s.r, s.c));
@@ -854,7 +906,7 @@ function kiCandidates(S, pi, K, memo, billig) {
   // --- Straßen: Handelsrouten zur Hauptstadt
   if (canBuildRoads(p)) for (const plan of kiRoadPlans(S, pi).slice(0, 4))
     add(plan.label, X => kiBuildRoadPlan(X, pi, plan), plan.tag);
-  // --- Sklaverei: Bevölkerung gegen 10 Münzen
+  // --- Sklaverei: Bevölkerung gegen Münzen (SLAVERY_COINS)
   if (!billig && slaveryUsable(p)) for (const city of citiesOf(S, pi))
     if (city.pop >= 2 && city.sacrificed !== S.round) {
       const id = city.id;
@@ -921,6 +973,12 @@ function kiSitesAll(S, pi, K) {
     }
     front = next;
   }
+  // Kolonien (v84): gekaufte Felder, die die Suche nicht erreicht – wie foundDistance (Weg
+  // bis 200 Schritte, sonst die Luftlinie)
+  for (const k of (S.bought[pi] || [])) if (!dist.has(k)) {
+    const dd = foundDistance(S, pi, ...unkey(k));
+    if (dd != null) dist.set(k, dd);
+  }
   const n = citiesOf(S, pi).length;
   const base = n * (n + 1) / 2;
   const out = [];
@@ -947,7 +1005,8 @@ function kiSitesAll(S, pi, K) {
 // Siedelplätze ändern sich mit Städten, Armeen, Techs und Straßen – nicht mit den Ressourcen
 const kiSiteKey = (S, pi) => S.cities.length + '|' +
   S.armies.filter(a => a.owner !== pi).map(a => a.r + ',' + a.c).join(';') + '|' +
-  Object.keys(S.players[pi].techs).length + '|' + Object.keys(S.roads).length;
+  Object.keys(S.players[pi].techs).length + '|' + Object.keys(S.roads).length + '|' +
+  (S.bought[pi] || []).length;           // gekaufte Felder: Kolonien (v84)
 /* Straßenpläne: für jede eigene Stadt ohne Handelsroute der billigste Weg zum Straßennetz
    der Hauptstadt (Dijkstra, Kosten = Felder ohne Straße). Nur auf eigenem oder neutralem
    Land, nie auf Meer – so wie buildRoad es erlaubt. Mit Eisenbahn zusätzlich der Ausbau

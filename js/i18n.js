@@ -124,7 +124,7 @@ const DATA_EN = {
     navigation: ['Navigation', 'Movement across sea'],
     demokratie: ['Democracy', 'Army cost = 4 × count'],
     wallfahrt: ['Pilgrimage', '+3 to all yields per wonder you own'],
-    sklaverei: ['Slavery', 'Sacrifice city population → 10 coins · becomes obsolete in the Modern Age'],
+    sklaverei: ['Slavery', 'Sacrifice city population → 7 coins · becomes obsolete in the Modern Age'],
     rittertum: ['Chivalry', 'Only 1 population lost when conquering'],
     kundschafterei: ['Scouting', 'Copy a tech (2× its cost in coins)'],
     buerokratie: ['Bureaucracy', 'The capital produces double'],
@@ -133,7 +133,7 @@ const DATA_EN = {
     nationalismus: ['Nationalism', 'Army cost = 2 × count'],
     spionage: ['Espionage', 'Copy a tech (1× its cost in coins)'],
     militaergericht: ['Military tribunal', 'No population lost when conquering'],
-    kolonialismus: ['Colonialism', 'Buy a tile for 3 coins'],
+    kolonialismus: ['Colonialism', 'Buy a tile for 3 coins; found a city there even without a route'],
     massenmedien: ['Mass media', 'One coin feeds three population'],
     un: ['United Nations', '>1/2 of the population to win'],
     oekologie: ['Ecology', 'Cities: +1 to all yields per 2 population (rounded down)'],
@@ -336,8 +336,8 @@ const UI_EN = {
   'Ereignisstärke': 'Event strength',
   'Mit Weltwundern': 'With wonders',
   'Marathon': 'Marathon',
-  'Marathon: vier Reiche auf einer Zufallskarte, viermal so groß wie die Originalkarte. Technologien kosten je Zeitalter das Zwei- bis Fünffache, die Singularität das 2,5-Fache. Vor dem ersten Zug sehen alle die Karte und die Starttechnologien und draften dann ihre Fähigkeiten: je zwei, in Schlangenreihenfolge.':
-    'Marathon: four empires on a random map four times the size of the original map. Technologies cost two to five times as much depending on the age, the Singularity 2.5 times. Before the first turn everyone sees the map and the starting technologies and then drafts their abilities: two each, in snake order.',
+  'Marathon: vier Reiche auf einer Zufallskarte, viermal so groß wie die Originalkarte. Technologien kosten je Zeitalter das Zwei- bis Fünffache, die Singularität 300. Höchstens fünf neue Städte je Zug, und der Militärsieg verlangt zwei eroberte Hauptstädte. Vor dem ersten Zug sehen alle die Karte und die Starttechnologien und draften dann ihre Fähigkeiten: je zwei, in Schlangenreihenfolge.':
+    'Marathon: four empires on a random map four times the size of the original map. Technologies cost two to five times as much depending on the age, the Singularity 300. At most five new cities per turn, and a military victory takes two captured capitals. Before the first turn everyone sees the map and the starting technologies and then drafts their abilities: two each, in snake order.',
   'Fähigkeiten werden vor dem ersten Zug gedraftet – je zwei, auch fremde.': 'Abilities are drafted before the first turn – two each, from any civilisation.',
   'Marathon · Fähigkeiten draften': 'Marathon · draft abilities',
   'Marathonkarte (%s × %s)': 'Marathon map (%s × %s)',
@@ -354,8 +354,13 @@ const UI_EN = {
   'Starttechnologien: %s': 'Starting technologies: %s',
   '%s · Starttechnologien': '%s · starting technologies',
   'Ausgewürfelt vor dem Draft – im Spiel steht genau das hier. Kosten ohne Fähigkeiten.': 'Rolled before the draft – this is exactly what the game will have. Costs without abilities.',
-  'Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität das 2,5-Fache – die Kosten hier sind schon umgerechnet.':
-    'Marathon: technologies cost two, three, four and five times as much depending on the age, the Singularity 2.5 times – the costs shown here already include that.',
+  'Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität %s – die Kosten hier sind schon umgerechnet. Höchstens %s neue Städte je Zug. Militärsieg erst mit %s eroberten Hauptstädten; eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt weiter.':
+    'Marathon: technologies cost two, three, four and five times as much depending on the age, the Singularity %s – the costs shown here already include that. At most %s new cities per turn. A military victory takes %s captured capitals; a captured capital becomes an ordinary city, and its former empire plays on without a capital.',
+  'Höchstens %s neue Städte je Zug (Marathon).': 'At most %s new cities per turn (marathon).',
+  '%s von %s Hauptstädten erobert': '%s of %s capitals captured',
+  'ohne Hauptstadt': 'without a capital',
+  'Militärsieg (Hauptstädte von %s erobert)': 'Military victory (capitals of %s captured)',
+  '%s erobert die Hauptstadt von %s – %s von %s Hauptstädten für den Militärsieg.': '%s captures the capital of %s – %s of %s capitals for a military victory.',
   ' · Marathon': ' · marathon',
   '%s: Fähigkeiten %s.': '%s: abilities %s.',
   'Alter Techtree': 'Old tech tree',
@@ -455,7 +460,7 @@ const UI_EN = {
   '%s: Atomschlag auf %s/%s – %s Armee(n) zerstört.': '%s: nuclear strike on %s/%s – %s army/armies destroyed.',
   '%s: Barbaren mit Macht %s greifen die Stadt auf %s/%s an.': '%s: barbarians with power %s attack the city on %s/%s.',
   '%s: Beutezüge ergeben %s (%s) – gutgeschrieben zu Beginn der nächsten Runde.': '%s: raids yield %s (%s) – credited at the start of the next round.',
-  '%s: Bevölkerung geopfert → +10 Münzen.': '%s: population sacrificed → +10 coins.',
+  '%s: Bevölkerung geopfert → +%s Münzen.': '%s: population sacrificed → +%s coins.',
   '%s: Bürgerkrieg zerstört %s Armee(n).': '%s: civil war destroys %s army/armies.',
   '%s: Der Apostolische Palast schützt vor dem Ereignis.': '%s: the Apostolic Palace shields you from the event.',
   '%s: Die Pest kostet %s Bevölkerung.': '%s: the plague costs %s population.',
@@ -1072,8 +1077,8 @@ const UI_EN = {
     '<p>Time to expand. Settling on the gold-outlined tile costs <b>4 food</b> in total – 1 base cost for the first additional city plus 3 distance cost for the way there from the capital.</p> <p><b>How to found:</b> <b>Found city</b> at the bottom → tap the golden tile → <b>Found here</b>. While founding mode is on, every possible tile shows what a city there costs.</p>',
   '<p>Griechenland hat im eigenen Zug eine Armee neben deine Stadt gezogen und schon einmal angegriffen – im Protokoll steht dazu „Zug 1/2". Stadt und Armee sind golden umrandet.</p> <p><b>Angriffswert</b> = Machtwert je angreifender Armee, mehrere addieren sich: <b>5</b> (bei Bots ist das ihre Gesamtbevölkerung).<br> <b>Verteidigungswert</b> = 1 je Stadtbevölkerung plus den Machtwert benachbarter eigener Armeen: <b>1</b>.</p> <p>Der Angriff ist höher. Ist er <b>zwei Züge in Folge</b> höher, verlierst du die Stadt und 2 Bevölkerung. Im Protokoll steht dann „Zug 1/2" – das ist deine Vorwarnung, du hast genau eine Runde Zeit.</p>':
     '<p>On its own turn Greece moved an army next to your city and has already attacked once – the log says “turn 1/2”. City and army are outlined in gold.</p> <p><b>Attack value</b> = the power value per attacking army, several add up: <b>5</b> (for bots that is their total population).<br> <b>Defence value</b> = 1 per city population plus the power value of your adjacent armies: <b>1</b>.</p> <p>The attack is higher. If it is higher <b>two turns in a row</b>, you lose the city and 2 population. The log then says “turn 1/2” – that is your warning, you have exactly one round.</p>',
-  '<p>Hochzeivilization ist ein Spiel, bei dem vier Zivilisationen ihr Reich von der Antike in die Moderne führen. Alle Reiche beginnen mit nur einer einzigen Stadt, werden aber schon bald expandieren, ihre Bevölkerung vergrößern, neue Technologien erforschen und Armeen bauen. Eine Zivilisation gewinnt durch wirtschaftliche, militärische oder Technologische Vorherrschaft. Wie genau das im Detail funktioniert, wird später erklärt.</p> <p>Du spielst <b>Russland</b>, die anderen drei Reiche übernehmen Bots auf dem höchsten Schwierigkeitsgrad „David".</p> <p>Golden umrandet ist deine <b>Hauptstadt</b>: Der Kreis mit Symbol ist die Stadt, die Striche daneben symbolisieren die Bevölkerung. Die Linie um die Felder darum ist die Reichsgrenze. <p>Gezogen wird immer in derselben Reihenfolge: <b>Russland (grün) → Griechenland (blau) → England (rot) → Wikingerreich (lila)</b>. Wo die Runde beginnt, hängt vom Startspieler ab, hier bist das du.</p> <p class="tut-note">Im Tutorial sind nur die Schritte dieser Beispielpartie möglich – so bleibt alles nachvollziehbar. „Tutorial beenden" gibt alles frei.</p>':
-    '<p>Hochzeivilization is a game in which four civilisations lead their empire from Antiquity into the Modern Age. Every empire starts with a single city, but will soon expand, grow its population, research new technologies and build armies. A civilisation wins through economic, military or technological supremacy. Exactly how that works in detail is explained later.</p> <p>You play <b>Russia</b>, the other three empires are run by bots on the highest difficulty, “David”.</p> <p>Outlined in gold is your <b>capital</b>: the circle with a symbol is the city, the strokes next to it stand for the population. The line around the tiles is the border of your empire. <p>Turn order is always the same: <b>Russia (green) → Greece (blue) → England (red) → Vikings (purple)</b>. Where the round begins depends on the starting player, which here is you.</p> <p class="tut-note">In the tutorial only the steps of this example game are possible – that keeps everything comprehensible. “End tutorial” releases everything.</p>',
+  '<p>Hochzeivilization ist ein Spiel, bei dem vier Zivilisationen ihr Reich von der Antike in die Moderne führen. Alle Reiche beginnen mit nur einer einzigen Stadt, werden aber schon bald expandieren, ihre Bevölkerung vergrößern, neue Technologien erforschen und Armeen bauen. Eine Zivilisation gewinnt durch wirtschaftliche, militärische oder Technologische Vorherrschaft. Wie genau das im Detail funktioniert, wird später erklärt.</p> <p>Du spielst <b>Russland</b>, die anderen drei Reiche übernehmen Bots auf dem höchsten Schwierigkeitsgrad „David".</p> <p>Golden umrandet ist deine <b>Hauptstadt</b>: Der Kreis ist die Stadt, die Zahl darin ihre Bevölkerung – in der Farbe des Reichs, dem sie gehört. Die Linie um die Felder darum ist die Reichsgrenze. <p>Gezogen wird immer in derselben Reihenfolge: <b>Russland (grün) → Griechenland (blau) → England (rot) → Wikingerreich (lila)</b>. Wo die Runde beginnt, hängt vom Startspieler ab, hier bist das du.</p> <p class="tut-note">Im Tutorial sind nur die Schritte dieser Beispielpartie möglich – so bleibt alles nachvollziehbar. „Tutorial beenden" gibt alles frei.</p>':
+    '<p>Hochzeivilization is a game in which four civilisations lead their empire from Antiquity into the Modern Age. Every empire starts with a single city, but will soon expand, grow its population, research new technologies and build armies. A civilisation wins through economic, military or technological supremacy. Exactly how that works in detail is explained later.</p> <p>You play <b>Russia</b>, the other three empires are run by bots on the highest difficulty, “David”.</p> <p>Outlined in gold is your <b>capital</b>: the circle is the city, the number in it its population – in the colour of the empire it belongs to. The line around the tiles is the border of your empire. <p>Turn order is always the same: <b>Russia (green) → Greece (blue) → England (red) → Vikings (purple)</b>. Where the round begins depends on the starting player, which here is you.</p> <p class="tut-note">In the tutorial only the steps of this example game are possible – that keeps everything comprehensible. “End tutorial” releases everything.</p>',
   '<p>Im Gegensatz zu anderen Spielen nutzt Hochzeivilization einen dynamischen Technologiebaum: Jede Technologie ist nur mit <b>50 % Wahrscheinlichkeit</b> in einer Partie verfügbar.</p> <p><b>So forschst du:</b> unten auf <b>Forschen</b> → im Bogen die Kachel <b>Schrift</b> antippen. Der Bogen zeigt Kosten oben links in der Kachel.</p>':
     '<p>Unlike other games, Hochzeivilization uses a dynamic technology tree: every technology is only available in a given game with a <b>50 % probability</b>.</p> <p><b>How to research:</b> <b>Research</b> at the bottom → tap the <b>writing</b> tile in the sheet. The sheet shows the cost at the top left of each tile.</p>',
   '<p>Jede Stadt darf einmal pro Runde wachsen. Die Hauptstadt kostet 2 Nahrung und 2 Münzen, die jüngere Stadt nur jeweils 1. Kleine Städte wachsen billiger.</p> <p><b>Warum beide?</b> Nahrung und Münzen verfallen sonst. Und weil die Kosten mit der Größe steigen, ist es effizienter, viele kleine Städte gleichmäßig zu vergrößern als eine große.</p>':

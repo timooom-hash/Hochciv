@@ -62,6 +62,19 @@ function markRoundStart(S) {
   }
 }
 const capitalOf = (S, pi) => citiesOf(S, pi).find(x => x.cap);
+/* Militärsieg im Marathon (v84, Anweisung des Autors): erst mit der zweiten eroberten
+   Hauptstadt. Eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt (captureCity) –
+   dieselbe kann also nicht zweimal zählen, und wer seine Hauptstadt verloren hat, spielt
+   ohne weiter, wie nach einem Barbarenüberfall. p.capTaken: die Reiche, deren Hauptstadt
+   dieses Reich genommen hat. */
+const capitalsToWin = S => S && S.marathon ? MARATHON_CAPITALS : 1;
+const capitalsTaken = p => (p && p.capTaken ? p.capTaken.length : 0);
+/* Gründungen in diesem Zug (Marathon: höchstens MARATHON_MAX_FOUNDS). Jedes Reich hat genau
+   einen Zug je Runde, also zählt die Runde. */
+const foundedThisTurn = (S, pi) => {
+  const p = S.players[pi];
+  return p.foundRound === S.round ? (p.foundCount || 0) : 0;
+};
 const roadLevel = (S, r, c) => S.roads[key(r, c)] || 0;
 /* Auf Plättchenkarten darf dieselbe Zivilisation mehrfach am Tisch sitzen. Damit die
    Reiche unterscheidbar bleiben, bekommen die Doppelgänger im Aufbau einen eigenen Namen
@@ -1234,15 +1247,24 @@ function foundPassable(S, pi, r, c, opts) {
   }
   return true;
 }
-/* Distanz zur Hauptstadt in passierbaren Feldern, oder null, wenn es keinen Weg gibt. */
+/* Distanz zur Hauptstadt in passierbaren Feldern, oder null, wenn es keinen Weg gibt.
+   Kolonien (v84, Anweisung des Autors): ein per Kolonialismus gekauftes Feld ist auch ohne
+   Siedlerweg erreichbar – übers Meer, über fremdes Gebiet oder sonst Gesperrtes hinweg –,
+   gemessen wie mit der Luftwaffe: die Luftlinie. Gibt es einen Weg, gilt weiter der Weg. */
 function foundDistance(S, pi, r, c) {
   const cap = capitalOf(S, pi) || citiesOf(S, pi)[0];
   if (!cap) return 0;
   const tab = foundTable(S, pi, cap, '');
-  if (tab) return tableSteps(tab, cap, r, c);
-  const fremd = foreignTerritory(S, pi);
-  return pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd }));
+  let d;
+  if (tab) d = tableSteps(tab, cap, r, c);
+  else {
+    const fremd = foreignTerritory(S, pi);
+    d = pathSteps(cap.r, cap.c, r, c, (rr, cc) => foundPassable(S, pi, rr, cc, { fremd }));
+  }
+  if (d == null && isColony(S, pi, r, c)) d = hexDistance(cap.r, cap.c, r, c);
+  return d;
 }
+const isColony = (S, pi, r, c) => (S.bought[pi] || []).includes(key(r, c));
 /* Wegtabelle für den Gründungsmodus (v75). Die Oberfläche fragt dort JEDES Feld der
    Karte ab – je Feld zwei bis vier Wegsuchen von der Hauptstadt, auf der großen Karte gut
    50 ms je Zeichnen. Innerhalb von withFoundTable rechnet eine einzige Breitensuche je
@@ -1345,6 +1367,8 @@ function canFound(S, pi, r, c) {
   return null;
 }
 function foundSiteError(S, pi, r, c) {
+  if (S.marathon && foundedThisTurn(S, pi) >= MARATHON_MAX_FOUNDS)
+    return T('Höchstens %s neue Städte je Zug (Marathon).', MARATHON_MAX_FOUNDS);
   const t = terrainAt(S, r, c);
   if (!t || isOff(t)) return T('Kein Feld.');
   if (!TERRAIN[t].land) return T('Nicht auf Meer.');
@@ -1369,6 +1393,9 @@ function foundCity(S, pi, r, c) {
   const pop = isAbil(S.players[pi], 'siedler') ? 2 : 1;   // Russland: Städte mit 2 Bevölkerung
   const city = { id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round };
   S.cities.push(city);
+  const p = S.players[pi];
+  if (p.foundRound !== S.round) { p.foundRound = S.round; p.foundCount = 0; }
+  p.foundCount++;
   log(S, 'act', T('%s: Stadt gegründet auf %s/%s (%s Nahrung, Bevölkerung %s).', civOf(S.players[pi]).n, r, c, cost, pop));
   claimOrphanWonders(S, pi, city);      // Wunder, die ohne Stadt auf dem Feld stehen
   return null;
@@ -1499,8 +1526,8 @@ function sacrifice(S, pi, city) {           // Sklaverei
   if (!city || city.owner !== pi) return T('Fremde Stadt.');
   if (city.pop < 2) return T('Die letzte Bevölkerung darf nicht geopfert werden.');
   if (city.sacrificed === S.round) return T('Diese Stadt hat diese Runde schon geopfert.');
-  city.pop--; city.sacrificed = S.round; p.res.coins += 10;
-  log(S, 'act', T('%s: Bevölkerung geopfert → +10 Münzen.', civOf(p).n));
+  city.pop--; city.sacrificed = S.round; p.res.coins += SLAVERY_COINS;
+  log(S, 'act', T('%s: Bevölkerung geopfert → +%s Münzen.', civOf(p).n, SLAVERY_COINS));
   return null;
 }
 function buyTile(S, pi, r, c) {             // Kolonialismus
@@ -1732,11 +1759,21 @@ function captureCity(S, pi, city) {
   }
   // Militärsieg: der einzige Sieg, der sofort und ohne Punktvergleich endet. Er schlägt
   // auch schon angemeldete Siege – wer die Hauptstadt nimmt, gewinnt auf der Stelle.
-  if (wasCapital && p.kind !== 'barbar')
-    S.over = {
-      winner: pi, winners: [pi], military: true,
-      how: T('Militärsieg (Hauptstadt von %s erobert)', civOf(loser).n),
-    };
+  // Im Marathon (v84) erst mit der zweiten eroberten Hauptstadt (capitalsToWin).
+  if (wasCapital && p.kind !== 'barbar') {
+    (p.capTaken = p.capTaken || []).push(S.players.indexOf(loser));
+    const namen = p.capTaken.map(i => civOf(S.players[i]).n);
+    if (capitalsTaken(p) >= capitalsToWin(S))
+      S.over = {
+        winner: pi, winners: [pi], military: true,
+        how: capitalsToWin(S) > 1
+          ? T('Militärsieg (Hauptstädte von %s erobert)', namen.join(T(' und ')))
+          : T('Militärsieg (Hauptstadt von %s erobert)', civOf(loser).n),
+      };
+    else
+      log(S, 'head', T('%s erobert die Hauptstadt von %s – %s von %s Hauptstädten für den Militärsieg.',
+        civOf(p).n, civOf(loser).n, capitalsTaken(p), capitalsToWin(S)));
+  }
   if (!citiesOf(S, S.players.indexOf(loser)).length) loser.dead = true;
 }
 

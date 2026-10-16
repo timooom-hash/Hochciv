@@ -155,7 +155,7 @@ function terrainGlyph(g, t, x, y) {
       fill: '#c4552f' });
   }
 }
-/* Weltwunder einer Stadt: kleine Rauten unter dem Stadtsymbol, Zahl = Stufe. */
+/* Weltwunder einer Stadt: kleine Rauten unter der Stadtscheibe, Zahl = Stufe. */
 function wonderMarks(g, S2, ct, x, y) {
   const list = (S2.wonders || []).filter(w => w.cityId === ct.id);
   if (!list.length) return;
@@ -182,15 +182,6 @@ function orphanMarks(g, S2) {
     });
     t.textContent = '◈'; g.appendChild(t);
   });
-}
-function tallyMarks(g, n, x, y, col) {
-  for (let i = 0; i < Math.min(n, 20); i++) {
-    const row = Math.floor(i / 5), k = i % 5;
-    g.appendChild(svgEl('line', {
-      x1: x - 14 + k * 6, y1: y - 22 - row * 6, x2: x - 14 + k * 6 + 2, y2: y - 30 - row * 6,
-      stroke: col, 'stroke-width': 2, 'stroke-linecap': 'round', 'pointer-events': 'none'
-    }));
-  }
 }
 /* ------------------------------------------------------------------ Kartenansichten (v75)
    Drei Schichten legen sich auf Wunsch über die Karte:
@@ -453,9 +444,12 @@ function drawMap(svg, map, opts) {
           cx: x, cy: y + 15, r: 3, fill: civ.color, 'pointer-events': 'none'
         }));
     });
-    // 5b Machtringe der Städte – außen um die Stadtscheibe, Striche und Wunder darüber
+    // 5b Machtringe der Städte – außen um die Stadtscheibe, Wunder darüber
     if (opts.power) powerRings(world, S2, opts.power, 'stadt');
-    // 6 Städte
+    // 6 Städte: in der Scheibe die Bevölkerung als Zahl, in der Farbe des Reichs (v84,
+    // Anweisung des Autors – vorher stand dort das Reichssymbol, die Bevölkerung als Striche
+    // darüber). Hauptstädte behalten den dunklen, dicken Ring; mehrstellige Zahlen werden
+    // kleiner, damit sie in der Scheibe bleiben.
     S2.cities.forEach(ct => {
       const [x, y] = hexCenter(ct.r, ct.c, HEX);
       const civ = civOf(S2.players[ct.owner]);
@@ -463,11 +457,13 @@ function drawMap(svg, map, opts) {
         cx: x, cy: y, r: 15, fill: '#f7f1e0', stroke: ct.cap ? '#2a2721' : civ.color,
         'stroke-width': ct.cap ? 3.5 : 2.4, 'pointer-events': 'none'
       }));
+      const n = String(Math.max(0, ct.pop)), lang = n.length;
       const t = svgEl('text', {
-        x, y: y + 7, 'text-anchor': 'middle', 'font-size': 20, fill: civ.color, 'pointer-events': 'none'
+        x, y: y + (lang > 2 ? 4.5 : lang > 1 ? 6 : 7), 'text-anchor': 'middle',
+        'font-size': lang > 2 ? 13 : lang > 1 ? 17 : 20, 'font-weight': 700,
+        fill: civ.color, 'pointer-events': 'none', 'data-pop': n,
       });
-      t.textContent = SYM[civ.sym]; world.appendChild(t);
-      tallyMarks(world, ct.pop, x, y, civ.color);
+      t.textContent = n; world.appendChild(t);
       wonderMarks(world, S2, ct, x, y);
     });
   } else if (map.capitals) {
@@ -580,6 +576,9 @@ function toggleYields() {
 function toggleFoundMode() {
   if (!S || S.over || isAuto(P(S))) return;
   const an = ui.mode !== 'found';
+  // Marathon (v84): höchstens fünf Gründungen je Zug – dann gar nicht erst in den Modus
+  if (an && S.marathon && foundedThisTurn(S, S.cur) >= MARATHON_MAX_FOUNDS)
+    return toast(T('Höchstens %s neue Städte je Zug (Marathon).', MARATHON_MAX_FOUNDS));
   ui.mode = an ? 'found' : null;
   if (an) ui.army = null;
   closeSheet();
@@ -746,7 +745,7 @@ function openTile(r, c) {
         act(() => buildArmy(S, pi, city)),
         available(S, pi, 'coins', payOpts(S, pi)) < ac || !!armyAt(S, r, c));
       if (slaveryUsable(p))
-        btn('Bevölkerung opfern', city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+10🪙',
+        btn('Bevölkerung opfern', city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+' + SLAVERY_COINS + '🪙',
           act(() => sacrifice(S, pi, city)),
           city.pop < 2 || city.sacrificed === S.round);
       if (army && army.owner === pi)          // Armee steht in der Stadt und muss heraus
@@ -1337,9 +1336,14 @@ function worldModal() {
   let h = `<p class="sub">${T('Die Reiche')}</p><div class="civ-list">` +
     S.players.filter(x => x.kind !== 'barbar').map((x, i) => {
       const c = civOf(x), as = abilInfos(x);
+      // Marathon (v84): wie weit zum Militärsieg, und wer seine Hauptstadt schon verloren hat
+      const haupt = S.marathon && !x.dead ? [
+        capitalsTaken(x) ? T('%s von %s Hauptstädten erobert', capitalsTaken(x), capitalsToWin(S)) : '',
+        capitalOf(S, S.players.indexOf(x)) ? '' : T('ohne Hauptstadt'),
+      ].filter(Boolean).map(t => ' · ' + t).join('') : '';
       return `<div class="civ-row${i === pi ? ' self' : ''}">
         <span class="civ-chip" style="border-color:${c.color};color:${c.color}">${SYM[c.sym]}</span>
-        <span class="civ-n">${esc(c.n)}${x.dead ? ' · ' + T('ausgeschieden') : ''}</span>
+        <span class="civ-n">${esc(c.n)}${x.dead ? ' · ' + T('ausgeschieden') : ''}${haupt}</span>
         <span class="civ-a">${as.length ? as.map(a => `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`).join('')
         : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
     }).join('') + '</div>';
@@ -2412,7 +2416,7 @@ function rulesModal() {
     <p class="sub">${T('Alle Technologien')}</p>
     <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
     ${oldTreeShown() ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt noch der alte Techtree.')}</p>` : ''}
-    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität das 2,5-Fache – die Kosten hier sind schon umgerechnet.')}</p>` : ''}
+    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität %s – die Kosten hier sind schon umgerechnet. Höchstens %s neue Städte je Zug. Militärsieg erst mit %s eroberten Hauptstädten; eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt weiter.', MARATHON_SINGULARITY, MARATHON_MAX_FOUNDS, MARATHON_CAPITALS)}</p>` : ''}
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);
