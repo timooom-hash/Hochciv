@@ -647,7 +647,10 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 {
   const S = mk('griechenland', ['sklaverei']);
   const c = capitalOf(S, 0); c.pop = 4;
+  const vorher = S.players[0].res.coins;
   eq(sacrifice(S, 0, c), null, 'erstes Opfern klappt');
+  eq([S.players[0].res.coins - vorher, SLAVERY_COINS], [7, 7], 'eine geopferte Bevölkerung bringt 7 Münzen (v84, vorher 10)');
+  eq(TECH_BY_KEY.sklaverei.e.includes(SLAVERY_COINS + ' Münzen'), true, 'der Techbogen nennt die 7 Münzen');
   eq(typeof sacrifice(S, 0, c), 'string', 'zweites Opfern in derselben Runde wird abgelehnt');
   eq(c.pop, 3, 'nur eine Bevölkerung geopfert');
 }
@@ -681,12 +684,12 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 /* Kundschafterei/Spionage + Internet: jede Tech bietet bezahlt UND gratis an */
 {
   const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 15 });
-  S.players[1].techs.stadtmauern = true;   // Kosten 5
+  S.players[1].techs.stadtmauern = true;   // Kosten 2 (bis v83: 5)
   S.players[1].techs.taktik = true;        // Kosten 1
   S.players[0].techs.kundschafterei = true; S.players[0].techs.internet = true;
   S.players[0].res.coins = 50;
   const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
-  eq(sm.paidCoins, 10, 'Kundschafterei: 2× Basiskosten (2×5) in Münzen');
+  eq(sm.paidCoins, 4, 'Kundschafterei: 2× Basiskosten (2×2) in Münzen');
   eq(sm.freeOk, true, 'Internet-Gratiskopie steht trotz Kundschafterei zur Verfügung (Bugfix)');
   // Gratiskopie kostet keine Münzen und verbraucht das Rundenkontingent
   eq(copyTech(S, 0, 'stadtmauern', 'free'), null, 'gratis kopieren klappt');
@@ -704,7 +707,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   S.players[1].techs.stadtmauern = true;
   S.players[0].techs.spionage = true;
   const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
-  eq(sm.paidCoins, 5, 'Spionage: 1× Basiskosten in Münzen');
+  eq(sm.paidCoins, 2, 'Spionage: 1× Basiskosten in Münzen (Stadtmauern 2)');
   eq(sm.freeOk, false, 'ohne Internet keine Gratiskopie');
 }
 
@@ -2060,6 +2063,62 @@ const setEvent = (S, k) => {
     eq(canFound(S, 0, ZR, ZC), null, 'auf einem fremden Einzelfeld darf noch gegründet werden');
   }
 
+  /* Kolonien (v84, Anweisung des Autors): ein per Kolonialismus gekauftes Feld darf auch
+     ohne Siedlerweg besiedelt werden, wenn es sonst erlaubt ist – übers Wasser, über fremdes
+     Gebiet und alles andere hinweg. Entfernung wie mit der Luftwaffe: die Luftlinie. */
+  {
+    const kolonie = sorte => {
+      const S = mitMauer(sorte);
+      S.players[0].techs.kolonialismus = true;
+      S.bought[0] = [key(ZR, ZC)];
+      return S;
+    };
+    const luft = hexDistance(5, 5, ZR, ZC);
+    for (const [sorte, name] of [['M', 'Wasser'], ['feindgebiet', 'gegnerischem Gebiet'], ['V', 'Vulkanen'], ['feindarmee', 'gegnerischen Armeen']])
+      eq([weg(kolonie(sorte)), canFound(kolonie(sorte), 0, ZR, ZC)], [luft, null],
+        `Kolonie hinter ${name}: gründbar, Entfernung die Luftlinie (${luft})`);
+    eq(foundCost(kolonie('M'), 0, ZR, ZC), 1 + luft, 'Kosten: Stadtkosten 1 + Luftlinie');
+    {
+      const S = kolonie('M'); S.players[0].techs.kartografie = true;
+      eq(foundCost(S, 0, ZR, ZC), 1, 'mit Kartografie fallen die Distanzkosten auch hier weg');
+    }
+    // was sonst gilt, gilt weiter
+    {
+      const S = kolonie('M');
+      S.armies.push({ id: S.nextId++, owner: 1, r: ZR, c: ZC + 1, mp: 0, born: -1 });
+      eq(canFound(S, 0, ZR, ZC), 'Nicht direkt neben einer gegnerischen Armee.', 'Kolonie neben einer gegnerischen Armee: weiter nicht');
+    }
+    {
+      const S = kolonie('M'); setT(S, ZR, ZC, 'V');
+      eq(canFound(S, 0, ZR, ZC), 'Nicht auf einem Vulkan.', 'Kolonie auf einem Vulkan: weiter nicht');
+    }
+    {
+      const S = kolonie('M');
+      S.cities.push({ id: S.nextId++, owner: 1, r: ZR + 2, c: ZC, pop: 1, cap: false, grown: 0, born: -1 });
+      eq(canFound(S, 0, ZR, ZC), 'Mindestens 3 Felder Abstand zu allen Städten.', 'Kolonie zu nah an einer Stadt: weiter nicht');
+    }
+    {
+      const S = mitMauer('M'); S.bought[1] = [key(ZR, ZC)];
+      eq(canFound(S, 0, ZR, ZC), 'Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.',
+        'das gekaufte Feld eines anderen Reichs hilft nicht');
+    }
+    {
+      // Gibt es einen Weg, zählt der Weg – auch als Umweg (die Luftlinie gilt nur ohne Weg)
+      const S = flacheKarte(); S.bought[0] = [key(ZR, ZC)];
+      for (let r = 1; r < S.map.rows.length; r++) setT(S, r, SP, 'V');     // Lücke ganz oben
+      const umweg = weg(S);
+      eq(umweg > luft, true, `mit Weg zählt der Weg (${umweg} Felder Umweg statt Luftlinie ${luft})`);
+    }
+    {
+      // die KI sieht die Kolonie als Siedelplatz, zu denselben Kosten
+      const S = kolonie('M');
+      const s = kiSitesAll(S, 0, kiContext(S, 0)).find(x => x.r === ZR && x.c === ZC);
+      eq(s && s.cost, foundCost(S, 0, ZR, ZC), 'die KI sieht die Kolonie zu denselben Kosten wie die Regel');
+      eq(kiSitesAll(mitMauer('M'), 0, kiContext(mitMauer('M'), 0)).some(x => x.r === ZR && x.c === ZC), false,
+        '… und ohne Kolonie nicht');
+    }
+  }
+
   /* Der Bot-Siedler steht unter derselben Sperre. Sonst wäre die Regel ein einseitiger
      Nachteil des Menschen: der Bot zöge weiter quer durch fremdes Land. Geprüft an der
      Wegsuche, mit der der Bot sein Ziel wählt (settleDistances → botSettlerPass). */
@@ -2534,7 +2593,15 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     schrift: 1, mathematik: 2, astronomie: 3, philosophie: 4,
     wiss_methode: 11, chemie: 12, biologie: 15,
     landwirtschaft: 1, bewaesserung: 5,
-  }, 'alter Techtree: die neun Kosten bis v81');
+    eisenverarbeitung: 2, belagerung: 4, stadtmauern: 5,
+  }, 'alter Techtree: die neun Kosten bis v81 und die drei militärischen bis v83');
+  // v84 (Anweisung des Autors): Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5
+  eq(['stadtmauern', 'eisenverarbeitung', 'belagerung'].map(k => TECH_BY_KEY[k].c), [2, 4, 5],
+    'Militär/Antike: Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5 (v84)');
+  eq(leiter(STD, 2), ['taktik', 'stadtmauern', 'eisenverarbeitung', 'belagerung'],
+    'Standard: Militär/Antike nach Kosten 1, 2, 4, 5');
+  eq(leiter(OLD, 2), ['taktik', 'eisenverarbeitung', 'belagerung', 'stadtmauern'],
+    'alter Techtree (Tutorial): Militär/Antike wie bis v83'); 
   eq([STD.oldTree, OLD.oldTree], [false, true], 'der alte Techtree steht als Schalter im Spielstand');
   eq(newGame({ seed: 7, players: auf('england') }).oldTree, false, 'ohne Angabe gilt der (neue) Standard');
   eq(newGame({ seed: 7, players: auf('england'), altTree: false }).oldTree, false,
@@ -2555,7 +2622,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     const [W0, W1] = [false, true].map(old => mkT('england', old, [], { wonders: true }));
     const anders = [], ungeordnet = [];
     for (let f = 0; f < 4; f++) for (let a = 0; a < 4; a++) {
-      const geaendert = (a === 0 && f < 2) || (a === 2 && f === 0);     // Antike 0/1, Industrialisierung 0
+      const geaendert = (a === 0 && f < 3) || (a === 2 && f === 0);     // Antike 0/1/2, Industrialisierung 0
       if (!geaendert && leiter(W0, f, a).join() !== leiter(W1, f, a).join()) anders.push(`${f}/${a}`);
       for (const X of [W0, W1]) {
         const k = techsIn(f, a, X).map(t => techBase(X, t));
@@ -2643,14 +2710,15 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     // Die Techtexte nennen dieselben Zahlen wie die Regel – in beiden Sprachen und Techtrees
     const K = TECH_BY_KEY, A = { oldTree: true };
     const texte = X => [techEffect(K.kolonialismus, X), techEffect(K.kundschafterei, X)];
-    eq(texte(STD), [`Für ${COLONY_COST} Münzen Feld kaufen`, `Tech kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
+    eq(texte(STD), [`Für ${COLONY_COST} Münzen Feld kaufen; dort auch ohne Weg gründen`, `Tech kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
       'Techtexte nennen den Feldpreis und den Kopierfaktor der Regel');
     eq(texte(A), texte(STD), 'der alte Techtree zeigt dieselben Texte');
     setLang('en', { quiet: true });
     const en = [texte(null), texte(A)];
     setLang('de', { quiet: true });
-    eq(en, [[`Buy a tile for ${COLONY_COST} coins`, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`],
-      [`Buy a tile for ${COLONY_COST} coins`, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
+    const kauftext = `Buy a tile for ${COLONY_COST} coins; found a city there even without a route`;
+    eq(en, [[kauftext, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`],
+      [kauftext, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
   }
 
   // Plättchenmodus: der Vorabwurf läuft im selben Techtree wie die Partie. Geprüft an
@@ -2755,7 +2823,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
 /* ============================ Marathon (v83, Anweisung des Autors)
    Vier Reiche, Zufallskarte 24 × 36 (viermal die Europakarte), jede Hauptstadt mit
    Nahrung + ½ Münzen ≥ 4 auch mit 2 Bevölkerung, Technologien ×2/×3/×4/×5, Singularität
-   ×2,5, Fähigkeiten im Snake-Draft aus 2n + 1. */
+   300 (v84; v83: ×2,5), Fähigkeiten im Snake-Draft aus 2n + 1. */
 {
   // --- Karte und Hauptstädte, über viele Startwerte
   const anteil = {}, schwach = [];
@@ -2794,7 +2862,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const k4 = ['mathematik', 'papier', 'chemie', 'computertechnik'].map(k => TECH_BY_KEY[k]);
   eq(k4.map(t => techCost(M, 0, t)), k4.map((t, i) => techCost(N, 0, t) * [2, 3, 4, 5][i]),
     'Marathon: Antike ×2, Mittelalter ×3, Industrialisierung ×4, Moderne ×5');
-  eq([techCost(M, 0, SINGULARITY), techCost(N, 0, SINGULARITY)], [250, 100], 'Singularität ×2,5 (250 statt 100)');
+  eq([techCost(M, 0, SINGULARITY), techCost(N, 0, SINGULARITY)], [300, 100], 'Singularität 300 (v84; v83: 250)');
   const gr = M.players.findIndex(p => p.civ === 'griechenland');
   M.players[gr].drafted = ['griechenland:basis', 'russland:basis'];
   eq(techCost(M, gr, TECH_BY_KEY.papier), 6 * 3 - 2, 'Rabatte ziehen danach ab (Papier 18 − 2)');
@@ -2802,6 +2870,66 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   ['schrift', 'papier'].forEach(k => { M.players[(gr + 1) % 4].techs[k] = true; });
   eq(['schrift', 'papier'].map(k => copyableTechs(M, gr).find(o => o.tech.k === k).paidCoins), [8, 18],
     'Kopieren zahlt die Grundkosten des Marathons (Schrift 4 × 2, Papier 6 × 3)');
+
+  // --- Höchstens fünf Gründungen je Zug (v84, Anweisung des Autors) – nur im Marathon
+  {
+    const gruende = (marathon, seed) => {
+      const X = newGame({ seed, map: marathonMap(seed), marathon,
+        players: CIVS.map(c => ({ civ: c.k, kind: 'human', drafted: ['england:gruenden', 'russland:basis'] })) });
+      const pi = X.cur;
+      X.players[pi].res.food = 9999;
+      let n = 0, sechste = null;
+      for (let r = 0; r < X.map.rows.length && n < 7; r++) for (let c = 0; c < X.map.rows[r].length && n < 7; c++) {
+        if (foundSiteError(X, pi, r, c)) {
+          if (n === 5 && sechste == null && X.marathon) sechste = foundSiteError(X, pi, r, c);
+          continue;
+        }
+        if (!foundCity(X, pi, r, c)) n++;
+      }
+      return { X, pi, n, sechste };
+    };
+    const a = gruende(true, 31);
+    eq([a.n, foundedThisTurn(a.X, a.pi)], [5, 5], 'Marathon: fünf Städte in einem Zug, dann ist Schluss');
+    eq(a.sechste, 'Höchstens 5 neue Städte je Zug (Marathon).', 'die sechste: Meldung mit dem Grund');
+    eq(canFound(a.X, a.pi, 0, 0), 'Höchstens 5 neue Städte je Zug (Marathon).', 'jeder Platz nennt dann den Grund zuerst');
+    for (let i = 0; i < 4; i++) endTurn(a.X);                // eine Runde weiter
+    eq([a.X.cur, foundedThisTurn(a.X, a.pi)], [a.pi, 0], 'im nächsten Zug zählt es von vorn');
+    eq(gruende(false, 31).n, 7, 'außerhalb des Marathons gibt es keine Grenze');
+  }
+
+  // --- Militärsieg erst mit der zweiten eroberten Hauptstadt (v84) – nur im Marathon
+  {
+    const mkM = marathon => {
+      const X = newGame({ seed: 32, map: marathonMap(32), marathon,
+        players: CIVS.map(c => ({ civ: c.k, kind: 'human', drafted: ['england:basis', 'russland:basis'] })) });
+      X.cities.forEach(c => { c.pop = 5; });                // übersteht die Eroberung
+      return X;
+    };
+    const X = mkM(true);
+    const [a, b, c] = [0, 1, 2];
+    const capB = capitalOf(X, b), capC = capitalOf(X, c);
+    captureCity(X, a, capB);
+    eq([X.over, capitalsTaken(X.players[a]), capitalsToWin(X)], [null, 1, 2], 'erste Hauptstadt: noch kein Sieg, 1 von 2');
+    eq([capB.owner, capB.cap, capitalOf(X, b)], [a, false, undefined],
+      'die eroberte Hauptstadt ist eine gewöhnliche Stadt, ihr altes Reich hat keine mehr');
+    eq(X.log.some(l => /1 von 2 Hauptstädten für den Militärsieg/.test(l.m)), true, 'das Protokoll nennt den Stand');
+    // zurückerobert zählt sie für niemanden: sie ist keine Hauptstadt mehr
+    captureCity(X, b, capB);
+    eq([X.over, capitalsTaken(X.players[b])], [null, 0], 'zurückerobert zählt die alte Hauptstadt nicht');
+    captureCity(X, a, capC);
+    eq([!!X.over, X.over && X.over.winner, X.over && X.over.military], [true, a, true], 'zweite Hauptstadt: Militärsieg');
+    eq(/Hauptstädte von .+ und .+ erobert/.test(X.over.how), true, 'der Sieg nennt beide: ' + X.over.how);
+    const N = mkM(false);
+    captureCity(N, 0, capitalOf(N, 1));
+    eq([!!N.over, N.over && N.over.military], [true, true], 'außerhalb des Marathons: eine Hauptstadt genügt');
+    // Barbaren zählen nie (wie bisher)
+    eq(capitalsToWin(null), 1, 'ohne Spielstand: eine');
+    // die KI: Anteil am Militärsieg, den die nächste Hauptstadt bringt
+    const Y = mkM(true);
+    eq([kiCapitalShare(Y, Y.players[0]), kiCapitalShare(N, N.players[2])], [0.5, 1], 'KI: im Marathon zählt die erste Hauptstadt halb');
+    Y.players[0].capTaken = [3];
+    eq(kiCapitalShare(Y, Y.players[0]), 1, '… die zweite ganz');
+  }
 
   // --- Draft
   const V = newGame({ seed: 4, map: marathonMap(4), marathon: true, startPlayer: 2,
@@ -2939,12 +3067,13 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     o.count = o.rail + o.road;
     return o;
   };
-  let guard = 0, langsam = 0, err = null, routen = 0, routenAnders = [], gainAnders = 0;
+  let guard = 0, langsam = 0, err = null, routen = 0, routenAnders = [], gainAnders = 0, gruendungen = 0;
   try {
     while (!S.over && guard++ < 400) {
       const t0 = Date.now();
       kiTurn(S, S.cur);
       langsam = Math.max(langsam, Date.now() - t0);
+      gruendungen = Math.max(gruendungen, foundedThisTurn(S, S.cur));
       if (S.over) break;
       endTurn(S);
       S.players.forEach((_, pi) => {
@@ -2962,8 +3091,14 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     }
   } catch (e) { err = e.message; }
   eq([err, !!S.over], [null, true], `die Partie läuft ohne Fehler zu Ende (${S.over ? S.over.how.split(' (')[0] : 'offen'} in Runde ${S.round})`);
-  eq(langsam < 8000, true, `kein KI-Zug über 8 s auf der großen Karte (längster ${langsam} ms)`);
+  // Grenze 10 s (v84; v83: 8 s): mit Singularität 300 läuft diese Partie eine Runde länger,
+  // bis 53 Städte und 27 Armeen – längster Zug allein auf dem Testrechner gut 4 s, neben
+  // einem zweiten Prüflauf bis gut 8 s (vor der Beschleunigung von kiRisk in v84)
+  eq(langsam < 10000, true, `kein KI-Zug über 10 s auf der großen Karte (längster ${langsam} ms)`);
   eq([routenAnders, routen > 0], [[], true], `Handelsrouten schnell gerechnet = wie bis v82 (${routen} Routen über die Partie)`);
+  eq(gruendungen <= MARATHON_MAX_FOUNDS, true, `die KI gründet höchstens fünf Städte je Zug (höchstens ${gruendungen})`);
+  if (S.over && S.over.military)
+    eq(capitalsTaken(S.players[S.over.winner]), 2, 'ein Militärsieg der KI kommt mit zwei Hauptstädten');
   eq(gainAnders, 0, 'Ertrag beim Siedeln mit vorab gerechnetem Einkommen = ohne');
 }
 

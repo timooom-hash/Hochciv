@@ -2594,7 +2594,7 @@ step('Techtree: der Bogen zeigt die Leitern nach den Kosten des (einzigen) Techt
     if (k.some((n, i) => i && n < k[i - 1])) throw new Error('Spalte ' + s + ' fällt: ' + k.join(','));
   }
   const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
-  if (ko !== 'Für 3 Münzen Feld kaufen') throw new Error('Kolonialismus-Kachel: ' + ko);
+  if (ko !== 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen') throw new Error('Kolonialismus-Kachel: ' + ko);
   if (ku !== 'Tech kopieren (2× Kosten in Münzen)') throw new Error('Kundschafterei-Kachel: ' + ku);
   G('closeModal')();
   console.log('       Forschung: ' + fo.map(x => x.join(' ')).join(', '));
@@ -3188,6 +3188,36 @@ step('Marathon: das Spiel beginnt mit genau dieser Karte und den gedrafteten Fä
   if (!L.marathon || JSON.stringify(G('abilitiesOf')(L.players[ich])) !== JSON.stringify(D.picks[ich])) throw new Error('nach dem Fortsetzen anders');
   console.log('       ' + $('hud-name').textContent + ' · ' + S.map.name);
 });
+step('Marathon (v84): höchstens fünf Gründungen je Zug, eroberte Hauptstädte im Weltblatt', () => {
+  const S = G('S');
+  if (!S.marathon) throw new Error('kein Marathon');
+  while (AUTO(G('P')(S)) && !S.over && $('bot-next')) $('bot-next').onclick();
+  const ich = S.cur, p = S.players[ich];
+  // fünf Städte gegründet: „Stadt gründen" geht nicht erst in den Modus, sondern sagt warum
+  p.foundRound = S.round; p.foundCount = 5;
+  G('endFoundMode')();
+  $('a-found').onclick();
+  if (G('ui').mode === 'found') throw new Error('Gründungsmodus trotz fünf Gründungen');
+  if (!/Höchstens 5 neue Städte je Zug/.test($('toast').textContent)) throw new Error('Meldung: ' + $('toast').textContent);
+  if (G('canFound')(S, ich, 0, 0) !== 'Höchstens 5 neue Städte je Zug (Marathon).') throw new Error('Regel kennt die Grenze nicht');
+  p.foundCount = 0;
+  $('a-found').onclick();
+  if (G('ui').mode !== 'found') throw new Error('nach dem Zurücksetzen kein Gründungsmodus');
+  G('endFoundMode')();
+  // Weltblatt: wer wie viele Hauptstädte erobert hat, wer keine mehr hat (ohne echte Eroberung
+  // nachgestellt – die Regel selbst prüft test.js)
+  const andere = S.players.findIndex((x, i) => i !== ich && x.kind !== 'bot');
+  const kap = G('capitalOf')(S, andere);
+  p.capTaken = [andere]; kap.cap = false;
+  try {
+    $('a-info').onclick();
+    const txt = $('ov-body').textContent;
+    G('closeModal')();
+    if (!/1 von 2 Hauptstädten erobert/.test(txt)) throw new Error('Weltblatt ohne Stand: ' + txt.slice(0, 200));
+    if (!/ohne Hauptstadt/.test(txt)) throw new Error('Weltblatt nennt das Reich ohne Hauptstadt nicht');
+  } finally { delete p.capTaken; kap.cap = true; }
+  G('redraw')();
+});
 step('Marathon: „Nochmal spielen" führt wieder in den Draft, mit neuer Karte', () => {
   const S = G('S'), alt = JSON.stringify(S.map.rows);
   G('startFromRecipe')(S.recipe);
@@ -3203,6 +3233,26 @@ step('Marathon: der Draft auf Englisch', () => {
     if (/Starttechnologien|Reiche in Zugfolge|wählt Fähigkeit/.test(txt)) throw new Error('deutsche Reste');
   } finally { G('switchLang')('de'); }
   G('show')('screen-menu');
+});
+
+step('Städte zeigen ihre Bevölkerung als Zahl in der Farbe ihres Reichs, ohne Striche (v84)', () => {
+  frischesSpiel();
+  const S = G('S');
+  S.cities[0].pop = 12;
+  G('redraw')();
+  const texte = [...$('map').querySelectorAll('text[data-pop]')];
+  const ist = texte.map(t => t.textContent + '|' + t.getAttribute('fill')).sort();
+  const soll = S.cities.map(ct => ct.pop + '|' + G('civOf')(S.players[ct.owner]).color).sort();
+  if (JSON.stringify(ist) !== JSON.stringify(soll)) throw new Error('Zahlen: ' + ist.join(', ') + ' statt ' + soll.join(', '));
+  const zwoelf = texte.find(t => t.textContent === '12');
+  if (!zwoelf || +zwoelf.getAttribute('font-size') >= 20) throw new Error('zweistellige Zahl nicht verkleinert');
+  // Reichssymbole gibt es auf der Karte nur noch bei Armeen (je zwei Texte: Umriss und Fläche)
+  const syms = Object.values(G('SYM'));
+  const mitSym = [...$('map').querySelectorAll('text')].filter(t => syms.includes(t.textContent)).length;
+  if (mitSym !== 2 * S.armies.length) throw new Error(mitSym + ' Symbole bei ' + S.armies.length + ' Armeen');
+  // die Bevölkerungsstriche (Linien der Breite 2) sind weg
+  if ($('map').querySelectorAll('line[stroke-width="2"]').length) throw new Error('noch Bevölkerungsstriche');
+  console.log('       ' + ist.join(' · '));
 });
 
 step('kein abgefangener Fehler im Zugablauf', () => {

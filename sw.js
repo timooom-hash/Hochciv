@@ -1,6 +1,6 @@
 /* Offline-Cache. Bei Änderungen VERSION erhöhen. */
-const VERSION = 'hochciv-v83';
-const BUILD_HASH = 'c72c27c6c739';   // von tools_version.js
+const VERSION = 'hochciv-v84';
+const BUILD_HASH = '8a02fe506c71';   // von tools_version.js
 const FILES = [
   './', './index.html', './css/style.css',
   './js/data.js', './js/civs.js', './js/i18n.js', './js/hex.js', './js/tiles.js', './js/engine.js', './js/expansion.js', './js/bots.js', './js/ki.js', './js/marathon.js', './js/tutorial.js', './js/ui.js',

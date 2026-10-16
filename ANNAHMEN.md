@@ -3669,3 +3669,140 @@ der Mensch tippt, der Bot wählt nicht, jeder Bogen zeigt die Marathonkosten ohn
 keine Armee auf der Draftkarte), Spielbeginn (dieselbe Karte, dieselben Fähigkeiten,
 Kopfzeile mit beiden, Regelbogen mit Hinweis und umgerechneten Kosten, Protokoll, Speichern
 und Fortsetzen), „Nochmal spielen" in einen neuen Draft, der Draft auf Englisch.
+
+## Sklaverei 7 · drei Militärkosten · Marathonregeln · Kolonien · Bevölkerung als Zahl (v84)
+
+**Anweisung des Autors (16.10.):**
+1. Sklaverei bringt nur noch 7 Münzen je Opfer.
+2. Eisenverarbeitung kostet 4, Belagerungsmaschinen 5, Stadtmauern 2.
+3. Nur im Marathon: höchstens 5 Städte je Zug gründen; ein Militärsieg verlangt zwei
+   eroberte Hauptstädte; die Singularität kostet 300.
+4. Fehler: Ist ein Platz nur deshalb nicht besiedelbar, weil er über Wasser oder durch
+   fremdes Gebiet nicht erreichbar ist, sonst aber erlaubt, und kontrolliert der Spieler das
+   Feld per Kolonialismus, soll er besiedelbar sein – die Entfernung dann direkt, wie mit
+   Flugzeugen.
+5. Oberfläche: In der Stadt statt des Symbols die Bevölkerung als Zahl, die Striche weg;
+   die Zahl bleibt in der Farbe des Reichs, damit man sieht, wem die Stadt gehört.
+
+### Sklaverei 7, drei Militärkosten
+
+* `SLAVERY_COINS = 7` (data.js) – Regel (`sacrifice`), Knopf („+7🪙"), Protokoll, Techtext,
+  englisch ebenso. Die KI probiert das Opfern auf Kopien aus und sieht die 7 von selbst; ihr
+  fester Zuschlag für die Technologie (`kiTechBonus`: 2) ist nicht nachgestellt.
+* Militär der Antike: **Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5**
+  (bis v83: 5, 2, 4). Die Leiter dort ist jetzt Taktik 1, Stadtmauern 2, Eisenverarbeitung 4,
+  Belagerungsmaschinen 5 – auch die Würfe auf „die n-te Technologie" folgen ihr. Im Marathon
+  das Doppelte (4, 8, 10).
+* **Das Tutorial behält die alten Kosten** (Auslegung): Es läuft im alten Techtree und ist
+  auf feste Würfe gebaut; mit anderen Kosten verschöbe sich sein Ablauf. Die drei stehen
+  deshalb in `OLD_TECH_COSTS` (jetzt zwölf Einträge) und gelten dort und in Partien von vor
+  v82. Partien aus v82/v83 bekommen die neuen Kosten.
+
+### Marathon: Singularität 300, fünf Gründungen je Zug, zwei Hauptstädte
+
+* **Singularität 300** (`MARATHON_SINGULARITY`; v83: das 2,5-Fache, 250). Rabatte ziehen
+  danach ab, der Kreml schlägt seine 50 danach auf.
+* **Höchstens fünf Gründungen je Zug** (`MARATHON_MAX_FOUNDS`). Gezählt in `p.foundRound` /
+  `p.foundCount` beim Gründen (`foundCity`) – jedes Reich hat genau einen Zug je Runde. Ist die
+  Grenze erreicht, nennt `foundSiteError` das als ersten Grund („Höchstens 5 neue Städte je
+  Zug"), die Karte im Gründungsmodus blendet jeden Platz ab, und „Stadt gründen" geht gar
+  nicht erst in den Modus, sondern sagt es. Die KI bietet danach keine Gründung mehr an.
+  Bots gründen ohnehin höchstens eine Stadt je Zug. Was nicht zählt: Eroberungen.
+* **Militärsieg mit der zweiten eroberten Hauptstadt** (`MARATHON_CAPITALS`). Wie bisher
+  wird eine eroberte Hauptstadt eine gewöhnliche Stadt des Eroberers (`captureCity` setzt
+  `cap: false` – das galt schon immer, sichtbar wurde es bisher nur, wenn Barbaren eine
+  Hauptstadt nahmen). Daraus folgt (**Auslegung**):
+  - gezählt wird, wie viele Hauptstädte ein Reich **genommen hat** (`p.capTaken`), nicht wie
+    viele es hält – wer die erste wieder verliert, behält den Zähler;
+  - dieselbe Hauptstadt zählt nur einmal, zurückerobert für niemanden – die zweite muss also
+    die eines anderen Reichs sein;
+  - wer seine Hauptstadt verloren hat, **spielt ohne Hauptstadt weiter**: keine
+    Handelsrouten mehr, Gründungsentfernung ab seiner ersten Stadt, Bürokratie ohne Wirkung,
+    Bots bauen ihre Armeen in ihrer ersten Stadt. Eine neue Hauptstadt gibt es nicht.
+  Die erste Eroberung steht im Protokoll („… 1 von 2 Hauptstädten für den Militärsieg"), das
+  Weltblatt nennt bei jedem Reich, wie viele es genommen hat und ob es noch eine Hauptstadt
+  hat; der Sieg nennt beide Reiche. Im normalen Spiel bleibt alles beim Alten
+  (`capitalsToWin` = 1).
+* **KI:** Eine Belagerung der ersten fremden Hauptstadt ist ihr die Hälfte des Spielwerts
+  wert, der zweiten der ganze (`kiCapitalShare`); eine genommene Hauptstadt zählt als halber
+  Sieg (`kiVictory`). Die eigene Hauptstadt zu verlieren, wiegt gegen einen Gegner, der schon
+  eine genommen hat, das ganze Spiel, sonst die Hälfte (`kiRisk`, je Gegner gewichtet). Dass
+  Bots ohne Hauptstadt in ihrer ersten Stadt bauen, weiß sie auch.
+* **Gemessen** (Marathon, vier KI, Draft der KI): 32 ganze Partien (20 mit vier KI Schwer, 12 mit
+  vier KI Mittel), alle ohne Fehler und mit einem Sieg zu Ende, Runde 6 bis 12: Forschung 22,
+  Wirtschaft 8, Militär 2. Eine erste Hauptstadt fiel in 8 der 24 Partien, in denen es
+  mitgezählt wurde; zweimal folgte die zweite und damit der Militärsieg (beide Male Stufe
+  Mittel, der Siegtext nennt beide Reiche). Dieselben 8 Startwerte der Stufe Schwer endeten
+  in v83 viermal militärisch, jetzt keinmal (Forschung 6, Wirtschaft 2) – zwei Hauptstädte
+  und die teurere Singularität verschieben die Partien zur Forschung. Längster Zug je Partie
+  allein auf dem Testrechner 1,5–5,6 s (8 Partien), mit zwei Läufen nebeneinander bis 7,2 s.
+
+### Kolonien ohne Siedlerweg
+
+* `foundDistance`: findet sich kein Weg (Wasser ohne Navigation, fremdes Gebiet, Vulkane,
+  fremde Armeen …) und das Feld ist **per Kolonialismus gekauft** (`S.bought[pi]`), zählt die
+  Luftlinie von der Hauptstadt (`hexDistance`, wie mit der Luftwaffe); ohne Hauptstadt von
+  der ersten Stadt, wie jede Gründungsentfernung. Damit gehen `foundSiteError`, `foundCost`,
+  der Gründungsmodus und die KI denselben Weg.
+* **Auslegungen:**
+  - nicht nur Wasser und fremdes Gebiet, sondern **jeder** fehlende Weg – der Autor nannte
+    diese beiden als Beispiel, und „wie mit Flugzeugen" überfliegt alles;
+  - alles andere gilt weiter: nur auf Land, nicht auf einem Vulkan, nicht auf einer Armee,
+    nicht neben einer gegnerischen Armee, mindestens 3 Felder von jeder Stadt;
+  - nur die eigenen Kolonien – ein Feld, das ein anderes Reich gekauft hat, hilft nicht;
+  - **gibt es einen Weg, gilt der Weg**, auch als Umweg (wörtlich „in that case"). Eine
+    Kolonie hinter einem langen Umweg kostet also mehr als eine gleich weite ohne jeden Weg.
+  - Kartografie erlässt die Distanzkosten auch hier.
+* **KI:** `kiSitesAll` nimmt eigene Kolonien, die ihre Breitensuche nicht erreicht, mit der
+  Entfernung aus `foundDistance` auf; ihr Merker für Siedelplätze kennt jetzt auch die
+  gekauften Felder (sonst sah sie eine eben gekaufte Kolonie erst nach der nächsten Gründung).
+* Der Techtext von Kolonialismus sagt es: „Für 3 Münzen Feld kaufen; dort auch ohne Weg
+  gründen".
+
+### Bevölkerung als Zahl
+
+* Die Stadtscheibe zeigt die Bevölkerung als fette Zahl in der Farbe des Reichs; die Striche
+  darüber und das Reichssymbol in der Stadt sind weg. Zweistellige Zahlen 17 statt 20 Punkt,
+  dreistellige 13. Die Hauptstadt behält ihren dunklen, dicken Ring, andere Städte den Ring
+  in Reichsfarbe; Armeen tragen weiter das Symbol. Legephase und Editor zeigen weiter Symbole
+  – dort gibt es noch keine Stadt mit Bevölkerung.
+* Das Tutorial sagt es (deutsch und englisch): „Der Kreis ist die Stadt, die Zahl darin ihre
+  Bevölkerung – in der Farbe des Reichs, dem sie gehört."
+* Sichtprobe in Chromium: Originalkarte mit Bevölkerungen 1 bis 12, Marathonkarte bis 15 –
+  auch auf den kleinen Feldern des Marathons lesbar.
+
+### Tempo der KI (Marathon, späte Züge)
+
+Mit Singularität 300 und zwei Hauptstädten dauern Marathonpartien länger; die Partie aus
+`test.js` lief eine Runde länger, bis 53 Städte und 27 Armeen, längster Zug 7,7 s. Profil:
+`kiRisk` 55 % – je eigene Stadt und Gegner die Plätze an der Stadt (`kiAttackSlots`, eine
+Paarung Armee ↔ Feld), und das zweimal (Wellen und Mindestangriff), mit `cityAt`/`armyAt`
+je Feld über alle Städte und Armeen. Geändert, **ohne andere Ergebnisse**:
+
+* `kiOccupancy`: Städte und Armeen je Feld und Id, einmal je `kiRisk`;
+* die Plätze einmal je Stadt und Gegner, für Wellen und Mindestangriff gemeinsam;
+* ein Merker je Stadt und Gegner und Zug: das Ergebnis hängt nur an den freien Feldern und
+  daran, welche seiner Armeen und Städte noch stehen.
+
+Geprüft: dieselben Endstände über 14 ganze Partien (6 Marathon mit gemischten Stufen, Bot,
+Ereignissen, Wundern; 8 zu viert auf der Plättchenkarte) und dieselben Ergebnisse auf vier
+gespeicherten späten Zügen; dort 8,2 → 5,2 s, 6,1 → 4,9 s, 6,7 → 6,0 s, 4,0 → 3,5 s. Die
+Grenze des Zeittests in `test.js` steht jetzt bei 10 s (v83: 8 s).
+
+### Abgesichert
+
+`test.js`: 7 Münzen je Opfer und im Techtext; die drei Kosten, die Leiter Militär/Antike in
+beiden Techtrees, die übrigen Leitern unverändert, `OLD_TECH_COSTS` mit zwölf Einträgen,
+Kopierpreise mit Stadtmauern 2; Marathon: Singularität 300, fünf Gründungen und dann die
+Meldung als erster Grund, im nächsten Zug von vorn, ohne Marathon keine Grenze; zwei
+Hauptstädte (die erste ohne Sieg, die eroberte ist gewöhnlich, das alte Reich ohne
+Hauptstadt, Protokoll, zurückerobert zählt nicht, die zweite siegt, der Siegtext nennt beide,
+im normalen Spiel genügt eine), der Anteil der KI; Kolonien hinter Wasser, fremdem Gebiet,
+Vulkanen und fremden Armeen (gründbar, Luftlinie, Kosten, Kartografie), was weiter gilt
+(gegnerische Armee daneben, Vulkan, Abstand, fremde Kolonie), Umweg zählt als Weg, die KI
+sieht die Kolonie zu denselben Kosten; die ganze Marathonpartie der KI (höchstens fünf
+Gründungen je Zug, ein Militärsieg mit zwei Hauptstädten). `smoke.js`: Städte zeigen ihre
+Bevölkerung als Zahl in Reichsfarbe (auch zweistellig verkleinert), kein Symbol in Städten,
+keine Striche; Marathon: „Stadt gründen" nach fünf Gründungen mit Meldung, danach wieder;
+Weltblatt mit eroberten Hauptstädten und „ohne Hauptstadt"; Kolonialismus-Kachel mit dem
+neuen Text.

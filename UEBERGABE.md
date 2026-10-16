@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 9.10., `sw.js` v83)
+# Hochzeivilization — Projekt-Übergabe (Stand 16.10., `sw.js` v84)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v83)
+## Letzte Sitzungen auf einen Blick (v61 → v84)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -38,8 +38,13 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v81 | **Regelbogen:** Abschnitte „Bewegung, Straßen und Eisenbahn" (Bewegungspunkte, Bau und Preise, Kosten je Schritt, Handelsrouten) und „Kontrollzone (Schießpulver)" – Wortlaut vom Autor freigegeben, deutsch und englisch; `test.js` prüft jede Aussage an der Regelmaschine | Oberfläche |
 | v82 | **Kosten am Knopf: was tatsächlich abgeht** (Gründen für 10 🌾 mit 8 im Vorrat: „8🌾 4🪙"), Einstellung „Kosten ohne Umtausch anzeigen" für die alte Anzeige. **Ein Techtree:** der frühere alternative ist der Standard, das Häkchen im Aufbau ist weg; der alte gilt nur noch im Tutorial und in Partien von vor v82 | Oberfläche + Regel |
 | v83 | **Kriegerkultur mit Burgenbau:** +2 Macht auch je eigener Stadt. **Wirtschaftssieg zu Rundenbeginn:** eigene und Weltbevölkerung von dort, geprüft dort für alle (kein Wirtschaftssieg in Runde 2 im Duell mehr). **Marathon:** vier Reiche, Zufallskarte 24 × 36, Hauptstädte mit Nahrung + ½ Münzen ≥ 4, Technologien ×2/×3/×4/×5 (Singularität ×2,5), Fähigkeiten im Schlangen-Draft aus 2n + 1 (`js/marathon.js`); Fähigkeiten als Liste (`abilitiesOf`, `hasAbil`). die langsamsten KI-Züge auf großen Karten 10–30 % kürzer (Handelsrouten, Siedelplätze, Straßenpläne – gleiche Ergebnisse) | Regel + Modus + KI |
+| v84 | **Sklaverei 7 Münzen** (vorher 10). **Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5** (vorher 5/2/4; das Tutorial behält die alten). **Marathon:** Singularität 300, höchstens fünf Gründungen je Zug, Militärsieg erst mit der zweiten eroberten Hauptstadt (wer seine verliert, spielt ohne weiter). **Kolonien:** ein per Kolonialismus gekauftes Feld ist auch ohne Siedlerweg besiedelbar, Entfernung Luftlinie. **Städte zeigen ihre Bevölkerung als Zahl** in Reichsfarbe statt Symbol und Strichen. `kiRisk` schneller (gleiche Ergebnisse) | Regel + Modus + Oberfläche + KI |
 
-Neu in v83: die ersten vier Punkte unter „Was das Spiel heute kann", ausführlich in
+Neu in v84: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Sklaverei 7 · drei Militärkosten · Marathonregeln · Kolonien · Bevölkerung als
+Zahl (v84)"), vier neue Fragilitäten und die offenen Punkte 29–32.
+
+Neu in v83: die nächsten vier Punkte unter „Was das Spiel heute kann", ausführlich in
 `ANNAHMEN.md` (Abschnitt „Kriegerkultur mit Burgenbau · Wirtschaftssieg zu Rundenbeginn ·
 Marathon (v83)"), sechs neue Fragilitäten und die offenen Punkte 24–28 (KI-Zugzeit im
 Marathon, Kolonisten im Marathon, Kriegerkultur zu viert, Draft nicht gespeichert, die
@@ -85,21 +90,21 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1260 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1265 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 436 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 445 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1939 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 1976 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1799 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ki.js` | 1858 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/marathon.js` | 301 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
-| `js/ui.js` | 2438 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/ui.js` | 2442 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 680 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 6096 | **1551 Assertions**, `node test.js` |
-| `smoke.js` | 3215 | **140 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 6231 | **1585 Assertions**, `node test.js` |
+| `smoke.js` | 3265 | **142 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 59 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -127,6 +132,15 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v84 auf einen Blick.** Sklaverei bringt 7 Münzen (`SLAVERY_COINS`). Militär der Antike:
+  Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5 – im Tutorial (alter Techtree,
+  `OLD_TECH_COSTS`) die alten 5/2/4. Marathon: Singularität 300 (`MARATHON_SINGULARITY`),
+  höchstens fünf Gründungen je Zug (`MARATHON_MAX_FOUNDS`, `foundedThisTurn`), Militärsieg
+  mit der zweiten eroberten Hauptstadt (`MARATHON_CAPITALS`, `p.capTaken`, `capitalsToWin`);
+  eine eroberte Hauptstadt ist eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt
+  weiter. Kolonien: ein per Kolonialismus gekauftes Feld ist ohne Siedlerweg besiedelbar,
+  Entfernung die Luftlinie (`foundDistance`, `isColony`). Städte zeigen ihre Bevölkerung als
+  Zahl in Reichsfarbe (`drawMap`), Symbol und Striche sind weg.
 - **Marathon (v83).** Spielart im Aufbau, immer vier Reiche: Zufallskarte 24 × 36
   (`marathonMap`), je Viertel eine Hauptstadt mit Nahrung + ½ Münzen ≥ 4 im ersten Zug –
   gerechnet mit 2 Bevölkerung –, mindestens 14 Felder auseinander. Technologien kosten
@@ -673,10 +687,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1551 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1585 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (140 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (142 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -827,7 +841,7 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Flankenregel ändert, sieht dort, ob die KI nachziehen muss.
 - **Technologiekosten immer über `techBase(S, t)`, nie über `t.c`** (seit v70). `t.c` sind
   seit v82 die Kosten des einzigen Techtrees; im alten (Tutorial und Partien von vor v82,
-  `S.oldTree`) weichen neun davon ab. Wer eine neue Stelle baut, die Kosten zeigt,
+  `S.oldTree`) weichen zwölf davon ab (seit v84 auch die drei militärischen der Antike). Wer eine neue Stelle baut, die Kosten zeigt,
   vergleicht oder sortiert, und dort `t.c` nimmt, zeigt im Tutorial falsche Zahlen.
 - **`S.oldTree` steht in jedem neuen Spielstand, auch als `false`** (seit v82). Daran
   erkennt `migrateState` einen Spielstand von vor v82 (dort hieß der Schalter andersherum
@@ -893,6 +907,21 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   nichts. Die echte Partie entsteht in `draftGo` neu aus `cfg` (gleiche Karte, gleiche Würfe
   über `cfg.avail`/`cfg.wpool`, gleicher Startwert).
 - **Der Draftbildschirm dreht sich mit wie das Spiel** (`TURN_SCREENS`): er zeigt die Karte.
+- **Ein Reich kann ohne Hauptstadt sein** – im Marathon nach der ersten Eroberung regelmäßig
+  (seit v84; vorher nur nach Barbarenüberfällen). `capitalOf` liefert dann `undefined`; jede
+  Stelle, die eine Hauptstadt braucht, nimmt `capitalOf(S, pi) || citiesOf(S, pi)[0]` oder
+  prüft auf leer. `p.capTaken` zählt genommene Hauptstädte; die Regel steht allein in
+  `captureCity` (`capitalsToWin`).
+- **Gründungen je Zug zählen über die Runde** (`p.foundRound`/`p.foundCount`, seit v84): jedes
+  Reich hat genau einen Zug je Runde. Wer einen zweiten Zug in derselben Runde einführt, muss
+  den Zähler beim Zugbeginn zurücksetzen.
+- **Kolonien stecken in `foundDistance`** (seit v84): ohne Weg zählt für eigene gekaufte Felder
+  die Luftlinie. Die KI rechnet Siedelplätze selbst (`kiSitesAll`) und fragt für Kolonien
+  außerhalb ihrer Suche `foundDistance`; ihr Merker (`kiSiteKey`) enthält die gekauften Felder.
+- **`kiAttackSlots` merkt sich Ergebnisse je Stadt und Gegner für einen Zug** (seit v84, am
+  Objekt `hit`): der Schlüssel sind die freien Felder an der Stadt und welche seiner Armeen
+  und Städte noch stehen. Wer die Funktion etwas Weiteres lesen lässt (Gelände, Technologien
+  …), nimmt es in den Schlüssel auf – sonst rechnet die KI mit alten Plätzen.
 - **`tradeRoutes` rechnet mit einer eigenen Stadttabelle** (seit v83, Tempo): wer ändert, wie
   Städte Wege sperren oder als Straße zählen, ändert es dort mit – `effectiveRoad` allein
   reicht nicht. `test.js` vergleicht über eine ganze Marathonpartie mit der Fassung bis v82.
@@ -1315,6 +1344,25 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Bevölkerung gerechnet, ohne Technologien. (f) Der Kreml-Zuschlag auf die Singularität
    (+50) wird im Marathon nicht vervielfacht. (g) Das Tutorial erklärt den Zeitpunkt des
    Wirtschaftssiegs nicht (alter Techtree, feste Partie, bleibt bis zum neuen Übungsspiel).
+29. **Hauptstadt verloren – und dann? (v84, Auslegung, zum Ändern angeboten).** Im Marathon
+   wird eine eroberte Hauptstadt eine gewöhnliche Stadt, und ihr altes Reich spielt ohne
+   Hauptstadt weiter (keine Handelsrouten, Gründungen ab der ersten Stadt) – so wie es nach
+   einem Barbarenüberfall schon immer war. Alternative: Die größte Stadt wird neue Hauptstadt
+   (dann könnte dasselbe Reich ein zweites Mal „enthauptet" werden). Gezählt wird, wie viele
+   Hauptstädte ein Reich genommen hat, nicht wie viele es hält.
+30. **Kolonie hinter einem Umweg (v84, wörtlich umgesetzt).** Die Luftlinie gilt nur, wenn es
+   gar keinen Weg gibt; gibt es einen, zählt er, auch als langer Umweg. Eine Kolonie hinter
+   einem Umweg kann deshalb mehr kosten als eine gleich weite ohne jeden Weg. Wer für eigene
+   Kolonien immer die kürzere von beiden will: eine Zeile in `foundDistance`.
+31. **Sklaverei 7 und die drei Militärkosten nicht gemessen (v84).** Die KI rechnet mit den
+   neuen Werten (sie probiert Aktionen auf Kopien aus); ihr fester Zuschlag für die
+   Technologie Sklaverei (`kiTechBonus` 2) ist nicht nachgestellt. Messreihen zur Balance gab
+   es diesmal keine.
+32. **Militärsiege im Marathon selten (v84, gemessen).** In 32 Marathonpartien der KI (v84) endeten 2
+   militärisch, 22 mit der Singularität und 8 wirtschaftlich; dieselben 8 Startwerte der
+   Stufe Schwer endeten in v83 viermal militärisch, jetzt keinmal. Eine erste Hauptstadt fiel
+   in 8 von 24 Partien. Zwei Hauptstädte und die teurere Singularität wirken in dieselbe
+   Richtung – ob der Militärsieg so selten sein soll, entscheidet das Spielen.
 
 ## Arbeitsweise, die der Autor schätzt
 

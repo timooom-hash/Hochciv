@@ -29,7 +29,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | Tutorial | Geführtes Übungsspiel in der normalen Oberfläche: 24 Schritte mit Erklärpanel unter der Karte, 15 davon mit Aufgabe und genauem Klickweg. Läuft auf Schienen (nur der vorgesehene Schritt ist möglich) und deterministisch. „Fertig" gibt das Spiel frei, es läuft weiter. |
 | Einstellungen | Im Hauptmenü: die Erweiterungsmodule **Ereignisse** und **Weltwunder** zuschalten. Ab Werk sind beide aus und fehlen im Aufbau ganz; eingeschaltet steht dort wieder das Häkchen und entscheidet je Partie. Dazu **Kosten ohne Umtausch anzeigen** (ab Werk aus, siehe Kosten) |
 | Kosten (v82) | Jeder Knopf zeigt, was **tatsächlich** abgeht: fehlt Nahrung oder Wissenschaft, steht dort auch der Rest in Münzen (bzw. was sonst einspringt) – Gründen für 10 Nahrung mit 8 im Vorrat zeigt **8🌾 4🪙**. Reicht es gar nicht oder wird nichts umgetauscht, steht der Preis selbst da. Im Technologiebogen gilt das für die Kacheln, die man gerade erforschen kann; die Karte im Gründungsmodus zeigt weiter den Preis (zum Vergleichen). Mit **Kosten ohne Umtausch anzeigen** in den Einstellungen wie bis v81 überall nur der Preis |
-| Techtree (v82) | Seit v82 gibt es einen Techtree – den früheren „alternativen": Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5 · in der Forschung der Industrialisierung Chemie 11, Biologie 12, Wissenschaftliche Methode 15. Das Häkchen im Aufbau ist weg. Der alte (Schrift 1, Mathematik 2 … Landwirtschaft 1, Bewässerung 5, Wiss. Methode 11, Chemie 12, Biologie 15) gilt nur noch im **Tutorial** und in Partien, die vor v82 mit ihm begonnen wurden – dort nennen Weltblatt und Regelbogen ihn. Quelle: die Kosten in `TECHS`, die alten in `OLD_TECH_COSTS` (`js/data.js`) |
+| Techtree (v82) | Seit v82 gibt es einen Techtree – den früheren „alternativen": Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Bewässerung 1, Landwirtschaft 5 · in der Forschung der Industrialisierung Chemie 11, Biologie 12, Wissenschaftliche Methode 15. Das Häkchen im Aufbau ist weg. Der alte (Schrift 1, Mathematik 2 … Landwirtschaft 1, Bewässerung 5, Wiss. Methode 11, Chemie 12, Biologie 15) gilt nur noch im **Tutorial** und in Partien, die vor v82 mit ihm begonnen wurden – dort nennen Weltblatt und Regelbogen ihn. Seit v84 im Militär der Antike: **Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5** (vorher 5, 2, 4 – das Tutorial behält die alten). Quelle: die Kosten in `TECHS`, die alten in `OLD_TECH_COSTS` (`js/data.js`) |
 | Spielart | „Vier Reiche“, „Drei Reiche“, „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) oder **„Marathon“** (v83: vier Reiche auf einer großen Zufallskarte, teurere Technologien, Fähigkeiten im Draft – siehe unten) |
 | Mensch / KI / Bot | Je Platz im Aufbau. Die **KI** spielt nach den Regeln für Menschen: sie bezahlt alles, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie, und sie legt ihr Startplättchen verdeckt selbst. Stufe Leicht/Mittel/Schwer für alle KI gemeinsam – gleiche Regeln, nur übersieht und verrechnet sich die leichtere Stufe öfter; im Duell gemessen Leicht zwischen den Bots Prinz und König, Mittel etwas über König, Schwer etwas über David. **Bots** spielen nach den Bot-Regeln (Würfelproben, Macht = Bevölkerung) und haben ihre eigene Schwierigkeit. Ab Werk sind die Gegner KI |
 | Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen. Bei ausgelostem Reich steht die Fähigkeit zwangsläufig ebenfalls auf Zufall |
@@ -46,12 +46,14 @@ sonst behalten installierte Geräte die alte Fassung.
 | Karte | fest und immer vollständig sichtbar – kein Zoomen, kein Schieben. Im Hochformat dreht die App sich selbst quer (im ☰-Menü abschaltbar) |
 | **Forschen** | Technologiebogen; erforschbares ist rot umrandet — durchgezogen heißt bezahlbar, gestrichelt zu teuer. Kopieren (Spionage/Kundschafterei/Internet) erscheint unten im selben Fenster |
 | Atomwaffen | Zielfeld antippen → *Atomschlag* im Aktionsblatt (einmal pro Runde) |
-| Sklaverei / Kolonialismus | im Aktionsblatt der Stadt bzw. eines herrenlosen Feldes |
+| Sklaverei / Kolonialismus | im Aktionsblatt der Stadt bzw. eines herrenlosen Feldes. Sklaverei bringt seit v84 **7 Münzen** je geopferter Bevölkerung (vorher 10). Ein per Kolonialismus gekauftes Feld darf seit v84 auch **ohne Siedlerweg** besiedelt werden (übers Meer, über fremdes Gebiet hinweg), sofern sonst alles passt; die Entfernung zählt dann wie mit der Luftwaffe als Luftlinie. Gibt es einen Weg, gilt der Weg |
+| Städte auf der Karte | Scheibe mit der **Bevölkerung als Zahl** in der Farbe des Reichs (seit v84; vorher Reichssymbol und Striche); die Hauptstadt hat einen dunklen, dicken Ring. Armeen tragen weiter das Reichssymbol |
 | **Protokoll** | jede Aktion; die Würfe dahinter hängen eingeklappt an der Zeile und lassen sich antippen |
 
 ## Spielende
 
-Ein **Militärsieg** (fremde Hauptstadt erobert) endet das Spiel auf der Stelle.
+Ein **Militärsieg** (fremde Hauptstadt erobert, im Marathon die zweite) endet das Spiel auf
+der Stelle.
 Der **Wirtschaftssieg** verlangt mehr als 2/3 der Weltbevölkerung (im Duell mehr als 3/4,
 mit Theologie oder Vereinten Nationen weniger). Seit v83 wird er **zu Beginn jeder Runde**
 geprüft, ab Runde 2, für alle Reiche mit der Bevölkerung von genau diesem Moment – eigene
@@ -168,9 +170,17 @@ Platz, jede Zivilisation einmal.
   Bevölkerung (falls jemand Siedlertrecks draftet) und ohne Technologien. Unter den
   erlaubten Aufstellungen die, deren schwächste Hauptstadt am besten dasteht.
 * **Technologien** kosten je Zeitalter das Doppelte (Antike), Dreifache (Mittelalter),
-  Vierfache (Industrialisierung) und Fünffache (Moderne), die Singularität das 2,5-Fache
-  (250). Rabatte (Griechenland, Wissenschaftliche Methode) ziehen danach ab; Kopieren zahlt
-  die Marathonkosten. Regelbogen und Technologiebogen zeigen die umgerechneten Zahlen.
+  Vierfache (Industrialisierung) und Fünffache (Moderne), die Singularität **300** (seit
+  v84; v83: das 2,5-Fache, 250). Rabatte (Griechenland, Wissenschaftliche Methode) ziehen
+  danach ab; Kopieren zahlt die Marathonkosten. Regelbogen und Technologiebogen zeigen die
+  umgerechneten Zahlen.
+* **Höchstens fünf neue Städte je Zug** (seit v84). „Stadt gründen" sagt danach, warum es
+  nicht mehr geht.
+* **Militärsieg erst mit zwei eroberten Hauptstädten** (seit v84). Eine eroberte Hauptstadt
+  wird eine gewöhnliche Stadt – sie zählt also nur einmal, auch zurückerobert für niemanden –,
+  und ihr altes Reich spielt ohne Hauptstadt weiter, wie nach einem Barbarenüberfall: keine
+  Handelsrouten mehr, Gründungsentfernungen ab seiner ersten Stadt. Weltblatt und Protokoll
+  zeigen, wer wie viele Hauptstädte genommen hat.
 * **Draft der Fähigkeiten:** Vor dem ersten Zug sehen alle die Karte, jede Hauptstadt mit
   ihrem Ertrag und die ausgewürfelten Starttechnologien jedes Reichs (Knopf **Bogen**).
   Dann wählt jedes Reich in Schlangenreihenfolge (Zugfolge ab dem Startspieler, dann
