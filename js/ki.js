@@ -983,23 +983,26 @@ function kiSitesAll(S, pi, K) {
     }
     front = next;
   }
-  // Kolonien (v84): gekaufte Felder, die die Suche nicht erreicht – wie foundDistance (Weg
-  // bis 200 Schritte, sonst die Luftlinie)
-  for (const k of (S.bought[pi] || [])) if (!dist.has(k)) {
-    const dd = foundDistance(S, pi, ...unkey(k));
-    if (dd != null) dist.set(k, dd);
-  }
+  /* Kolonien (v84): gekaufte Felder, die die Suche nicht erreicht – wie foundDistance (Weg
+     bis 200 Schritte, sonst die Luftlinie). Tempo (v86): Wer viel kauft, hat bald hundert
+     und mehr Felder (gemessen im Marathon: 211), und für jedes lief eine eigene Wegsuche
+     samt fremdem Gebiet – bis 10 s je Zug. Jetzt nur noch für Felder, die überhaupt als
+     Platz in Frage kommen (kiSiteOk – die übrigen fielen unten ohnehin heraus), und alle
+     über EINE Wegtabelle (withFoundTable, dieselben Entfernungen wie pathSteps). */
+  const kolonien = (S.bought[pi] || []).filter(k => !dist.has(k) && kiSiteOk(S, pi, ...unkey(k)));
+  if (kolonien.length) withFoundTable(S, pi, () => {
+    for (const k of kolonien) {
+      const dd = foundDistance(S, pi, ...unkey(k));
+      if (dd != null) dist.set(k, dd);
+    }
+  });
   const n = citiesOf(S, pi).length;
   const base = n * (n + 1) / 2;
   const out = [];
   const vorher = income(S, pi);           // für jeden Platz dasselbe (v83, Tempo)
   for (const [k, dd] of dist) {
     const [r, c] = unkey(k);
-    const t = terrainAt(S, r, c);
-    if (!t || isOff(t) || !TERRAIN[t].land || TERRAIN[t].block) continue;
-    if (enemyArmyAdjacent(S, pi, r, c)) continue;
-    { const a = armyAt(S, r, c); if (a && a.owner !== pi) continue; }
-    if (S.cities.some(ct => hexDistance(ct.r, ct.c, r, c) < 3)) continue;
+    if (!kiSiteOk(S, pi, r, c)) continue;
     // Kosten wie foundCost
     const ohneStadt = isAbil(p, 'gruenden'), ohneWeg = has(p, 'kartografie');
     let cost = ohneStadt && ohneWeg ? Math.min(base, dd) : ohneStadt ? dd : ohneWeg ? base : base + dd;
@@ -1011,6 +1014,16 @@ function kiSitesAll(S, pi, K) {
   }
   out.sort((a, b) => (b.v - b.cost * 1.2) - (a.v - a.cost * 1.2));
   return out;
+}
+// Kommt das Feld als Siedelplatz in Frage? Land ohne Vulkan, keine gegnerische Armee darauf
+// oder daneben, mindestens 3 Felder von jeder Stadt – ohne Weg und Kosten.
+function kiSiteOk(S, pi, r, c) {
+  const t = terrainAt(S, r, c);
+  if (!t || isOff(t) || !TERRAIN[t].land || TERRAIN[t].block) return false;
+  if (enemyArmyAdjacent(S, pi, r, c)) return false;
+  const a = armyAt(S, r, c);
+  if (a && a.owner !== pi) return false;
+  return !S.cities.some(ct => hexDistance(ct.r, ct.c, r, c) < 3);
 }
 // Siedelplätze ändern sich mit Städten, Armeen, Techs und Straßen – nicht mit den Ressourcen
 const kiSiteKey = (S, pi) => S.cities.length + '|' +

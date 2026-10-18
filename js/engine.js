@@ -448,11 +448,14 @@ function tileYield(S, pi, t) {
 }
 /* Ertrag eines konkreten Feldes: wie tileYield, aber mit Bürokratie –
    die verdoppelt alles, was die Hauptstadt produziert, also auch ihr Umland. */
-function tileYieldAt(S, pi, r, c) {
+// `pre` (v86, Tempo): für viele Felder hintereinander (incomeBreakdown) – Hauptstadt einmal
+// gesucht, der Ertrag je Geländeart einmal gerechnet. Ohne `pre` wie bisher.
+function tileYieldAt(S, pi, r, c, pre) {
   const p = S.players[pi];
-  const y = tileYield(S, pi, terrainAt(S, r, c));
+  const t = terrainAt(S, r, c);
+  const y = pre ? (pre.y[t] || (pre.y[t] = tileYield(S, pi, t))).slice() : tileYield(S, pi, t);
   if (has(p, 'buerokratie')) {
-    const cap = capitalOf(S, pi);
+    const cap = pre ? pre.cap : capitalOf(S, pi);
     if (cap && hexDistance(cap.r, cap.c, r, c) === 1) return y.map(n => n * 2);
   }
   return y;
@@ -475,14 +478,19 @@ function cityPopYield(S, pi) {
    des Rasters. */
 function controlledTiles(S, pi) {
   const set = new Set();
+  /* Tempo (v86): die Stadtfelder einmal als Menge statt je Feld cityAt über alle Städte – mit
+     vielen gekauften Feldern (im Marathon über 200 bei einem Reich) lief das je
+     Einkommensrechnung zehntausendfach. Gleiches Ergebnis, gleiche Reihenfolge. */
+  const stadtFeld = new Set(S.cities.map(ct => key(ct.r, ct.c)));
   for (const city of citiesOf(S, pi))
     for (const [r, c] of neighbors(city.r, city.c)) {
       const t = terrainAt(S, r, c);
       if (!t || isOff(t)) continue;
-      if (cityAt(S, r, c)) continue;
-      set.add(key(r, c));
+      const k = key(r, c);
+      if (stadtFeld.has(k)) continue;
+      set.add(k);
     }
-  for (const k of (S.bought[pi] || [])) if (!cityAt(S, ...unkey(k))) set.add(k);
+  for (const k of (S.bought[pi] || [])) if (!stadtFeld.has(k)) set.add(k);
   return set;
 }
 /* Grenzt die Stadt an Meer? (Für Englands Alternative "Seemacht".) */
@@ -538,11 +546,12 @@ function incomeBreakdown(S, pi) {
   // Feld nicht zusätzlich an eine andere eigene Stadt grenzt.
   const deadTile = (r, c) => revolution && cap && hexDistance(cap.r, cap.c, r, c) === 1 &&
     !citiesOf(S, pi).some(ct => !ct.cap && hexDistance(ct.r, ct.c, r, c) === 1);
+  const pre = { cap, y: {} };              // tileYieldAt: Hauptstadt und Geländeertrag einmal (v86)
   for (const k of controlledTiles(S, pi)) {
     const [r, c] = unkey(k);
     if (deadTile(r, c)) continue;
     const t = terrainAt(S, r, c);
-    const y = tileYieldAt(S, pi, r, c);
+    const y = tileYieldAt(S, pi, r, c, pre);
     const e = byTerrain[t] || (byTerrain[t] = { count: 0, y: [0, 0, 0] });
     e.count++; e.y[0] += y[0]; e.y[1] += y[1]; e.y[2] += y[2];
   }
@@ -552,18 +561,29 @@ function incomeBreakdown(S, pi) {
   }
   // Bevölkerung als eigene Zeile
   const py = cityPopYield(S, pi);
-  let pop = 0, pyy = [0, 0, 0], sea = 0;
+  /* Bürokratie: die Hauptstadt produziert doppelt – ihre Felder (tileYieldAt), ihre
+     Bevölkerung und seit v86 (Anweisung des Autors: „sie gehören eigentlich zur Hauptstadt")
+     auch Handelsrouten, Ökologie und der Nahrungsposten der Gentechnik, jeweils ganz. */
+  const buro = has(p, 'buerokratie') ? 2 : 1;
+  let pop = 0, pyy = [0, 0, 0], sea = 0, ecoPop = 0;
   for (const city of citiesOf(S, pi)) {
     pop += city.pop;
     if (isAbil(p, 'kuestenstaedte') && cityAtSea(S, city)) sea++;
     if (revolution && city.cap) { pyy[1] += py[1] * city.pop; continue; }   // verbraucht nur Nahrung
-    const mult = (city.cap && has(p, 'buerokratie')) ? 2 : 1;
-    /* Ökologie (v69, vorher nur Nahrung): je zwei Bevölkerung einer Stadt +1 auf alle drei
-       Erträge, je Stadt abgerundet. Bleibt Teil der Bevölkerungszeile – Bürokratie
-       verdoppelt ihn also in der Hauptstadt, die Revolution lässt ihn dort ausfallen, und
-       der Nahrungsanteil senkt weiter popFoodCost, genau wie vor v69. */
-    const eco = has(p, 'oekologie') ? Math.floor(city.pop / 2) : 0;
-    for (let i = 0; i < 3; i++) pyy[i] += (py[i] * city.pop + eco) * mult;
+    ecoPop += city.pop;
+    const mult = city.cap ? buro : 1;
+    for (let i = 0; i < 3; i++) pyy[i] += py[i] * city.pop * mult;
+  }
+  /* Ökologie: je zwei Bevölkerung +1 auf alle drei Erträge (v69, vorher nur Nahrung) –
+     seit v86 (Anweisung des Autors) über das ganze Reich gezählt und einmal abgerundet,
+     vier Städte mit je 1 Bevölkerung bringen also +2 (bis v85 je Stadt abgerundet: 0).
+     Steht weiter in der Bevölkerungszeile, der Nahrungsanteil senkt also wie bisher
+     popFoodCost. Bürokratie verdoppelt ihn ganz (v86; bis v85 nur den Anteil der
+     Hauptstadt). Bei einer Revolution produziert die Hauptstadt nichts – ihre Bevölkerung
+     zählt dann nicht mit, wie bis v85 auch. */
+  if (has(p, 'oekologie')) {
+    const eco = Math.floor(ecoPop / 2) * buro;
+    for (let i = 0; i < 3; i++) pyy[i] += eco;
   }
   // Seemacht (v53): +1 je Küstenstadt auf alle drei Erträge, vorher +2
   if (sea) extra.push({
@@ -572,13 +592,17 @@ function incomeBreakdown(S, pi) {
   });
   // Handelsrouten: Städte, die über Straßen (+1) oder durchgehend Eisenbahn (+2) an
   // der Hauptstadt hängen. Grundregel, gilt also auch für Bots.
+  // Mit Bürokratie doppelt (v86). `note` erklärt das in der Übersicht.
   const tr = tradeRoutes(S, pi);
-  if (tr.bonus)
-    extra.push({ name: 'Handelsrouten', glyph: '🛤', count: tr.count, y: [tr.bonus, tr.bonus, tr.bonus] });
+  if (tr.bonus) {
+    const b = tr.bonus * buro;
+    extra.push({ name: T('Handelsrouten'), glyph: '🛤', count: tr.count, y: [b, b, b],
+      note: buro > 1 ? T('Bürokratie ×2') : null });
+  }
   // Wallfahrt (Erweiterung): je eigenem Weltwunder +3 auf alle drei Erträge
   if (has(p, 'wallfahrt') && p.kind !== 'bot') {
     const w = wondersOf(S, pi).length;
-    if (w) extra.push({ name: 'Wallfahrt', glyph: '⛪', count: w, y: [3 * w, 3 * w, 3 * w] });
+    if (w) extra.push({ name: T('Wallfahrt'), glyph: '⛪', count: w, y: [3 * w, 3 * w, 3 * w] });
   }
   // Summe, danach die Ereignis- und Wundereffekte auf das Gesamteinkommen
   const total = [0, 0, 0];
@@ -594,11 +618,13 @@ function incomeBreakdown(S, pi) {
      durch den Tadsch Mahal. Bei Hungersnot („keine Nahrung produziert") bleibt auch
      dieser Posten aus – sonst käme mitten in der Hungersnot Nahrung aus dem Labor.
      Die Zeile wird nachträglich in `extra` gehängt und von Hand aufaddiert, weil sie
-     auf der fertigen Wissenschaftssumme steht; Übersicht und Summe bleiben so gleich. */
+     auf der fertigen Wissenschaftssumme steht; Übersicht und Summe bleiben so gleich.
+     Bürokratie verdoppelt den Posten (v86) – zusätzlich dazu, dass die verdoppelte
+     Wissenschaft der Hauptstadt schon in der Summe steht, aus der er gerechnet wird. */
   if (has(p, 'gentechnik') && !evActive(S, pi, 'hungersnot')) {
-    const gen = Math.floor(total[0] / GENE_SCI_PER_FOOD);
+    const gen = Math.floor(total[0] / GENE_SCI_PER_FOOD) * buro;
     if (gen > 0) {
-      extra.push({ name: T('Gentechnik'), glyph: '🧬', y: [0, gen, 0] });
+      extra.push({ name: T('Gentechnik'), glyph: '🧬', y: [0, gen, 0], note: buro > 1 ? T('Bürokratie ×2') : null });
       total[1] += gen;
     }
   }

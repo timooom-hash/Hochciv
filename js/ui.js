@@ -872,7 +872,7 @@ function yieldOverview(S, pi) {
   for (const r of b.rows)
     h += yieldRow(r.name, TERRAIN_GLYPH[r.key] || '▪', TERRAIN[r.key].color, r.count, r.y);
   for (const e of (b.extra || []))
-    h += yieldRow(e.name, e.glyph || '✦', '#c8a86a', e.count, e.y);
+    h += yieldRow(e.note ? `${e.name} (${e.note})` : e.name, e.glyph || '✦', '#c8a86a', e.count, e.y);
   h += yieldRow(T('Bevölkerung'), '👥', '#c8b98a', b.pop.count, b.pop.y, { cls: 'pop' });
   h += yieldRow(T('Summe'), '∑', '#6b5d47', null, b.total, { cls: 'sum' });
   // Vorschau: kein Einkommen, sondern was die Armeen zu Zugende erbeuten (Wikinger)
@@ -2393,7 +2393,7 @@ function rulesModal() {
     <p style="font-size:13px;margin:4px 0">${T('Jede Armee hat je Zug 3 Bewegungspunkte (mit Panzerschiff 6, mit Luftwaffe 9); ein Schritt aufs Nachbarfeld kostet 1. Armeen ziehen nicht auf Städte und nicht auf andere Armeen. Eine Armee, die in einer Stadt entsteht, muss sie im selben Zug verlassen.')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Straßen (ab Rad) und Eisenbahnen (ab Eisenbahn, auch ohne Rad) baust du, indem du ein Feld antippst – auf Land, in deinem Gebiet oder auf herrenlosen Feldern, nicht auf Städten. Straße 1 Münze, Eisenbahn 2 Münzen, auf einer Straße 1.')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Ein Schritt kostet ½, wenn beide Felder mindestens eine Straße haben, und nichts, wenn beide eine Eisenbahn haben: Auf einem zusammenhängenden Eisenbahnnetz kommt eine Armee mit übriger Bewegung beliebig weit. Ein Stadtfeld zählt als Straße bzw. Eisenbahn, sobald ein Nachbarfeld eine hat. Straßen und Eisenbahnen gehören niemandem – auch gegnerische Armeen fahren darauf.')}</p>
-    <p style="font-size:13px;margin:4px 0">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße. Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße. Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn.')} ${T('Mit Bürokratie zählt das doppelt.')}</p>
     <p class="sub">${T('Kontrollzone (Schießpulver)')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Mit Schießpulver hat jede deiner Armeen eine Kontrollzone: die sechs Felder ringsum, mit Raketentechnik auch den zweiten Ring. Mit Burgenbau gilt das auch für deine Städte.')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Eine fremde Armee, die ein Feld in einer Kontrollzone betritt, hält dort an: Ihre übrige Bewegung verfällt für diesen Zug, auch auf Straße und Eisenbahn. Durch eine Kontrollzone kommt sie also nicht hindurch – eine Straße oder Eisenbahn, die hindurchführt, ist für sie dort unterbrochen.')}</p>
