@@ -47,6 +47,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | **Forschen** | Technologiebogen; erforschbares ist rot umrandet — durchgezogen heißt bezahlbar, gestrichelt zu teuer. Kopieren (Spionage/Kundschafterei/Internet) erscheint unten im selben Fenster |
 | Atomwaffen | Zielfeld antippen → *Atomschlag* im Aktionsblatt (einmal pro Runde) |
 | Sklaverei / Kolonialismus | im Aktionsblatt der Stadt bzw. eines herrenlosen Feldes. Sklaverei bringt seit v84 **7 Münzen** je geopferter Bevölkerung (vorher 10). Ein per Kolonialismus gekauftes Feld darf seit v84 auch **ohne Siedlerweg** besiedelt werden (übers Meer, über fremdes Gebiet hinweg), sofern sonst alles passt; die Entfernung zählt dann wie mit der Luftwaffe als Luftlinie. Gibt es einen Weg, gilt der Weg |
+| Ökologie / Bürokratie | **Ökologie** bringt seit v86 je 2 Bevölkerung **des ganzen Reichs** +1 auf alle drei Erträge, einmal abgerundet (vorher je Stadt: vier Städte mit je 1 Bevölkerung brachten nichts, jetzt +2). **Bürokratie** verdoppelt die Hauptstadt samt Umland und seit v86 auch **Handelsrouten, Ökologie und den Nahrungsposten der Gentechnik** – die Ertragsübersicht schreibt dann „(Bürokratie ×2)" an die Zeile |
 | Städte auf der Karte | Scheibe mit der **Bevölkerung als Zahl** in der Farbe des Reichs (seit v84; vorher Reichssymbol und Striche); die Hauptstadt hat einen dunklen, dicken Ring. Armeen tragen weiter das Reichssymbol |
 | **Protokoll** | jede Aktion; die Würfe dahinter hängen eingeklappt an der Zeile und lassen sich antippen |
 

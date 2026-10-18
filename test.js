@@ -220,6 +220,68 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     'Bei zwei Städten verdoppelt Bürokratie nur die Hauptstadt samt Umland');
 }
 
+/* --- Bürokratie (v86, Anweisung des Autors): verdoppelt auch Handelsrouten, Ökologie und den
+   Nahrungsposten der Gentechnik – „sie gehören eigentlich zur Hauptstadt". Wallfahrt und
+   Seemacht nicht (nicht genannt). Bei einer Revolution produziert die Hauptstadt selbst
+   nichts; die drei Posten laufen weiter, verdoppelt (Auslegung, ANNAHMEN v86). */
+{
+  const zeile = (X, n) => (incomeBreakdown(X, 0).extra || []).find(e => e.name === n);
+  const summeGehtAuf = X => {
+    const b = incomeBreakdown(X, 0);
+    return JSON.stringify([0, 1, 2].map(i => b.rows.reduce((n, r) => n + r.y[i], 0) +
+      b.extra.reduce((n, e) => n + e.y[i], 0) + b.pop.y[i])) === JSON.stringify(b.total);
+  };
+  // Hauptstadt und eine Stadt daneben, verbunden über ihr Feld (Straße 1, Eisenbahn 2)
+  const mitRoute = (techs, stufe) => {
+    const X = mk('griechenland', techs);
+    const cap = capitalOf(X, 0);
+    const nb = neighbors(cap.r, cap.c).find(([r, c]) => isLand(X, r, c) && !cityAt(X, r, c));
+    X.cities.push({ id: 910, owner: 0, r: nb[0], c: nb[1], pop: 1, cap: false, grown: 0, born: 0 });
+    X.roads[key(nb[0], nb[1])] = stufe;
+    return X;
+  };
+  const route = (techs, stufe) => { const z = zeile(mitRoute(techs, stufe), 'Handelsrouten'); return z && [z.y, z.note]; };
+  eq(route([], 1), [[1, 1, 1], null], 'Handelsroute über Straße: +1');
+  eq(route(['buerokratie'], 1), [[2, 2, 2], 'Bürokratie ×2'], 'mit Bürokratie +2, und die Zeile sagt warum');
+  eq(route(['buerokratie'], 2), [[4, 4, 4], 'Bürokratie ×2'], 'über Eisenbahn mit Bürokratie +4');
+  eq(summeGehtAuf(mitRoute(['buerokratie'], 2)), true, 'Zeilen und Summe gehen auf (Handelsroute, Bürokratie)');
+  {
+    // Revolution: Hauptstadt still, die Handelsroute bleibt – verdoppelt
+    const X = mitRoute(['buerokratie'], 2);
+    X.ev = X.ev || { mode: 'hard' }; X.event = { round: X.round, k: 'revolution', row: 0, col: 0 };   // wie setEvent (steht weiter unten)
+    eq(evActive(X, 0, 'revolution'), true, 'Revolution läuft');
+    eq(zeile(X, 'Handelsrouten').y, [4, 4, 4], 'Revolution: die Handelsroute läuft weiter, mit Bürokratie doppelt');
+  }
+  // Gentechnik: der Nahrungsposten doppelt – gerechnet aus der schon verdoppelten Wissenschaft
+  {
+    const ohne = mk('griechenland', ['gentechnik']), mit = mk('griechenland', ['gentechnik', 'buerokratie']);
+    [ohne, mit].forEach(X => { capitalOf(X, 0).pop = 8; });
+    const a = incomeBreakdown(ohne, 0), b = incomeBreakdown(mit, 0);
+    const g = X => zeile(X, 'Gentechnik');
+    eq(b.total[0], 2 * a.total[0], 'eine Stadt: Bürokratie verdoppelt die Wissenschaft');
+    eq([g(ohne).y[1], g(mit).y[1]], [Math.floor(a.total[0] / GENE_SCI_PER_FOOD), 2 * Math.floor(b.total[0] / GENE_SCI_PER_FOOD)],
+      'Gentechnik: Bürokratie verdoppelt den Posten zusätzlich');
+    eq([g(ohne).note, g(mit).note], [null, 'Bürokratie ×2'], 'die Zeile sagt es');
+    eq(summeGehtAuf(mit), true, 'Zeilen und Summe gehen auf (Gentechnik, Bürokratie)');
+  }
+  // Nicht genannt, nicht verdoppelt: Wallfahrt und Seemacht
+  {
+    const wall = techs => {
+      const X = mkX('griechenland', { wonders: true }, ['wallfahrt'].concat(techs));
+      const cap = capitalOf(X, 0);
+      X.wonders.push({ k: 'gaerten', lvl: 1, owner: 0, cityId: cap.id, r: cap.r, c: cap.c });
+      return zeile(X, 'Wallfahrt').y;
+    };
+    eq([wall([]), wall(['buerokratie'])], [[3, 3, 3], [3, 3, 3]], 'Wallfahrt: Bürokratie verdoppelt sie nicht');
+    const see = techs => { const X = mkA('england', 'kuestenstaedte'); techs.forEach(k => { X.players[0].techs[k] = true; });
+      const z = zeile(X, 'Städte am Meer'); return z ? z.y : null; };
+    const b = SEA_CITY_BONUS;
+    eq([see([]), see(['buerokratie'])], [[b, b, b], [b, b, b]], 'Seemacht (Hauptstadt am Meer): Bürokratie verdoppelt sie nicht');
+  }
+  eq(/Handelsrouten, Ökologie und Gentechnik/.test(TECH_BY_KEY.buerokratie.e), true, 'Techtext der Bürokratie nennt die drei');
+  eq(/trade routes, ecology and genetic engineering/.test(DATA_EN.tech.buerokratie[1]), true, 'englisch ebenso');
+}
+
 /* --- Belagerung braucht zwei aufeinanderfolgende Züge */
 {
   const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 5 });
@@ -966,6 +1028,14 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     stadt(S, 1, 2, 8);
     eq(tradeRoutes(S, 0).count, 0, 'Regelbogen: eine fremde Stadt auf dem Weg unterbricht sie');
   }
+  // „Mit Bürokratie zählt das doppelt." (v86)
+  { const S = leer();
+    stadt(S, 0, 2, 2, true); stadt(S, 0, 2, 6);
+    for (let c = 3; c <= 5; c++) S.roads[key(2, c)] = 2;
+    const zeile = () => incomeBreakdown(S, 0).extra.find(e => e.name === 'Handelsrouten').y;
+    const ohne = zeile(); S.players[0].techs.buerokratie = true;
+    eq([ohne, zeile()], [[2, 2, 2], [4, 4, 4]], 'Regelbogen: Handelsroute über reine Eisenbahn +2, mit Bürokratie doppelt');
+  }
   // „die sechs Felder ringsum, mit Raketentechnik auch den zweiten Ring. Mit Burgenbau gilt das
   //  auch für deine Städte." · „Die Luftwaffe ignoriert Kontrollzonen."
   { const S = leer(), o = S.players[1];
@@ -1463,11 +1533,11 @@ const setEvent = (S, k) => {
   eq(p.popCovered <= p.popFood, true, 'nie mehr gedeckt als die Bevölkerung isst');
 }
 
-/* Ökologie (v69, Anweisung des Autors): je zwei Bevölkerung einer Stadt +1 auf ALLE drei
-   Erträge statt nur +1 Nahrung, je Stadt abgerundet. Der Nahrungsanteil ist genau der
-   alte, Wissenschaft und Münzen kommen im selben Umfang dazu. Der Posten steht in der
-   Bevölkerungszeile – daran hängt, dass Bürokratie ihn in der Hauptstadt verdoppelt, die
-   Revolution ihn dort ausfallen lässt und popFoodCost wie bisher sinkt. */
+/* Ökologie: je zwei Bevölkerung +1 auf ALLE drei Erträge (v69, vorher nur Nahrung) – seit v86
+   (Anweisung des Autors) über das ganze Reich gezählt und einmal abgerundet: vier Städte mit je
+   1 Bevölkerung bringen +2, bis v85 je Stadt abgerundet nichts. Der Posten steht weiter in der
+   Bevölkerungszeile (popFoodCost sinkt wie bisher), Bürokratie verdoppelt ihn ganz (v86, bis
+   v85 nur den Hauptstadtanteil), bei Revolution zählt die Bevölkerung der Hauptstadt nicht. */
 {
   const ertrag = X => { const i = income(X, 0); return [i.sci, i.food, i.coins]; };
   // Zwei gleiche Spiele, das zweite mit Ökologie; `richte` stellt beide gleich her
@@ -1482,16 +1552,28 @@ const setEvent = (S, k) => {
   eq(plus([], hauptstadt(2)), [1, 1, 1], 'Ökologie: Bevölkerung 2 bringt +1 auf alle drei Erträge');
   eq(plus([], hauptstadt(5)), [2, 2, 2], 'Ökologie: Bevölkerung 5 bringt +2 auf alle drei, abgerundet');
 
-  // Abgerundet wird je Stadt, nicht übers Reich: 5 + 3 Bevölkerung → 2 + 1, nicht 4
-  const zweiStaedte = X => {
-    const cap = capitalOf(X, 0); cap.pop = 5;
-    const spot = within(cap.r, cap.c, 7).find(([r, c]) => isLand(X, r, c) &&
+  // Eine weitere eigene Stadt, mindestens 3 Felder von jeder anderen
+  const neueStadt = (X, pop, id) => {
+    const cap = capitalOf(X, 0);
+    const spot = within(cap.r, cap.c, 9).find(([r, c]) => isLand(X, r, c) &&
       hexDistance(cap.r, cap.c, r, c) >= 4 && !X.cities.some(x => hexDistance(x.r, x.c, r, c) < 3));
-    X.cities.push({ id: 901, owner: 0, r: spot[0], c: spot[1], pop: 3, cap: false, grown: 0, born: 0 });
+    X.cities.push({ id, owner: 0, r: spot[0], c: spot[1], pop, cap: false, grown: 0, born: 0 });
   };
-  eq(plus([], zweiStaedte), [3, 3, 3], 'Ökologie: je Stadt abgerundet – 5 + 3 Bevölkerung geben +3, nicht +4');
-  eq(plus(['buerokratie'], zweiStaedte), [5, 5, 5],
-    'Ökologie: Bürokratie verdoppelt den Hauptstadtanteil (2 × 2 + 1)');
+  // Übers Reich gezählt: 5 + 3 Bevölkerung → +4 (bis v85 je Stadt: 2 + 1)
+  const zweiStaedte = X => { hauptstadt(5)(X); neueStadt(X, 3, 901); };
+  eq(plus([], zweiStaedte), [4, 4, 4], 'Ökologie: übers ganze Reich gezählt – 5 + 3 Bevölkerung geben +4 (bis v85 je Stadt +3)');
+  // das Beispiel des Autors: vier Städte mit je 1 Bevölkerung
+  const vierEinzel = X => { hauptstadt(1)(X); [902, 903, 904].forEach(id => neueStadt(X, 1, id)); };
+  {
+    const V = mk('griechenland'); vierEinzel(V);
+    eq([citiesOf(V, 0).length, popOf(V, 0)], [4, 4], 'vier Städte mit je 1 Bevölkerung');
+  }
+  eq(plus([], vierEinzel), [2, 2, 2], 'Ökologie: vier Städte mit je 1 Bevölkerung bringen +2 (bis v85: 0)');
+  const dreiEinzel = X => { hauptstadt(1)(X); [902, 903].forEach(id => neueStadt(X, 1, id)); };
+  eq(plus([], dreiEinzel), [1, 1, 1], 'Ökologie: drei Bevölkerung im Reich bringen +1 (einmal abgerundet)');
+  eq(plus(['buerokratie'], zweiStaedte), [8, 8, 8],
+    'Ökologie: Bürokratie verdoppelt den ganzen Posten (2 × 4; bis v85 nur den Hauptstadtanteil: 2 × 2 + 1)');
+  eq(plus(['buerokratie'], vierEinzel), [4, 4, 4], 'Ökologie mit Bürokratie: vier Einzelstädte +4');
 
   // Nahrungsseite wie vor v69: der Posten senkt, was die Bevölkerung isst
   {
@@ -1503,12 +1585,17 @@ const setEvent = (S, k) => {
     const summe = [0, 1, 2].map(i =>
       b.rows.reduce((n, r) => n + r.y[i], 0) + b.extra.reduce((n, e) => n + e.y[i], 0) + b.pop.y[i]);
     eq(summe, b.total, 'Ökologie: Zeilen und Summe gehen auf');
+    const C = mk('griechenland'), D = mk('griechenland', ['oekologie']);
+    [C, D].forEach(vierEinzel);
+    eq([popFoodCost(C, 0), popFoodCost(D, 0)], [4, 2], 'vier Einzelstädte: Bevölkerungskosten 4 → 2');
   }
 
   // Ereignisse: Revolution legt die Hauptstadt still, Hungersnot und Wirtschaftskrise
   // kappen je nur ihren Ertrag
-  const mitEreignis = k => X => { hauptstadt(5)(X); setEvent(X, k); };
-  eq(plus([], mitEreignis('revolution')), [0, 0, 0], 'Ökologie: bei Revolution bringt die Hauptstadt auch hier nichts');
+  const mitEreignis = (k, richte = hauptstadt(5)) => X => { richte(X); setEvent(X, k); };
+  eq(plus([], mitEreignis('revolution')), [0, 0, 0], 'Ökologie: bei Revolution zählt die Bevölkerung der Hauptstadt nicht');
+  eq(plus([], mitEreignis('revolution', zweiStaedte)), [1, 1, 1],
+    'Ökologie bei Revolution: es zählen nur die übrigen Städte (3 Bevölkerung → +1)');
   eq(plus([], mitEreignis('hungersnot')), [2, 0, 2], 'Ökologie: Hungersnot kappt nur den Nahrungsanteil');
   eq(plus([], mitEreignis('wirtschaftskrise')), [2, 2, 0], 'Ökologie: Wirtschaftskrise kappt nur den Münzanteil');
 
@@ -1523,8 +1610,10 @@ const setEvent = (S, k) => {
     eq([z.sci - a.sci, z.food - a.food, z.coins - a.coins], [3, 3, 3], 'Ökologie wirkt auch für Bots');
   }
   // Anzeige und Rechnung sagen dasselbe, in beiden Sprachen
-  eq(/alle Erträge/.test(TECH_BY_KEY.oekologie.e), true, 'Ökologie: Techtext nennt alle Erträge');
-  eq(/all yields/.test(DATA_EN.tech.oekologie[1]), true, 'Ökologie: englischer Techtext ebenso');
+  eq([/alle Erträge/.test(TECH_BY_KEY.oekologie.e), /ganzen Reich/.test(TECH_BY_KEY.oekologie.e)], [true, true],
+    'Ökologie: Techtext nennt alle Erträge und das ganze Reich');
+  eq([/all yields/.test(DATA_EN.tech.oekologie[1]), /empire/.test(DATA_EN.tech.oekologie[1])], [true, true],
+    'Ökologie: englischer Techtext ebenso');
 }
 
 /* ================= Erst würfeln, dann legen (Plättchenmodus)

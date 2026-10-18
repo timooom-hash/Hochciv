@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 17.10., `sw.js` v85)
+# Hochzeivilization — Projekt-Übergabe (Stand 18.10., `sw.js` v86)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v85)
+## Letzte Sitzungen auf einen Blick (v61 → v86)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -40,6 +40,12 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v83 | **Kriegerkultur mit Burgenbau:** +2 Macht auch je eigener Stadt. **Wirtschaftssieg zu Rundenbeginn:** eigene und Weltbevölkerung von dort, geprüft dort für alle (kein Wirtschaftssieg in Runde 2 im Duell mehr). **Marathon:** vier Reiche, Zufallskarte 24 × 36, Hauptstädte mit Nahrung + ½ Münzen ≥ 4, Technologien ×2/×3/×4/×5 (Singularität ×2,5), Fähigkeiten im Schlangen-Draft aus 2n + 1 (`js/marathon.js`); Fähigkeiten als Liste (`abilitiesOf`, `hasAbil`). die langsamsten KI-Züge auf großen Karten 10–30 % kürzer (Handelsrouten, Siedelplätze, Straßenpläne – gleiche Ergebnisse) | Regel + Modus + KI |
 | v84 | **Sklaverei 7 Münzen** (vorher 10). **Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5** (vorher 5/2/4; das Tutorial behält die alten). **Marathon:** Singularität 300, höchstens fünf Gründungen je Zug, Militärsieg erst mit der zweiten eroberten Hauptstadt (wer seine verliert, spielt ohne weiter). **Kolonien:** ein per Kolonialismus gekauftes Feld ist auch ohne Siedlerweg besiedelbar, Entfernung Luftlinie. **Städte zeigen ihre Bevölkerung als Zahl** in Reichsfarbe statt Symbol und Strichen. `kiRisk` schneller (gleiche Ergebnisse) | Regel + Modus + Oberfläche + KI |
 | v85 | **Wirtschaftssieg am Rundenende:** einmal je Runde geprüft, wenn alle gleich oft gezogen haben, mit dem Stand von dort – gewinnt jemand, endet das Spiel sofort (Punktvergleich nur, wenn in derselben Runde ein anderer Sieg angemeldet war); auch schon in Runde 1. **Startausgleich:** im ersten Zug +1/+2/+3 Münzen für den Zweiten/Dritten/Vierten in der Zugfolge (Bots nicht). **Marathon:** Günstige Forschung und Wissenschaftliche Methode ziehen doppelt ab, Freie Forschung nur bis ins Mittelalter. Die KI sieht als Letzte der Runde ihren Wirtschaftssieg; ihre Draftwerte im Marathon sind neu gemessen (200 Partien) | Regel + Modus + KI |
+| v86 | **Ökologie übers ganze Reich:** je 2 Bevölkerung des Reichs +1 auf alle drei Erträge, einmal abgerundet (vorher je Stadt). **Bürokratie** verdoppelt auch Handelsrouten, Ökologie und den Nahrungsposten der Gentechnik; die Ertragsübersicht sagt es („Bürokratie ×2"). Späte KI-Züge mit vielen Kolonien schneller (gleiche Ergebnisse) | Regel + KI-Tempo |
+
+Neu in v86: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Ökologie übers ganze Reich · Bürokratie auch für Handelsrouten, Ökologie und
+Gentechnik (v86)"), eine Fragilität neu, die offenen Punkte 36 und 37; Punkt 9 und der
+Abschnitt „Ökologie (v69)" nachgetragen.
 
 Neu in v85: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Wirtschaftssieg am Rundenende · Marathon: Griechenland und Methode ·
@@ -70,7 +76,7 @@ Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstan
 Punkt 12 (dominiert über alle Lagen oder nur je Lage?), seit v75 Punkt 13 (Bot-Partner
 verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell), seit v85 Punkt 33
 (Auslegungen zu Wirtschaftssieg, Startausgleich und Rabatten) und 34 (der Startausgleich
-gleicht wenig aus).
+gleicht wenig aus), seit v86 Punkt 36 (Auslegungen zu Bürokratie und Ökologie).
 
 ## Wo alles liegt
 
@@ -98,21 +104,21 @@ gleicht wenig aus).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1273 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1277 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 452 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 2013 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 2039 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1868 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ki.js` | 1881 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/marathon.js` | 302 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
 | `js/ui.js` | 2443 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 680 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 6331 | **1609 Assertions**, `node test.js` |
-| `smoke.js` | 3323 | **144 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 6420 | **1630 Assertions**, `node test.js` |
+| `smoke.js` | 3342 | **144 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 59 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -140,6 +146,15 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v86 auf einen Blick.** Ökologie: ⌊Bevölkerung des Reichs / 2⌋ auf alle drei Erträge, in der
+  Bevölkerungszeile von `incomeBreakdown` (senkt also weiter `popFoodCost`); bei Revolution
+  zählt die Hauptstadt nicht. Bürokratie: Faktor `buro` in `incomeBreakdown` für Felder und
+  Bevölkerung der Hauptstadt (wie bisher) und ganz für Handelsrouten, Ökologie und den
+  Gentechnik-Posten; Wallfahrt und Seemacht nicht. Zeilen tragen dann `note: 'Bürokratie ×2'`,
+  die Übersicht hängt es an den Namen. Zeilennamen „Handelsrouten"/„Wallfahrt" jetzt über `T()`.
+  Tempo (gleiche Ergebnisse): `kiSitesAll` prüft Kolonien erst mit `kiSiteOk` und holt ihre
+  Entfernungen aus einer Wegtabelle, `controlledTiles` kennt die Stadtfelder als Menge,
+  `tileYieldAt(…, pre)` rechnet Hauptstadt und Geländeertrag je Einkommensrechnung einmal.
 - **v85 auf einen Blick.** Wirtschaftssieg: geprüft nur noch am Rundenende
   (`checkEconomyRoundEnd` in `advanceTurn`, vor `resolveClaims`), für alle mit dem Stand von
   dort, auch in Runde 1; gewinnt jemand, ist das Spiel gleich aus – Punktvergleich nur mit
@@ -606,6 +621,9 @@ Chromium: Bogen und Aufbau wie gewollt.
 
 ### Ökologie: +1 auf alle Erträge (v69)
 
+(Seit v86 übers ganze Reich gezählt statt je Stadt, und Bürokratie verdoppelt den ganzen
+Posten – siehe „v86 auf einen Blick". Das Folgende ist der Stand von v69.)
+
 Auf Anweisung des Autors. Vorher „Städte: +1 Nahrung / 2 Bevölkerung (abrunden)", jetzt
 „Städte: +1 auf alle Erträge / 2 Bevölkerung (abrunden)" – je Stadt ⌊Bevölkerung / 2⌋ auf
 Wissenschaft, Nahrung und Münzen. Geändert: eine Schleife in `incomeBreakdown`
@@ -707,7 +725,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1609 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1630 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (144 Schritte), inklusive
@@ -921,6 +939,10 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
 - **Der Startausgleich hängt an `S.round === 1` und `turnPosition`** (seit v85): wer die
   erste Runde anders zählt (etwa eine Vorrunde einführt) oder Plätze in der Zugfolge
   verschiebt, prüft den Ausgleich mit. Barbaren hängen hinten an und zählen nicht.
+- **Wer eine neue Einkommenszeile baut, entscheidet über die Bürokratie** (seit v86): In
+  `incomeBreakdown` verdoppelt `buro` Hauptstadtfelder, Hauptstadtbevölkerung, Handelsrouten,
+  Ökologie und Gentechnik – sonst nichts. Eine neue Zeile ist ohne `buro` nicht verdoppelt;
+  ist sie es, bekommt sie `note` wie die anderen, sonst sieht man es in der Übersicht nicht.
 - **Fähigkeitstexte über `abilEffect(a, S)`** (seit v85): im Marathon wirken zwei Fähigkeiten
   anders, die Texte dazu stehen dort (die Methode in `techEffect`). Wer eine Fähigkeit im
   Marathon anders wirken lässt, ergänzt dort den Text – Kopfzeile, Weltblatt, Draft und
@@ -1256,7 +1278,8 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
 9. **„Ertrag beim Siedeln" rechnet immer mit Bevölkerung 1** – auch für Russland mit
    *Siedlertrecks*, dessen Städte mit 2 Bevölkerung gegründet werden (`foundCity`).
    Gemessen (Seed 7, erstes gründbares Feld): Vorschau 1🔬 −1🌾 5🪙, tatsächlich
-   2🔬 −2🌾 6🪙; mit Ökologie seit v69 tatsächlich 3🔬 −1🌾 7🪙. Vorbestehend, durch v69 nur
+   2🔬 −2🌾 6🪙; mit Ökologie seit v69 tatsächlich 3🔬 −1🌾 7🪙 (gemessen mit v69 – seit v86
+   zählt Ökologie übers Reich, die Zahlen sind nicht nachgemessen). Vorbestehend, durch v69 nur
    größer geworden. Behebung wäre eine Zeile in `settleGain` (Bevölkerung wie in
    `foundCity`); das Tutorial spielt Russland mit Grundfähigkeit und wäre nicht betroffen.
 10. **Spieltipp zur Kundschafterei** („im Allgemeinen nicht effizient") stimmt seit v72 nur
@@ -1413,6 +1436,18 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Fruchtbarkeit stärker. `KI_DRAFT_BASE` folgt der Messung; ob die KI damit besser draftet
    als mit der alten Tabelle, ist nicht gegeneinander gemessen. Die alten Werte stehen in
    `ANNAHMEN.md` (v83 und v85), falls nur Griechenland nachgezogen werden soll.
+36. **Getroffene Auslegungen (v86) – zum Ändern angeboten.** (a) Bei einer Revolution laufen
+   Handelsrouten, die Ökologie der übrigen Städte und die Gentechnik weiter, mit Bürokratie
+   verdoppelt; wer sie als „Teil der Hauptstadt" mit ausfallen lassen will: drei Stellen in
+   `incomeBreakdown`. (b) Die Bevölkerung der Hauptstadt zählt bei Revolution nicht zur
+   Ökologie. (c) Gentechnik wird verdoppelt, obwohl sie schon vorher indirekt an der
+   Bürokratie hing (aus der verdoppelten Wissenschaft gerechnet). (d) Wallfahrt und Seemacht
+   – auch der Seemacht-Bonus der Hauptstadt selbst – bleiben unverdoppelt (nicht genannt).
+37. **Kolonien im Marathon (v86, gemessen).** Mit dem zusätzlichen Geld aus Bürokratie und
+   Ökologie kauft die KI im Marathon viel mehr Felder: 722 statt 149 in 16 Partien, ein Reich
+   bis 215. Das ist regelgerecht (3 Münzen je Feld, der Ertrag bleibt), macht aber späte
+   Züge teuer – nach den Tempo-Änderungen höchstens 5,2 s in diesen Partien. Ob 200 gekaufte
+   Felder so gewollt sind, entscheidet das Spielen; die KI-Grenze dafür wäre `kiColonySpots`.
 
 ## Arbeitsweise, die der Autor schätzt
 

@@ -1350,7 +1350,24 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   if (!/Handelsrouten/.test($('ov-body').textContent))
     throw new Error('Handelsrouten fehlen in der Ertragsübersicht');
   G('closeModal')();
-  console.log('       Straße +1, Eisenbahn +2, Zeile im Forschungsbogen sichtbar');
+  // Bürokratie verdoppelt sie (v86) – und die Zeile sagt es, auch auf Englisch
+  p.techs.buerokratie = true;
+  if (JSON.stringify(zeile().y) !== '[4,4,4]') throw new Error('Bürokratie verdoppelt die Handelsroute nicht: ' + JSON.stringify(zeile().y));
+  $('a-tech').onclick();
+  if (!/Handelsrouten \(Bürokratie ×2\)/.test($('ov-body').textContent)) throw new Error('Zeile nennt die Bürokratie nicht');
+  G('closeModal')();
+  G('switchLang')('en');
+  try {
+    G('clearMissing')();
+    $('a-tech').onclick();
+    const en = $('ov-body').textContent;
+    G('closeModal')();
+    if (!/Trade routes \(Bureaucracy ×2\)/.test(en)) throw new Error('englisch: ' + (en.match(/.{0,20}routes.{0,30}/) || [''])[0]);
+    const fehlt = G('missingStrings')();
+    if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));
+  } finally { G('switchLang')('de'); }
+  delete p.techs.buerokratie;
+  console.log('       Straße +1, Eisenbahn +2, mit Bürokratie +4, Zeile im Forschungsbogen sichtbar (DE/EN)');
 });
 step('Zurückblättern springt nicht sofort wieder vor', () => {
   G('tutorialStart')();
@@ -3075,7 +3092,8 @@ step('Regelbogen: Bewegung, Straßen, Eisenbahn und Kontrollzone (v81), auch auf
   G('rulesModal')();
   const de = $('ov-body').textContent.replace(/\s+/g, ' ');
   for (const t of ['Bewegung, Straßen und Eisenbahn', 'Kontrollzone (Schießpulver)',
-    'Eisenbahn 2 Münzen, auf einer Straße 1', 'Die Luftwaffe ignoriert Kontrollzonen'])
+    'Eisenbahn 2 Münzen, auf einer Straße 1', 'Die Luftwaffe ignoriert Kontrollzonen',
+    'nur eine fremde Stadt unterbricht ihn. Mit Bürokratie zählt das doppelt.'])
     if (!de.includes(t)) throw new Error('fehlt: ' + t);
   // nach dem Absatz zur Nahrung, vor den Geländeerträgen; die Handelsrouten genau einmal
   const pos = ['Die Nahrungsproduktion', 'Bewegung, Straßen und Eisenbahn', 'Handelsrouten: jede eigene Stadt',
@@ -3088,7 +3106,8 @@ step('Regelbogen: Bewegung, Straßen, Eisenbahn und Kontrollzone (v81), auch auf
     G('clearMissing')();
     G('rulesModal')();
     const en = $('ov-body').textContent.replace(/\s+/g, ' ');
-    for (const t of ['Movement, roads and railways', 'Zone of control (Gunpowder)', 'The Air force ignores zones of control'])
+    for (const t of ['Movement, roads and railways', 'Zone of control (Gunpowder)', 'The Air force ignores zones of control',
+      'only a foreign city breaks it. With Bureaucracy this counts double.'])
       if (!en.includes(t)) throw new Error('fehlt auf Englisch: ' + t);
     const fehlt = G('missingStrings')();
     if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));

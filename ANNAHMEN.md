@@ -3988,3 +3988,104 @@ viert, dritt und zweit, ab einem anderen Startspieler, nur in Runde 1, Bots nich
 Protokoll. `smoke.js`: Regelbogen im Marathon mit doppelten Rabatten, Freier Forschung bis ins
 Mittelalter, Startausgleich und Rundenende (deutsch und englisch, ohne fehlende Übersetzung);
 im normalen Spiel die alten Texte und der Ausgleich der beiden KI im Protokoll.
+
+## Ökologie übers ganze Reich · Bürokratie auch für Handelsrouten, Ökologie und Gentechnik (v86)
+
+**Anweisung des Autors (18.10.):**
+1. Ökologie soll für die Gesamtbevölkerung wirken, nicht nur je Stadt – vier Städte mit je
+   1 Bevölkerung sollen sie zweimal auslösen, nicht keinmal.
+2. Bürokratie soll auch das Einkommen aus Handelsrouten, Ökologie und Gentechnik betreffen,
+   „da sie eigentlich Teil der Hauptstadt sind".
+
+### Ökologie
+
+* +1 auf alle drei Erträge je **zwei Bevölkerung des ganzen Reichs**, einmal abgerundet
+  (`incomeBreakdown`). Bis v85 je Stadt abgerundet: 5 + 3 Bevölkerung gaben +3, jetzt +4;
+  vier Städte mit je 1 Bevölkerung gaben nichts, jetzt +2. Beim Abrunden geht höchstens
+  noch ein halber Punkt verloren, nicht mehr bis zu einem halben je Stadt.
+* Der Posten steht weiter in der Bevölkerungszeile der Ertragsübersicht; sein Nahrungsanteil
+  senkt also wie seit v69, was die Bevölkerung isst (`popFoodCost`, das Füttern mit
+  Gentechnik/Massenmedien).
+* **Revolution** (Ereignis, „die Hauptstadt produziert nichts"): Die Bevölkerung der
+  Hauptstadt zählt nicht mit – wie bis v85, als ihr Anteil in der Hauptstadtzeile ausfiel
+  (Auslegung).
+* Bots bekommen Ökologie wie bisher. Techtext: „+1 auf alle Erträge je 2 Bevölkerung im
+  ganzen Reich (abrunden)", englisch „… across the empire …".
+
+### Bürokratie
+
+* Verdoppelt wie bisher Felder und Bevölkerung der Hauptstadt, **dazu jetzt ganz**:
+  Handelsrouten (Straße +2, Eisenbahn +4 je verbundener Stadt), die Ökologie des ganzen
+  Reichs und den Nahrungsposten der Gentechnik. Ein Faktor `buro` in `incomeBreakdown` an
+  diesen Stellen.
+* **Gentechnik hing schon vorher an der Bürokratie, nur indirekt:** Ihr Posten wird aus der
+  Wissenschaftssumme gerechnet, in der die verdoppelte Wissenschaft der Hauptstadt schon
+  steckt. Jetzt wird der Posten selbst noch einmal verdoppelt (so verstanden: „Bürokratie
+  soll auch das Einkommen aus der Gentechnik betreffen"). Beispiel (Originalkarte,
+  Startwert 7, Griechenland, nur die Hauptstadt mit 8 Bevölkerung): ohne Bürokratie 8
+  Wissenschaft → 2 Nahrung; mit Bürokratie 16 Wissenschaft → bis v85 4 Nahrung, jetzt
+  2 × 4 = 8.
+* **Nicht verdoppelt** (nicht genannt): Wallfahrt (+3 je Wunder), Seemacht – auch nicht der
+  Bonus der Hauptstadt selbst, wenn sie am Meer liegt –, die Beute der Wikinger und der Taj
+  Mahal, der ohnehin das ganze Einkommen verdoppelt.
+* **Revolution:** Felder und Bevölkerung der Hauptstadt produzieren nichts, wie bisher.
+  Handelsrouten, die Ökologie der übrigen Städte und die Gentechnik laufen weiter und bleiben
+  mit Bürokratie verdoppelt (Auslegung). Wer sie als „Teil der Hauptstadt" auch bei einer
+  Revolution ausfallen lassen will: drei Stellen in `incomeBreakdown`.
+* **Anzeige:** In der Ertragsübersicht heißen die Zeilen mit Bürokratie „Handelsrouten
+  (Bürokratie ×2)" und „Gentechnik (Bürokratie ×2)"; die Ökologie steckt wie bisher in der
+  Bevölkerungszeile. Techtext: „Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie
+  und Gentechnik". Im Regelbogen steht hinter dem Absatz zu den Handelsrouten (Wortlaut vom
+  Autor, v81, unverändert) ein Satz mehr: „Mit Bürokratie zählt das doppelt."
+* Nebenbei: Die Zeilen „Handelsrouten" und „Wallfahrt" der Ertragsübersicht blieben auf
+  Englisch deutsch – jetzt „Trade routes" und „Pilgrimage".
+
+### KI
+
+Sie bewertet Technologien und Aktionen über das Einkommen (`kiValue`, `baseIncome`) und hat
+für Bürokratie und Ökologie keinen festen Zuschlag – beide Änderungen sieht sie also von
+selbst, auch beim Straßenbau für Handelsrouten. Nicht nachgestellt.
+
+**Gemessen** (KI Schwer gegen KI Schwer, dieselben Startwerte in v85 und v86):
+
+| | Duell (600 Partien) | zu viert (600) | Marathon (16, Draft der KI) |
+|---|---|---|---|
+| Siegarten v85 → v86 | Forschung 225 → 234, Militär 198 → 193, Wirtschaft 177 → 173 | Militär 508 → 511, Forschung 78 → 80, Wirtschaft 14 → 9 | Forschung 11 → 12, Wirtschaft 4 → 2, Militär 1 → 2 |
+| mittlere Endrunde | 5,95 → 5,91 | 5,14 → 5,10 | 9,25 → 9,38 |
+| gleiches Ergebnis | 414 von 600 | 469 von 600 | – |
+| Ökologie erforscht | 40 % → 41 % der Reiche | 18 % → 19 % | 24 → 33 von 64 Reichen |
+
+Auf der Plättchenkarte ändert sich wenig: Die Partien enden nach fünf, sechs Runden, Ökologie
+kommt spät, große Reiche entstehen kaum. Im Marathon greifen beide Änderungen, und die KI
+setzt das zusätzliche Geld in **Kolonien** um: gekaufte Felder in 16 Partien zusammen 149
+(v85) gegen 722 (v86), in drei Partien ein Reich mit über 50, höchstens 215.
+
+**Tempo:** Mit so vielen Kolonien wurden späte KI-Züge langsam – bis 10 s allein auf dem
+Testrechner (15 s, als drei Messungen gleichzeitig liefen; v85 höchstens 5,7 s). Die Ursache
+lag schon in v84/v85, sie wurde nur jetzt sichtbar: Auf denselben Spielständen brauchte v85
+genauso lange. Drei Stellen sind jetzt schneller, **ohne andere Ergebnisse**:
+* `kiSitesAll`: Kolonien nur noch prüfen, wenn das Feld überhaupt als Siedelplatz in Frage
+  kommt (`kiSiteOk`, dieselbe Prüfung wie danach), und alle Entfernungen aus einer Wegtabelle
+  (`withFoundTable`) statt je Feld eine eigene Wegsuche samt fremdem Gebiet;
+* `controlledTiles`: die Stadtfelder einmal als Menge statt je Feld `cityAt` über alle Städte;
+* `incomeBreakdown`: Hauptstadt und Ertrag je Geländeart einmal je Rechnung (`tileYieldAt`
+  mit `pre`).
+Geprüft: dieselben Endstände über 10 ganze Partien (4 Marathon mit gemischten Stufen, Bot,
+Ereignissen und Wundern, 6 zu viert auf der Plättchenkarte) und dieselben Ergebnisse auf fünf
+gespeicherten Zügen; die 16 Marathonpartien von oben enden gleich (Sieger, Siegart, Runde,
+Punkte). Die langsamsten Stände: 9,4 → 4,3 s, 9,5 → 5,1 s, 7,1 → 5,4 s, 6,4 →
+4,8 s; ohne Kolonien unverändert (2,9 s). Längster KI-Zug in den 16 Marathonpartien jetzt
+5,2 s (zwei Partien gleichzeitig).
+
+### Abgesichert
+
+`test.js`: Ökologie bei 1, 2 und 5 Bevölkerung, übers Reich gezählt (5 + 3 → +4, das Beispiel
+des Autors vier Einzelstädte → +2, drei Bevölkerung → +1), mit Bürokratie ganz doppelt (+8,
++4), Bevölkerungskosten (5 → 3, vier Einzelstädte 4 → 2), Zeile und Summe, Revolution (nur
+die übrigen Städte), Hungersnot, Wirtschaftskrise, Bots, Techtext deutsch und englisch;
+Bürokratie: Handelsroute über Straße +1 → +2, über Eisenbahn +4, Hinweis in der Zeile,
+Revolution, Gentechnik doppelt aus der schon verdoppelten Wissenschaft, Zeilen und Summe,
+Wallfahrt und Seemacht nicht, Techtext; Regelbogen: Handelsroute +2, mit Bürokratie +4.
+`smoke.js`: Ertragsübersicht mit „Handelsrouten (Bürokratie ×2)" und +4, englisch „Trade
+routes (Bureaucracy ×2)" ohne fehlende Übersetzung; der neue Satz im Regelbogen, deutsch und
+englisch.
