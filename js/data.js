@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v84';
+const APP_VERSION = 'v85';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -183,6 +183,13 @@ const MARATHON_TECH_FACTOR = [2, 3, 4, 5];
 const MARATHON_SINGULARITY = 300;
 const MARATHON_MAX_FOUNDS = 5;      // neue Städte je Zug
 const MARATHON_CAPITALS = 2;        // eroberte Hauptstädte für den Militärsieg
+/* Seit v85 (Anweisung des Autors): Griechenlands Günstige Forschung und die Wissenschaftliche
+   Methode wirken doppelt, Griechenlands Freie Forschung reicht nur bis ins Mittelalter. */
+const MARATHON_DISCOUNT_FACTOR = 2;
+const MARATHON_FREE_TECH_AGE = 1;   // Freie Forschung: bis Mittelalter (sonst bis Industrialisierung, 2)
+/* Startausgleich (v85, Anweisung des Autors): im allerersten Zug bekommt der Zweite in der
+   Zugfolge 1 Münze dazu, der Dritte 2, der Vierte 3 – zu zweit also nur der Zweite. */
+const START_BONUS_COINS = [0, 1, 2, 3];
 const MARATHON_MIN_START = 4;      // Nahrung + ½ Münzen der Hauptstadt im ersten Zug, mit 2 Bevölkerung
 const MARATHON_MIN_DIST = 14;      // Mindestabstand der Hauptstädte (Originalkarte: 7 auf halber Breite)
 /* Grundkosten einer Technologie IN DIESER PARTIE, vor allen Vergünstigungen (Griechenland,

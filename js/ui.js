@@ -536,11 +536,11 @@ function redraw() {
   // Im Marathon (v83) zwei gedraftete – beide stehen da
   const abils = abilInfos(p);
   $('hud-name').innerHTML = esc(civ.n) + (p.kind === 'bot' ? T(' · Bot') : p.kind === 'ki' ? T(' · KI') : '') +
-    abils.map(a => `<span class="hud-abil" title="${esc(a.e)}">${esc(a.n)}</span>`).join('');
+    abils.map(a => `<span class="hud-abil" title="${esc(abilEffect(a, S))}">${esc(a.n)}</span>`).join('');
   const ev = curEvent();
   // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
   // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet. Der aktuelle Stand:
-  // geprüft wird er seit v83 zu Beginn der nächsten Runde.
+  // geprüft wird er seit v85 am Ende der Runde, wenn alle gezogen haben.
   const mine = popOf(S, S.cur), all = worldPop(S);
   const pct = all > 0 ? Math.round((mine / all) * 100) : 0;
   // Ist ein Sieg angemeldet, läuft die Runde noch zu Ende – das muss in der Kopfzeile
@@ -1344,7 +1344,7 @@ function worldModal() {
       return `<div class="civ-row${i === pi ? ' self' : ''}">
         <span class="civ-chip" style="border-color:${c.color};color:${c.color}">${SYM[c.sym]}</span>
         <span class="civ-n">${esc(c.n)}${x.dead ? ' · ' + T('ausgeschieden') : ''}${haupt}</span>
-        <span class="civ-a">${as.length ? as.map(a => `<b>${esc(a.n)}</b><small>${esc(a.e)}</small>`).join('')
+        <span class="civ-a">${as.length ? as.map(a => `<b>${esc(a.n)}</b><small>${esc(abilEffect(a, S))}</small>`).join('')
         : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
     }).join('') + '</div>';
   if (oldTreeShown())
@@ -2125,7 +2125,7 @@ function drawDraft() {
     D.pool.map(id => {
       const a = abilById(id), civ = CIV_BY_KEY[a.civ];
       return `<button class="dr-ab" data-ab="${id}" ${opts.includes(id) ? '' : 'disabled'}>
-        <span class="dr-civ">${SYM[civ.sym]} ${esc(civ.n)}</span><b>${esc(a.n)}</b><small>${esc(a.e)}</small></button>`;
+        <span class="dr-civ">${SYM[civ.sym]} ${esc(civ.n)}</span><b>${esc(a.n)}</b><small>${esc(abilEffect(a, V))}</small></button>`;
     }).join('');
   // Reiche in Zugfolge: gewählte Fähigkeiten, Startertrag der Hauptstadt, Starttechnologien
   const reihe = V.players.map((_, k) => (V.startIdx + k) % V.players.length);
@@ -2382,11 +2382,12 @@ function rulesModal() {
       <li>${T('Macht halbiert sich (aufgerundet).')}</li>
       <li>${T('Aktionen in beliebiger Reihenfolge, beliebig oft.')}</li>
       <li>${T('Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen. Zwei Züge in Folge stärker → Stadt erobert.')}</li>
-      <li>${T('Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; geprüft zu Beginn jeder Runde ab Runde 2, für alle mit der Bevölkerung von dort) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
+      <li>${T('Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; geprüft am Ende jeder Runde, wenn alle gleich oft gezogen haben – dann endet das Spiel sofort) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
         victoryLabels(!!(S && S.duel)).base, victoryLabels(!!(S && S.duel)).un,
         victoryLabels(!!(S && S.duel)).theologie)}</li>
     </ol>
     <p class="sub">${T('Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen. 2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.')}</p>
+    <p class="sub">${T('Startausgleich: Im allerersten Zug bekommen der Zweite, Dritte und Vierte in der Zugfolge 1, 2 bzw. 3 Münzen dazu.')}</p>
     <p class="sub">${T('Die Nahrungsproduktion darf nicht negativ werden: Wachstum wird blockiert, sobald das Einkommen dadurch unter 0 fiele – gerechnet auf dem dauerhaften Wert, ein Ereignis dieser Runde zählt dafür nicht. Gentechnik und Massenmedien heben die Grenze auf: zu Zugbeginn ernährt jede Münze drei Bevölkerung, jede Wissenschaft eine – höchstens bis zur Höhe dessen, was die Bevölkerung isst, also kein allgemeiner Umtausch. Gentechnik bringt zusätzlich Nahrung ins Einkommen: je vier Wissenschaft eine.')}</p>
     <p class="sub">${T('Bewegung, Straßen und Eisenbahn')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Jede Armee hat je Zug 3 Bewegungspunkte (mit Panzerschiff 6, mit Luftwaffe 9); ein Schritt aufs Nachbarfeld kostet 1. Armeen ziehen nicht auf Städte und nicht auf andere Armeen. Eine Armee, die in einer Stadt entsteht, muss sie im selben Zug verlassen.')}</p>
@@ -2407,7 +2408,7 @@ function rulesModal() {
     </table>
     <p class="sub">${T('Zivilisationen — je drei wählbare Fähigkeiten (Bots haben keine)')}</p>
     ${CIVS.map(c => `<p style="font-size:13px;margin:6px 0"><b>${SYM[c.sym]} ${c.n}</b><br>` +
-      c.abilities.map((a, j) => `<span style="color:var(--ink-soft)">${j === 0 ? T('Grund') : T('Alt. %s', j + 1)}:</span> ${a.e}`).join('<br>') +
+      c.abilities.map((a, j) => `<span style="color:var(--ink-soft)">${j === 0 ? T('Grund') : T('Alt. %s', j + 1)}:</span> ${abilEffect(Object.assign({ civ: c.k }, a), S)}`).join('<br>') +
       '</p>').join('')}
     <p class="sub">${T('Weltwunder (Erweiterung)')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Kosten 10/20/30/40 … für das 1./2./3./4. Wunder. Stufe 2 muss seltener sein als Stufe 1, Stufe 3 seltener als Stufe 2. Je Stadt zwei Wunder. Ein Wunder der Stufe 3 gewinnt zu Beginn des nächsten Zuges.')}</p>
@@ -2416,7 +2417,7 @@ function rulesModal() {
     <p class="sub">${T('Alle Technologien')}</p>
     <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
     ${oldTreeShown() ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt noch der alte Techtree.')}</p>` : ''}
-    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität %s – die Kosten hier sind schon umgerechnet. Höchstens %s neue Städte je Zug. Militärsieg erst mit %s eroberten Hauptstädten; eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt weiter.', MARATHON_SINGULARITY, MARATHON_MAX_FOUNDS, MARATHON_CAPITALS)}</p>` : ''}
+    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität %s – die Kosten hier sind schon umgerechnet. Griechenlands Günstige Forschung und die Wissenschaftliche Methode ziehen doppelt ab, Griechenlands Freie Forschung reicht nur bis ins Mittelalter. Höchstens %s neue Städte je Zug. Militärsieg erst mit %s eroberten Hauptstädten; eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt weiter.', MARATHON_SINGULARITY, MARATHON_MAX_FOUNDS, MARATHON_CAPITALS)}</p>` : ''}
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);

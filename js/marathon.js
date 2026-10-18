@@ -250,19 +250,20 @@ function draftPick(D, pi, id) {
 /* ------------------------------------------------------------------ Wahl der KI
    Feste Grundwerte je Fähigkeit, dazu, was die Karte um die eigene Hauptstadt hergibt
    (Wald für Taiga, Küste für Seemacht, Land für Siedler und Kolonisten).
-   Die Grundwerte sind gemessen (v83, ANNAHMEN): 40 Marathonpartien mit vier KI (Schwer) und
-   zufällig zugeteilten Fähigkeiten, Stärke je Fähigkeit über ein bedingtes Logit (wer
-   gewinnt, gegeben die Fähigkeiten aller vier), Mitbesitz herausgerechnet. Eindeutig ist
-   nur das Ergebnis für Kolonisten (21 Siege in 27 Partien, wo ein Viertel zu erwarten
-   wäre); die übrigen liegen dicht beieinander und sind auf 40 Partien unsicher – sie sind
-   die gemessene Reihenfolge, etwas zur Mitte gezogen. Taiga, Seemacht und Siedlertrecks
-   haben einen niedrigen Grundwert, weil die Karte im Mittel etwas dazugibt (gemessen über
-   120 Hauptstädte: Taiga +2,8, Seemacht +2,4, Land +1,5) – gemessen ist der Wert samt Karte. */
+   Die Grundwerte sind gemessen (v85, ANNAHMEN; zuerst v83 mit 40 Partien): 200
+   Marathonpartien nach den Regeln von v85 mit vier KI (Schwer) und zufällig zugeteilten
+   Fähigkeiten, Stärke L je Fähigkeit über ein bedingtes Logit (wer gewinnt, gegeben die
+   Fähigkeiten aller vier und ihren Platz in der Zugfolge), Mitbesitz herausgerechnet.
+   Grundwert = 6 + 2,5 · L, gerundet auf halbe Punkte. Taiga, Seemacht, Siedlertrecks und
+   Kolonisten bekommen von der Karte im Mittel etwas dazu (gemessen über 120 Hauptstädte:
+   Taiga +2,8, Seemacht +2,4, Land +1,5) – gemessen ist der Wert samt Karte, also steht hier
+   der Wert ohne. Weit vorn nur Kolonisten (105 Siege bei 139 Besitzern), dann die Freie
+   Forschung; die übrigen liegen auf ±0,5 genau. */
 const KI_DRAFT_BASE = {
-  'england:gruenden': 15, 'england:basis': 8, 'england:kuestenstaedte': 2,
-  'griechenland:gratistech': 7.5, 'griechenland:basis': 5, 'griechenland:rueckschau': 4.5,
-  'wikinger:armeemacht': 7.5, 'wikinger:basis': 6.5, 'wikinger:kampfertrag': 3.5,
-  'russland:siedler': 2.5, 'russland:wachstum': 2.5, 'russland:basis': 1,
+  'england:gruenden': 14.5, 'england:basis': 5.5, 'england:kuestenstaedte': 2,
+  'griechenland:gratistech': 8.5, 'griechenland:basis': 5, 'griechenland:rueckschau': 7,
+  'wikinger:armeemacht': 3.5, 'wikinger:basis': 4, 'wikinger:kampfertrag': 5,
+  'russland:siedler': 3, 'russland:wachstum': 5, 'russland:basis': 0,
 };
 function kiDraftValue(V, pi, id, mine) {
   if (mine.includes(id)) return -5;                  // doppelt wirkt nichts

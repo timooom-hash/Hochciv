@@ -578,7 +578,8 @@ function kiTechBonus(S, pi, k, K, y) {
     case 'alchemie': return 0.12 * H * Math.max(0, y.sci) + 2;
     case 'gilden': return 0.12 * H * Math.max(0, y.coins) + 2;
     case 'computertechnik': return 0.2 * H * Math.max(0, y.coins) + 3;
-    case 'wiss_methode': return 18 + 4 * Math.min(4, H);
+    // im Marathon zieht sie doppelt ab (v85), also auch doppelt so viel wert
+    case 'wiss_methode': return discountFactor(S) * (18 + 4 * Math.min(4, H));
     case 'philosophie': return 3 + 0.6 * H;
     case 'theologie': case 'un': return 3;
     case 'sklaverei': return 2;
@@ -781,8 +782,8 @@ function kiVictory(S, pi, K) {
   if ((S.claims || []).some(c => c.pi === pi)) v += K.vGame * 0.7;
   // Marathon (v84): jede eroberte Hauptstadt ist ein Schritt zum Militärsieg
   if (capitalsToWin(S) > 1) v += K.vGame * capitalsTaken(p) / capitalsToWin(S);
-  // Wirtschaftssieg: Anteil an der Schwelle, steil zum Ende hin. Geprüft wird zu Beginn
-  // der nächsten Runde (v83); der aktuelle Anteil ist dafür die beste Schätzung.
+  // Wirtschaftssieg: Anteil an der Schwelle, steil zum Ende hin. Geprüft wird am Ende der
+  // Runde (v85); der aktuelle Anteil ist dafür die beste Schätzung.
   const w = worldPop(S);
   if (w > 0) {
     const o = victoryOption(S, p);
@@ -850,8 +851,17 @@ function kiWonderValue(S, pi, K) {
    (Belagerungen, Flankieren, Wirtschaftssieg), dann kiValue. So sieht die Bewertung, was
    eine Aktion am Zugende auslöst. X wird dabei verändert – nur mit Kopien aufrufen. */
 function kiScore(X, pi, K) {
-  if (!X.over) combatPhase(X, pi);      // Wirtschaftssieg: erst zu Rundenbeginn (v83)
+  if (!X.over) combatPhase(X, pi);
+  // Wirtschaftssieg: geprüft am Rundenende (v85). Wer die Runde beschließt, für den ist das
+  // gleich nach seinem Zug – er sieht seinen Anspruch wie bis v82 alle am Zugende.
+  if (!X.over && kiLastInRound(X, pi)) checkVictory(X, pi);
   return kiValue(X, pi, K);
+}
+/* Zieht nach pi in dieser Runde niemand mehr? (Ausgeschiedene und Barbaren ziehen nicht.) */
+function kiLastInRound(S, pi) {
+  const n = S.players.length, first = S.startIdx || 0;
+  for (let i = (pi + 1) % n; i !== first; i = (i + 1) % n) if (!S.players[i].dead) return false;
+  return true;
 }
 const kiValueAfterCombat = (S, pi, K, seed) => kiScore(kiClone(S, seed), pi, K);
 

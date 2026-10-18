@@ -43,19 +43,15 @@ const citiesOf = (S, pi) => S.cities.filter(x => x.owner === pi);
 const armiesOf = (S, pi) => S.armies.filter(x => x.owner === pi);
 const popOf = (S, pi) => citiesOf(S, pi).reduce((a, x) => a + x.pop, 0);
 const worldPop = S => S.cities.reduce((a, x) => a + x.pop, 0);
-/* Wirtschaftssieg zu Rundenbeginn (v83, Anweisung des Autors): gezählt wird gegen die
-   Bevölkerung zu Beginn der Runde, nicht gegen die während eines Zuges – so ist der Nenner
-   für alle Reiche einer Runde derselbe. Ausgelegt als: eigene Bevölkerung UND
-   Weltbevölkerung zu Rundenbeginn, geprüft gleich dort (markRoundStart) für alle Reiche in
-   Zugfolge. Nur den Nenner festzuhalten und die eigene Bevölkerung laufend zu zählen, hieße:
-   das eigene Wachstum im Zug zählt oben, aber nicht unten – gemessen endeten so alle 40
-   KI-Duelle in Runde 2 mit dem Wirtschaftssieg (ANNAHMEN, v83). */
-const victoryWorld = S => S.roundPop != null ? S.roundPop : worldPop(S);
-const victoryOwn = (S, pi) => S.roundPops && S.roundPops[pi] != null ? S.roundPops[pi] : popOf(S, pi);
-function markRoundStart(S) {
-  S.roundPop = worldPop(S);
-  S.roundPops = S.players.map((_, i) => popOf(S, i));
-  if (S.over || S.round <= 1) return;
+/* Wirtschaftssieg am Rundenende (v85, Anweisung des Autors): einmal je Runde, an ihrem Ende –
+   wenn alle gleich oft gezogen haben –, mit der Bevölkerung von dort, für alle Reiche in
+   Zugfolge. Wer die Schwelle überschreitet, gewinnt sofort: die Partie endet gleich dort,
+   nach dem Punktvergleich, falls in derselben Runde ein anderes Reich die Singularität
+   erforscht oder ein Wunder der Stufe 3 gebaut hat (resolveClaims). Schon am Ende von Runde 1.
+   Vorher: v83/v84 zu Rundenbeginn mit der Bevölkerung von dort, und die Partie lief bis zum
+   Ende jener Runde; bis v82 am Ende jedes Zuges mit dem laufenden Stand, ab Runde 2. */
+function checkEconomyRoundEnd(S) {
+  if (S.over) return;
   for (let k = 0; k < S.players.length; k++) {
     const pi = ((S.startIdx || 0) + k) % S.players.length, p = S.players[pi];
     if (!p.dead && canWin(p)) checkVictory(S, pi);
@@ -136,6 +132,19 @@ function abilById(id) {
    einzige), abilInfos alle. */
 function abilInfos(p) { return abilitiesOf(p).map(abilById).filter(Boolean); }
 function abilInfo(p) { return abilInfos(p)[0] || null; }
+/* Wirkungstext einer Fähigkeit in dieser Partie ({civ, k, e}): im Marathon wirken zwei anders
+   (v85) – Griechenlands Günstige Forschung doppelt, die Freie Forschung nur bis ins
+   Mittelalter. Ohne Spielstand oder sonst der Text des Zivilisationsbogens. */
+function abilEffect(a, S) {
+  if (a && S && S.marathon) {
+    if (a.civ === 'griechenland' && a.k === 'basis')
+      return T('Techs %s günstiger (je Zeitalter, im Marathon doppelt)',
+        [1, 2, 3, 4, 5].map(n => n * MARATHON_DISCOUNT_FACTOR).join('/'));
+    if (a.k === 'gratistech')
+      return T('1× pro Runde eine verfügbare Technologie des Mittelalters oder früher umsonst erforschen (Marathon)');
+  }
+  return a ? a.e : '';
+}
 
 /* Machtwert: Bots haben immer ihre Gesamtbevölkerung als Macht.
    Zuschläge (Wikinger "Kriegerkultur", Zeusstatue) erhöhen den Machtwert,
@@ -248,7 +257,6 @@ function newGame(cfg) {
   S.startIdx = startIdx;      // Rundenwechsel und Ereignis hängen am Startspieler
   S.cur = startIdx;
   startRound(S);          // Ereignis der ersten Runde
-  markRoundStart(S);          // Nenner des Wirtschaftssiegs für diese Runde (victoryWorld)
   beginTurn(S);
   return S;
 }
@@ -259,10 +267,14 @@ function techCost(S, pi, tech) {
   let c = techBase(S, tech);          // Grundkosten dieser Partie (im Tutorial der alte Techtree)
   const age = tech.k === 'singularitaet' ? 4 : tech.age;
   if (tech.k === 'singularitaet' && kremlBuilt(S)) c += KREML_SURCHARGE;
-  if (hasAbil(p, 'griechenland', 'basis')) c -= (age + 1);   // 1/2/3/4/5 je Zeitalter
-  if (has(p, 'wiss_methode')) c -= 2 * (age + 1);        // -2/-4/-6/-8/-10
+  const f = discountFactor(S);                                   // Marathon: doppelt (v85)
+  if (hasAbil(p, 'griechenland', 'basis')) c -= f * (age + 1);   // 1/2/3/4/5 je Zeitalter
+  if (has(p, 'wiss_methode')) c -= f * 2 * (age + 1);            // -2/-4/-6/-8/-10
   return Math.max(0, c);
 }
+const discountFactor = S => S && S.marathon ? MARATHON_DISCOUNT_FACTOR : 1;
+// Freie Forschung (Griechenland): bis Industrialisierung, im Marathon bis Mittelalter (v85)
+const freeTechMaxAge = S => S && S.marathon ? MARATHON_FREE_TECH_AGE : 2;
 // Griechenland hat keinen Würfelbonus mehr – nur Philosophie gibt +1.
 function availBonus(p) { return has(p, 'philosophie') ? 1 : 0; }
 function rollAvailability(S, pi, field, age) {
@@ -302,6 +314,7 @@ function migrateState(S) {
   if (!S) return S;
   if (S.oldTree === undefined) S.oldTree = !S.altTree;
   delete S.altTree;
+  delete S.roundPop; delete S.roundPops;   // Stand zu Rundenbeginn (v83/v84), seit v85 ungenutzt
   return S;
 }
 function rollSetup(cfg) {
@@ -369,12 +382,14 @@ function grantTech(S, pi, tk, quelle, opts) {
   return null;
 }
 /* Griechenland "Freie Forschung": 1× pro Runde eine verfügbare Technologie
-   der Industrialisierung oder früher (Zeitalter 0–2) umsonst. */
+   der Industrialisierung oder früher (Zeitalter 0–2) umsonst – im Marathon nur bis ins
+   Mittelalter (0–1, v85). */
 function freeTechOptions(S, pi) {
   const p = S.players[pi];
   if (!isAbil(p, 'gratistech') || p.freeTechUsed === S.round) return [];
   if (evActive(S, pi, 'dunkles_zeitalter')) return [];
-  return techPool(S).filter(t => t.age <= 2 && p.avail[t.k] && !p.techs[t.k]);
+  const bis = freeTechMaxAge(S);
+  return techPool(S).filter(t => t.age <= bis && p.avail[t.k] && !p.techs[t.k]);
 }
 function useFreeTech(S, pi, tk) {
   const p = S.players[pi];
@@ -854,6 +869,18 @@ function growthBlocked(S, pi, city, delta = 1) {
 }
 
 /* ------------------------------------------------------------ Zugbeginn */
+/* Platz in der Zugfolge (0 = Startspieler) und der Startausgleich daraus: im allerersten Zug
+   bekommt der Zweite 1 Münze, der Dritte 2, der Vierte 3 (v85, Anweisung des Autors). Bots
+   zahlen nichts, also brauchen sie auch nichts. */
+const turnPosition = (S, pi) => {
+  const n = S.players.filter(p => p.kind !== 'barbar').length;   // Barbaren hängen hinten an
+  return (pi - (S.startIdx || 0) + n) % n;
+};
+function startBonus(S, pi) {
+  const p = S.players[pi];
+  if (S.round !== 1 || p.kind === 'bot' || p.kind === 'barbar') return 0;
+  return START_BONUS_COINS[turnPosition(S, pi)] || 0;
+}
 function beginTurn(S) {
   const p = P(S);
   if (p.dead || !citiesOf(S, S.cur).length && !armiesOf(S, S.cur).length) { p.dead = true; return; }
@@ -880,6 +907,14 @@ function beginTurn(S) {
         : T(' – Nahrung bleibt bei 0.')));
   if (p.kind !== 'bot')
     log(S, 'info', T('Einkommen: %s Wissenschaft, %s Nahrung, %s Münzen.', p.res.sci, p.res.food, p.res.coins));
+  // Startausgleich (v85): im allerersten Zug Münzen je nach Platz in der Zugfolge
+  const ausgleich = startBonus(S, S.cur);
+  if (ausgleich) {
+    p.res.coins += ausgleich;
+    const platz = turnPosition(S, S.cur) + 1;
+    log(S, 'act', ausgleich === 1 ? T('Startausgleich: +1 Münze (%s. in der Zugfolge).', platz)
+      : T('Startausgleich: +%s Münzen (%s. in der Zugfolge).', ausgleich, platz));
+  }
   // 2 Macht reduzieren. Zuschläge aus Armeen/Zeusstatue erhöhen den Verlust,
   // können aber selbst nicht verloren gehen.
   if (p.kind !== 'bot' && powerOf(S, S.cur) > 0) {
@@ -1802,23 +1837,24 @@ function techEffect(t, S) {
   const L = victoryLabels(!!(S && S.duel));
   if (t.k === 'theologie') return T('>%s der Bevölkerung zum Sieg', L.theologie);
   if (t.k === 'un') return T('>%s der Bevölkerung zum Sieg', L.un);
+  // Marathon (v85): die Wissenschaftliche Methode wirkt doppelt
+  if (t.k === 'wiss_methode' && S && S.marathon)
+    return T('Techkosten %s (je Zeitalter, im Marathon doppelt)',
+      [2, 4, 6, 8, 10].map(n => '−' + n * MARATHON_DISCOUNT_FACTOR).join('/'));
   return t.e;
 }
-/* Wirtschaftssieg. In Runde 1 gibt es ihn nicht (v77, Anweisung des Autors): mit einer
-   Handvoll Bevölkerung auf der Welt reichte dem Startspieler eine gegründete Stadt und
-   ein Wachstum, im Duell etwa 4 von 5 – und der Anspruch bleibt gültig, auch wenn der
-   Gegner im selben Zug nachzieht. Gemessen mit der KI: 5 von 30 Duellen endeten so in
-   Runde 1. Die Sperre greift auch bei der Nachprüfung am Rundenende (resolveClaims ruft
-   diese Funktion). */
+/* Wirtschaftssieg eines Reichs, gerufen nur am Rundenende (checkEconomyRoundEnd). Seit v85
+   auch in Runde 1 (Anweisung des Autors): die Sperre von v77 war nötig, weil der Startspieler
+   damals am Ende seines eigenen Zuges anmelden konnte, bevor die anderen gezogen hatten –
+   am Rundenende haben alle gleich oft gezogen. */
 function checkVictory(S, pi) {
   if (S.over) return S.over;
-  if (S.round <= 1) return S.over;
-  // eigene und Weltbevölkerung zu Rundenbeginn (v83) – gerufen aus markRoundStart
-  const p = S.players[pi], w = victoryWorld(S), mine = victoryOwn(S, pi);
+  // gerufen am Rundenende (checkEconomyRoundEnd, v85) – mit dem Stand von dort
+  const p = S.players[pi], w = worldPop(S), mine = popOf(S, pi);
   const o = victoryOption(S, p);
   const enough = o.strict ? mine > w * o.frac : mine >= w * o.frac;
   if (w > 0 && enough && S.cities.length > 1)
-    claimVictory(S, pi, T('Wirtschaftssieg (%s von %s Weltbevölkerung, Schwelle %s)', mine, w, o.label));
+    claimVictory(S, pi, T('Wirtschaftssieg (%s von %s Weltbevölkerung, Schwelle %s)', mine, w, o.label), { rundenende: true });
   return S.over;
 }
 
@@ -1834,7 +1870,7 @@ function checkVictory(S, pi) {
    Bevölkerung sinkt, ein Stufe-3-Wunder wird erobert). Er zählt für den Punktvergleich
    genauso mit – gewertet werden die Punkte am Rundenende, nicht zur Zeit des Anspruchs.
    Nur der Militärsieg endet sofort und ohne Vergleich.                              */
-function claimVictory(S, pi, how) {
+function claimVictory(S, pi, how, opts) {
   if (S.over) return S.over;                       // Militärsieg ist schon gefallen
   if (!canWin(S.players[pi])) return null;         // Barbaren gewinnen nie
   if (!S.claims) S.claims = [];
@@ -1846,9 +1882,12 @@ function claimVictory(S, pi, how) {
   S.claims.push({ pi, how, round: S.round });
   if (S.endRound == null) S.endRound = S.round;
   log(S, 'head', `${civ}: ${how}`);
-  log(S, 'info', S.claims.length > 1
-    ? T('%s meldet ebenfalls einen Sieg an – am Rundenende entscheiden Punkte.', civ)
-    : T('Das Spiel endet am Ende dieser Runde (Runde %s).', S.endRound) +
+  // Am Rundenende (Wirtschaftssieg, v85) wird gleich entschieden – „das Spiel endet am Ende
+  // dieser Runde" wäre dort irreführend
+  if (S.claims.length > 1)
+    log(S, 'info', T('%s meldet ebenfalls einen Sieg an – am Rundenende entscheiden Punkte.', civ));
+  else if (!(opts && opts.rundenende))
+    log(S, 'info', T('Das Spiel endet am Ende dieser Runde (Runde %s).', S.endRound) + ' ' +
       T('Wer bis dahin ebenfalls eine Siegbedingung erfüllt, kommt in den Punktvergleich.'));
   return null;
 }
@@ -1867,9 +1906,7 @@ const isHumanPlayer = p => !!p && p.kind !== 'bot' && p.kind !== 'barbar';
 function resolveClaims(S) {
   if (S.over) return true;
   if (S.endRound == null || S.round < S.endRound) return false;
-  // Bis v82 wurde hier der Wirtschaftssieg aller noch einmal geprüft (sonst hing der
-  // Vergleich an der Sitzreihenfolge). Seit v83 prüft markRoundStart alle zugleich zu
-  // Rundenbeginn – hier gäbe es nichts Neues mehr.
+  // Den Wirtschaftssieg prüft unmittelbar davor checkEconomyRoundEnd für alle zugleich (v85).
   // Ausgeschiedene Reiche (keine Stadt mehr) können nicht gewinnen. Die Vorgabe
   // schützt nur vor dem Wegfallen der *Siegbedingung*, nicht vor dem Untergang.
   const live = (S.claims || []).filter(c =>
@@ -1948,8 +1985,8 @@ function pendingWarnings(S, pi) {
 function finishTurn(S) {
   if (S.over) return S.over;
   combatPhase(S, S.cur);
-  // Der Wirtschaftssieg wird seit v83 nicht mehr am Zugende geprüft, sondern zu Beginn der
-  // Runde für alle (markRoundStart) – mit der Bevölkerung von dort.
+  // Der Wirtschaftssieg wird nicht am Zugende geprüft, sondern am Ende der Runde für alle
+  // (checkEconomyRoundEnd, v85).
   return S.over;
 }
 function advanceTurn(S) {
@@ -1961,9 +1998,9 @@ function advanceTurn(S) {
   do {
     S.cur = (S.cur + 1) % S.players.length;
     if (S.cur === first) {
+      checkEconomyRoundEnd(S);     // Wirtschaftssieg: alle haben gleich oft gezogen (v85)
       if (resolveClaims(S)) return S.over;
       S.round++; startRound(S);
-      markRoundStart(S);           // nach dem Ereignis: so steht die Welt zu Rundenbeginn da
     }
     guard++;
   } while (S.players[S.cur].dead && guard < 20);
