@@ -3806,3 +3806,185 @@ Bevölkerung als Zahl in Reichsfarbe (auch zweistellig verkleinert), kein Symbol
 keine Striche; Marathon: „Stadt gründen" nach fünf Gründungen mit Meldung, danach wieder;
 Weltblatt mit eroberten Hauptstädten und „ohne Hauptstadt"; Kolonialismus-Kachel mit dem
 neuen Text.
+
+## Wirtschaftssieg am Rundenende · Marathon: Griechenland und Methode · Startausgleich (v85)
+
+**Anweisung des Autors (17.10.):**
+1. Der Wirtschaftssieg wird nur noch einmal berechnet, am Rundenende (wenn jeder gleich oft
+   gezogen hat). Gewinnt dort jemand, endet das Spiel sofort – höchstens Punktvergleich, wenn
+   andere die Singularität haben. Die Rundenbeschränkung fällt weg: auch in Runde 1, wenn
+   die Bedingung erfüllt ist.
+2. Nur im Marathon: Griechenlands Günstige Forschung und die Wissenschaftliche Methode
+   bekommen den doppelten Bonus. Griechenlands Freie Forschung reicht nur bis ins
+   Mittelalter.
+3. Ausgleich für die Startplätze: im allerersten Zug bekommen der Zweite, Dritte und Vierte
+   1, 2 bzw. 3 Münzen dazu – zu zweit nur der Zweite 1, zu dritt der Zweite 1 und der
+   Dritte 2.
+
+### Wirtschaftssieg am Rundenende
+
+* `checkEconomyRoundEnd` steht in `advanceTurn` genau dort, wo die Runde umschlägt (nach dem
+  Zug des Letzten in der Zugfolge, vor dem Ereignis der neuen Runde), und prüft alle lebenden
+  Reiche in Zugfolge ab dem Startspieler mit dem Stand dieses Moments – eigene und
+  Weltbevölkerung. Gleich danach entscheidet `resolveClaims`: Ist der Wirtschaftssieg der
+  einzige Anspruch der Runde, ist das Spiel aus; hat in derselben Runde schon jemand einen
+  anderen Sieg angemeldet, entscheiden die Punkte wie bisher (Mensch vor Bot). Alle
+  Schwellen liegen über der Hälfte – am Rundenende kann also höchstens ein Reich den
+  Wirtschaftssieg haben.
+* Weg sind `markRoundStart` und der festgehaltene Stand zu Rundenbeginn (`S.roundPop`,
+  `S.roundPops`); `migrateState` räumt die beiden Felder aus alten Spielständen. Am Zugende
+  wird nichts geprüft (`finishTurn` rechnet nur noch die Kampfphase).
+* **Runde 1:** seit v77 gesperrt, weil der Startspieler damals am Ende seines eigenen Zuges
+  anmelden konnte, bevor die anderen gezogen hatten (die KI fand den Sieg mit 4 von 5
+  Bevölkerung im Duell). Am Rundenende haben alle einmal gezogen; die Sperre ist weg.
+* **Auslegungen:**
+  - „Andere haben die Singularität": Auch ein **Kultursieg** derselben Runde (Wunder der
+    Stufe 3) kommt in den Punktvergleich – er ist wie die Singularität ein angemeldeter Sieg,
+    der am Rundenende fällt. Wer nur die Singularität gelten lassen will: eine Zeile in
+    `resolveClaims`.
+  - Ein Militärsieg mitten in der Runde beendet das Spiel wie immer sofort – ein Rundenende
+    gibt es dann nicht mehr.
+  - Die Meldung „Das Spiel endet am Ende dieser Runde" entfällt beim Wirtschaftssieg (es ist
+    schon das Ende); im Protokoll steht der Anspruch und gleich darauf das Ergebnis.
+* **Regelbogen und Tutorial** sagen es: „geprüft am Ende jeder Runde, wenn alle gleich oft
+  gezogen haben – dann endet das Spiel sofort"; im Tutorial (beide Fassungen) „am Ende einer
+  Runde" und im Merkkasten, dass nur noch der Forschungssieg angemeldet wird und der
+  Wirtschaftssieg am Rundenende zählt. Damit ist Punkt 28 (g) der offenen Punkte erledigt.
+* **KI:** Wer die Runde beschließt, sieht in seiner Bewertung jetzt seinen Anspruch
+  (`kiScore` ruft `checkVictory`, wenn `kiLastInRound`) – wie bis v82 jedes Reich am Zugende.
+  Für alle anderen bleibt es beim laufenden Anteil an der Schwelle (`kiVictory`), denn nach
+  ihnen ziehen noch andere. Gepaart gemessen (600 Duelle mit und ohne): 8 Partien ändern
+  sich, in allen gewinnt dasselbe Reich – der Zweite, jetzt wirtschaftlich in derselben Runde
+  oder früher statt mit Forschung oder Militär.
+* **Gemessen** (KI Schwer gegen KI Schwer, Plättchenkarte, ohne Ereignisse und Wunder,
+  dieselben Startwerte in jeder Fassung; „v85 ohne Ausgleich" = v85 mit genulltem
+  Startausgleich, um die beiden Änderungen zu trennen)::
+
+  | v84 → v85 ohne Ausgleich | Duell (600) | zu dritt (400) | zu viert (600) | KI gegen Bot David (400) |
+  |---|---|---|---|---|
+  | Wirtschaftssiege | 128 → 199 | 24 → 55 | 4 → 8 | 38 → 66 |
+  | mittlere Endrunde | 6,24 → 5,91 | 6,26 → 6,13 | 5,25 → 5,24 | 6,11 → 5,97 |
+  | Partien mit anderem Ergebnis | 199 | 55 | 8 | 66 |
+
+  Gepaart im Duell: Alle 128 Wirtschaftssiege aus v84 gewinnt in v85 dasselbe Reich, genau
+  eine Runde früher – die Runde, die v84 nach dem Anspruch noch spielte, fällt weg. In 62
+  weiteren Partien gewann in v84 dasselbe Reich in eben dieser Runde militärisch; jetzt endet
+  die Partie davor mit seinem Wirtschaftssieg. **Wer gewinnt, ändert sich kaum:** Der
+  Startspieler gewinnt im Duell 74,2 % (v84) bzw. 74,3 %; zu viert sind 592 von 600 Partien
+  gleich, weil dort selten jemand die Schwelle erreicht.
+  **Runde 1:** In 600 Duellen KI gegen KI fiel kein Wirtschaftssieg vor Runde 3. Gegen den Bot
+  David einmal in 400 Duellen, am Ende von Runde 1: Russland (KI, Siedlertrecks) gründete im
+  ersten Zug eine zweite Stadt mit 2 Bevölkerung – 4 von 5 –, der Bot verfehlte seinen
+  Wachstumswurf. In v84 endete dieselbe Partie eine Runde später genauso. Das ist der Fall,
+  der v77 zur Sperre führte; der Autor hat sie bewusst aufgehoben.
+
+### Marathon: Rabatte doppelt, Freie Forschung bis ins Mittelalter
+
+* `techCost` zieht im Marathon das Doppelte ab (`discountFactor`, `MARATHON_DISCOUNT_FACTOR`
+  = 2): Günstige Forschung 2/4/6/8/10 statt 1/2/3/4/5 je Zeitalter, Wissenschaftliche
+  Methode 4/8/12/16/20 statt 2/4/6/8/10 – wie bisher nach dem Marathonaufschlag. Papier
+  kostet Griechenland damit 18 − 4 = 14 (v84: 16), die Singularität mit beidem
+  300 − 10 − 20 = 270 (v84: 285).
+* Freie Forschung: `freeTechOptions` bietet im Marathon nur Antike und Mittelalter an
+  (`freeTechMaxAge`, `MARATHON_FREE_TECH_AGE` = 1), im normalen Spiel weiter bis zur
+  Industrialisierung.
+* **Auslegungen:**
+  - „doppelter Bonus" = doppelter Abzug je Zeitalter;
+  - auch für die Singularität (beide Rabatte galten schon immer auch für sie);
+  - Kopieren zahlt weiter die Grundkosten ohne Rabatt (unverändert);
+  - wer beide Fähigkeiten bzw. Fähigkeit und Methode hat, bekommt beide Abzüge, wie bisher.
+* **Texte:** `abilEffect(a, S)` gibt im Marathon „Techs 2/4/6/8/10 günstiger (je Zeitalter,
+  im Marathon doppelt)" und „… eine verfügbare Technologie des Mittelalters oder früher
+  umsonst erforschen (Marathon)" – in Kopfzeile, Weltblatt, Draft und Regelbogen; der
+  Techtext der Methode heißt im Marathon „Techkosten −4/−8/−12/−16/−20 (je Zeitalter, im
+  Marathon doppelt)". Der Marathonhinweis im Regelbogen und im Aufbau nennt beides.
+* **KI:** Kosten (`techCost`) und Gratisauswahl (`freeTechOptions`) sieht sie von selbst.
+  Ihr fester Zuschlag für die Methode (`kiTechBonus`) ist im Marathon verdoppelt – doppelte
+  Ersparnis, doppelter Wert (Auslegung, nicht gesondert gemessen).
+
+* **Draftwerte der KI neu gemessen** (`KI_DRAFT_BASE`): 200 Marathonpartien nach den Regeln
+  von v85, vier KI Schwer, je Reich zwei zufällig zugeteilte Fähigkeiten, Startspieler
+  reihum – alle 200 ohne Fehler zu Ende (Forschung 133, Wirtschaft 60, Militär 7; Runde 5
+  bis 12). Bedingtes Logit wie in v83, jetzt mit dem Platz in der Zugfolge als eigener
+  Größe; Bereiche aus 40 Bootstrap-Stichproben.
+
+  | Fähigkeit | Siege / Besitzer | Stärke (90 %-Bereich) | Grundwert v83 → v85 |
+  |---|---|---|---|
+  | Kolonisten (England) | 105 / 139 | +4,1 (3,8 … 5,0) | 15 → 14,5 |
+  | Freie Forschung (Griechenland) | 43 / 144 | +1,0 (0,7 … 1,5) | 7,5 → 8,5 |
+  | Rückschau (Griechenland) | 38 / 142 | +0,5 (0,0 … 1,1) | 4,5 → 7 |
+  | Handelsreich (England) | 29 / 127 | −0,2 (−0,7 … 0,3) | 8 → 5,5 |
+  | Fruchtbarkeit (Russland) | 27 / 126 | −0,3 (−0,7 … 0,1) | 2,5 → 5 |
+  | Günstige Forschung (Griechenland) | 30 / 140 | −0,5 (−0,9 … −0,1) | 5 → 5 |
+  | Beutezüge (Wikinger) | 25 / 147 | −0,5 (−1,0 … −0,1) | 3,5 → 5 |
+  | Siedlertrecks (Russland) | 30 / 141 | −0,5 (−0,8 … −0,2) | 2,5 → 3 |
+  | Seemacht (England) | 21 / 127 | −0,6 (−1,1 … −0,1) | 2 → 2 |
+  | Seefahrer (Wikinger) | 18 / 112 | −0,9 (−1,4 … −0,3) | 6,5 → 4 |
+  | Kriegerkultur (Wikinger) | 18 / 139 | −0,9 (−1,5 … −0,5) | 7,5 → 3,5 |
+  | Taiga (Russland) | 16 / 116 | −1,2 (−1,8 … −0,6) | 1 → 0 |
+
+  Grundwert = 6 + 2,5 · Stärke, auf halbe Punkte gerundet; bei Taiga, Seemacht,
+  Siedlertrecks und Kolonisten abzüglich dessen, was die Karte im Mittel dazugibt (2,8 /
+  2,4 / 1,5 / 1,5) – dieselbe Zuordnung, die v83 von Hand getroffen hatte, jetzt als Regel.
+  **Für Griechenland:** Die Freie Forschung bleibt trotz der Grenze die zweitstärkste
+  Fähigkeit (die KI holte sich 384-mal eine Technologie des Mittelalters umsonst, 67-mal eine
+  der Antike), die Günstige Forschung bleibt trotz doppeltem Abzug unter der Mitte. Dass sich
+  die Tabelle sonst stärker bewegt – Kriegerkultur und Handelsreich nach unten, Rückschau und
+  Fruchtbarkeit nach oben –, liegt an fünfmal so vielen Partien und an den Regeln von v84
+  (zwei Hauptstädte, Singularität 300, fünf Gründungen), nach denen bisher nicht gemessen
+  war. Kolonisten bleiben weit vorn (Punkt 25 der offenen Punkte). Ob die KI mit der neuen
+  Tabelle besser draftet als mit der alten, ist nicht gegeneinander gemessen. Platz in der
+  Zugfolge im Marathon: Siege 56 / 70 / 38 / 36 vom Startspieler an – flacher als auf der
+  Plättchenkarte.
+* **Die KI spielt den Marathon von v85** (Draft der KI mit der neuen Tabelle): 20 ganze
+  Partien – 16 mit vier KI Schwer, 4 mit zwei KI Mittel und zwei Bots –, alle ohne Fehler zu
+  Ende, Runde 6 bis 12: Forschung 17, Wirtschaft 3, Militär 0; eine erste Hauptstadt fiel in 6
+  der 20. Längster KI-Zug 3,8 s (61 Städte auf der Karte, zwei Partien gleichzeitig auf dem
+  Testrechner).
+
+### Startausgleich
+
+* `START_BONUS_COINS` = [0, 1, 2, 3] nach dem Platz in der Zugfolge vom Startspieler aus
+  (`turnPosition`), in `beginTurn` nach dem Einkommen der ersten Runde aufgeschlagen
+  (`startBonus`), im Protokoll: „Startausgleich: +2 Münzen (3. in der Zugfolge)."; der
+  Regelbogen nennt die Regel.
+* **Auslegungen:**
+  - Platz = Zugfolge ab dem Startspieler, nicht Zivilisation oder Platz im Aufbau;
+  - **Bots bekommen nichts** – nach den Bot-Regeln zahlen sie nichts, Münzen nützen ihnen
+    nicht. Ihr Platz zählt trotzdem: Ein Mensch hinter einem Bot bekommt den Betrag seines
+    Platzes. Die KI bekommt den Ausgleich wie ein Mensch;
+  - Münzen wie jedes Einkommen: nur in diesem Zug gültig;
+  - im Tutorial ändert sich nichts (der Mensch beginnt, die anderen sind Bots).
+* **Gemessen:**
+
+  | Sieganteil nach Platz in der Zugfolge (%) | v84 | v85 ohne Ausgleich | **v85** | Empfindlichkeit |
+  |---|---|---|---|---|
+  | Duell (600 Partien) | 74,2 / 25,8 | 74,3 / 25,7 | **72,0 / 28,0** | Zweiter +3 Münzen: 68,4 / 31,6 |
+  | zu dritt (400) | 45,0 / 32,3 / 22,8 | 45,5 / 32,8 / 21,8 | **45,1 / 34,5 / 20,4** | – |
+  | zu viert (600) | 42,7 / 33,8 / 19,3 / 4,2 | 42,7 / 33,8 / 19,3 / 4,2 | **37,5 / 34,7 / 21,8 / 6,0** | 0/2/4/6 Münzen: 37,7 / 31,5 / 25,3 / 5,5 |
+
+  KI Schwer gegen KI Schwer, sonst wie oben; Standardfehler je Anteil etwa 2 Punkte (zu
+  dritt 2,4). Der Ausgleich wirkt in die richtige Richtung – im Duell etwa 2 Punkte je Münze
+  für den Zweiten, zu viert 5 Punkte weniger für den Startspieler –, **das Gefälle bleibt
+  aber steil**: zu viert gewinnt der Vierte 6 % der Partien, der Startspieler 37 %; zu dritt
+  ist keine Wirkung messbar. Der doppelte Ausgleich (0/2/4/6) hilft zu viert dem Dritten,
+  nicht dem Vierten.
+  Gegen den Bot David (400 Duelle) gewinnt die KI als Zweite 33,5 % – mit und ohne Ausgleich
+  dieselbe Zahl in anderen Partien –, als Erste 61,5 % (der Bot bekommt nichts). Woran der
+  Startvorteil hängt, ist nicht gemessen; zu viert endet die Partie meist militärisch (508
+  von 600), und diese Siege holt der Startspieler am häufigsten (186, der Vierte 28). Alles
+  KI gegen KI – wie stark der Vorteil zwischen Menschen ist, zeigt erst das Spielen.
+
+### Abgesichert
+
+`test.js`: Wirtschaftssieg erst am Rundenende (kein Anspruch mitten in der Runde, Sieg mit
+dem Stand am Rundenende, wieder unter der Schwelle kein Sieg), schon am Ende von Runde 1 (auch
+4 von 5 im Duell), sofort entschieden, mit Punktvergleich neben Singularität und Kultursieg
+derselben Runde, Militärsieg schlägt weiterhin jeden Anspruch; Marathon: beide Rabatte
+doppelt (Papier, Chemie, Singularität, einzeln und zusammen), normal unverändert, Freie
+Forschung bis Mittelalter (Chemie nicht, Papier ja), normal bis Industrialisierung, Texte von
+Fähigkeit und Methode in beiden Spielarten, der verdoppelte KI-Zuschlag; Startausgleich zu
+viert, dritt und zweit, ab einem anderen Startspieler, nur in Runde 1, Bots nicht, KI schon,
+Protokoll. `smoke.js`: Regelbogen im Marathon mit doppelten Rabatten, Freier Forschung bis ins
+Mittelalter, Startausgleich und Rundenende (deutsch und englisch, ohne fehlende Übersetzung);
+im normalen Spiel die alten Texte und der Ausgleich der beiden KI im Protokoll.

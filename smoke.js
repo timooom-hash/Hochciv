@@ -3218,6 +3218,37 @@ step('Marathon (v84): höchstens fünf Gründungen je Zug, eroberte Hauptstädte
   } finally { delete p.capTaken; kap.cap = true; }
   G('redraw')();
 });
+step('Marathon (v85): Regelbogen mit doppeltem Rabatt, Freier Forschung bis ins Mittelalter, Startausgleich', () => {
+  const S = G('S');
+  if (!S.marathon) throw new Error('kein Marathon');
+  const soll = {
+    de: ['Techs 2/4/6/8/10 günstiger (je Zeitalter, im Marathon doppelt)',
+      'Technologie des Mittelalters oder früher umsonst erforschen (Marathon)',
+      'Techkosten −4/−8/−12/−16/−20 (je Zeitalter, im Marathon doppelt)',
+      'Startausgleich: Im allerersten Zug bekommen der Zweite, Dritte und Vierte',
+      'geprüft am Ende jeder Runde, wenn alle gleich oft gezogen haben',
+      'Griechenlands Freie Forschung reicht nur bis ins Mittelalter'],
+    en: ['Techs 2/4/6/8/10 cheaper (by age, doubled in marathon)',
+      'technology of the Middle Ages or earlier for free (marathon)',
+      'Tech costs −4/−8/−12/−16/−20 (by age, doubled in marathon)',
+      'Starting compensation: on their very first turn',
+      'checked at the end of every round, when everyone has had the same number of turns',
+      'free research only reaches the Middle Ages'],
+  };
+  const lesen = () => { G('rulesModal')(); const t = $('ov-body').textContent.replace(/\s+/g, ' '); G('closeModal')(); return t; };
+  const de = lesen();
+  for (const t of soll.de) if (!de.includes(t)) throw new Error('fehlt: ' + t);
+  if (de.includes('Industrialisierung oder früher umsonst')) throw new Error('alter Text der Freien Forschung');
+  G('switchLang')('en');
+  try {
+    G('clearMissing')();
+    const en = lesen();
+    for (const t of soll.en) if (!en.includes(t)) throw new Error('fehlt auf Englisch: ' + t);
+    const fehlt = G('missingStrings')();
+    if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));
+  } finally { G('switchLang')('de'); }
+  G('redraw')();
+});
 step('Marathon: „Nochmal spielen" führt wieder in den Draft, mit neuer Karte', () => {
   const S = G('S'), alt = JSON.stringify(S.map.rows);
   G('startFromRecipe')(S.recipe);
@@ -3253,6 +3284,33 @@ step('Städte zeigen ihre Bevölkerung als Zahl in der Farbe ihres Reichs, ohne 
   // die Bevölkerungsstriche (Linien der Breite 2) sind weg
   if ($('map').querySelectorAll('line[stroke-width="2"]').length) throw new Error('noch Bevölkerungsstriche');
   console.log('       ' + ist.join(' · '));
+});
+
+step('Normales Spiel (v85): Griechenland und Methode wie bisher, Startausgleich im Protokoll', () => {
+  kiAufbau('vier', ['human', 'ki', 'bot', 'ki'], '0');
+  $('setup-start').value = '0'; $('setup-start').onchange();
+  $('setup-go').onclick();
+  const S = G('S');
+  if (S.marathon || AUTO(G('P')(S))) throw new Error('kein normales Spiel beim Menschen');
+  G('rulesModal')();
+  const txt = $('ov-body').textContent.replace(/\s+/g, ' ');
+  G('closeModal')();
+  for (const t of ['Techs 1/2/3/4/5 günstiger', 'Technologie der Industrialisierung oder früher umsonst erforschen',
+    'Techkosten −2/−4/−6/−8/−10 (je Zeitalter)', 'Startausgleich: Im allerersten Zug'])
+    if (!txt.includes(t)) throw new Error('fehlt: ' + t);
+  if (/im Marathon doppelt|des Mittelalters oder früher/.test(txt)) throw new Error('Marathontext im normalen Spiel');
+  // der Mensch beginnt; nach einer Runde stehen die beiden KI mit ihrem Platz im Protokoll,
+  // der Bot nicht
+  $('a-end').onclick();
+  let n = 0;
+  while (AUTO(G('P')(G('S'))) && !G('S').over && n++ < 6 && $('bot-next')) $('bot-next').onclick();
+  const platz = i => G('turnPosition')(S, i);
+  const soll = S.players.map((p, i) => i).filter(i => S.players[i].kind === 'ki').sort((a, b) => platz(a) - platz(b))
+    .map(i => G('START_BONUS_COINS')[platz(i)] === 1 ? `Startausgleich: +1 Münze (${platz(i) + 1}. in der Zugfolge).`
+      : `Startausgleich: +${G('START_BONUS_COINS')[platz(i)]} Münzen (${platz(i) + 1}. in der Zugfolge).`);
+  const zeilen = G('S').log.filter(l => /^Startausgleich/.test(l.m)).map(l => l.m);
+  if (soll.length !== 2 || JSON.stringify(zeilen) !== JSON.stringify(soll)) throw new Error('Protokoll: ' + zeilen.join(' | ') + ' statt ' + soll.join(' | '));
+  console.log('       ' + zeilen.join(' · ') + ' (Bot auf Platz ' + (platz(S.players.findIndex(p => p.kind === 'bot')) + 1) + ')');
 });
 
 step('kein abgefangener Fehler im Zugablauf', () => {

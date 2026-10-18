@@ -33,7 +33,7 @@ sonst behalten installierte Geräte die alte Fassung.
 | Spielart | „Vier Reiche“, „Drei Reiche“, „1 gegen 1“ (freie Zivilisationswahl; im Duell Wirtschaftssieg erst über 3/4) oder **„Marathon“** (v83: vier Reiche auf einer großen Zufallskarte, teurere Technologien, Fähigkeiten im Draft – siehe unten) |
 | Mensch / KI / Bot | Je Platz im Aufbau. Die **KI** spielt nach den Regeln für Menschen: sie bezahlt alles, hat ihre Zivilisationsfähigkeit, Ereignisse treffen sie, und sie legt ihr Startplättchen verdeckt selbst. Stufe Leicht/Mittel/Schwer für alle KI gemeinsam – gleiche Regeln, nur übersieht und verrechnet sich die leichtere Stufe öfter; im Duell gemessen Leicht zwischen den Bots Prinz und König, Mittel etwas über König, Schwer etwas über David. **Bots** spielen nach den Bot-Regeln (Würfelproben, Macht = Bevölkerung) und haben ihre eigene Schwierigkeit. Ab Werk sind die Gegner KI |
 | Zivilisationen | Auf der Plättchenkarte darf jeder Platz frei wählen, auch zweimal dieselbe (Doppelgänger bekommen Ziffern und je eine der vier Zivilisationsfarben). Auf den festen Karten sitzt jede genau einmal. Zivilisation und Fähigkeit lassen sich auch auslosen. Bei ausgelostem Reich steht die Fähigkeit zwangsläufig ebenfalls auf Zufall |
-| Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe |
+| Startspieler | frei wählbar oder zufällig – bei mehr als einem Menschen ist Zufall die Vorgabe. **Startausgleich** (seit v85): im allerersten Zug bekommen der Zweite, Dritte und Vierte in der Zugfolge **1, 2 bzw. 3 Münzen** dazu – zu zweit nur der Zweite 1, zu dritt 1 und 2. Gezählt ab dem Startspieler; Bots bekommen nichts (sie zahlen nichts) |
 | Fähigkeit sehen | Die eigene Fähigkeit steht in der Kopfzeile neben dem Reichsnamen; das Weltblatt (ⓘ) listet alle Reiche mit Fähigkeit und Wirkung. Im Marathon stehen dort beide gedrafteten |
 | Karte | Originalkarte, Große Karte, **Plättchenkarte** (die Zufallskarte) oder eigene aus dem Editor |
 | Plättchenkarte | Zufallskarte aus Dreiecken zu 15 Feldern. Vor dem Spiel legt jedes Reich verdeckt sein eigenes Startdreieck: Lage wählen (drei), Hauptstadt setzen. Dann wird aufgedeckt. **Rötlich umrandet** sind Startfelder, bei denen ein anderes Feld – auch in einer anderen Lage – von einem Ertrag mehr und von keinem weniger bringt |
@@ -55,14 +55,16 @@ sonst behalten installierte Geräte die alte Fassung.
 Ein **Militärsieg** (fremde Hauptstadt erobert, im Marathon die zweite) endet das Spiel auf
 der Stelle.
 Der **Wirtschaftssieg** verlangt mehr als 2/3 der Weltbevölkerung (im Duell mehr als 3/4,
-mit Theologie oder Vereinten Nationen weniger). Seit v83 wird er **zu Beginn jeder Runde**
-geprüft, ab Runde 2, für alle Reiche mit der Bevölkerung von genau diesem Moment – eigene
-und Weltbevölkerung. Was im Lauf einer Runde wächst oder fällt, zählt erst zu Beginn der
-nächsten; so gilt in einer Runde für alle derselbe Nenner. Die Kopfzeile zeigt den
-laufenden Stand, also das, was zu Beginn der nächsten Runde zählen wird.
-**Wirtschafts-, Forschungs- und Kultursieg** werden angemeldet: die Runde wird noch zu
-Ende gespielt, die Kopfzeile zeigt dann „letzte Runde". Erfüllen mehrere Reiche in
-derselben Runde eine Bedingung, entscheiden am Rundenende Punkte:
+mit Theologie oder Vereinten Nationen weniger). Seit v85 wird er **einmal je Runde geprüft,
+am Rundenende** – wenn alle gleich oft gezogen haben –, für alle Reiche mit dem Stand von
+genau diesem Moment, auch schon am Ende von Runde 1. Erfüllt ihn dort jemand, **endet das
+Spiel sofort**; nur wenn in derselben Runde schon ein anderer Sieg angemeldet war
+(Singularität, Weltwunder), entscheiden die Punkte. Die Kopfzeile zeigt den laufenden
+Stand. (v83/v84: zu Beginn jeder Runde ab Runde 2, danach lief die Runde noch zu Ende;
+bis v82 am Ende jedes Zuges.)
+**Forschungs- und Kultursieg** werden angemeldet: die Runde wird noch zu Ende gespielt,
+die Kopfzeile zeigt dann „letzte Runde". Erfüllen mehrere Reiche in derselben Runde eine
+Bedingung, entscheiden am Rundenende Punkte:
 
 > Punkte = Bevölkerung + Anzahl Weltwunder + Anzahl Technologien
 
@@ -171,9 +173,11 @@ Platz, jede Zivilisation einmal.
   erlaubten Aufstellungen die, deren schwächste Hauptstadt am besten dasteht.
 * **Technologien** kosten je Zeitalter das Doppelte (Antike), Dreifache (Mittelalter),
   Vierfache (Industrialisierung) und Fünffache (Moderne), die Singularität **300** (seit
-  v84; v83: das 2,5-Fache, 250). Rabatte (Griechenland, Wissenschaftliche Methode) ziehen
-  danach ab; Kopieren zahlt die Marathonkosten. Regelbogen und Technologiebogen zeigen die
-  umgerechneten Zahlen.
+  v84; v83: das 2,5-Fache, 250). Rabatte ziehen danach ab, **seit v85 doppelt**:
+  Griechenlands Günstige Forschung 2/4/6/8/10 und die Wissenschaftliche Methode
+  4/8/12/16/20 je Zeitalter. Griechenlands **Freie Forschung** reicht im Marathon nur bis
+  ins **Mittelalter** (sonst bis zur Industrialisierung). Kopieren zahlt die Marathonkosten.
+  Regelbogen, Technologiebogen, Draft und Kopfzeile zeigen die Marathonwerte.
 * **Höchstens fünf neue Städte je Zug** (seit v84). „Stadt gründen" sagt danach, warum es
   nicht mehr geht.
 * **Militärsieg erst mit zwei eroberten Hauptstädten** (seit v84). Eine eroberte Hauptstadt

@@ -2865,7 +2865,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq([techCost(M, 0, SINGULARITY), techCost(N, 0, SINGULARITY)], [300, 100], 'Singularität 300 (v84; v83: 250)');
   const gr = M.players.findIndex(p => p.civ === 'griechenland');
   M.players[gr].drafted = ['griechenland:basis', 'russland:basis'];
-  eq(techCost(M, gr, TECH_BY_KEY.papier), 6 * 3 - 2, 'Rabatte ziehen danach ab (Papier 18 − 2)');
+  eq(techCost(M, gr, TECH_BY_KEY.papier), 6 * 3 - 4, 'Rabatte ziehen danach ab, im Marathon doppelt (v85: Papier 18 − 2 × 2)');
   M.players[gr].techs.spionage = true;
   ['schrift', 'papier'].forEach(k => { M.players[(gr + 1) % 4].techs[k] = true; });
   eq(['schrift', 'papier'].map(k => copyableTechs(M, gr).find(o => o.tech.k === k).paidCoins), [8, 18],
@@ -3153,73 +3153,67 @@ const duellKarte = (civA, civB, seed) => {
     players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }],
   });
   const a = capitalOf(S, 0), b = capitalOf(S, 1);
-  S.round = 2;                               // in Runde 1 gibt es keinen Wirtschaftssieg (v77)
-  // seit v83 geprüft zu Rundenbeginn (markRoundStart), mit der Bevölkerung von dort
+  // seit v85 geprüft am Rundenende (checkEconomyRoundEnd), auch schon in Runde 1
   a.pop = 3; b.pop = 1;                     // genau 3/4
-  markRoundStart(S);
+  checkEconomyRoundEnd(S);
   eq(S.claims.length, 0, 'genau 3/4 reicht nicht (strikt größer)');
   a.pop = 4;                                 // 4/5 > 3/4
-  markRoundStart(S);
+  checkEconomyRoundEnd(S);
   eq(S.claims.map(c => c.pi), [0], 'über 3/4 wird der Sieg angemeldet');
   // im Vier-Reiche-Spiel hätte 3/4 schon gereicht – dort gilt „mehr als 2/3" (seit v77
   // strikt wie alle anderen Schwellen; bis v74 genügten genau 2/3)
   const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
-  N.round = 2;
   N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = genau 2/3
-  markRoundStart(N);
+  checkEconomyRoundEnd(N);
   eq(N.claims.length, 0, 'ohne Duell reichen genau 2/3 nicht mehr (mehr als 2/3, v77)');
   N.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
-  markRoundStart(N);
+  checkEconomyRoundEnd(N);
   eq(N.claims.map(c => c.pi), [0], 'mehr als 2/3 wird angemeldet');
 }
-/* Wirtschaftssieg zu Rundenbeginn (v83, Anweisung des Autors): gezählt wird gegen die
-   Bevölkerung zu Beginn der Runde – für alle Reiche derselbe Nenner. Umgesetzt mit eigener
-   und Weltbevölkerung von dort, geprüft zu Rundenbeginn für alle. */
+/* Wirtschaftssieg am Rundenende (v85, Anweisung des Autors): einmal je Runde, an ihrem Ende –
+   wenn alle gleich oft gezogen haben –, mit der Bevölkerung von dort. Wer gewinnt, gewinnt
+   sofort; in derselben Runde angemeldete Siege anderer kommen in den Punktvergleich. Auch
+   schon in Runde 1 (vorher: v77–v84 gesperrt, v83/v84 zu Rundenbeginn geprüft). */
 {
-  const S = newGame({ seed: 77, startPlayer: 0,
+  const vier = () => newGame({ seed: 77, startPlayer: 0,
     players: ['russland', 'griechenland', 'england', 'wikinger'].map(k => ({ civ: k, kind: 'human' })) });
-  endTurn(S); endTurn(S); endTurn(S); endTurn(S);                 // Runde 2 beginnt
-  eq([S.round, S.cur, S.roundPop, S.roundPops], [2, 0, 4, [1, 1, 1, 1]], 'zu Rundenbeginn: Welt 4, je Reich 1');
-  // Griechenland (zweiter am Zug) wächst im eigenen Zug weit über 2/3
-  endTurn(S);
-  const g = capitalOf(S, 1);
-  g.pop = 9;                                                      // 9 von 12 > 2/3 – aber erst jetzt
-  const nenner = [];
-  for (let i = 0; i < 3; i++) { nenner.push(victoryWorld(S)); endTurn(S); }
-  eq(nenner, [4, 4, 4], 'der Nenner bleibt die ganze Runde derselbe, für jedes Reich');
-  eq(S.claims.length, 1, 'zu Beginn von Runde 3 geprüft: Griechenland meldet an');
-  eq([S.round, S.cur, S.claims[0].pi, S.claims[0].round], [3, 0, 1, 3],
-    '… bevor in Runde 3 jemand zieht – das Spiel endet am Ende von Runde 3');
-  eq(/9 von 12 Weltbevölkerung/.test(S.claims[0].how), true, 'gezählt mit der Bevölkerung zu Rundenbeginn (9 von 12)');
-  // Wer im eigenen Zug über die Schwelle wächst, hat damit noch nicht angemeldet
-  const T2 = newGame({ seed: 77, startPlayer: 0,
-    players: ['russland', 'griechenland', 'england', 'wikinger'].map(k => ({ civ: k, kind: 'human' })) });
-  for (let i = 0; i < 4; i++) endTurn(T2);
-  capitalOf(T2, 0).pop = 9;                                      // Russland wächst im Zug
-  endTurn(T2);
-  eq(T2.claims.length, 0, 'am Ende des eigenen Zugs wird nichts angemeldet (seit v83)');
-  capitalOf(T2, 0).pop = 2;                                      // … und verliert es wieder
+  const S = vier();
+  endTurn(S);                                                     // Russland fertig
+  capitalOf(S, 1).pop = 9;                                        // Griechenland: 9 von 12 > 2/3
+  endTurn(S); endTurn(S);                                         // Griechenland, England
+  eq([S.claims.length, S.over], [0, null], 'während der Runde wird nichts angemeldet');
+  endTurn(S);                                                     // Wikinger: Rundenende
+  eq([!!S.over, S.over && S.over.winner, S.round], [true, 1, 1], 'am Ende von Runde 1: Griechenland gewinnt sofort');
+  eq(/9 von 12 Weltbevölkerung/.test(S.over.how), true, 'gezählt mit der Bevölkerung am Rundenende (9 von 12)');
+  eq(S.log.some(l => /endet am Ende dieser Runde/.test(l.m)), false, 'ohne die Ankündigung „am Ende dieser Runde" – es ist schon so weit');
+  // Wer im eigenen Zug über die Schwelle wächst und bis zum Rundenende wieder darunter fällt, gewinnt nicht
+  const T2 = vier();
+  capitalOf(T2, 0).pop = 9; endTurn(T2);                          // Russland über der Schwelle …
+  capitalOf(T2, 0).pop = 2;                                       // … und wieder darunter
   for (let i = 0; i < 3; i++) endTurn(T2);
-  eq([T2.round, T2.claims.length], [3, 0], 'zu Rundenbeginn zählt, was dann ist: kein Anspruch');
+  eq([T2.round, T2.claims.length, T2.over], [2, 0, null], 'es zählt der Stand am Rundenende: kein Sieg');
+  // Singularität in derselben Runde: Punktvergleich
+  const U = vier();
+  endTurn(U);                                                     // Russland
+  claimVictory(U, 1, 'Forschungssieg (Singularität)');            // Griechenland in seinem Zug
+  capitalOf(U, 2).pop = 12;                                       // England: 12 von 15 > 2/3
+  for (let i = 0; i < 3; i++) endTurn(U);
+  eq([U.claims.map(c => c.pi), !!U.over, U.over && U.over.score && U.over.score.length], [[1, 2], true, 2],
+    'Wirtschaftssieg am Rundenende neben der Singularität derselben Runde: die Punkte entscheiden');
+  eq(U.over.winner, 2, '… hier für England (12 Bevölkerung)');
 }
-/* Kein Wirtschaftssieg in Runde 1 (v77, Anweisung des Autors). Vorher reichte dem
-   Startspieler eine Gründung und ein Wachstum: im Duell 4 von 5, zu dritt 4 von 6 – und
-   der Anspruch blieb, auch wenn die anderen im selben Zug nachzogen. */
+/* Wirtschaftssieg schon in Runde 1 (v85; v77–v84 war Runde 1 gesperrt, weil der Startspieler
+   damals am Ende seines eigenen Zuges anmeldete – vor den Zügen der anderen). */
 {
   const S = newGame({ seed: 8, duel: true, map: duellKarte('russland', 'england', 8),
     players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
   eq(S.round, 1, 'das Spiel beginnt in Runde 1');
   const a = capitalOf(S, 0), b = capitalOf(S, 1);
-  a.pop = 4; b.pop = 1;                              // 4 von 5 – weit über 3/4
-  checkVictory(S, 0);
-  eq(S.claims.length, 0, 'in Runde 1 wird kein Wirtschaftssieg angemeldet');
-  endTurn(S);                                         // zweiter Spieler
-  eq(S.claims.length, 0, 'auch nicht bei der Nachprüfung am Ende von Runde 1');
-  eq([S.over, S.round], [null, 1], 'das Spiel läuft weiter');
-  endTurn(S);                                         // Runde 2 beginnt
-  eq(S.round, 2, 'Runde 2');
-  checkVictory(S, 0);
-  eq(S.claims.map(c => c.pi), [0], 'ab Runde 2 wie gewohnt');
+  a.pop = 4; b.pop = 1;                              // 4 von 5 – über 3/4
+  endTurn(S);                                         // erster Spieler fertig
+  eq([S.claims.length, S.over], [0, null], 'nach dem ersten Zug noch nichts – der zweite zieht noch');
+  endTurn(S);                                         // zweiter fertig: Ende von Runde 1
+  eq([!!S.over, S.over && S.over.winner, S.round], [true, 0, 1], 'am Ende von Runde 1 gewinnt 4 von 5');
 }
 /* Eine vollständige 1-gegen-1-Partie Mensch gegen Bot läuft durch */
 {
@@ -3425,6 +3419,109 @@ const duellKarte = (civA, civB, seed) => {
   S.players[0].avail.robotik = true;
   S.round++;
   eq(freeTechOptions(S, 0).some(t => t.k === 'robotik'), false, 'nur bis Industrialisierung (Robotik ist Moderne)');
+}
+
+/* Marathon (v85, Anweisung des Autors): Griechenlands Günstige Forschung und die
+   Wissenschaftliche Methode ziehen doppelt ab, die Freie Forschung reicht nur bis ins
+   Mittelalter. Im normalen Spiel bleibt alles, wie es war. */
+{
+  const spiel = (marathon, ab) => {
+    const S = newGame({ seed: 7, map: marathon ? marathonMap(7) : undefined, marathon,
+      players: CIVS.map(c => c.k !== 'griechenland'
+        ? { civ: c.k, kind: 'human', drafted: marathon ? ['england:basis', 'russland:basis'] : undefined }
+        : marathon ? { civ: c.k, kind: 'human', drafted: ['griechenland:' + ab, 'russland:basis'] }
+          : { civ: c.k, kind: 'human', ability: ab }) });
+    const idx = k => S.players.findIndex(p => p.civ === k);
+    return { S, gr: idx('griechenland'), ru: idx('russland') };
+  };
+  const papier = TECH_BY_KEY.papier, chemie = TECH_BY_KEY.chemie;
+  {
+    const n = spiel(false, 'basis'), m = spiel(true, 'basis');
+    eq([techCost(n.S, n.gr, papier), techCost(m.S, m.gr, papier)], [6 - 2, 18 - 4],
+      'Günstige Forschung: Papier normal 6 − 2, im Marathon 18 − 4 (doppelt)');
+    eq([techCost(n.S, n.gr, SINGULARITY), techCost(m.S, m.gr, SINGULARITY)], [100 - 5, 300 - 10],
+      'Singularität: normal 100 − 5, im Marathon 300 − 10');
+    eq([techCost(n.S, n.ru, papier), techCost(m.S, m.ru, papier)], [6, 18], 'ohne die Fähigkeit kein Rabatt');
+    [n, m].forEach(x => { x.S.players[x.ru].techs.wiss_methode = true; x.S.players[x.gr].techs.wiss_methode = true; });
+    eq([techCost(n.S, n.ru, papier), techCost(m.S, m.ru, papier)], [6 - 4, 18 - 8],
+      'Wissenschaftliche Methode: Papier normal 6 − 4, im Marathon 18 − 8 (doppelt)');
+    const ch = x => techBase(x.S, chemie);
+    eq([techCost(n.S, n.gr, chemie), techCost(m.S, m.gr, chemie)],
+      [Math.max(0, ch(n) - 3 - 6), Math.max(0, ch(m) - 6 - 12)],
+      `beides zusammen, Chemie: normal ${ch(n)} − 3 − 6, im Marathon ${ch(m)} − 6 − 12`);
+    eq([techCost(n.S, n.gr, SINGULARITY), techCost(m.S, m.gr, SINGULARITY)], [100 - 5 - 10, 300 - 10 - 20],
+      'Singularität mit beidem: normal 85, im Marathon 270');
+    // Texte: Bogen, Draft und HUD lesen abilEffect, der Techbaum techEffect
+    const ab = abilById('griechenland:basis'), gt = abilById('griechenland:gratistech');
+    eq(abilEffect(ab, m.S), 'Techs 2/4/6/8/10 günstiger (je Zeitalter, im Marathon doppelt)', 'Fähigkeitstext im Marathon');
+    eq([abilEffect(ab, n.S), abilEffect(ab, null)], [ab.e, ab.e], 'sonst der Text des Zivilisationsbogens');
+    eq(abilEffect(gt, m.S), '1× pro Runde eine verfügbare Technologie des Mittelalters oder früher umsonst erforschen (Marathon)',
+      'Freie Forschung im Marathon: bis Mittelalter');
+    eq(abilEffect(gt, n.S), gt.e, 'normal: bis Industrialisierung');
+    eq(abilEffect(abilById('england:gruenden'), m.S), abilById('england:gruenden').e, 'andere Fähigkeiten unverändert');
+    eq(techEffect(TECH_BY_KEY.wiss_methode, m.S), 'Techkosten −4/−8/−12/−16/−20 (je Zeitalter, im Marathon doppelt)',
+      'Techtext der Wissenschaftlichen Methode im Marathon');
+    eq(techEffect(TECH_BY_KEY.wiss_methode, n.S), TECH_BY_KEY.wiss_methode.e, 'normal der alte Text');
+    // die KI wertet die Methode im Marathon doppelt (ihr fester Zuschlag sieht die Kosten nicht)
+    const K = kiContext(n.S, n.ru);
+    eq(kiTechBonus(m.S, m.ru, 'wiss_methode', K, {}), 2 * kiTechBonus(n.S, n.ru, 'wiss_methode', K, {}),
+      'KI: Zuschlag für die Wissenschaftliche Methode im Marathon doppelt');
+  }
+  {
+    const n = spiel(false, 'gratistech'), m = spiel(true, 'gratistech');
+    const drei = ['papier', 'chemie', 'robotik'];
+    [n, m].forEach(x => drei.forEach(k => { x.S.players[x.gr].avail[k] = true; }));
+    const frei = x => freeTechOptions(x.S, x.gr).map(t => t.k).filter(k => drei.includes(k)).sort();
+    eq(frei(n), ['chemie', 'papier'], 'Freie Forschung normal: bis Industrialisierung (Chemie ja, Robotik nein)');
+    eq(frei(m), ['papier'], 'im Marathon nur bis ins Mittelalter (Papier ja, Chemie nicht)');
+    eq(useFreeTech(m.S, m.gr, 'chemie'), 'Nicht möglich.', 'Chemie gibt es im Marathon nicht umsonst');
+    eq([useFreeTech(m.S, m.gr, 'papier'), has(m.S.players[m.gr], 'papier')], [null, true], 'Papier schon');
+    eq(techCost(m.S, m.gr, papier), techBase(m.S, papier), 'die Alternative hat keinen Kostenrabatt, auch im Marathon nicht');
+  }
+}
+
+/* Startausgleich (v85, Anweisung des Autors): im allerersten Zug bekommt der Zweite in der
+   Zugfolge 1 Münze, der Dritte 2, der Vierte 3 – zu zweit nur der Zweite 1, zu dritt 1 und 2.
+   Gezählt ab dem Startspieler, nicht nach Zivilisation. Bots bekommen nichts. */
+{
+  // spielt eine Runde und notiert je Reich: Münzen zu Zugbeginn minus Einkommen
+  const extra = (players, startPlayer, runden = 1) => {
+    const S = newGame({ seed: 21, startPlayer, players });
+    const out = {};
+    for (let r = 0; r < runden; r++) for (let k = 0; k < S.players.length; k++) {
+      const pi = S.cur, p = S.players[pi];
+      (out[p.civ] = out[p.civ] || []).push(p.res.coins - income(S, pi).coins);
+      endTurn(S);
+    }
+    return { S, out };
+  };
+  const mensch = k => ({ civ: k, kind: 'human' });
+  const ZUGFOLGE = ['russland', 'griechenland', 'england', 'wikinger'];
+  {
+    const { S, out } = extra(ZUGFOLGE.map(mensch), 0, 2);
+    eq(ZUGFOLGE.map(k => out[k]), [[0, 0], [1, 0], [2, 0], [3, 0]],
+      'zu viert ab Russland: 0/1/2/3 Münzen im ersten Zug, in Runde 2 nichts mehr');
+    eq(S.log.filter(e => /^Startausgleich/.test(e.m)).map(e => e.m), ['Startausgleich: +1 Münze (2. in der Zugfolge).',
+      'Startausgleich: +2 Münzen (3. in der Zugfolge).', 'Startausgleich: +3 Münzen (4. in der Zugfolge).'],
+      'das Protokoll nennt Betrag und Platz, nur in Runde 1');
+  }
+  {
+    // Startspieler England: England 0, Wikinger 1, Russland 2, Griechenland 3
+    const { out } = extra(ZUGFOLGE.map(mensch), 2);
+    eq(ZUGFOLGE.map(k => out[k][0]), [2, 3, 0, 1], 'Startspieler England: gezählt ab dem Startspieler');
+  }
+  {
+    const { out } = extra([mensch('griechenland'), mensch('wikinger')], 1);
+    eq([out.wikinger[0], out.griechenland[0]], [0, 1], 'zu zweit: nur der Zweite bekommt 1 Münze');
+    const drei = extra([mensch('russland'), mensch('england'), mensch('wikinger')], 0);
+    eq(['russland', 'england', 'wikinger'].map(k => drei.out[k][0]), [0, 1, 2], 'zu dritt: 1 und 2');
+  }
+  {
+    const { out } = extra([mensch('russland'), { civ: 'griechenland', kind: 'bot', diff: 'david' },
+      { civ: 'england', kind: 'ki' }, { civ: 'wikinger', kind: 'bot', diff: 'david' }], 0);
+    eq([out.russland[0], out.griechenland[0], out.england[0], out.wikinger[0]], [0, 0, 2, 0],
+      'Bots bekommen nichts, die KI schon (England als Dritter: 2)');
+  }
 }
 {
   const S = mkA('griechenland', 'rueckschau');
@@ -4975,7 +5072,7 @@ for (const n of [2, 3, 4]) {
   // Hilfsspiel: vier Menschen in Zugreihenfolge, Startspieler Russland (Index 0),
   // damit die Runde nachvollziehbar bei Russland beginnt und endet.
   const ZUGFOLGE = ['russland', 'griechenland', 'england', 'wikinger'];
-  // Es steht in Runde 2: in Runde 1 gibt es keinen Wirtschaftssieg (v77).
+  // Es steht in Runde 2 (bis v84 gab es in Runde 1 keinen Wirtschaftssieg; seit v85 egal).
   const mkEnd = () => {
     const S = newGame({
       seed: 77, wonders: true, startPlayer: 0,
@@ -4997,13 +5094,11 @@ for (const n of [2, 3, 4]) {
     eq([sc.pop, sc.wonders, sc.techs, sc.total], [7, 2, 3, 12],
       'Punkte = Bevölkerung + Wunder + Technologien');
   }
-  // --- Ein Anspruch: die Runde läuft weiter, das Spiel endet am Rundenende
+  // --- Ein Anspruch (Forschungssieg): die Runde läuft weiter, das Spiel endet am Rundenende
   {
     const S = mkEnd();
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
-    markRoundStart(S);                             // so steht es zu Beginn von Runde 2 (v83)
-    eq(S.claims.map(c => c.pi), [0], 'zu Rundenbeginn angemeldet');
-    eq(finishTurn(S), null, 'der Wirtschaftssieg beendet den Zug nicht');
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
+    eq(finishTurn(S), null, 'der Anspruch beendet den Zug nicht');
     eq([S.over, S.endRound], [null, 2], 'Ende ist für Runde 2 vorgemerkt');
     advanceTurn(S);
     eq([S.over, S.cur, S.round], [null, 1, 2], 'Griechenland ist regulär am Zug');
@@ -5012,40 +5107,46 @@ for (const n of [2, 3, 4]) {
     endTurn(S);                                    // Wikinger beenden die Runde
     eq(!!S.over, true, 'am Rundenende ist das Spiel zu Ende');
     eq([S.over.winner, S.round, S.over.shared], [0, 2, false], 'Russland gewinnt in Runde 2');
-    eq(S.over.how.startsWith('Wirtschaftssieg'), true, 'und zwar mit dem Wirtschaftssieg');
+    eq(S.over.how.startsWith('Forschungssieg'), true, 'und zwar mit dem Forschungssieg');
   }
-  // --- Verlorene Bedingung schadet dem Anspruch nicht
+  // --- Wirtschaftssieg (v85): erst am Rundenende geprüft, dann sofort entschieden
   {
     const S = mkEnd();
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
-    markRoundStart(S);
+    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
+    endTurn(S); endTurn(S); endTurn(S);            // Russland, Griechenland, England
+    eq([S.claims.length, S.over], [0, null], 'während der Runde kein Anspruch');
+    endTurn(S);                                    // Wikinger beenden die Runde
+    eq([!!S.over, S.over && S.over.winner, S.round], [true, 0, 2], 'am Rundenende gewinnt Russland sofort');
+    eq(S.over.how.startsWith('Wirtschaftssieg'), true, 'und zwar mit dem Wirtschaftssieg');
+  }
+  // --- Verlorene Bedingung schadet dem Anspruch nicht (Kultursieg: das Wunder fällt später)
+  {
+    const S = mkEnd();
+    claimVictory(S, 0, 'Kultursieg (Weltwunder der Stufe 3)');
     finishTurn(S);
     eq(S.claims.length, 1, 'Anspruch steht');
-    capitalOf(S, 0).pop = 1;                       // Bedingung fällt weg
-    checkVictory(S, 0);
-    eq(S.claims.length, 1, 'der Anspruch bleibt trotzdem stehen');
     advanceTurn(S); endTurn(S); endTurn(S); endTurn(S);
     eq([!!S.over, S.over && S.over.winner], [true, 0],
-      'und gewinnt am Rundenende, obwohl die Bevölkerung längst gesunken ist');
+      'und gewinnt am Rundenende, was immer bis dahin geschieht');
   }
   // --- Zwei Ansprüche in derselben Runde: Punkte entscheiden
   {
     const S = mkEnd();
-    // Russland: Wirtschaftssieg, wenig Technologien
+    // Russland: über der Schwelle, wenig Technologien
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     S.players[0].techs = { rad: true };
-    markRoundStart(S);                              // Anspruch Russland zu Rundenbeginn
     finishTurn(S);
-    // Griechenland: Forschungssieg, dafür viele Technologien
+    // Griechenland: Forschungssieg in seinem Zug, dafür viele Technologien
     const g = S.players[1];
     techPool(S).forEach(t => { if (t.k !== 'singularitaet') g.techs[t.k] = true; });
     advanceTurn(S);
     applyTech(S, 1, SINGULARITY, 'Test');
-    eq(S.claims.map(c => c.pi), [0, 1], 'beide Ansprüche sind vermerkt');
+    eq(S.claims.map(c => c.pi), [1], 'Griechenland hat angemeldet');
     eq(S.over, null, 'entschieden ist noch nichts');
     const pR = victoryScore(S, 0).total, pG = victoryScore(S, 1).total;
     eq(pG > pR, true, `Griechenland hat mehr Punkte (${pG} zu ${pR})`);
     endTurn(S); endTurn(S); endTurn(S);
+    eq(S.claims.map(c => c.pi), [1, 0], 'am Rundenende kommt Russlands Wirtschaftssieg dazu (v85)');
     eq(!!S.over, true, 'Rundenende');
     eq(S.over.winner, 1, 'der Punktsieger gewinnt, nicht der erste Anspruch');
     eq(S.over.score.length, 2, 'die Punktetafel nennt beide');
@@ -5184,8 +5285,7 @@ for (const n of [2, 3, 4]) {
   // --- Militärsieg schlägt jeden angemeldeten Anspruch, sofort
   {
     const S = mkEnd();
-    S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
-    markRoundStart(S);                              // zu Rundenbeginn angemeldet (v83)
+    claimVictory(S, 0, 'Forschungssieg (Singularität)');
     eq(S.claims.map(c => c.pi), [0], 'Russland hat angemeldet');
     // Griechenland erobert die russische Hauptstadt
     const cap = capitalOf(S, 0), att = S.players[1];
@@ -5197,17 +5297,17 @@ for (const n of [2, 3, 4]) {
     eq([S.over.winner, S.over.military], [1, true], 'und gewinnt für den Angreifer');
     eq(S.over.score, undefined, 'ohne Punktvergleich');
   }
-  // --- Bis v82 wurde am Rundenende noch einmal für alle geprüft. Seit v83 zählt der
-  //     Wirtschaftssieg zu Rundenbeginn: wer erst im Lauf der Runde über die Schwelle
-  //     wächst, kommt am Ende dieser Runde nicht mehr in den Vergleich.
+  // --- Seit v85 wird der Wirtschaftssieg am Rundenende für alle geprüft: wer bis dahin über
+  //     die Schwelle kommt, ist im Vergleich – auch neben dem Kultursieg eines anderen.
   {
     const S = mkEnd();
-    // Wikinger (letzter im Zug) melden an; Russland erfüllt die Schwelle erst danach
+    // Wikinger (letzter im Zug) melden an; Russland ist am Rundenende über der Schwelle
     claimVictory(S, 3, 'Kultursieg (Weltwunder der Stufe 3)');
     S.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });
     for (let i = 0; i < 4; i++) endTurn(S);
-    eq(S.claims.map(c => c.pi), [3], 'Russland kommt am Rundenende nicht mehr dazu (v83)');
-    eq([!!S.over, S.over && S.over.winner], [true, 3], 'das Spiel ist zu Ende, die Wikinger gewinnen');
+    eq(S.claims.map(c => c.pi), [3, 0], 'Russland kommt am Rundenende in den Vergleich (v85)');
+    eq([!!S.over, S.over && S.over.winner, S.over && S.over.score && S.over.score.length], [true, 0, 2],
+      'die Punkte entscheiden – hier für Russland (7 Bevölkerung)');
   }
   // --- Ausgeschiedene Reiche gewinnen nicht; verfällt der letzte Anspruch, geht es weiter
   {

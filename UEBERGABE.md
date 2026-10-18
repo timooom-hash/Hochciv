@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 16.10., `sw.js` v84)
+# Hochzeivilization — Projekt-Übergabe (Stand 17.10., `sw.js` v85)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v84)
+## Letzte Sitzungen auf einen Blick (v61 → v85)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -39,6 +39,12 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v82 | **Kosten am Knopf: was tatsächlich abgeht** (Gründen für 10 🌾 mit 8 im Vorrat: „8🌾 4🪙"), Einstellung „Kosten ohne Umtausch anzeigen" für die alte Anzeige. **Ein Techtree:** der frühere alternative ist der Standard, das Häkchen im Aufbau ist weg; der alte gilt nur noch im Tutorial und in Partien von vor v82 | Oberfläche + Regel |
 | v83 | **Kriegerkultur mit Burgenbau:** +2 Macht auch je eigener Stadt. **Wirtschaftssieg zu Rundenbeginn:** eigene und Weltbevölkerung von dort, geprüft dort für alle (kein Wirtschaftssieg in Runde 2 im Duell mehr). **Marathon:** vier Reiche, Zufallskarte 24 × 36, Hauptstädte mit Nahrung + ½ Münzen ≥ 4, Technologien ×2/×3/×4/×5 (Singularität ×2,5), Fähigkeiten im Schlangen-Draft aus 2n + 1 (`js/marathon.js`); Fähigkeiten als Liste (`abilitiesOf`, `hasAbil`). die langsamsten KI-Züge auf großen Karten 10–30 % kürzer (Handelsrouten, Siedelplätze, Straßenpläne – gleiche Ergebnisse) | Regel + Modus + KI |
 | v84 | **Sklaverei 7 Münzen** (vorher 10). **Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5** (vorher 5/2/4; das Tutorial behält die alten). **Marathon:** Singularität 300, höchstens fünf Gründungen je Zug, Militärsieg erst mit der zweiten eroberten Hauptstadt (wer seine verliert, spielt ohne weiter). **Kolonien:** ein per Kolonialismus gekauftes Feld ist auch ohne Siedlerweg besiedelbar, Entfernung Luftlinie. **Städte zeigen ihre Bevölkerung als Zahl** in Reichsfarbe statt Symbol und Strichen. `kiRisk` schneller (gleiche Ergebnisse) | Regel + Modus + Oberfläche + KI |
+| v85 | **Wirtschaftssieg am Rundenende:** einmal je Runde geprüft, wenn alle gleich oft gezogen haben, mit dem Stand von dort – gewinnt jemand, endet das Spiel sofort (Punktvergleich nur, wenn in derselben Runde ein anderer Sieg angemeldet war); auch schon in Runde 1. **Startausgleich:** im ersten Zug +1/+2/+3 Münzen für den Zweiten/Dritten/Vierten in der Zugfolge (Bots nicht). **Marathon:** Günstige Forschung und Wissenschaftliche Methode ziehen doppelt ab, Freie Forschung nur bis ins Mittelalter. Die KI sieht als Letzte der Runde ihren Wirtschaftssieg; ihre Draftwerte im Marathon sind neu gemessen (200 Partien) | Regel + Modus + KI |
+
+Neu in v85: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Wirtschaftssieg am Rundenende · Marathon: Griechenland und Methode ·
+Startausgleich (v85)"), eine Fragilität geändert, zwei neu, die offenen Punkte 33–35;
+Punkt 14 und 28 nachgetragen.
 
 Neu in v84: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Sklaverei 7 · drei Militärkosten · Marathonregeln · Kolonien · Bevölkerung als
@@ -62,7 +68,9 @@ der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), sei
 (Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei), seit v73
 Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstand 2) und
 Punkt 12 (dominiert über alle Lagen oder nur je Lage?), seit v75 Punkt 13 (Bot-Partner
-verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
+verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell), seit v85 Punkt 33
+(Auslegungen zu Wirtschaftssieg, Startausgleich und Rabatten) und 34 (der Startausgleich
+gleicht wenig aus).
 
 ## Wo alles liegt
 
@@ -90,21 +98,21 @@ verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1265 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1273 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 445 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 452 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 1976 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 2013 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1858 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
-| `js/marathon.js` | 301 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
-| `js/ui.js` | 2442 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
+| `js/ki.js` | 1868 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/marathon.js` | 302 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
+| `js/ui.js` | 2443 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
 | `js/tutorial.js` | 680 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 6231 | **1585 Assertions**, `node test.js` |
-| `smoke.js` | 3265 | **142 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 6331 | **1609 Assertions**, `node test.js` |
+| `smoke.js` | 3323 | **144 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 59 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -132,6 +140,17 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v85 auf einen Blick.** Wirtschaftssieg: geprüft nur noch am Rundenende
+  (`checkEconomyRoundEnd` in `advanceTurn`, vor `resolveClaims`), für alle mit dem Stand von
+  dort, auch in Runde 1; gewinnt jemand, ist das Spiel gleich aus – Punktvergleich nur mit
+  Ansprüchen derselben Runde (Singularität, Kultursieg). `markRoundStart`, `S.roundPop(s)`
+  und die Sperre für Runde 1 sind weg. Startausgleich: `START_BONUS_COINS` [0, 1, 2, 3] nach
+  `turnPosition` in `beginTurn` der ersten Runde, Bots nicht. Marathon: `discountFactor` = 2
+  für Günstige Forschung und Wissenschaftliche Methode in `techCost`, `freeTechMaxAge` = 1
+  (Mittelalter) in `freeTechOptions`; Texte über `abilEffect(a, S)` und `techEffect`. KI:
+  `kiLastInRound` → `checkVictory` in `kiScore`; Methode im Marathon doppelt gewertet;
+  `KI_DRAFT_BASE` neu gemessen (200 Marathonpartien nach v85, Grundwert = 6 + 2,5 ·
+  Logit-Stärke, Kartenanteil abgezogen).
 - **v84 auf einen Blick.** Sklaverei bringt 7 Münzen (`SLAVERY_COINS`). Militär der Antike:
   Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5 – im Tutorial (alter Techtree,
   `OLD_TECH_COSTS`) die alten 5/2/4. Marathon: Singularität 300 (`MARATHON_SINGULARITY`),
@@ -152,10 +171,9 @@ Gedächtnis rekonstruieren.
 - **Fähigkeiten als Liste (v83).** `abilitiesOf(p)` → Schlüssel „Zivilisation:Fähigkeit";
   Grundfähigkeiten (`basis`) immer mit `hasAbil(p, civ, 'basis')`, die übrigen mit
   `isAbil(p, k)`; `abilInfos(p)` für die Anzeige. Ohne Draft genau eine wie bisher.
-- **Wirtschaftssieg zu Rundenbeginn (v83).** Gezählt mit eigener und Weltbevölkerung zu
-  Beginn der Runde (`S.roundPops`, `S.roundPop`), geprüft dort für alle in Zugfolge
-  (`markRoundStart`); nicht mehr am Zugende, keine Nachprüfung am Rundenende. Die
-  Kopfzeile zeigt den laufenden Stand.
+- **Wirtschaftssieg zu Rundenbeginn (v83, bis v84).** Gezählt mit eigener und
+  Weltbevölkerung zu Beginn der Runde, geprüft dort für alle in Zugfolge; seit v85 ersetzt
+  durch die Prüfung am Rundenende (siehe oben).
 - **Kriegerkultur mit Burgenbau (v83).** +2 Macht je Armee und, mit Burgenbau, je eigener
   Stadt (`warriorUnits`); die Baukosten weiterer Armeen zählen nur echte Armeen.
 - **Kosten am Knopf (v82).** Jeder Kostenknopf zeigt, was tatsächlich abgeht (`costText` →
@@ -181,6 +199,8 @@ Gedächtnis rekonstruieren.
   und „Abwehr: vorher leicht, im Ernstfall alles".
 - **Wirtschaftssieg (v77):** „mehr als 2/3" (vorher „mindestens"), und in Runde 1 gar nicht –
   beides Anweisung des Autors nach einem Fund der KI (Sieg in Runde 1 mit 4 von 5 im Duell).
+  Die Sperre für Runde 1 ist seit v85 weg (geprüft wird am Rundenende, wenn alle gezogen
+  haben).
 - **Eine Regelvariante.** Die früher „experimentell v2" genannten Regeln sind der Standard:
   Singularität 100, Keramik und Theologie in der Techliste, Verbundwerkstoffe = kostenloses
   Wachstum, Sklaverei ab Moderne obsolet (im Bogen durchgestrichen), Siegschwellen stapeln
@@ -687,10 +707,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1585 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1609 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (142 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (144 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -893,12 +913,18 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Fähigkeiten haben. Grundfähigkeiten heißen überall `basis` – `isAbil(p, 'basis')` wirft,
   und `test.js` sucht den Quelltext danach ab. Wer eine Fähigkeit mit Zahlwirkung baut,
   bedenkt, dass zwei zusammenkommen können (Vorbild: `growPrice` nimmt den größeren Faktor).
-- **Der Wirtschaftssieg hängt an `markRoundStart`** (seit v83): es hält die Bevölkerung zu
-  Rundenbeginn fest (`S.roundPop`, `S.roundPops`) und prüft dort alle. Wer einen neuen Weg
-  baut, eine Runde zu beginnen, ruft es mit (`newGame`, `advanceTurn`). Tests, die die
-  Bevölkerung direkt setzen, rufen danach `markRoundStart` – `checkVictory` allein rechnet mit
-  dem festgehaltenen Stand. Spielstände von vor v83 haben ihn nicht; dann zählt bis zum
-  nächsten Rundenbeginn der laufende (`victoryOwn`/`victoryWorld`).
+- **Der Wirtschaftssieg hängt an `checkEconomyRoundEnd` in `advanceTurn`** (seit v85; v83/v84
+  `markRoundStart` zu Rundenbeginn): genau beim Umschlag der Runde, vor `resolveClaims`. Wer
+  einen anderen Weg baut, eine Runde zu beenden, ruft beides in dieser Reihenfolge. Tests,
+  die die Bevölkerung direkt setzen, spielen die Runde zu Ende oder rufen
+  `checkEconomyRoundEnd` selbst. Die KI weiß davon in `kiScore` (`kiLastInRound`).
+- **Der Startausgleich hängt an `S.round === 1` und `turnPosition`** (seit v85): wer die
+  erste Runde anders zählt (etwa eine Vorrunde einführt) oder Plätze in der Zugfolge
+  verschiebt, prüft den Ausgleich mit. Barbaren hängen hinten an und zählen nicht.
+- **Fähigkeitstexte über `abilEffect(a, S)`** (seit v85): im Marathon wirken zwei Fähigkeiten
+  anders, die Texte dazu stehen dort (die Methode in `techEffect`). Wer eine Fähigkeit im
+  Marathon anders wirken lässt, ergänzt dort den Text – Kopfzeile, Weltblatt, Draft und
+  Regelbogen lesen alle diese eine Stelle; `a.e` direkt zeigt den Text des Bogens.
 - **Eine neue JS-Datei muss in sieben Listen** (zuletzt `js/marathon.js`): `index.html`,
   `sw.js`, `build_single.py`, `smoke.js`, `test.js` (Lade- und Übersetzungsliste),
   `tools_ki.js` – sonst fehlt sie offline, in der Einzeldatei oder in den Prüfprogrammen.
@@ -1262,7 +1288,10 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Stadt. Lösung wäre, Flankenpartner in (a) mit zu belegen; Balancefrage, nicht angefasst.
 14. **Wirtschaftssieg in Runde 2 im Duell (v77) – erledigt mit v83.** Seit der Wirtschaftssieg
    mit der Bevölkerung zu Rundenbeginn zählt, haben zu Beginn von Runde 2 beide Reiche genau
-   einen Zug gehabt: 0 von 40 KI-Duellen enden in Runde 2 (v82: 7 von 40).
+   einen Zug gehabt: 0 von 40 KI-Duellen enden in Runde 2 (v82: 7 von 40). Seit v85 wird am
+   Rundenende geprüft, auch in Runde 1: in 600 Duellen KI gegen KI kein Wirtschaftssieg vor
+   Runde 3; gegen den Bot David einer in 400 am Ende von Runde 1 (Siedlertrecks und eine
+   zweite Stadt, 4 von 5, der Bot verfehlte sein Wachstum) – vom Autor so gewollt.
 15. **Passt Leicht für Einsteiger? (v78)** Seit v78 sind die Stufen deutlich getrennt
    (Duell gepaart Schwer–Leicht 32 : 8, zu dritt und zu viert je 21 : 3) und an den Bots
    geeicht: im Duell spielte Leicht etwa wie Prinz, Mittel wie König, Schwer wie David. Die
@@ -1338,12 +1367,13 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Sekunden bis wenige Minuten; gespeichert wird ab dem ersten Zug.
 28. **Getroffene Auslegungen (v83) – zum Ändern angeboten.** (a) Wirtschaftssieg: eigene
    **und** Weltbevölkerung zu Rundenbeginn, geprüft dort; die wörtliche Lesart (nur der
-   Nenner fest) ließ jedes KI-Duell in Runde 2 enden. (b) Kriegerkultur: +2 je Stadt, wie
+   Nenner fest) ließ jedes KI-Duell in Runde 2 enden (seit v85 überholt: geprüft am
+   Rundenende). (b) Kriegerkultur: +2 je Stadt, wie
    eine Armee. (c) Draft: n = Reiche außer Bots (Bots haben keine Fähigkeiten). (d) Keine
    Fähigkeit doppelt im eigenen Reich, solange anderes übrig ist. (e) Startertrag mit 2
    Bevölkerung gerechnet, ohne Technologien. (f) Der Kreml-Zuschlag auf die Singularität
    (+50) wird im Marathon nicht vervielfacht. (g) Das Tutorial erklärt den Zeitpunkt des
-   Wirtschaftssiegs nicht (alter Techtree, feste Partie, bleibt bis zum neuen Übungsspiel).
+   Wirtschaftssiegs nicht – seit v85 erledigt: „am Ende einer Runde", in beiden Fassungen.
 29. **Hauptstadt verloren – und dann? (v84, Auslegung, zum Ändern angeboten).** Im Marathon
    wird eine eroberte Hauptstadt eine gewöhnliche Stadt, und ihr altes Reich spielt ohne
    Hauptstadt weiter (keine Handelsrouten, Gründungen ab der ersten Stadt) – so wie es nach
@@ -1363,6 +1393,26 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Stufe Schwer endeten in v83 viermal militärisch, jetzt keinmal. Eine erste Hauptstadt fiel
    in 8 von 24 Partien. Zwei Hauptstädte und die teurere Singularität wirken in dieselbe
    Richtung – ob der Militärsieg so selten sein soll, entscheidet das Spielen.
+33. **Getroffene Auslegungen (v85) – zum Ändern angeboten.** (a) Im Punktvergleich neben dem
+   Wirtschaftssieg am Rundenende steht jeder in derselben Runde angemeldete Sieg, auch der
+   Kultursieg – genannt hatte der Autor die Singularität. (b) Bots bekommen keinen
+   Startausgleich (sie zahlen nichts), ihr Platz zählt trotzdem mit. (c) Der Platz zählt ab
+   dem Startspieler. (d) „Doppelter Bonus" = doppelter Abzug je Zeitalter, auch auf die
+   Singularität. (e) Der feste KI-Zuschlag der Wissenschaftlichen Methode ist im Marathon
+   verdoppelt (nicht gesondert gemessen).
+34. **Der Startausgleich gleicht wenig aus (v85, gemessen).** KI gegen KI: im Duell gewinnt der
+   Startspieler 72,0 % statt 74,3 % (mit +3 Münzen für den Zweiten 68,4 %), zu viert 37,5 %
+   statt 42,7 %, der Vierte 6,0 % statt 4,2 % (auch mit 0/2/4/6 Münzen 5,5 %); zu dritt keine
+   messbare Wirkung. Münzen im ersten Zug sind ein schwacher Hebel gegen diesen Vorteil –
+   woran er hängt, ist nicht gemessen (zu viert entscheidet meist der Militärsieg, den der
+   Startspieler am häufigsten holt). Zwischen Menschen nicht gemessen.
+35. **Draftwerte im Marathon neu gemessen (v85).** 200 Partien nach den Regeln von v85 (v83: 40):
+   Kolonisten weit vorn (105 Siege bei 139 Besitzern), die Freie Forschung trotz der Grenze
+   an zweiter Stelle, die Günstige Forschung trotz doppeltem Abzug unter der Mitte;
+   Kriegerkultur und Handelsreich deutlich schwächer als in v83 gemessen, Rückschau und
+   Fruchtbarkeit stärker. `KI_DRAFT_BASE` folgt der Messung; ob die KI damit besser draftet
+   als mit der alten Tabelle, ist nicht gegeneinander gemessen. Die alten Werte stehen in
+   `ANNAHMEN.md` (v83 und v85), falls nur Griechenland nachgezogen werden soll.
 
 ## Arbeitsweise, die der Autor schätzt
 
