@@ -401,20 +401,29 @@ function useFreeTech(S, pi, tk) {
 }
 /* Griechenland "Rückschau": beliebige Tech eines früheren Zeitalters, auch nicht freigeschaltet. */
 /* Offene Rückschau-Ansprüche. Es können mehrere gleichzeitig sein (Oxford gibt zwei
-   Technologien, also zwei Ansprüche); sie werden der Reihe nach abgearbeitet. */
-function backPick(p) { return (p.backPicks || [])[0] || null; }
+   Technologien, also zwei Ansprüche); sie werden der Reihe nach abgearbeitet.
+   Ein Anspruch, für den nichts mehr übrig ist – alle früheren Technologien seines Feldes
+   sind schon da –, wird übersprungen (v87, beim Umbau gefunden). Bis v86 blieb er vorn in
+   der Schlange stehen, und jede weitere Rückschau desselben Zuges war verloren: Papier
+   erforscht mit der ganzen Antike der Forschung, danach Segeln – für Segeln gab es nichts.
+   Mit Spielstand liefert backPick den ersten nutzbaren Anspruch, ohne den ersten überhaupt. */
+const backPickPool = (S, p, bp) => techPool(S).filter(t => t.f === bp.f && t.age <= bp.age && !p.techs[t.k]);
+function backPick(p, S) {
+  const list = p.backPicks || [];
+  return (S ? list.find(bp => backPickPool(S, p, bp).length) : list[0]) || null;
+}
 function backPickOptions(S, pi) {
   const p = S.players[pi];
-  const bp = backPick(p);
-  if (!bp) return [];
-  return techPool(S).filter(t => t.f === bp.f && t.age <= bp.age && !p.techs[t.k]);
+  const bp = backPick(p, S);
+  return bp ? backPickPool(S, p, bp) : [];
 }
 function useBackPick(S, pi, tk) {
   const p = S.players[pi];
-  if (!backPickOptions(S, pi).some(t => t.k === tk)) return T('Nicht möglich.');
+  const bp = backPick(p, S);
+  if (!bp || !backPickPool(S, p, bp).some(t => t.k === tk)) return T('Nicht möglich.');
   const err = grantTech(S, pi, tk, T('Rückschau'), { noBack: true });   // keine Kette
   if (err) return err;
-  p.backPicks.shift();
+  p.backPicks.splice(p.backPicks.indexOf(bp), 1);
   return null;
 }
 
@@ -1261,6 +1270,58 @@ function growFree(S, pi, city, n, why) {
   else log(S, 'info', T('%s: kostenloses Wachstum (%s) nicht möglich – Nahrungsgrenze.', civOf(S.players[pi]).n, why));
   return done;
 }
+/* ------------------------------------------------ Sammelaktionen (v87, Wunsch des Autors)
+   Abkürzungen der Oberfläche („Fähigkeiten"): dieselbe Aktion in allen eigenen Städten, eine
+   nach der anderen über die Regel der einzelnen Stadt (growCity, sacrifice). Eine eigene
+   Regel gibt es dafür nicht – und die KI braucht keinen Kandidaten, sie erwägt jede Stadt
+   ohnehin einzeln.
+   Gewachsen wird von der kleinsten Stadt an (bei gleicher Größe in der Reihenfolge der
+   Städte): Wachstum kostet je Bevölkerung, so wachsen bei knappen Mitteln die meisten. Was
+   an einer Stadt scheitert (schon gewachsen, neu, Sturmflut, Nahrungsgrenze, zu wenig
+   Mittel), wird übersprungen; die übrigen wachsen trotzdem. `mode`: 'free' (Verbundwerkstoffe)
+   oder 'paid'. */
+function growAllOrder(S, pi) {
+  return citiesOf(S, pi).map((c, i) => ({ c, i }))
+    .sort((a, b) => a.c.pop - b.c.pop || a.i - b.i).map(x => x.c);
+}
+// done/of: gewachsene von allen eigenen Städten · why: Gründe der übrigen · price: Summe der
+// Wachstumspreise der gewachsenen (bezahlt; der Preis ohne Umtausch, wie am Stadtknopf)
+function growAll(S, pi, mode) {
+  const out = { done: 0, of: 0, why: [], price: { food: 0, coins: 0 } };
+  for (const city of growAllOrder(S, pi)) {
+    out.of++;
+    const pc = mode === 'paid' ? growPrice(S, pi, city) : null;
+    const e = growCity(S, pi, city, mode);
+    if (e) { out.why.push(e); continue; }
+    out.done++;
+    if (pc) { out.price.food += pc.food; out.price.coins += pc.coins; }
+  }
+  return out;
+}
+/* Was growAll täte – ausgeführt auf einer Wegwerfkopie, also dieselbe Rechnung und nie eine
+   andere Antwort. Nachrechnen ginge nur mit den Regeln noch einmal: welche Städte wachsen,
+   hängt an Vorrat und Nahrungsgrenze nach jedem einzelnen Schritt. (Wachsen alle, ist das
+   Bezahlte genau, was costPaid für die Summe sagt – gemessen an 2847 zufälligen Ständen
+   mit England, Alchemie, Gilden, Computertechnik, Fruchtbarkeit und Dampfmaschine.)
+   Dazu `paid`: was tatsächlich von jedem Vorrat abginge. Ändert nichts am Spielstand. Die
+   Kopie kommt ohne Protokoll aus – Wachsen würfelt nicht. */
+function stateCopy(S) {
+  const flach = {};
+  for (const k in S) flach[k] = k === 'log' ? [] : S[k];
+  return JSON.parse(JSON.stringify(flach));
+}
+function growAllPlan(S, pi, mode) {
+  const C = stateCopy(S), vor = S.players[pi].res;
+  const out = growAll(C, pi, mode), nach = C.players[pi].res;
+  out.paid = { sci: vor.sci - nach.sci, food: vor.food - nach.food, coins: vor.coins - nach.coins };
+  return out;
+}
+/* Der häufigste Grund, aus dem eine Sammelaktion Städte ausgelassen hat (für den Knopf). */
+function commonReason(why) {
+  const n = {};
+  (why || []).forEach(w => { n[w] = (n[w] || 0) + 1; });
+  return (why || []).reduce((best, w) => (best == null || n[w] > n[best] ? w : best), null);
+}
 /* Gegnerisches Territorium: alle beherrschten Felder ANDERER, noch lebender Reiche –
    Stadtumland und per Kolonialismus gekaufte Felder, so wie controlledTiles es überall
    im Spiel versteht (Stadtfelder selbst gehören dort nicht dazu, die prüft
@@ -1579,7 +1640,9 @@ function slaveryUsable(p) {
   if (SLAVERY_OBSOLETE_IN_MODERN && hasModernTech(p)) return false;
   return true;
 }
-function sacrifice(S, pi, city) {           // Sklaverei
+// Warum hier nicht geopfert werden kann – oder null. Die Prüfung von sacrifice, einzeln
+// abfragbar für die Sammelaktion (v87).
+function sacrificeError(S, pi, city) {
   const p = S.players[pi];
   if (!has(p, 'sklaverei')) return T('Sklaverei nicht erforscht.');
   if (SLAVERY_OBSOLETE_IN_MODERN && hasModernTech(p))
@@ -1587,9 +1650,25 @@ function sacrifice(S, pi, city) {           // Sklaverei
   if (!city || city.owner !== pi) return T('Fremde Stadt.');
   if (city.pop < 2) return T('Die letzte Bevölkerung darf nicht geopfert werden.');
   if (city.sacrificed === S.round) return T('Diese Stadt hat diese Runde schon geopfert.');
+  return null;
+}
+function sacrifice(S, pi, city) {           // Sklaverei
+  const p = S.players[pi];
+  const err = sacrificeError(S, pi, city); if (err) return err;
   city.pop--; city.sacrificed = S.round; p.res.coins += SLAVERY_COINS;
   log(S, 'act', T('%s: Bevölkerung geopfert → +%s Münzen.', civOf(p).n, SLAVERY_COINS));
   return null;
+}
+/* Sammelaktion (v87): in jeder eigenen Stadt, in der es geht, je eine Bevölkerung opfern.
+   Die Städte hängen nicht voneinander ab, die Reihenfolge ist also egal. */
+function sacrificeAll(S, pi) {
+  const out = { done: 0, of: 0, why: [] };
+  for (const city of citiesOf(S, pi)) {
+    out.of++;
+    const e = sacrifice(S, pi, city);
+    if (e) out.why.push(e); else out.done++;
+  }
+  return out;
 }
 function buyTile(S, pi, r, c) {             // Kolonialismus
   const p = S.players[pi];
@@ -1668,6 +1747,24 @@ function copyTech(S, pi, tk, mode) {
   const same = techPool(S).filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
   if (same.length === 1) rollAvailability(S, pi, opt.tech.f, opt.tech.age + 1);
   return null;
+}
+/* Was diesem Reich gerade GRATIS offensteht (v87, Wunsch des Autors: die Zahl an
+   „Fähigkeiten"). Je Art einmal, gleich wie oft sie geht – kostenloses Wachstum in fünf
+   Städten ist eine Art, zwei offene Rückschau-Ansprüche auch. Gezählt wird nur, was sich
+   jetzt auch wirklich nutzen lässt: kostenloses Wachstum, das an der Nahrungsgrenze
+   scheitert, oder eine Internet-Kopie ohne etwas zu kopieren zählen nicht. Bezahltes
+   (Wachsen, Kopieren, Sklaverei) zählt nie. Die kostenlosen Technologien aus Wundern
+   (Bibliothek, Oxford, Raumfahrt) gehören dazu – sie sind dieselbe Art Anspruch wie die
+   Freie Forschung. */
+function freeActions(S, pi) {
+  const out = [];
+  if (freeTechOptions(S, pi).length) out.push('forschung');
+  if (backPickOptions(S, pi).length) out.push('rueckschau');
+  if (freePickOptions(S, pi).length) out.push('wunder');
+  if (citiesOf(S, pi).some(c => freeGrowthAvailable(S, pi, c) && !growBlockReason(S, pi, c)))
+    out.push('wachstum');
+  if (internetAvailable(S, pi) && copyableTechs(S, pi).some(o => o.freeOk)) out.push('internet');
+  return out;
 }
 function nuke(S, pi, r, c) {                // Atomwaffen
   const p = S.players[pi];

@@ -56,9 +56,16 @@ function setBarHeight() {
   const bar = document.querySelector('#screen-game .actionbar');
   const hud = document.querySelector('#screen-game .hud');
   const st = document.documentElement.style;
-  // getBoundingClientRect statt offsetHeight: subpixelgenau und auch dann korrekt,
-  // wenn die App gedreht dargestellt wird.
-  const hoch = el => el ? Math.round(el.getBoundingClientRect().height) : 0;
+  // getBoundingClientRect statt offsetHeight: subpixelgenau. Es misst aber das Rechteck NACH
+  // der Drehung – ist die App hochkant um 90° gedreht (turning), ist dessen Höhe die Breite
+  // der Leiste, also fast die ganze Bildschirmhöhe. Dann gilt die Breite (v87, beim Prüfen
+  // gefunden: bis v86 stand --bar-h gedreht auf z. B. 1180px, und jedes Blatt – auch das eines
+  // KI-Zugs samt „Weiter" – lag außerhalb des Bildschirms).
+  const hoch = el => {
+    if (!el) return 0;
+    const r = el.getBoundingClientRect();
+    return Math.round(turning() ? r.width : r.height);
+  };
   if (hoch(bar)) st.setProperty('--bar-h', hoch(bar) + 'px');
   if (hoch(hud)) st.setProperty('--hud-h', hoch(hud) + 'px');
 }
@@ -186,8 +193,10 @@ function orphanMarks(g, S2) {
 /* ------------------------------------------------------------------ Kartenansichten (v75)
    Drei Schichten legen sich auf Wunsch über die Karte:
    · Erträge – je Feld bis zu drei Chips: Wissenschaft blau, Nahrung grün, Münzen gold,
-     Nullen weggelassen. Gerechnet für das Reich, das gerade schaut (tileYieldAt), also
-     mit seinen Technologien. Stadtfelder bringen selbst nichts und bleiben frei.
+     Nullen weggelassen. Gerechnet für das Reich am Zug (tileYieldAt), also mit seinen
+     Technologien. Stadtfelder bringen selbst nichts und bleiben frei. Seit v87 nur noch im
+     Gründungsmodus: der eigene Umschalter „Erträge" zeigte genau dasselbe und ist entfallen
+     (an seiner Stelle steht „Fähigkeiten").
    · Gründungsmodus – auf jedem möglichen Platz die Kosten in Nahrung (rot, wenn sie
      diesen Zug nicht reichen), unmögliche Felder abgeblendet. Entscheiden tun
      foundSiteError und foundCost aus engine.js, nicht die Oberfläche.
@@ -506,13 +515,6 @@ function attachTaps(svg, onTap) {
 
 /* ------------------------------------------------------------------ Spielansicht */
 function currentMap() { return customMap || DEFAULT_MAP; }
-/* Wessen Erträge zeigt die Ertragsansicht? Wer am Zug ist – während Bots oder die KI
-   ziehen, der Mensch, der zuschaut (sonst sprängen die Zahlen mit jedem Zug um). */
-function viewerOf(S2) {
-  if (!isAuto(P(S2))) return S2.cur;
-  const m = S2.players.findIndex(p => p.kind === 'human' && !p.dead);
-  return m >= 0 ? m : S2.cur;
-}
 function redraw() {
   if (ui.army && !S.armies.includes(ui.army)) ui.army = null;
   const p = P(S), civ = civOf(p);
@@ -523,12 +525,12 @@ function redraw() {
   drawMap($('map'), S.map, {
     state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : null,
     turn: isAuto(p) ? -1 : S.cur,
-    yields: showYields || gruenden ? viewerOf(S) : null,
+    // Erträge je Feld nur im Gründungsmodus – den gibt es nur im eigenen Zug (v87)
+    yields: gruenden ? S.cur : null,
     found: gruenden ? S.cur : null,
     power: ui.powerView ? powerView(S) : null,
   });
   $('a-found').classList.toggle('on', gruenden);
-  $('a-yields').classList.toggle('on', showYields);
   $('hud-sym').textContent = SYM[civ.sym];
   $('hud-sym').style.borderColor = civ.color;
   // Neben dem Reichsnamen steht die Fähigkeit – ausgelost oder gewählt, hier sieht man,
@@ -552,25 +554,25 @@ function redraw() {
   $('hud-sci').textContent = p.res.sci;
   $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
   $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
-  ['a-tech', 'a-found', 'a-power', 'a-end'].forEach(id => $(id).disabled = !human);
-  // „Erträge" ist reine Ansicht: immer bedienbar, auch im Tutorial und während Bots ziehen
-  $('a-yields').disabled = false;
+  ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-end'].forEach(id => $(id).disabled = !human);
   if (ui.tut) {
     const bar = tutAllow().bar;
     TUT_BAR.forEach(id => $(id).disabled = !human || (bar ? !bar.includes(id) : true));
     renderTutPanel();
   }
+  // Zahl an „Fähigkeiten" (v87): wie viele ARTEN kostenloser Aktionen offen sind
+  // (freeActions) – nur, solange man den Knopf drücken kann; im Zug eines Bots oder der KI
+  // wäre es deren Zahl
+  const frei = $('a-abil').disabled ? 0 : freeActions(S, S.cur).length;
+  $('a-abil-n').textContent = frei ? String(frei) : '';
+  $('a-abil-n').hidden = !frei;
   saveGame();
 }
-/* Die Knöpfe der Leiste, die das Tutorial an seine Schienen bindet (alle außer „Erträge"). */
-const TUT_BAR = ['a-tech', 'a-found', 'a-power', 'a-info', 'a-log', 'a-end'];
-/* Ertragsansicht an/aus – je Gerät gemerkt. */
-let showYields = !!load('hochciv.yields');
-function toggleYields() {
-  showYields = !showYields;
-  store('hochciv.yields', showYields || null);
-  if (S && $('screen-game').classList.contains('show')) redraw();
-}
+/* Die Knöpfe der Leiste, die das Tutorial an seine Schienen bindet – seit v87 alle: der
+   Ansichtsschalter „Erträge", der als einziger immer frei war, ist entfallen. „Fähigkeiten"
+   enthält Aktionen (Wachsen, Opfern, Kopieren …) und gibt keine Tutorialaufgabe frei – es
+   bleibt dort also zu. */
+const TUT_BAR = ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-info', 'a-log', 'a-end'];
 /* Gründungsmodus an/aus (v75). Stadtgründung ist eine eigene Aktion der Leiste: an, zeigt
    die Karte Erträge und Kosten; ein Tipp auf ein Feld öffnet das Gründungsblatt. */
 function toggleFoundMode() {
@@ -634,8 +636,13 @@ const fmtY = y => y.map((n, i) => n + Y_ICON[i]).join(' ');
 const COST_ICON = { sci: '🔬', food: '🌾', coins: '🪙' };
 function costText(cost, alt, opts) {
   if (prefs.listPrice || !S || S.over) return alt;
-  const paid = costPaid(S, S.cur, cost, opts);
-  if (!paid) return alt;
+  return paidText(cost, costPaid(S, S.cur, cost, opts), alt);
+}
+/* Das Formatieren allein: `paid` ist, was von jedem Vorrat abgeht (oder null, wenn es nicht
+   reicht). Seit v87 eigens, weil „Alle Städte wachsen" auch nur einen Teil der Städte wachsen
+   lassen kann – dessen `paid` kommt aus growAllPlan, nicht aus costPaid über eine Summe. */
+function paidText(cost, paid, alt) {
+  if (prefs.listPrice || !paid) return alt;
   const eigen = COST_ORDER.filter(k => cost[k] > 0);
   if (COST_ORDER.every(k => (paid[k] || 0) === (cost[k] || 0))) return alt;
   const reihe = eigen.concat(['food', 'coins', 'sci'].filter(k => !eigen.includes(k)));
@@ -925,7 +932,7 @@ function techBoardHTML(S, pi, opts) {
 }
 function techModal() {
   endFoundMode();
-  const pi = S.cur, p = P(S);
+  const pi = S.cur;
   // Nur die kleine Legende mit zwei Beispielmarken – der erklärende Absatz darüber ist
   // raus, er stand in jeder Ansicht im Weg.
   const bsp = S.players.find((pl, i) => i !== pi && !pl.dead);
@@ -937,42 +944,9 @@ function techModal() {
        </p>`
     : '';
   grid += techBoardHTML(S, pi);
-  // Griechenland "Freie Forschung": eine verfügbare Tech bis Industrialisierung gratis
-  const ft = freeTechOptions(S, pi);
-  if (ft.length) {
-    grid += `<p class="sub" style="margin-top:14px">${T('Freie Forschung (1× pro Runde, kostenlos)')}</p>`;
-    grid += ft.map(t => `<button class="tech avail afford" data-freetech="${t.k}">
-      <span class="c">${T('gratis')}</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
-  }
-  const bp = backPickOptions(S, pi);
-  if (bp.length) {
-    grid += `<p class="sub" style="margin-top:14px">${T('Rückschau: eine Technologie aus %s, früheres Zeitalter, kostenlos', FIELDS[backPick(p).f])}</p>`;
-    grid += bp.map(t => `<button class="tech avail afford" data-backtech="${t.k}">
-      <span class="c">${T('gratis')}</span><b>${t.n}</b><span class="eff">${techEffect(t, S)}</span></button>`).join('');
-  }
-  const cop = copyableTechs(S, pi);
-  if (cop.length) {
-    const anyFree = internetAvailable(S, pi) && cop.some(o => o.freeOk);
-    grid += `<p class="sub" style="margin-top:14px">${T('Technologien kopieren')}${
-      anyFree ? ' · ' + T('1× gratis per Internet') : ''}</p>`;
-    cop.slice(0, 40).forEach(o => {
-      // je Technologie ggf. zwei Knöpfe: bezahlt und/oder gratis
-      const buttons = [];
-      if (o.paidCoins != null)
-        buttons.push(`<button class="tech avail ${available(S, pi, 'coins') >= o.paidCoins
-          ? 'afford' : 'costly'}" data-copy="${o.tech.k}" data-mode="paid">
-          <span class="c">${costText({ coins: o.paidCoins }, `${o.paidCoins}🪙`)}</span><b>${o.tech.n}</b>
-          <span class="eff">${techEffect(o.tech, S)}</span>${ownerMarks(S, o.tech.k, pi)}</button>`);
-      // Gratiskopie: dieselbe Kachel wie jede andere, mit der Wirkung der Technologie.
-      // Dass es die Internet-Kopie ist, sagen schon „gratis" und die Überschrift.
-      if (o.freeOk)
-        buttons.push(`<button class="tech avail afford" data-copy="${o.tech.k}" data-mode="free">
-          <span class="c">${T('gratis')}</span><b>${o.tech.n}</b>
-          <span class="eff">${techEffect(o.tech, S)}</span>
-          ${ownerMarks(S, o.tech.k, pi)}</button>`);
-      grid += buttons.join('');
-    });
-  }
+  /* Freie Forschung, Rückschau und Kopieren (Spionage, Kundschafterei, Internet) standen bis
+     v86 hier unter dem Bogen – seit v87 leben sie unter „Fähigkeiten" (abilSheet), mit der
+     Zahl an der Leiste, wenn etwas davon gratis offen ist. */
   const layout = `<div class="tech-layout">
     <aside class="tech-aside">${yieldOverview(S, pi)}</aside>
     <div class="tech-main">${grid}</div>
@@ -984,18 +958,6 @@ function techModal() {
     const e = doResearch(S, S.cur, b.dataset.tech);
     if (e) return toast(e);
     redraw(); if (S.over) { closeModal(); gameOver(); } else techModal();
-  });
-  $('ov-body').querySelectorAll('[data-freetech]').forEach(b => b.onclick = () => {
-    const e = useFreeTech(S, S.cur, b.dataset.freetech);
-    if (e) return toast(e); redraw(); techModal();
-  });
-  $('ov-body').querySelectorAll('[data-backtech]').forEach(b => b.onclick = () => {
-    const e = useBackPick(S, S.cur, b.dataset.backtech);
-    if (e) return toast(e); redraw(); techModal();
-  });
-  $('ov-body').querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
-    const e = copyTech(S, S.cur, b.dataset.copy, b.dataset.mode);
-    if (e) return toast(e); redraw(); techModal();
   });
 }
 function powerSheet() {
@@ -1022,6 +984,154 @@ function powerSheet() {
     if (e) toast(e);
     redraw(); powerSheet();             // die Ringe zeigen gleich den neuen Machtwert
   });
+}
+/* ------------------------------------------------------------------ Fähigkeiten (v87)
+   Wunsch des Autors: ein Ort für die besonderen Fähigkeiten und alles, was über eine
+   einzelne Stadt hinausgeht – in der Leiste an der Stelle des früheren Umschalters
+   „Erträge" (der zeigte dasselbe wie der Gründungsmodus).
+   · die eigene Zivilisationsfähigkeit (im Marathon beide) mit Wirkung; die aktiven zum
+     Auslösen: Freie Forschung und Rückschau – bis v86 unten im Technologiebogen,
+   · kostenlose Technologien aus Wundern (Bibliothek, Oxford, Raumfahrt): das Fenster dazu
+     geht weiter von selbst auf, hier bleiben sie greifbar, wenn man es geschlossen hat,
+   · Wachsen in allen Städten: kostenlos (Verbundwerkstoffe) und bezahlt, mit dem, was
+     tatsächlich abgeht – die Abkürzung, damit man nicht jede Stadt einzeln antippt,
+   · Sklaverei in allen Städten, solange sie nicht obsolet ist,
+   · Kopieren: Spionage, Kundschafterei, Internet – bis v86 im Technologiebogen.
+   Die Zahl an der Leiste zählt die ARTEN kostenloser Aktionen, die gerade gehen
+   (freeActions); dieselben Knöpfe sind im Blatt hervorgehoben (.opt.free). Entschieden
+   wird alles in der Regelmaschine (freeTechOptions, backPickOptions, growAllPlan,
+   sacrificeError, copyableTechs …) – das Blatt ordnet und formatiert nur.
+   `oben`: aus der Leiste geöffnet, also von oben; nach einer Aktion bleibt die Stelle. */
+function abilSheet(oben) {
+  if (!S || S.over || isAuto(P(S))) return;
+  endFoundMode();
+  const pi = S.cur, p = P(S);
+  const rows = [], handlers = [];
+  // label = deutscher Schlüssel (data-label, wie btn in openTile), titel = was dasteht
+  const knopf = (label, act, titel, sub, cost, fn, off, frei) => {
+    const id = 'f' + (handlers.length + 1) + Math.random().toString(36).slice(2, 6);
+    rows.push(`<button class="opt${frei ? ' free' : ''}" id="${id}" data-label="${label}" data-act="${act}" ${off ? 'disabled' : ''}>` +
+      `<span>${titel}${sub ? `<small>${sub}</small>` : ''}</span><span class="cost">${cost || ''}</span></button>`);
+    handlers.push([id, fn]);
+  };
+  const kopf = t => rows.push(`<h4 class="abil-h">${t}</h4>`);
+  const notiz = t => rows.push(`<p class="sub abil-note">${t}</p>`);
+  // Einzelne Wahl (Technologie, Kopie): Fehler melden, sonst neu zeichnen – auch das Ende
+  // der Partie (Oxford kann die Singularität bringen)
+  const tu = fn => () => {
+    const e = fn();
+    if (e) return toast(e);
+    redraw();
+    if (S.over) { closeSheet(); return gameOver(); }
+    abilSheet();
+  };
+  // Sammelaktion: dazu ein Satz, wie viele Städte es waren
+  const alle = (fn, satz) => () => {
+    const r = fn();
+    redraw();
+    if (r.done) toast(satz(r)); else toast(commonReason(r.why) || T('Nicht möglich.'));
+    abilSheet();
+  };
+  const staedte = n => n === 1 ? T('1 Stadt') : T('%s Städte', n);
+  // Unterzeile einer Sammelaktion: alle, ein Teil (samt häufigstem Grund für den Rest) oder keine
+  const sammelSub = (r, zusatz) => {
+    const grund = commonReason(r.why);
+    if (!r.of) return T('Keine Stadt.');
+    if (!r.done) return grund || '';
+    return (r.done === r.of ? staedte(r.done) : T('%s von %s Städten', r.done, r.of)) +
+      (zusatz ? ' · ' + zusatz : '') + (r.done < r.of && grund ? ' · ' + T('übrige: %s', grund) : '');
+  };
+  const techSub = t => t.k === 'singularitaet' ? esc(SINGULARITY.e) : esc(techEffect(t, S));
+
+  /* 1 Zivilisationsfähigkeit(en). Doppelt gedraftet wirkt eine nur einfach – steht also auch
+     nur einmal da. */
+  const gesehen = new Set();
+  const abils = abilInfos(p).filter(a => !gesehen.has(a.id) && gesehen.add(a.id));
+  kopf(abils.length > 1 ? T('Deine Fähigkeiten') : T('Deine Fähigkeit'));
+  abils.forEach(a => {
+    rows.push(`<div class="abil-card"><b>${esc(a.n)}</b><small>${esc(abilEffect(a, S))}</small></div>`);
+    if (a.k === 'gratistech') {
+      const ft = freeTechOptions(S, pi);
+      ft.forEach(t => knopf('Freie Forschung', 'forschung:' + t.k, esc(t.n), techSub(t), T('gratis'),
+        tu(() => useFreeTech(S, pi, t.k)), false, true));
+      if (!ft.length) notiz(p.freeTechUsed === S.round ? T('Diese Runde schon genutzt.')
+        : evActive(S, pi, 'dunkles_zeitalter') ? T('Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.')
+          : T('Gerade ist keine passende Technologie verfügbar.'));
+    }
+    if (a.k === 'rueckschau') {
+      const bp = backPickOptions(S, pi);
+      if (bp.length) {
+        notiz(T('Rückschau: eine Technologie aus %s, früheres Zeitalter, kostenlos', FIELDS[backPick(p, S).f]));
+        bp.forEach(t => knopf('Rückschau', 'rueckschau:' + t.k, esc(t.n), techSub(t), T('gratis'),
+          tu(() => useBackPick(S, pi, t.k)), false, true));
+      } else notiz(T('Gerade nichts offen. Jede Technologie ab dem Mittelalter, die du erforschst, bringt hier eine kostenlose aus einem früheren Zeitalter desselben Feldes – nur im selben Zug.'));
+    }
+  });
+  if (!abils.length) notiz(T('Bots haben keine Fähigkeit'));
+
+  // 2 kostenlose Technologien aus Wundern
+  const pick = freePick(p), fp = freePickOptions(S, pi);
+  if (pick && fp.length) {
+    kopf(T('Kostenlose Technologie'));
+    notiz(esc(pick.why) + ' · ' + T('Noch %s kostenlose Technologie(n).', pick.n));
+    fp.forEach(t => knopf('Kostenlose Technologie', 'wunder:' + t.k, esc(t.n), techSub(t), T('gratis'),
+      tu(() => useFreePick(S, pi, t.k)), false, true));
+  }
+
+  // 3 Wachstum in allen Städten – kostenlos (Verbundwerkstoffe) und bezahlt
+  kopf(T('Wachstum'));
+  if (has(p, 'verbundwerkstoffe')) {
+    const r = growAllPlan(S, pi, 'free');
+    knopf('Alle Städte kostenlos wachsen', 'wachsen:gratis', T('Alle Städte kostenlos wachsen'),
+      sammelSub(r, TECH_BY_KEY.verbundwerkstoffe.n), r.done ? T('gratis') : '—',
+      alle(() => growAll(S, pi, 'free'), x => x.done === x.of ? T('Alle Städte sind gewachsen.')
+        : T('Gewachsen: %s von %s Städten.', x.done, x.of)), !r.done, r.done > 0);
+  }
+  {
+    const r = growAllPlan(S, pi, 'paid');
+    const preis = `${r.price.food}🌾 ${r.price.coins}🪙`;
+    knopf('Alle Städte wachsen', 'wachsen:bezahlt', T('Alle Städte wachsen'), sammelSub(r),
+      r.done ? paidText(r.price, r.paid, preis) : '—',
+      alle(() => growAll(S, pi, 'paid'), x => x.done === x.of ? T('Alle Städte sind gewachsen.')
+        : T('Gewachsen: %s von %s Städten.', x.done, x.of)), !r.done);
+  }
+
+  // 4 Sklaverei in allen Städten (nicht mehr, sobald sie obsolet ist)
+  if (slaveryUsable(p)) {
+    kopf(esc(TECH_BY_KEY.sklaverei.n));
+    const st = citiesOf(S, pi), why = st.map(c => sacrificeError(S, pi, c)).filter(Boolean);
+    const r = { done: st.length - why.length, of: st.length, why };
+    knopf('In allen Städten opfern', 'opfern', T('In allen Städten opfern'),
+      sammelSub(r, r.done ? T('je 1 Bevölkerung') : ''), r.done ? '+' + r.done * SLAVERY_COINS + '🪙' : '—',
+      alle(() => sacrificeAll(S, pi), x => T('Geopfert: %s Bevölkerung, +%s Münzen.', x.done, x.done * SLAVERY_COINS)),
+      !r.done);
+  }
+
+  // 5 Kopieren – Spionage (1×), Kundschafterei (2×) und die Gratiskopie per Internet
+  const bezahlt = copyRate(p) != null, netz = has(p, 'internet');
+  if (bezahlt || netz) {
+    const frei = internetAvailable(S, pi);
+    kopf(T('Technologien kopieren') + (frei ? ' · ' + T('1× gratis per Internet') : ''));
+    const weg = has(p, 'spionage') ? TECH_BY_KEY.spionage : has(p, 'kundschafterei') ? TECH_BY_KEY.kundschafterei : null;
+    notiz([weg ? `${esc(weg.n)}: ${esc(weg.e)}` : '',
+      netz ? `${esc(TECH_BY_KEY.internet.n)}: ${frei ? esc(TECH_BY_KEY.internet.e) : T('diese Runde schon eingesetzt')}` : '']
+      .filter(Boolean).join(' · '));
+    const cop = copyableTechs(S, pi);
+    if (!cop.length) notiz(T('Nichts zu kopieren – kein anderes Reich hat eine Technologie, die dir fehlt.'));
+    cop.slice(0, 40).forEach(o => {
+      const t = o.tech, marken = ownerMarks(S, t.k, pi);
+      // je Technologie bis zu zwei Knöpfe: gratis per Internet und bezahlt
+      if (o.freeOk) knopf('Gratis kopieren', 'kopie:gratis:' + t.k, esc(t.n), techSub(t) + marken, T('gratis'),
+        tu(() => copyTech(S, pi, t.k, 'free')), false, true);
+      if (o.paidCoins != null) knopf('Kopieren', 'kopie:bezahlt:' + t.k, esc(t.n), techSub(t) + marken,
+        costText({ coins: o.paidCoins }, `${o.paidCoins}🪙`), tu(() => copyTech(S, pi, t.k, 'paid')),
+        available(S, pi, 'coins') < o.paidCoins);
+    });
+  }
+
+  sheet(`<h3>${T('Fähigkeiten')}</h3>` + rows.join(''));
+  if (oben) $('sheet').scrollTop = 0;
+  handlers.forEach(([id, fn]) => { const el = $(id); if (el) el.onclick = fn; });
 }
 /* Protokollzeilen als HTML. Die Würfe, die zu einer Aktion geführt haben, hängen als
    aufklappbares Detail an dieser Aktionszeile: sichtbar ist nur, was passiert ist,
@@ -1140,10 +1250,18 @@ function runBots() {
     ? logHtml(entries)
     : `<div class="logline info">${T('Keine Aktionen in dieser Runde.')}</div>`;
   ui.botLock = true;                   // Sheet ist jetzt gesperrt: nur „Weiter" führt weiter
-  sheet(`<h3>${civOf(p).n} (${p.kind === 'ki' ? T('KI') : T('Bot')})</h3><p class="sub">${T('Runde %s', S.round)}</p>${lines}
+  /* „Weiter" oben und unten (v87, Wunsch des Autors): Wer das Protokoll nicht lesen will,
+     muss nicht erst ans Ende eines langen Blatts scrollen. Beide machen dasselbe. Das Blatt
+     beginnt oben – sonst bliebe die Scrollstelle des vorigen Blatts stehen, und der obere
+     Knopf wäre gerade dann außer Sicht. */
+  sheet(`<div class="bot-head"><div><h3>${civOf(p).n} (${p.kind === 'ki' ? T('KI') : T('Bot')})</h3>` +
+    `<p class="sub">${T('Runde %s', S.round)}</p></div>` +
+    `<button class="btn small primary" id="bot-next-top">${T('Weiter')}</button></div>${lines}
     <button class="btn wide" id="bot-next">${T('Weiter')}</button>`);
   $('sheet').classList.add('locked');
+  $('sheet').scrollTop = 0;
   $('bot-next').onclick = afterAutoTurn;
+  $('bot-next-top').onclick = afterAutoTurn;
 }
 /* „Weiter" unter dem Blatt eines KI- oder Bot-Zugs. Ist schon ein Mensch am Zug (ein
    zweites, verspätetes Antippen), wird nichts übersprungen. */
@@ -2267,6 +2385,7 @@ function boot() {
   customMap = load('hochciv.map');
   loadModules();
   loadPrefs();
+  store('hochciv.yields', null);     // Wahl des Umschalters „Erträge" (v75–v86) – entfallen
   const saved = load('hochciv.save');
   $('m-continue').hidden = !saved;
   bootTexts();
@@ -2318,7 +2437,7 @@ function boot() {
   $('a-tech').onclick = techModal;
   $('a-found').onclick = toggleFoundMode;
   $('a-power').onclick = powerSheet;
-  $('a-yields').onclick = toggleYields;
+  $('a-abil').onclick = () => abilSheet(true);
   $('a-info').onclick = worldModal;
   $('hud-feed').onclick = () => { if (!isAuto(P(S)) && !S.over) foodSheet(); };
   $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };

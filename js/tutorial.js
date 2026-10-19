@@ -511,7 +511,7 @@ const TUT_LOOK_ONLY = { bar: ['a-info', 'a-log'], labels: [], hex: () => [], tec
    an den Schienen vorbei. */
 function tutAllow() {
   const st = tutStep();
-  if (!st) return { bar: ['a-tech', 'a-found', 'a-power', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
+  if (!st) return { bar: ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-info', 'a-log', 'a-end'], labels: null, techs: null };
   if (!st.allow || (st.goal && st.goal())) return TUT_LOOK_ONLY;   // Leseschritt oder erledigt
   return Object.assign({ bar: [], labels: [], techs: [] }, st.allow);
 }
@@ -548,8 +548,9 @@ function tutGateTechs() {
   body.querySelectorAll('[data-tech]').forEach(b => {
     if (al.techs !== null && !al.techs.includes(b.dataset.tech)) b.disabled = true;
   });
-  body.querySelectorAll('[data-copy], [data-freetech], [data-backtech], [data-free]')
-    .forEach(b => { b.disabled = true; });
+  // Kopieren, Freie Forschung und Rückschau stehen seit v87 unter „Fähigkeiten" – dort hält
+  // TUT_BAR die Leiste zu. Hier bleibt nur die Wahl kostenloser Technologien.
+  body.querySelectorAll('[data-free]').forEach(b => { b.disabled = true; });
 }
 function tutHighlight() {
   const st = tutStep();
@@ -656,7 +657,8 @@ function tutMaybeAdvance() {
   if (ui.tut.i < (ui.tut.max || 0)) return;
   if (ui.botLock) return;
   const p = tutP();
-  if ((p.freePicks || []).some(c => c.n > 0) || (p.backPicks || []).length) return;
+  // offene Rückschau: nur, was sich noch wählen lässt (v87 – ein leerer Anspruch hält nichts auf)
+  if ((p.freePicks || []).some(c => c.n > 0) || backPickOptions(S, RU()).length) return;
   const overlayOpen = $('overlay') && $('overlay').classList.contains('show');
   if (st.keepOpen && overlayOpen) return;
   const from = ui.tut.i;

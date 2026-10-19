@@ -740,8 +740,6 @@ const UI_EN = {
     'Tile %s/%s · yield',
   'Feld kaufen':
     'Buy tile',
-  'Freie Forschung (1× pro Runde, kostenlos)':
-    'Free research (once per round, free)',
   'Für diese Spielerzahl gibt es keine Plättchenkarte.':
     'There is no tile map for this number of players.',
   'Melden Mensch und Bot in derselben Runde einen Sieg an, gewinnt der Mensch – auch mit weniger Punkten.':
@@ -1202,8 +1200,7 @@ const UI_EN = {
   'ausgeschieden': 'eliminated',
 
   'Ertragsübersicht': 'Yield overview',
-  /* --- Kartenansichten (v75): Erträge, Gründungsmodus, Machtringe */
-  'Erträge': 'Yields',
+  /* --- Kartenansichten (v75): Gründungsmodus, Machtringe (der Umschalter „Erträge" ist seit v87 weg) */
   'Hier gründen': 'Found here',
   'Feld für die neue Stadt antippen': 'Tap a tile for the new city',
   'Hier ließe sich eine Stadt gründen – über „Stadt gründen" in der Leiste.':
@@ -1238,6 +1235,31 @@ const UI_EN = {
   'flankiert eine Armee auf %s/%s': 'flanks an army at %s/%s',
   'baut Straße zur Stadt auf %s/%s': 'builds a road to the city at %s/%s',
   'baut Eisenbahn zur Stadt auf %s/%s': 'builds a railway to the city at %s/%s',
+
+  /* --- Fähigkeiten (v87): Blatt in der Leiste, Sammelaktionen, Kopieren */
+  'Fähigkeiten': 'Abilities',
+  'Deine Fähigkeit': 'Your ability',
+  'Deine Fähigkeiten': 'Your abilities',
+  'Diese Runde schon genutzt.': 'Already used this round.',
+  'Gerade ist keine passende Technologie verfügbar.': 'No suitable technology is available right now.',
+  'Gerade nichts offen. Jede Technologie ab dem Mittelalter, die du erforschst, bringt hier eine kostenlose aus einem früheren Zeitalter desselben Feldes – nur im selben Zug.':
+    'Nothing open right now. Every technology from the Middle Ages on that you research brings a free one here from an earlier age of the same field – in the same turn only.',
+  'Kostenlose Technologie': 'Free technology',
+  'Wachstum': 'Growth',
+  'Alle Städte kostenlos wachsen': 'Grow all cities for free',
+  'Alle Städte wachsen': 'Grow all cities',
+  'Alle Städte sind gewachsen.': 'All cities have grown.',
+  'Gewachsen: %s von %s Städten.': 'Grown: %s of %s cities.',
+  '1 Stadt': '1 city',
+  '%s Städte': '%s cities',
+  '%s von %s Städten': '%s of %s cities',
+  'übrige: %s': 'others: %s',
+  'Keine Stadt.': 'No city.',
+  'In allen Städten opfern': 'Sacrifice in all cities',
+  'je 1 Bevölkerung': '1 population each',
+  'Geopfert: %s Bevölkerung, +%s Münzen.': 'Sacrificed: %s population, +%s coins.',
+  'Nichts zu kopieren – kein anderes Reich hat eine Technologie, die dir fehlt.':
+    'Nothing to copy – no other empire has a technology you lack.',
 
   /* --- Karteneditor */
   'Größe': 'Size',
