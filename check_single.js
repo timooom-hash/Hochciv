@@ -54,5 +54,10 @@ console.log('Marathon:', M.map.name, '|', $('map').querySelectorAll('[data-r]').
   M.players.map(p => w.eval('abilitiesOf')(p).length).join('/'), 'Fähigkeiten je Reich');
 if (!M.marathon || M.players.some(p => w.eval('abilitiesOf')(p).length !== 2))
   { console.log('FEHLER: Marathon startet nicht mit gedrafteten Fähigkeiten'); process.exit(1); }
+// „Fähigkeiten" (v87): das Blatt aus der Leiste, hier mit den gedrafteten Fähigkeiten
+const F = w.eval(`(() => { closeModal(); if (isAuto(P(S))) return null; $('a-abil').onclick();
+  return [$('sheet-body').querySelectorAll('.abil-card').length, $('sheet-body').querySelectorAll('.opt').length]; })()`);
+console.log('Fähigkeiten:', F ? F[0] + ' Fähigkeit(en), ' + F[1] + ' Knöpfe' : 'KI am Zug – übersprungen');
+if (F && F[0] < 1) { console.log('FEHLER: das Blatt „Fähigkeiten" nennt keine Fähigkeit'); process.exit(1); }
 console.log('Fehler:', errs.length ? errs : 'keine');
 process.exit(errs.length?1:0);

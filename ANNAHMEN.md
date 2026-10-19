@@ -2539,6 +2539,10 @@ Machtansicht erscheint, was die Ringe zeigen, wie Gründen abläuft, wie Erträg
 
 ### Erträge je Feld
 
+(Seit v87 ist der Umschalter weg – er zeigte dasselbe wie der Gründungsmodus; an seiner
+Stelle steht „Fähigkeiten", siehe dort. Die Chips gibt es weiter im Gründungsmodus. Das
+Folgende ist der Stand von v75.)
+
 Ein Umschalter **Erträge** in der Leiste legt auf jedes Feld bis zu drei farbige Chips mit
 Zahl: Wissenschaft blau, Nahrung grün, Münzen gold; Nullen fehlen. Gerechnet wird mit
 `tileYieldAt` für das Reich, das gerade schaut – also mit dessen Technologien, Ereignissen
@@ -4089,3 +4093,183 @@ Wallfahrt und Seemacht nicht, Techtext; Regelbogen: Handelsroute +2, mit Bürokr
 `smoke.js`: Ertragsübersicht mit „Handelsrouten (Bürokratie ×2)" und +4, englisch „Trade
 routes (Bureaucracy ×2)" ohne fehlende Übersetzung; der neue Satz im Regelbogen, deutsch und
 englisch.
+
+## Fähigkeiten statt Erträge · „Weiter" oben und unten · Rückschau ohne Wahl · Blätter hochkant (v87)
+
+**Wunsch des Autors (18.10.):**
+1. Im Blatt eines Bot- oder KI-Zugs „Weiter" oben **und** unten – bei langem Protokoll muss man
+   sonst jedes Mal erst ans Ende scrollen.
+2. „Erträge" zeigt dasselbe wie „Stadt gründen": weg damit, an seiner Stelle **„Fähigkeiten"** –
+   der Ort für besondere Zivilisationsfähigkeiten (Griechenlands Freie Forschung, Rückschau);
+   mit Verbundwerkstoffen „Alle Städte kostenlos wachsen" (das kostenlose Wachstum in jeder
+   Stadt, statt durch alle Städte zu gehen); „Alle Städte wachsen" mit den Kosten am Knopf; mit
+   Sklaverei (solange nicht obsolet) „alle Städte opfern"; dazu jede Art des Kopierens. Sind
+   kostenlose Aktionen offen (Fähigkeiten, kostenloses Wachstum, Internet), steht an
+   „Fähigkeiten" eine Zahl – je Art, nicht jedes kostenlose Wachstum einzeln.
+
+### „Weiter" oben und unten
+
+* Neben dem Titel des Blatts (`.bot-head`, `#bot-next-top`) und wie bisher darunter
+  (`#bot-next`); beide rufen `afterAutoTurn`. Das Schließen-Kreuz ist in diesem Blatt ohnehin
+  ausgeblendet, die Ecke also frei.
+* Das Blatt beginnt oben (`scrollTop = 0` in `runBots`). Sonst bliebe die Scrollstelle des
+  vorigen Blatts stehen: wer dort unten „Weiter" getippt hat, sähe beim nächsten Bot den oberen
+  Knopf nicht.
+* Nicht mitlaufend (sticky) – gewünscht war oben und unten; wer liest, findet „Weiter" am Ende.
+
+### Fähigkeiten
+
+* Knopf in der Leiste an der Stelle von „Erträge" (`a-abil`), öffnet ein Blatt (`abilSheet`)
+  wie „Macht". Gesperrt, wenn kein Mensch am Zug ist oder die Partie vorbei ist; im Tutorial zu
+  (er steht in `TUT_BAR`, und kein Schritt gibt ihn frei – „Alle Städte wachsen" wäre ein Weg
+  an den Schienen vorbei).
+* **Inhalt**, je nachdem, was das Reich hat:
+  1. **Deine Fähigkeit(en)** – Name und Wirkung (`abilEffect`). Auf dem iPad stand bisher nur
+     der Name in der Kopfzeile; die Wirkung lag im `title` (ohne Maus nicht lesbar) und im
+     Weltblatt. Aktiv: **Freie Forschung** (die Wahl, sonst der Grund: schon genutzt, Dunkles
+     Zeitalter, nichts verfügbar) und **Rückschau** (die offene Wahl, sonst wie sie entsteht –
+     „nur im selben Zug"). Im Marathon doppelt gedraftet, steht eine Fähigkeit einmal da.
+  2. **Kostenlose Technologie** aus Wundern (Bibliothek, Oxford, Raumfahrt). Das Fenster dazu
+     geht weiter von selbst auf (Zugbeginn, nach dem Bau); hier bleibt die Wahl greifbar, wenn
+     man es geschlossen hat – bis v86 ging das erst zu Beginn des nächsten Zugs wieder.
+  3. **Wachstum:** „Alle Städte kostenlos wachsen" (mit Verbundwerkstoffen) und „Alle Städte
+     wachsen".
+  4. **Sklaverei:** „In allen Städten opfern", nur solange sie nicht obsolet ist.
+  5. **Technologien kopieren:** Spionage bzw. Kundschafterei (den Preis nennt der Text der
+     Technologie) und die Gratiskopie per Internet, je Technologie mit Wirkung und den Reichen,
+     die sie haben.
+* **Aus dem Technologiebogen ausgezogen:** Freie Forschung, Rückschau und Kopieren standen bis
+  v86 unter dem Bogen – auf dem iPad erst nach Scrollen zu sehen. Der Bogen zeigt jetzt nur
+  noch die Forschung.
+* **Die Zahl am Knopf** (`freeActions`, engine.js): die Arten kostenloser Aktionen, die gerade
+  gehen – Freie Forschung, Rückschau, Wunder-Technologie, kostenloses Wachstum,
+  Internet-Kopie. Je Art eins: fünf Städte mit kostenlosem Wachstum zählen einmal, zwei offene
+  Rückschau-Ansprüche auch. Nur, was sich nutzen lässt: kostenloses Wachstum, das in jeder
+  Stadt an der Nahrungsgrenze scheitert, oder eine Internet-Kopie ohne etwas zu kopieren
+  zählen nicht. Dieselben Knöpfe sind im Blatt hervorgehoben (`.opt.free`). Gerechnet bei
+  jedem Zeichnen; gemessen mit 60 Städten an der Nahrungsgrenze (jede Stadt wird geprüft)
+  15–18 ms in Node, sonst meist nach der ersten Stadt fertig.
+* **Auslegung – Wunder-Technologien zählen mit**, obwohl der Autor „Zivilisationsfähigkeiten,
+  kostenloses Wachstum, Internet" nannte: Sie sind derselbe Anspruch wie die Freie Forschung
+  (eine Technologie gratis), und ihre Wahl war nach dem Schließen des Fensters bis v86 gar
+  nicht mehr zu erreichen. Bezahltes (Wachsen, Kopieren, Sklaverei) zählt nie.
+* **Auslegung – „Alle Städte wachsen" steht immer da**, nicht erst mit Verbundwerkstoffen: die
+  Abkürzung hilft mit und ohne.
+
+### Sammelaktionen: alle Städte wachsen, in allen Städten opfern
+
+* **Keine neue Regel.** `growAll` und `sacrificeAll` (engine.js) rufen Stadt für Stadt
+  `growCity` bzw. `sacrifice` – dieselben Prüfungen, Preise und Protokollzeilen wie der
+  Einzelknopf. Die KI braucht keinen Kandidaten: sie erwägt jede Stadt ohnehin einzeln.
+* **Reihenfolge (Auslegung):** von der kleinsten Stadt an, gleich große in der Reihenfolge der
+  Städte (`growAllOrder`). Wachstum kostet je Bevölkerung – reichen die Mittel nicht für alle,
+  wachsen so die meisten.
+* **Teilweise (Auslegung):** Was an einer Stadt scheitert – schon gewachsen, in dieser Runde
+  gegründet, Sturmflut, Nahrungsgrenze, zu wenig Mittel –, wird ausgelassen, die übrigen
+  wachsen. Vorher steht am Knopf, wie viele es werden („2 von 3 Städten") und der häufigste
+  Grund für den Rest; geht keine, ist er gesperrt und nennt den Grund. Die Alternative „alle
+  oder keine" hieße: eine einzige zu teure Stadt, und man tippt wieder jede einzeln an.
+* **Kosten am Knopf:** was tatsächlich abgeht, wie seit v82 überall („3🌾 9🪙", wenn Münzen für
+  fehlende Nahrung einspringen); mit „Kosten ohne Umtausch anzeigen" der Preis, die Summe der
+  Einzelpreise. Gerechnet wird nicht über eine Summe (`costPaid`): die Sammelaktion läuft auf
+  einer Wegwerfkopie (`growAllPlan`, `stateCopy`), denn welche Städte wachsen, hängt an Vorrat
+  und Nahrungsgrenze nach jedem einzelnen Schritt. Wachsen alle, ist das Bezahlte genau, was
+  `costPaid` für die Summe sagt (gemessen an 2847 zufälligen Ständen mit England, Alchemie,
+  Gilden, Computertechnik, Fruchtbarkeit, Dampfmaschine – keine Abweichung).
+* **Ein Klick, ein Schritt je Stadt.** Mit Keramik (zwei bezahlte Schritte je Runde) lässt ein
+  zweiter Klick jede Stadt noch einmal wachsen, zum neuen Preis.
+* **Nebenbei bemerkt, nicht im Blatt erklärt:** Wer erst bezahlt und dann kostenlos wachsen
+  lässt, zahlt weniger – der Preis hängt an der Bevölkerung vor dem Schritt. Das gilt für die
+  Einzelknöpfe genauso.
+* **Opfern:** in jeder Stadt mit mindestens 2 Bevölkerung, die diese Runde noch nicht geopfert
+  hat, je eine – unabhängig voneinander, also ohne Reihenfolge. Am Knopf der Ertrag (+7 🪙 je
+  Stadt). Die Prüfung ist aus `sacrifice` herausgelöst (`sacrificeError`), sonst unverändert.
+* **Nie zugleich:** Verbundwerkstoffe ist eine Technologie der Moderne, und mit der Moderne wird
+  Sklaverei obsolet – „Alle Städte kostenlos wachsen" und „In allen Städten opfern" stehen nie
+  zusammen im Blatt.
+
+### „Erträge" entfallen
+
+* Knopf, Umschalter (`showYields`, `toggleYields`), die gemerkte Wahl (`hochciv.yields`, wird
+  beim Start gelöscht) und `viewerOf` (die Sicht des Menschen während Bot-Zügen) sind weg. Die
+  Chips je Feld zeichnet weiter `yieldChips` – im Gründungsmodus, den es nur im eigenen Zug
+  gibt.
+* Damit stehen alle Knöpfe der Leiste in `TUT_BAR`; „Erträge" war der einzige, der im Tutorial
+  und im Bot-Zug immer frei war.
+
+### Rückschau: ein Anspruch ohne Wahl blockierte die übrigen (Fehler, beim Umbau gefunden)
+
+* Rückschau gibt je erforschter Technologie ab dem Mittelalter einen Anspruch auf eine
+  Technologie eines früheren Zeitalters desselben Feldes; die Ansprüche warten in einer
+  Schlange (`p.backPicks`) und verfallen zum Zugende. Gewählt wurde immer aus dem **ersten**.
+  War für ihn nichts mehr übrig – alle früheren Technologien des Feldes schon erforscht –,
+  blieb er vorn stehen, und **jeder weitere Anspruch desselben Zugs war verloren**.
+  Nachgestellt: Griechenland mit Rückschau, die ganze Antike der Forschung erforscht, dann
+  Papier (Forschung, Mittelalter: leerer Anspruch) und Segeln (Produktion: hätte die Antike der
+  Produktion zur Wahl) – es gab nichts zu wählen, weder im Bogen noch für die KI.
+* Jetzt gilt der erste Anspruch, aus dem sich noch etwas wählen lässt (`backPick(p, S)`); der
+  leere bleibt liegen und verfällt zum Zugende wie bisher. Ohne Spielstand liefert `backPick(p)`
+  weiter den ersten. Betrifft auch die KI (sie wählt über `backPickOptions`/`useBackPick`) –
+  nicht nachgemessen, der Fall ist selten.
+
+### Hochkant lag jedes Blatt außerhalb des Bildschirms (Fehler, beim Prüfen gefunden)
+
+Beim Ansehen der neuen Blätter in Chromium mit Hochformat-Viewport (820 × 1180, die App
+dreht sich selbst quer): Stadtblatt, Macht, Fähigkeiten und das Blatt eines KI-Zugs lagen
+rechts außerhalb des Bildschirms – in v86 genauso. Ursache: `setBarHeight` setzt `--bar-h`
+und `--hud-h` aus `getBoundingClientRect().height`, und das misst das Rechteck **nach** der
+Drehung um 90°; dessen Höhe ist die Breite der Leiste. Gemessen 1180px statt 53px, das Blatt
+endet „über" der Leiste, also jenseits des Rands. Im KI-Zug ist die Leiste außerdem gesperrt –
+man kommt an „Weiter" nicht heran. Der Kommentar dort behauptete das Gegenteil („auch dann
+korrekt, wenn die App gedreht dargestellt wird").
+
+* Jetzt nimmt `setBarHeight` gedreht (`turning()`) die Breite des Rechtecks – quer wie bisher
+  die Höhe. Geprüft in Chromium: iPad hochkant und quer, Telefon hochkant und quer – das Blatt
+  „Fähigkeiten" und beide „Weiter" sind antippbar, ein echter Klick oben führt weiter.
+* **Kandidat für den gesperrten Bildschirm nach KI-Zügen** (v80, Offener Punkt 19): genau
+  dieses Bild, wenn das iPad hochkant gehalten wurde. Nicht belegt.
+* `smoke.js` gibt die gemessenen Rechtecke vor (jsdom kennt kein Layout): gedreht 53 × 1180 →
+  `--bar-h` 53px; Gegenprobe mit der alten Rechnung: 1180px.
+
+### Nebenbei: ein Smoke-Schritt hing am Zufall
+
+„Kosten (v82): das Beispiel des Autors" startete seine Partie mit den Ereignissen, die frühere
+Schritte eingeschaltet hatten. Eine Hungersnot in der ersten Runde macht Nahrung doppelt so
+teuer, und der Schritt (samt dem nächsten) schlug grundlos an – gesehen beim Prüfen von v87
+(„8🌾 8🪙" statt „8🌾 4🪙"). Er startet jetzt ohne Ereignisse, wie die KI-Schritte.
+
+### Abgesichert
+
+`test.js`, Block „Fähigkeiten: Sammelaktionen (v87)" und die drei folgenden: Reihenfolge
+(kleinste zuerst, Gleichstand nach Städten); „alle wachsen" = jede einzeln, Stadt für Stadt
+bezahlt, mit Standardkurs, Alchemie, Gilden und Handelsreich; die Vorschau ändert nichts und
+sagt dasselbe wie die Tat (Anzahl, Gründe, Preis, Abgang); genug Mittel (Preis 2 + 3 + 4),
+zweiter Klick, Keramik; knappe Mittel (die zwei kleinen); Nahrungsgrenze (genau die kleinste,
+Gründe, Gentechnik hebt sie auf); kostenlos (kein Abzug, einmal je Stadt, Nahrungsgrenze);
+neue Stadt ausgelassen; häufigster Grund. Opfern: `sacrificeError` je Stadt, alle Städte, einmal
+je Runde, obsolet in der Moderne. `freeActions`: Freie Forschung, kostenloses Wachstum in zwei
+Städten als eine Art, Nahrungsgrenze und Massenmedien, Internet nur mit etwas zu kopieren,
+bezahltes Kopieren und Sklaverei nicht, vier Arten zusammen. Rückschau: der nachgestellte Fall,
+`backPick` mit und ohne Spielstand, Gegenprobe nach der alten Regel.
+Gegenproben (je eine Stelle absichtlich falsch): `backPick` nach der alten Regel, kostenloses
+Wachstum je Stadt gezählt, ohne Sortierung, Nahrungsgrenze in der Zahl vergessen, Vorschau auf
+dem echten Spielstand, Opfern ohne Prüfung – jede schlägt an.
+
+`smoke.js`: Bot-Blatt mit „Weiter" oben (neben dem Titel) und unten, alle Bots allein über den
+oberen Knopf, „Fähigkeiten" im Bot-Zug zu und ohne Zahl, auch wenn der Bot etwas gratis offen
+hätte; Leiste mit „Fähigkeiten" an der Stelle von „Erträge", in `TUT_BAR`, Zahl 1 → 3, bezahltes
+Kopieren zählt nicht, genau die drei Arten im Blatt hervorgehoben, Zahl sinkt nach Gebrauch;
+Freie Forschung und Rückschau nur noch hier (nicht im Bogen), Wahl = Regelmaschine, danach
+weg; „Alle Städte wachsen" mit „3🌾 9🪙" am Knopf, „5🌾 5🪙" ohne Umtausch, „2 von 3 Städten"
+samt Grund, genau das abgebucht, danach gesperrt; kostenlos ohne Abzug; Opfern „+7🪙", „1 von 2
+Städten", danach gesperrt, ab der Moderne weg; englisch ohne fehlende Übersetzung samt
+Wunder-Technologie; Gratiskopie mit Wirkung und Besitzern, deutsch und englisch, einmal je
+Runde; Erträge nur noch im Gründungsmodus, Umschalter und gemerkte Wahl weg; Tutorial: Leiste
+samt „Fähigkeiten" in Leseschritten zu, nach „Fertig" frei; gedreht `--bar-h`/`--hud-h` 53/61px
+statt der gedrehten Breite.
+Gegenproben: oberer Knopf ohne Wirkung, „Fähigkeiten" nicht in `TUT_BAR`, Preis statt Abgang
+am Knopf, Zahl auch im Bot-Zug, die alte Höhenmessung gedreht – jede schlägt an.
+
+`check_single.js` öffnet in der Einzeldatei „Fähigkeiten" (Marathon, gedraftete Fähigkeiten).
+Sichtkontrolle in Chromium: iPad quer und hochkant (gedreht), Telefon quer und hochkant,
+deutsch und englisch – Blatt, Zahl an der Leiste, beide „Weiter".

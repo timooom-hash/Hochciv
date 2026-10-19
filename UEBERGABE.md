@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 18.10., `sw.js` v86)
+# Hochzeivilization — Projekt-Übergabe (Stand 18.10., `sw.js` v87)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v86)
+## Letzte Sitzungen auf einen Blick (v61 → v87)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -41,6 +41,14 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v84 | **Sklaverei 7 Münzen** (vorher 10). **Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5** (vorher 5/2/4; das Tutorial behält die alten). **Marathon:** Singularität 300, höchstens fünf Gründungen je Zug, Militärsieg erst mit der zweiten eroberten Hauptstadt (wer seine verliert, spielt ohne weiter). **Kolonien:** ein per Kolonialismus gekauftes Feld ist auch ohne Siedlerweg besiedelbar, Entfernung Luftlinie. **Städte zeigen ihre Bevölkerung als Zahl** in Reichsfarbe statt Symbol und Strichen. `kiRisk` schneller (gleiche Ergebnisse) | Regel + Modus + Oberfläche + KI |
 | v85 | **Wirtschaftssieg am Rundenende:** einmal je Runde geprüft, wenn alle gleich oft gezogen haben, mit dem Stand von dort – gewinnt jemand, endet das Spiel sofort (Punktvergleich nur, wenn in derselben Runde ein anderer Sieg angemeldet war); auch schon in Runde 1. **Startausgleich:** im ersten Zug +1/+2/+3 Münzen für den Zweiten/Dritten/Vierten in der Zugfolge (Bots nicht). **Marathon:** Günstige Forschung und Wissenschaftliche Methode ziehen doppelt ab, Freie Forschung nur bis ins Mittelalter. Die KI sieht als Letzte der Runde ihren Wirtschaftssieg; ihre Draftwerte im Marathon sind neu gemessen (200 Partien) | Regel + Modus + KI |
 | v86 | **Ökologie übers ganze Reich:** je 2 Bevölkerung des Reichs +1 auf alle drei Erträge, einmal abgerundet (vorher je Stadt). **Bürokratie** verdoppelt auch Handelsrouten, Ökologie und den Nahrungsposten der Gentechnik; die Ertragsübersicht sagt es („Bürokratie ×2"). Späte KI-Züge mit vielen Kolonien schneller (gleiche Ergebnisse) | Regel + KI-Tempo |
+| v87 | **„Weiter" oben und unten** im Blatt eines Bot- oder KI-Zugs. **„Fähigkeiten" statt „Erträge"** (zeigte dasselbe wie der Gründungsmodus): eigene Fähigkeit mit Wirkung, Freie Forschung und Rückschau, Wunder-Technologien, **Alle Städte (kostenlos) wachsen**, **In allen Städten opfern**, Kopieren – Freie Forschung, Rückschau und Kopieren sind aus dem Technologiebogen ausgezogen; an der Leiste die **Zahl der Arten kostenloser Aktionen**. Fehler: ein Rückschau-Anspruch ohne Wahl blockierte die übrigen; **hochkant (gedreht) lag jedes Blatt außerhalb des Bildschirms** – auch das eines KI-Zugs samt „Weiter" (`setBarHeight` maß die gedrehte Leiste). Ein vom Zufall abhängiger Smoke-Schritt (Hungersnot) läuft jetzt ohne Ereignisse | Oberfläche + Fehler |
+
+Neu in v87: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Fähigkeiten statt Erträge · „Weiter" oben und unten · Rückschau ohne Wahl · Blätter
+hochkant (v87)"),
+fünf Fragilitäten neu, eine ersetzt („Die Leiste hat zwei Sorten Knöpfe"), drei Einträge in der
+Bug-Historie, die offenen Punkte 38 und 39; Punkt 0 und 19 nachgetragen (der gedrehte
+Bildschirm ist ein Kandidat für den gesperrten Bildschirm von v80).
 
 Neu in v86: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Ökologie übers ganze Reich · Bürokratie auch für Handelsrouten, Ökologie und
@@ -76,7 +84,8 @@ Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstan
 Punkt 12 (dominiert über alle Lagen oder nur je Lage?), seit v75 Punkt 13 (Bot-Partner
 verlässt die Flanke), seit v77 Punkt 14 (Wirtschaftssieg in Runde 2 im Duell), seit v85 Punkt 33
 (Auslegungen zu Wirtschaftssieg, Startausgleich und Rabatten) und 34 (der Startausgleich
-gleicht wenig aus), seit v86 Punkt 36 (Auslegungen zu Bürokratie und Ökologie).
+gleicht wenig aus), seit v86 Punkt 36 (Auslegungen zu Bürokratie und Ökologie), seit v87
+Punkt 38 (Auslegungen zu „Fähigkeiten") und 39 (keine Erinnerung vor dem Zugende).
 
 ## Wo alles liegt
 
@@ -104,22 +113,22 @@ gleicht wenig aus), seit v86 Punkt 36 (Auslegungen zu Bürokratie und Ökologie)
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1277 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1299 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 452 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 334 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 2039 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) |
+| `js/engine.js` | 2136 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
 | `js/ki.js` | 1881 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/marathon.js` | 302 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
-| `js/ui.js` | 2443 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Erträge, Gründungsmodus, Machtringe (v75, ein Stück je Punkt seit v76) |
-| `js/tutorial.js` | 680 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
-| `test.js` | 6420 | **1630 Assertions**, `node test.js` |
-| `smoke.js` | 3342 | **144 Schritte** durch die echte UI via jsdom, `node smoke.js` |
-| `build_single.py` / `check_single.js` | 21 / 59 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
+| `js/ui.js` | 2562 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Gründungsmodus samt Erträgen, Machtringe (v75, ein Stück je Punkt seit v76) · Blatt „Fähigkeiten" (`abilSheet`, v87) |
+| `js/tutorial.js` | 682 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
+| `test.js` | 6621 | **1693 Assertions**, `node test.js` |
+| `smoke.js` | 3619 | **151 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `build_single.py` / `check_single.js` | 21 / 64 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
@@ -146,6 +155,23 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v87 auf einen Blick.** Blatt eines Bot-/KI-Zugs: „Weiter" auch oben (`#bot-next-top` neben
+  dem Titel, `.bot-head`), das Blatt beginnt oben. „Erträge" ist weg (Knopf, `showYields`,
+  `toggleYields`, `hochciv.yields`, `viewerOf`) – die Chips gibt es im Gründungsmodus. An der
+  Stelle **„Fähigkeiten"** (`a-abil`, `abilSheet`, in `TUT_BAR`): eigene Fähigkeit(en) mit
+  Wirkung; Freie Forschung und Rückschau (aus dem Technologiebogen ausgezogen); kostenlose
+  Technologie aus Wundern; „Alle Städte kostenlos wachsen" (Verbundwerkstoffe) und „Alle
+  Städte wachsen" – `growAll` Stadt für Stadt über `growCity`, von der kleinsten an, was
+  scheitert, wird ausgelassen, am Knopf „2 von 3 Städten" und was tatsächlich abgeht
+  (`growAllPlan` auf einer Kopie, `paidText`); „In allen Städten opfern" (`sacrificeAll`,
+  `sacrificeError`, nur solange Sklaverei nicht obsolet ist); Kopieren (Spionage,
+  Kundschafterei, Internet – auch aus dem Bogen ausgezogen). An der Leiste die Zahl der
+  **Arten** kostenloser Aktionen, die gerade gehen (`freeActions`: Freie Forschung, Rückschau,
+  Wunder-Technologie, kostenloses Wachstum, Internet). Fehler behoben: ein Rückschau-Anspruch
+  ohne Wahl blockierte jeden weiteren desselben Zugs (`backPick(p, S)`); hochkant gedreht
+  setzte `setBarHeight` `--bar-h`/`--hud-h` auf die gedrehte Breite der Leisten (in Chromium
+  1180px), jedes Blatt lag außerhalb des Bildschirms – jetzt gedreht die Breite des gemessenen
+  Rechtecks.
 - **v86 auf einen Blick.** Ökologie: ⌊Bevölkerung des Reichs / 2⌋ auf alle drei Erträge, in der
   Bevölkerungszeile von `incomeBreakdown` (senkt also weiter `popFoodCost`); bei Revolution
   zählt die Hauptstadt nicht. Bürokratie: Faktor `buro` in `incomeBreakdown` für Felder und
@@ -470,7 +496,8 @@ fehlen, Obergrenze ignoriert, 0 Punkte wieder voll) schlagen jeweils genau dort 
 Drei Wünsche aus einer Testrunde, vorab mit dem Autor abgestimmt; Einzelheiten und
 Auslegungen in `ANNAHMEN.md` (Abschnitt „Kartenansichten und Gründen als eigene Aktion").
 
-- **Erträge** (`a-yields`, Umschalter, `hochciv.yields`): je Feld bis zu drei Chips,
+- **Erträge** (`a-yields`, Umschalter, `hochciv.yields` – seit v87 entfallen, die Chips nur noch
+  im Gründungsmodus): je Feld bis zu drei Chips,
   Wissenschaft blau, Nahrung grün, Münzen gold, gerechnet mit `tileYieldAt` für den
   Zuschauenden (`viewerOf`: beim Bot-Zug der Mensch). Reine Ansicht – auch im Tutorial und
   im Bot-Zug bedienbar, deshalb nicht in `TUT_BAR`.
@@ -725,10 +752,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1630 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1693 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (144 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (151 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -904,10 +931,35 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Plättchen. Wer `PLACE_MIN_GAP` auf 1 senkt, macht Vorschau und rote Ränder zu
   Schätzungen – `test.js` schlägt dann an („kein Umland … auf einem fremden
   Startplättchen", „Vorschau = echtes Einkommen").
-- **Die Leiste hat zwei Sorten Knöpfe** (seit v75): Aktionen, die das Tutorial bindet
-  (`TUT_BAR` in ui.js, auch vom Smoke-Audit gelesen), und den Ansichtsschalter
-  „Erträge", der immer frei ist. Wer einen Knopf ergänzt, trägt ihn in `TUT_BAR` ein oder
-  begründet, warum nicht – sonst ist er im Tutorial entweder offen oder tot.
+- **Gedreht misst `getBoundingClientRect` das Rechteck nach der Drehung** (seit v87 bekannt):
+  hochkant (`turning()`) sind Breite und Höhe vertauscht. `setBarHeight` nimmt deshalb gedreht
+  die Breite; wer anderswo Größen misst, um daraus Layout zu setzen, macht es genauso oder
+  nimmt `offsetHeight`/`offsetWidth` (ohne Drehung, ganze Pixel). Bis v86 lag dadurch jedes
+  Blatt hochkant außerhalb des Bildschirms. jsdom kennt kein Layout – der Smoke-Schritt dazu
+  gibt die gemessenen Rechtecke vor; geprüft ist es in Chromium (Hochformat-Viewport).
+- **Alle Knöpfe der Leiste stehen in `TUT_BAR`** (seit v87; v75–v86 gab es daneben den
+  Ansichtsschalter „Erträge", der immer frei war). `TUT_BAR` (ui.js) liest auch das
+  Smoke-Audit, und `tutAllow` nennt dieselben Knöpfe für den Fall ohne Schritt. Wer einen
+  Knopf ergänzt, trägt ihn dort ein oder begründet, warum nicht – sonst ist er im Tutorial
+  entweder offen oder tot. „Fähigkeiten" bleibt im Tutorial zu: kein Schritt gibt es frei.
+- **Sammelaktionen haben keine eigene Regel** (seit v87): `growAll` und `sacrificeAll` rufen
+  Stadt für Stadt `growCity` bzw. `sacrifice`. Wer eine Wachstums- oder Opferregel ändert,
+  ändert sie dort – die Sammelaktionen folgen von selbst; eine Prüfung nur in der
+  Sammelaktion wäre falsch. Die Vorschau (`growAllPlan`) führt `growAll` auf einer Kopie aus
+  (`stateCopy`, JSON ohne Protokoll): der Spielstand muss JSON-fähig bleiben, und würfelte
+  `growCity` je, verriete die Vorschau den Wurf – die Kopie hat denselben Startwert.
+- **Eine neue kostenlose Aktion gehört in `freeActions` und in `abilSheet`** (seit v87), sonst
+  fehlt sie in der Zahl an „Fähigkeiten". `freeActions` läuft bei jedem Zeichnen (`redraw`) –
+  teure Prüfungen dort nur mit Abbruch nach dem ersten Treffer (`some`), wie beim
+  kostenlosen Wachstum.
+- **Freie Forschung, Rückschau und Kopieren stehen nicht mehr im Technologiebogen** (seit v87),
+  sondern unter „Fähigkeiten". Das Fenster der Wunder-Technologien (`freePickModal`) geht
+  weiter von selbst auf; die Wahl steht zusätzlich unter „Fähigkeiten".
+- **`backPick(p, S)` mit Spielstand liefert den ersten Rückschau-Anspruch, aus dem sich noch
+  etwas wählen lässt, ohne den ersten überhaupt** (seit v87). `backPickOptions`/`useBackPick`
+  nehmen den ersten nutzbaren; leere bleiben bis zum Zugende in `p.backPicks` liegen. Wer
+  „ist eine Rückschau offen?" fragt, fragt `backPickOptions(...).length`, nicht
+  `p.backPicks.length` (so jetzt auch `tutMaybeAdvance`).
 - **`withFoundTable` gilt nur innerhalb des Aufrufs und nur für (S, pi)** (seit v75). Wer
   zwischendurch den Spielstand ändert, darf das nicht im Bereich der Tabelle tun – sie
   kennt die Änderung nicht. `foundMarks` liest nur.
@@ -1054,6 +1106,22 @@ gegen die Fassung davor — identisch).
   Fehlerbehebung, nicht Aufräumen. Ebenso schreibt `mp()` das Dezimalkomma fest.
 
 ## Vollständige Bug-Historie (alle behoben — nicht versehentlich rückgängig machen)
+
+Aus der Sitzung v87:
+- **Hochkant lag jedes Blatt außerhalb des Bildschirms** (beim Prüfen in Chromium gefunden):
+  `setBarHeight` nahm die Höhe aus `getBoundingClientRect` – gedreht ist das die Breite der
+  Leiste. `--bar-h` und `--hud-h` standen auf der ganzen Bildschirmhöhe, und Stadtblatt,
+  Macht, Fähigkeiten und das Blatt eines KI-Zugs samt „Weiter" lagen jenseits des Rands; im
+  KI-Zug ist die Leiste zusätzlich gesperrt. Nicht wieder einführen: gedreht die Breite; der
+  Smoke-Schritt „Gedreht: --bar-h …" gibt die Rechtecke vor (Gegenprobe: 1180px).
+- **Rückschau-Anspruch ohne Wahl blockierte die übrigen** (beim Umbau gefunden): Gewählt wurde
+  immer aus dem ersten Anspruch der Schlange; war für ihn nichts mehr übrig (alle früheren
+  Technologien des Feldes erforscht), war jede weitere Rückschau desselben Zugs verloren – auch
+  für die KI. Nicht wieder einführen: `backPick(p, S)`; der Test stellt Papier (leer) und
+  Segeln (Produktion) nach, mit Gegenprobe nach der alten Regel.
+- **Smoke-Schritt „Kosten (v82)" hing an einem Ereignis** (gesehen beim Prüfen): Mit den
+  Ereignissen früherer Schritte konnte eine Hungersnot die Umtauschkurse verdoppeln, und der
+  Schritt samt dem nächsten schlug grundlos an. Er startet jetzt ohne Ereignisse.
 
 Aus früheren Sitzungen: Bürokratie verdoppelt Hauptstadt-Umland und Bevölkerung · doppelter
 Kampf-Aufruf bei Bots · Stadtfelder zählen als Straße/Eisenbahn · Armee in eigener Stadt
@@ -1229,7 +1297,8 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
 0. **Die erzwungene Drehung ist nicht auf echtem iOS geprüft**, nur in Chromium mit
    Hochformat-Viewport. Safari-Eigenheiten bei `position:fixed` in transformierten
    Vorfahren und bei `env(safe-area-inset-*)` sind ein Restrisiko. Auf dem iPad
-   gegenprüfen.
+   gegenprüfen. (v87: Bis dahin lag dort jedes Blatt außerhalb des Bildschirms, siehe
+   Bug-Historie – die Prüfung in Chromium hatte das nicht erfasst.)
 
 1. **Ein ungedecktes Nahrungsdefizit kostet nichts.** Seit dem Umbau auf `coverPop` ist
    das weniger schlimm: Decken macht Nahrung frei, statt nur ein folgenloses Defizit zu
@@ -1346,6 +1415,11 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    weder Zug um Zug noch mit zufälligem Tippen über die echte Oberfläche (zusammen gut 200
    Partien). v80 macht den Ablauf robust (siehe Fragilitäten); kommt es wieder vor, steht
    ein Fehler jetzt als „Interner Fehler (…)" im Protokoll – den Wortlaut brauchen wir.
+   **v87, ein Kandidat:** Hochkant gehalten (die App dreht sich selbst) lag das Blatt eines
+   KI-Zugs samt „Weiter" bis v86 außerhalb des Bildschirms, und die Leiste ist im KI-Zug
+   gesperrt – genau dieses Bild. Nicht belegt, dass es der gemeldete Fall war (wurde das
+   iPad hochkant gehalten?). Quer gehalten misst `setBarHeight` richtig; das Gerät zu
+   drehen, hätte dann vermutlich geholfen (nicht auf dem iPad geprüft).
 20. **Regelbogen zu Bewegung, Straßen, Eisenbahn und Kontrollzone – erledigt (v81).** Der
    Autor hat den Entwurf unverändert freigegeben; damit gelten auch die zwei Punkte, die er
    dabei bestätigen sollte, als Regel: Straßen gehören niemandem (jede Armee fährt auf jeder
@@ -1448,6 +1522,21 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    bis 215. Das ist regelgerecht (3 Münzen je Feld, der Ertrag bleibt), macht aber späte
    Züge teuer – nach den Tempo-Änderungen höchstens 5,2 s in diesen Partien. Ob 200 gekaufte
    Felder so gewollt sind, entscheidet das Spielen; die KI-Grenze dafür wäre `kiColonySpots`.
+
+38. **Getroffene Auslegungen (v87) – zum Ändern angeboten.** (a) „Alle Städte wachsen" steht
+   immer da, nicht erst mit Verbundwerkstoffen. (b) Gewachsen wird von der kleinsten Stadt an;
+   was an einer Stadt scheitert (Mittel, Nahrungsgrenze, schon gewachsen, neu, Sturmflut),
+   wird ausgelassen, die übrigen wachsen – der Knopf sagt vorher „2 von 3 Städten" und warum.
+   „Alle oder keine" wäre eine Zeile in `abilSheet` (Knopf sperren, wenn `done < of`). (c) Die
+   kostenlosen Technologien aus Wundern (Bibliothek, Oxford, Raumfahrt) zählen in der Zahl mit
+   und stehen unter „Fähigkeiten". (d) Freie Forschung, Rückschau und Kopieren sind aus dem
+   Technologiebogen ausgezogen statt an beiden Stellen zu stehen. (e) „In allen Städten
+   opfern" heißt so in Anlehnung an „Bevölkerung opfern" im Stadtblatt.
+39. **Keine Erinnerung vor dem Zugende (v87, nicht umgesetzt).** Rückschau und Freie Forschung
+   verfallen ungenutzt (Rückschau zum Zugende, Freie Forschung zum Rundenende); seit sie nicht
+   mehr direkt unter dem Bogen stehen, erinnert nur die Zahl an „Fähigkeiten". „Zug beenden"
+   könnte wie bei der wartenden Armee einmal nachfragen (`pendingWarnings`) – vielleicht
+   lästig, wenn man kostenloses Wachstum bewusst liegen lässt. Entscheidung des Autors.
 
 ## Arbeitsweise, die der Autor schätzt
 

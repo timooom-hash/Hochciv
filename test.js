@@ -4383,6 +4383,207 @@ const duellKarte = (civA, civB, seed) => {
   ui = { sel: null, army: null, mode: null, botTimer: null };
 }
 
+/* ==================================================== Fähigkeiten: Sammelaktionen (v87)
+   Wunsch des Autors: unter „Fähigkeiten" alle Städte auf einmal wachsen lassen (kostenlos mit
+   Verbundwerkstoffen und bezahlt, mit Kosten am Knopf) und in allen Städten opfern. Regeln
+   gibt es dafür keine eigenen – growAll und sacrificeAll rufen Stadt für Stadt growCity bzw.
+   sacrifice. Geprüft wird, dass das Ergebnis genau das der Einzelaktionen ist, in welcher
+   Reihenfolge gewachsen wird, was bei knappen Mitteln und an der Nahrungsgrenze geschieht,
+   und dass die Vorschau (growAllPlan) nichts verändert und dasselbe sagt wie die Tat. */
+{
+  // Russland auf einer reinen Graslandkarte: jedes Feld 1 Nahrung, jede Bevölkerung isst 1
+  const drei = (pops, techs = []) => {
+    const S = mkA('russland', 'basis', techs);
+    S.map.rows = S.map.rows.map(z => 'G'.repeat(z.length));
+    S.armies.length = 0;
+    const cap = capitalOf(S, 0);
+    // zwei weitere Städte, ganzes Umland auf der Karte, ohne Überschneidung (Abstand mindestens 3)
+    const drin = (r, c) => !!terrainAt(S, r, c);
+    const frei = within(cap.r, cap.c, 8).filter(([r, c]) => drin(r, c) && !cityAt(S, r, c) &&
+      neighbors(r, c).every(([a, b]) => drin(a, b)) &&
+      S.cities.every(ct => hexDistance(ct.r, ct.c, r, c) >= 3));
+    const a = frei[0], b = frei.find(([r, c]) => hexDistance(r, c, a[0], a[1]) >= 3);
+    S.cities.push({ id: S.nextId++, owner: 0, r: a[0], c: a[1], pop: pops[1], cap: false, grown: 0, born: 0 });
+    S.cities.push({ id: S.nextId++, owner: 0, r: b[0], c: b[1], pop: pops[2], cap: false, grown: 0, born: 0 });
+    cap.pop = pops[0];
+    return S;
+  };
+  const pops = S => citiesOf(S, 0).map(c => c.pop);
+  // Reihenfolge: von der kleinsten Stadt an, gleich große in der Reihenfolge der Städte
+  {
+    const S = drei([3, 2, 3]);
+    eq(growAllOrder(S, 0).map(c => citiesOf(S, 0).indexOf(c)), [1, 0, 2],
+      'Reihenfolge: kleinste Stadt zuerst, gleich große in der Reihenfolge der Städte');
+  }
+  // Ergebnis = die Einzelaktionen in dieser Reihenfolge; die Vorschau ändert nichts und sagt dasselbe
+  for (const [name, techs, civ] of [['Standardkurs', [], 'russland'], ['Alchemie', ['alchemie'], 'russland'],
+    ['Gilden', ['gilden'], 'russland'], ['Handelsreich (Münzen = Nahrung)', [], 'england']]) {
+    const S = drei([4, 3, 2], techs), T0 = drei([4, 3, 2], techs);
+    [S, T0].forEach(X => { X.players[0].res = { sci: 3, food: 4, coins: 9 }; X.players[0].civ = civ; });
+    const vorher = JSON.stringify(S);
+    const plan = growAllPlan(S, 0, 'paid');
+    eq(JSON.stringify(S), vorher, `${name}: die Vorschau ändert den Spielstand nicht`);
+    const einzeln = growAllOrder(T0, 0).map(c => growCity(T0, 0, c, 'paid'));
+    const tat = growAll(S, 0, 'paid');
+    eq([pops(S), S.players[0].res], [pops(T0), T0.players[0].res],
+      `${name}: alle Städte wachsen = jede einzeln, Stadt für Stadt bezahlt`);
+    eq([tat.done, tat.of, tat.why], [einzeln.filter(e => !e).length, 3, einzeln.filter(Boolean)],
+      `${name}: gezählt und begründet wie die Einzelaktionen (${tat.done} von ${tat.of})`);
+    eq([plan.done, plan.of, plan.why, plan.price], [tat.done, tat.of, tat.why, tat.price],
+      `${name}: die Vorschau sagt, was dann geschieht`);
+    eq(plan.paid, { sci: 3 - S.players[0].res.sci, food: 4 - S.players[0].res.food, coins: 9 - S.players[0].res.coins },
+      `${name}: am Knopf steht, was tatsächlich abgeht (${JSON.stringify(plan.paid)})`);
+  }
+  // Genug Mittel: alle drei, Preis = Summe der Einzelpreise
+  {
+    const S = drei([4, 3, 2]);
+    S.players[0].res = { sci: 0, food: 50, coins: 50 };
+    const r = growAll(S, 0, 'paid');
+    eq([r.done, r.of, r.price, pops(S)], [3, 3, { food: 9, coins: 9 }, [5, 4, 3]],
+      'genug Mittel: alle drei wachsen, Preis 2 + 3 + 4 je Nahrung und Münzen');
+    eq(S.players[0].res, { sci: 0, food: 41, coins: 41 }, 'abgebucht genau dieser Preis');
+    const nochmal = growAll(S, 0, 'paid');
+    eq([nochmal.done, commonReason(nochmal.why)], [0, T('Diese Runde schon gewachsen.')],
+      'ein zweites Mal: nichts, „Diese Runde schon gewachsen."');
+    S.players[0].techs.keramik = true;
+    eq(growAll(S, 0, 'paid').done, 3, 'mit Keramik ein zweiter bezahlter Schritt je Stadt');
+  }
+  // Knappe Mittel: von der kleinsten an, so viele es geht
+  {
+    const S = drei([4, 3, 2]);
+    S.players[0].res = { sci: 0, food: 5, coins: 5 };
+    const r = growAll(S, 0, 'paid');
+    eq([r.done, pops(S), r.price, commonReason(r.why)], [2, [4, 4, 3], { food: 5, coins: 5 }, T('Zu wenig Nahrung und Münzen.')],
+      'knappe Mittel: die zwei kleinen wachsen (2 + 3), die große nicht – mit Grund');
+  }
+  // Nahrungsgrenze: 3 · 6 Felder Grasland = 18 Nahrung, Bevölkerung 17 → noch genau ein Wachstum
+  {
+    const S = drei([6, 6, 5]);
+    S.players[0].res = { sci: 0, food: 50, coins: 50 };
+    eq(baseIncome(S, 0).food, 1, 'Ausgangslage: 1 Nahrung über dem Verbrauch');
+    const r = growAll(S, 0, 'paid');
+    eq([r.done, pops(S)], [1, [6, 6, 6]], 'Nahrungsgrenze: genau eine Stadt wächst – die kleinste');
+    eq(r.why, [T('Nahrungsproduktion würde negativ – Gentechnik oder Massenmedien nötig.'),
+      T('Nahrungsproduktion würde negativ – Gentechnik oder Massenmedien nötig.')], 'die übrigen nennen die Nahrungsgrenze');
+    S.players[0].techs.gentechnik = true;
+    eq(growAll(S, 0, 'paid').done, 2, 'Gentechnik hebt die Grenze auf: die übrigen wachsen');
+  }
+  // Kostenlos (Verbundwerkstoffe): kein Abzug, einmal je Stadt, Nahrungsgrenze gilt
+  {
+    const S = drei([4, 3, 2]);
+    S.players[0].res = { sci: 0, food: 0, coins: 0 };
+    eq(growAll(S, 0, 'free').done, 0, 'ohne Verbundwerkstoffe kein kostenloses Wachstum');
+    S.players[0].techs.verbundwerkstoffe = true;
+    const plan = growAllPlan(S, 0, 'free');
+    const r = growAll(S, 0, 'free');
+    eq([r.done, pops(S), S.players[0].res], [3, [5, 4, 3], { sci: 0, food: 0, coins: 0 }],
+      'Verbundwerkstoffe: alle drei wachsen kostenlos, ohne einen Vorrat');
+    eq([plan.done, plan.paid], [3, { sci: 0, food: 0, coins: 0 }], 'die Vorschau sagt: drei, nichts bezahlt');
+    eq([growAll(S, 0, 'free').done, commonReason(growAll(S, 0, 'free').why)], [0, T('Kein kostenloses Wachstum verfügbar.')],
+      'kostenlos nur einmal je Stadt und Runde');
+    const G2 = drei([6, 6, 5], ['verbundwerkstoffe']);
+    eq(growAll(G2, 0, 'free').done, 1, 'auch kostenlos gilt die Nahrungsgrenze');
+  }
+  // Neue Städte wachsen erst nächste Runde – die Sammelaktion lässt sie aus
+  {
+    const S = drei([4, 3, 2]);
+    S.players[0].res = { sci: 0, food: 50, coins: 50 };
+    S.cities[S.cities.length - 1].born = S.round;
+    const r = growAll(S, 0, 'paid');
+    eq([r.done, r.why], [2, [T('Neue Städte wachsen erst nächste Runde.')]], 'eine Stadt dieser Runde wird ausgelassen');
+  }
+  eq([commonReason(['a', 'b', 'b']), commonReason(['a', 'b']), commonReason([])], ['b', 'a', null],
+    'häufigster Grund; bei Gleichstand der erste');
+}
+/* Sklaverei in allen Städten: je Stadt mit mindestens 2 Bevölkerung eine opfern, einmal je
+   Runde, nicht mehr in der Moderne – die Prüfung ist die von sacrifice (sacrificeError). */
+{
+  const S = mkA('russland', 'basis', ['sklaverei']);
+  const cap = capitalOf(S, 0);
+  const spot = within(cap.r, cap.c, 6).find(([r, c]) => !foundSiteError(S, 0, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot[0], c: spot[1], pop: 1, cap: false, grown: 0, born: 0 });
+  const spot2 = within(cap.r, cap.c, 8).find(([r, c]) => !foundSiteError(S, 0, r, c) && !cityAt(S, r, c));
+  S.cities.push({ id: S.nextId++, owner: 0, r: spot2[0], c: spot2[1], pop: 4, cap: false, grown: 0, born: 0 });
+  cap.pop = 3;
+  S.players[0].res.coins = 0;
+  eq(citiesOf(S, 0).map(c => sacrificeError(S, 0, c)), [null, T('Die letzte Bevölkerung darf nicht geopfert werden.'), null],
+    'sacrificeError: wer opfern kann – die Stadt mit 1 Bevölkerung nicht');
+  const r = sacrificeAll(S, 0);
+  eq([r.done, r.of, r.why, citiesOf(S, 0).map(c => c.pop), S.players[0].res.coins],
+    [2, 3, [T('Die letzte Bevölkerung darf nicht geopfert werden.')], [2, 1, 3], 2 * SLAVERY_COINS],
+    'in allen Städten opfern: je eine Bevölkerung, je ' + SLAVERY_COINS + ' Münzen');
+  eq(sacrificeAll(S, 0).done, 0, 'einmal je Stadt und Runde');
+  const S2 = mkA('russland', 'basis', ['sklaverei', 'robotik']);
+  capitalOf(S2, 0).pop = 3;
+  eq([sacrificeAll(S2, 0).done, sacrificeError(S2, 0, capitalOf(S2, 0))],
+    [0, T('Sklaverei ist mit dem Eintritt in die Moderne obsolet.')], 'in der Moderne obsolet – auch für alle Städte');
+}
+/* Die Zahl an „Fähigkeiten": je ART kostenloser Aktionen eins, nur was gerade wirklich geht. */
+{
+  const art = (S) => freeActions(S, 0);
+  // Griechenland, Freie Forschung
+  const S = mkA('griechenland', 'gratistech');
+  eq(art(S), ['forschung'], 'Freie Forschung offen: eine Art');
+  eq(useFreeTech(S, 0, freeTechOptions(S, 0)[0].k), null, 'Freie Forschung genutzt');
+  eq(art(S), [], 'danach nichts mehr – bis zur nächsten Runde');
+  // Verbundwerkstoffe in drei Städten: EINE Art; an der Nahrungsgrenze keine
+  const W = mkA('russland', 'basis', ['verbundwerkstoffe']);
+  W.map.rows = W.map.rows.map(z => 'G'.repeat(z.length));
+  const cap = capitalOf(W, 0);
+  const frei = within(cap.r, cap.c, 8).filter(([r, c]) => terrainAt(W, r, c) && !cityAt(W, r, c) &&
+    W.cities.every(ct => hexDistance(r, c, ct.r, ct.c) >= 3));
+  W.cities.push({ id: W.nextId++, owner: 0, r: frei[0][0], c: frei[0][1], pop: 1, cap: false, grown: 0, born: 0 });
+  eq(art(W), ['wachstum'], 'kostenloses Wachstum in zwei Städten: eine Art');
+  growAll(W, 0, 'free');
+  eq(art(W), [], 'nach „Alle Städte kostenlos wachsen" nichts mehr offen');
+  const V = mkA('russland', 'basis', ['verbundwerkstoffe']);
+  V.map.rows = V.map.rows.map(z => 'G'.repeat(z.length));
+  capitalOf(V, 0).pop = 6;
+  eq([baseIncome(V, 0).food, art(V)], [0, []], 'an der Nahrungsgrenze zählt das kostenlose Wachstum nicht');
+  V.players[0].techs.massenmedien = true;
+  eq(art(V), ['wachstum'], 'mit Massenmedien zählt es wieder');
+  // Internet: nur, wenn es etwas zu kopieren gibt; bezahltes Kopieren zählt nie
+  const N = mkA('england', 'basis', ['internet', 'spionage']);
+  eq(art(N), [], 'Internet ohne etwas zu kopieren: zählt nicht');
+  N.players[1].techs.schrift = true; delete N.players[0].techs.schrift;
+  eq(art(N), ['internet'], 'Internet mit einer fremden Technologie: zählt');
+  eq(copyTech(N, 0, 'schrift', 'free'), null, 'per Internet kopiert');
+  N.players[1].techs.rad = true; delete N.players[0].techs.rad;
+  eq(art(N), [], 'danach zählt das bezahlte Kopieren (Spionage) nicht');
+  // Kostenlose Technologie aus einem Wunder – und alles zusammen
+  const A = mkA('griechenland', 'gratistech', ['verbundwerkstoffe', 'internet']);
+  A.players[1].techs.rad = true; delete A.players[0].techs.rad;
+  addFreePick(A, 0, { n: 2, maxAge: 1, why: 'Test' });
+  eq(art(A), ['forschung', 'wunder', 'wachstum', 'internet'], 'vier Arten auf einmal – zwei Wunder-Technologien zählen einmal');
+  const B = mkA('russland', 'basis', ['sklaverei']);
+  capitalOf(B, 0).pop = 3;
+  eq(art(B), [], 'Sklaverei zählt nicht (nicht kostenlos)');
+}
+/* Rückschau: ein Anspruch, für den nichts mehr übrig ist, blockiert die übrigen nicht (v87,
+   beim Umbau gefunden). Bis v86 blieb er vorn stehen – jede weitere Rückschau desselben Zuges
+   war verloren. */
+{
+  const S = mkA('griechenland', 'rueckschau');
+  const p = S.players[0];
+  techPool(S).filter(t => t.f === 0 && t.age === 0).forEach(t => { p.techs[t.k] = true; });
+  p.res = { sci: 99, food: 0, coins: 0 };
+  p.avail.papier = true; p.avail.segeln = true;
+  eq(doResearch(S, 0, 'papier'), null, 'Papier erforscht – die ganze Antike der Forschung ist schon da');
+  eq([p.backPicks.length, backPickOptions(S, 0).length], [1, 0], 'der Anspruch ist leer: nichts zu wählen');
+  eq(doResearch(S, 0, 'segeln'), null, 'danach Segeln (Produktion)');
+  const opts = backPickOptions(S, 0);
+  eq([opts.length > 0, opts.every(t => t.f === TECH_BY_KEY.segeln.f && t.age === 0)], [true, true],
+    'der zweite Anspruch ist nutzbar: Produktion der Antike');
+  eq([backPick(p, S).f, backPick(p).f], [TECH_BY_KEY.segeln.f, 0], 'backPick mit Spielstand: der erste nutzbare, ohne: der erste');
+  // Gegenprobe: nach der Regel bis v86 (nur der erste Anspruch) gäbe es nichts
+  eq(techPool(S).filter(t => t.f === p.backPicks[0].f && t.age <= p.backPicks[0].age && !p.techs[t.k]).length, 0,
+    'Gegenprobe: der erste Anspruch allein hätte nichts geboten');
+  eq(freeActions(S, 0), ['rueckschau'], 'und die Zahl an „Fähigkeiten" zählt ihn');
+  eq(useBackPick(S, 0, opts[0].k), null, 'genutzt');
+  eq([p.backPicks.length, backPickOptions(S, 0).length, freeActions(S, 0)], [1, 0, []],
+    'übrig bleibt nur der leere – er verfällt zum Zugende');
+}
+
 /* Die Versionsnummer steht an zwei Stellen – sie müssen zusammenpassen, sonst zeigt das
    Menü etwas anderes an, als der Offline-Cache ausliefert. */
 {

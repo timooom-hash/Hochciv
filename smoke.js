@@ -77,7 +77,7 @@ step('Tutorial: Übungsspiel startet in der Spieloberfläche', () => {
 });
 step('Tutorial: Schienen sperren alles außer dem vorgesehenen Schritt', () => {
   // Leseschritt 1: Aktionsleiste bis auf Nachschlagen gesperrt
-  const locked = ['a-tech', 'a-found', 'a-power', 'a-end'].filter(id => !$(id).disabled);
+  const locked = ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-end'].filter(id => !$(id).disabled);
   if (locked.length) throw new Error('offene Knöpfe im Leseschritt: ' + locked.join(','));
   // Gründungsschritt: nur das goldene Feld reagiert
   G('tutMove')(1); G('tutMove')(1); G('tutMove')(1);
@@ -104,7 +104,7 @@ step('Tutorial: Leseschritte erlauben gar keine Aktion', () => {
   const open = [...$('sheet-body').querySelectorAll('.opt')].filter(b => !b.disabled);
   if (open.length) throw new Error('im Leseschritt anklickbar: ' + open.map(b => b.textContent.trim()).join(', '));
   G('closeSheet')();
-  const bar = ['a-tech', 'a-found', 'a-power', 'a-end'].filter(id => !$(id).disabled);
+  const bar = ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-end'].filter(id => !$(id).disabled);
   if (bar.length) throw new Error('Leiste im Leseschritt offen: ' + bar.join(', '));
   console.log('       Stadtblatt und Leiste im Leseschritt vollständig gesperrt');
   $('tut-prev').onclick();
@@ -300,7 +300,7 @@ step('Tutorial: alle Aufgaben über die echte Oberfläche erledigen', () => {
 step('Tutorial: „Fertig" gibt das Spiel frei', () => {
   $('tut-next').onclick();
   if (!$('tut-panel').hidden) throw new Error('Panel bleibt stehen');
-  const locked = ['a-tech', 'a-found', 'a-power', 'a-end', 'a-yields'].filter(id => $(id).disabled);
+  const locked = ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-end'].filter(id => $(id).disabled);
   if (locked.length) throw new Error('Leiste bleibt gesperrt: ' + locked.join(','));
   const S = G('S');
   if (S.over) throw new Error('Spiel schon entschieden');
@@ -604,38 +604,45 @@ step('Sklaverei wird im Techbogen als obsolet markiert', () => {
   console.log('       ' + tile.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
   G('closeModal')();
 });
-step('Internet: Gratiskopie im Technologiebogen', () => {
+step('Internet: Gratiskopie unter „Fähigkeiten" (v87; bis v86 im Technologiebogen)', () => {
   const S = G('S'), pi = S.cur;
   S.players[pi].techs.internet = true;
   const other = (pi + 1) % S.players.length;
   S.players[other].techs.stadtmauern = true;
+  delete S.players[pi].techs.stadtmauern;
+  // Im Bogen steht kein Kopieren mehr
   $('a-tech').onclick();
-  const btn = [...$('ov-body').querySelectorAll('[data-copy]')].find(b => /Stadtmauern/.test(b.textContent));
-  if (!btn) throw new Error('keine kopierbare Technologie angezeigt');
-  const gratis = /gratis/.test(btn.textContent);
-  console.log('       Kopie als ' + (gratis ? 'gratis' : 'bezahlt') + ' markiert');
-  // Die Gratiskachel zeigt die Wirkung der Technologie wie jede andere Kachel – bis v72
-  // stand dort nur „Internet · Gratiskopie", die Wirkung fehlte.
-  const frei = $('ov-body').querySelector('[data-copy="stadtmauern"][data-mode="free"]');
-  if (!frei) throw new Error('keine Gratiskachel für Stadtmauern');
-  const eff = frei.querySelector('.eff').textContent.trim();
-  const soll = G('techEffect')(G('TECH_BY_KEY').stadtmauern, S);
-  if (eff !== soll) throw new Error('Gratiskachel zeigt „' + eff + '" statt der Wirkung „' + soll + '"');
-  if (/Gratiskopie/.test(frei.textContent)) throw new Error('„Gratiskopie" steht noch auf der Kachel');
-  if (frei.querySelector('.c').textContent.trim() !== 'gratis') throw new Error('Preisfeld nicht „gratis"');
-  // auf Englisch: „free" und die englische Wirkung (vorher stand „gratis" fest im Code)
-  G('closeModal')(); G('switchLang')('en'); G('techModal')();
-  const freiEn = $('ov-body').querySelector('[data-copy="stadtmauern"][data-mode="free"]');
-  const effEn = freiEn.querySelector('.eff').textContent.trim();
-  if (effEn !== 'Cities have +5 defence') throw new Error('englische Gratiskachel: „' + effEn + '"');
-  if (freiEn.querySelector('.c').textContent.trim() !== 'free')
-    throw new Error('englisches Preisfeld: „' + freiEn.querySelector('.c').textContent.trim() + '"');
-  G('closeModal')(); G('switchLang')('de'); $('a-tech').onclick();
-  console.log('       Gratiskachel: „' + eff + '" · englisch „' + effEn + '"');
-  const btn2 = [...$('ov-body').querySelectorAll('[data-copy]')].find(b => /Stadtmauern/.test(b.textContent));
-  btn2.onclick();
-  if (!G('has')(S.players[pi], 'stadtmauern')) throw new Error('Kopie nicht übernommen');
+  if ($('ov-body').querySelector('[data-copy]') || /Technologien kopieren/.test($('ov-body').textContent))
+    throw new Error('der Technologiebogen bietet noch Kopieren an');
   G('closeModal')();
+  G('redraw')();
+  if ($('a-abil-n').hidden || +$('a-abil-n').textContent < 1) throw new Error('keine Zahl an „Fähigkeiten" trotz Gratiskopie');
+  $('a-abil').onclick();
+  // Die Gratiskopie zeigt die Wirkung der Technologie – bis v72 stand dort nur
+  // „Internet · Gratiskopie", die Wirkung fehlte.
+  const frei = $('sheet-body').querySelector('[data-act="kopie:gratis:stadtmauern"]');
+  if (!frei) throw new Error('keine Gratiskopie für Stadtmauern');
+  if (!frei.classList.contains('free')) throw new Error('Gratiskopie nicht als kostenlos hervorgehoben');
+  const eff = frei.querySelector('small').childNodes[0].textContent.trim();
+  const soll = G('techEffect')(G('TECH_BY_KEY').stadtmauern, S);
+  if (eff !== soll) throw new Error('Gratiskopie zeigt „' + eff + '" statt der Wirkung „' + soll + '"');
+  if (/Gratiskopie/.test(frei.textContent)) throw new Error('„Gratiskopie" steht noch auf dem Knopf');
+  if (frei.querySelector('.cost').textContent.trim() !== 'gratis') throw new Error('Preisfeld nicht „gratis"');
+  if (!frei.querySelector('.owner-mark.has')) throw new Error('nicht zu sehen, wer sie hat');
+  // auf Englisch: „free" und die englische Wirkung
+  G('closeSheet')(); G('switchLang')('en'); $('a-abil').onclick();
+  const freiEn = $('sheet-body').querySelector('[data-act="kopie:gratis:stadtmauern"]');
+  const effEn = freiEn.querySelector('small').childNodes[0].textContent.trim();
+  if (effEn !== 'Cities have +5 defence') throw new Error('englische Gratiskopie: „' + effEn + '"');
+  if (freiEn.querySelector('.cost').textContent.trim() !== 'free')
+    throw new Error('englisches Preisfeld: „' + freiEn.querySelector('.cost').textContent.trim() + '"');
+  G('closeSheet')(); G('switchLang')('de'); $('a-abil').onclick();
+  console.log('       Gratiskopie: „' + eff + '" · englisch „' + effEn + '"');
+  $('sheet-body').querySelector('[data-act="kopie:gratis:stadtmauern"]').onclick();
+  if (!G('has')(S.players[pi], 'stadtmauern')) throw new Error('Kopie nicht übernommen');
+  if ($('sheet-body').querySelector('[data-act^="kopie:gratis:"]')) throw new Error('zweite Gratiskopie in derselben Runde');
+  if (!/schon eingesetzt/.test($('sheet-body').textContent)) throw new Error('kein Hinweis, dass das Internet genutzt ist');
+  G('closeSheet')();
 });
 step('Sklaverei- und Kolonialismus-Buttons erscheinen', () => {
   const S = G('S'), pi = S.cur, cap = G('capitalOf')(S, pi);
@@ -927,13 +934,16 @@ step('Gründungsmodus: Kosten auf der Karte, Blatt mit Siedelertrag, danach wied
   if (G('ui').mode === 'found') throw new Error('Forschen beendet den Modus nicht');
   console.log(`       ${ja} mögliche Plätze, ${nein} abgeblendet · gegründet auf ${gut.join('/')}, Modus danach aus`);
 });
-step('Erträge: Chips je Feld, gemerkt, immer bedienbar (v75)', () => {
+step('Erträge: Chips je Feld nur noch im Gründungsmodus, kein eigener Umschalter (v87)', () => {
   frischesSpiel();
   const S = G('S'), pi = S.cur;
-  if (G('showYields')) $('a-yields').onclick();              // sauberer Ausgangspunkt
-  if ($('map').querySelector('[data-yield]')) throw new Error('Chips ohne Ertragsansicht');
-  $('a-yields').onclick();
-  if (!G('showYields') || !$('a-yields').classList.contains('on')) throw new Error('Umschalten wirkt nicht');
+  // Der Umschalter „Erträge" zeigte dasselbe wie der Gründungsmodus – er ist weg, samt Wahl
+  if ($('a-yields')) throw new Error('Knopf „Erträge" steht noch in der Leiste');
+  if (G('typeof showYields') !== 'undefined' || G('typeof toggleYields') !== 'undefined' || G('typeof viewerOf') !== 'undefined')
+    throw new Error('Reste des Umschalters im Code');
+  if (G('load')('hochciv.yields') !== null) throw new Error('die alte Wahl liegt noch im Speicher');
+  if ($('map').querySelector('[data-yield]')) throw new Error('Chips außerhalb des Gründungsmodus');
+  $('a-found').onclick();
   // je Feld genau die Erträge ≠ 0, in der Reihenfolge Wissenschaft, Nahrung, Münzen
   const ist = {};
   $('map').querySelectorAll('[data-yield]').forEach(ch => {
@@ -950,15 +960,9 @@ step('Erträge: Chips je Feld, gemerkt, immer bedienbar (v75)', () => {
     if (soll.length) felder++;
   }));
   if (falsch.length) throw new Error('Chips falsch auf ' + falsch.slice(0, 5).join(', '));
-  if (!G('load')('hochciv.yields')) throw new Error('Wahl nicht gemerkt');
-  // Während ein Bot zieht, zeigt die Ansicht die Erträge des Menschen
-  const bot = S.players.findIndex(q => q.kind === 'bot');
-  const vorher = S.cur; S.cur = bot;
-  if (G('viewerOf')(S) !== vorher) throw new Error('beim Bot-Zug zählen die Erträge des Bots');
-  S.cur = vorher;
-  $('a-yields').onclick();
-  if ($('map').querySelector('[data-yield]') || G('load')('hochciv.yields')) throw new Error('Abschalten wirkt nicht');
-  console.log('       ' + felder + ' Felder mit Chips, Wahl gemerkt, beim Bot-Zug die Sicht des Menschen');
+  $('a-found').onclick();
+  if ($('map').querySelector('[data-yield]')) throw new Error('Chips bleiben nach dem Gründungsmodus');
+  console.log('       ' + felder + ' Felder mit Chips im Gründungsmodus, sonst keine');
 });
 step('Machtansicht: Ringe mit einem Teilstück je Punkt, nur solange das Machtblatt offen ist (v75/v76)', () => {
   frischesSpiel();
@@ -1677,6 +1681,39 @@ step('Blatt endet über der Aktionsleiste (Punkt 3, gemessen)', () => {
   if (!v) throw new Error('--bar-h wurde nicht gesetzt');
   if (!/^\d+px$/.test(v)) throw new Error('--bar-h ist kein Pixelmaß: ' + v);
   console.log('       --bar-h = ' + v);
+});
+/* Gedreht (v87, beim Prüfen gefunden): getBoundingClientRect misst NACH der Drehung um 90°.
+   Bis v86 wurde daraus die Höhe genommen – gedreht ist das die Breite der Leiste, also fast
+   die ganze Bildschirmhöhe (in Chromium 1180px), und jedes Blatt lag außerhalb des
+   Bildschirms, auch das eines KI-Zugs mit seinem „Weiter". jsdom kennt kein Layout, also
+   werden die gemessenen Rechtecke vorgegeben: Leiste 1180 × 53, Kopf 1180 × 61. */
+step('Gedreht: --bar-h und --hud-h messen die Leisten, nicht ihre gedrehte Breite (v87)', () => {
+  const html = window.document.documentElement, st = html.style;
+  const bar = window.document.querySelector('#screen-game .actionbar');
+  const hud = window.document.querySelector('#screen-game .hud');
+  const w = window.innerWidth, h = window.innerHeight;
+  const masse = (iw, ih, gedreht) => {
+    Object.defineProperty(window, 'innerWidth', { value: iw, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: ih, configurable: true });
+    bar.getBoundingClientRect = () => gedreht ? { width: 53, height: 1180 } : { width: 1180, height: 53 };
+    hud.getBoundingClientRect = () => gedreht ? { width: 61, height: 1180 } : { width: 1180, height: 61 };
+    G('syncLayout')();
+    return [st.getPropertyValue('--bar-h'), st.getPropertyValue('--hud-h')].join(' ');
+  };
+  try {
+    G('setTurn')(true); G('show')('screen-game');
+    if (!html.classList.contains('turn')) throw new Error('Spielbildschirm nicht gedreht');
+    const hochkant = masse(820, 1180, true);      // iPad hochkant, App dreht sich
+    const quer = masse(1180, 820, false);         // iPad quer, keine Drehung
+    if (hochkant !== '53px 61px') throw new Error('gedreht: ' + hochkant + ' statt 53px 61px');
+    if (quer !== '53px 61px') throw new Error('quer: ' + quer + ' statt 53px 61px');
+    console.log('       hochkant gedreht ' + hochkant + ' · quer ' + quer);
+  } finally {
+    delete bar.getBoundingClientRect; delete hud.getBoundingClientRect;
+    Object.defineProperty(window, 'innerWidth', { value: w, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
+    G('syncLayout')();
+  }
 });
 
 /* ============================================ Plättchenkarte: Startdreiecke legen */
@@ -2735,7 +2772,15 @@ step('Alter Techtree: das Tutorial läuft mit ihm – ohne Hinweis für Neulinge
    Vorrat zeigt „8🌾 4🪙". In den Einstellungen („Kosten ohne Umtausch anzeigen") wieder
    nur der Preis. Reicht es nicht oder wird nichts umgetauscht, steht der Preis da. */
 step('Kosten (v82): das Beispiel des Autors – 10 Nahrung mit 8 im Vorrat zeigt 8🌾 4🪙', () => {
-  $('m-new').onclick(); vierReiche(); $('setup-go').onclick();
+  // Ohne Ereignisse (v87): Die Häkchen aus den Modulschritten stehen hier noch, und eine
+  // Hungersnot der ersten Runde macht Nahrung doppelt so teuer (4 Münzen statt 2) – dann
+  // schlugen dieser und der nächste Schritt grundlos an (gesehen beim Prüfen von v87,
+  // „8🌾 8🪙" statt „8🌾 4🪙"; vorbestehend, die Ereignisse sind Zufall).
+  $('m-new').onclick(); vierReiche();
+  const mitEreignis = $('setup-events').checked;
+  $('setup-events').checked = false; $('setup-events').onchange();
+  $('setup-go').onclick();
+  $('setup-events').checked = mitEreignis; $('setup-events').onchange();
   const S = G('S'), p = S.players[S.cur], kt = G('costText');
   if (G('prefs').listPrice) throw new Error('ab Werk ist „Kosten ohne Umtausch" angehakt');
   p.res = { sci: 0, food: 8, coins: 10 };
@@ -2896,7 +2941,6 @@ step('KI: Züge laufen über das Blatt mit „Weiter", dann ist wieder der Mensc
   $('setup-events').checked = mitEreignis; $('setup-events').onchange();
   const S = G('S');
   if (AUTO(G('P')(S))) throw new Error('das Spiel beginnt nicht beim Menschen');
-  const mensch = S.cur;
   $('a-end').onclick();
   let n = 0, titel = '';
   while (G('P')(G('S')).kind === 'ki' && !G('S').over && n++ < 6) {
@@ -2904,9 +2948,9 @@ step('KI: Züge laufen über das Blatt mit „Weiter", dann ist wieder der Mensc
     if (!/\(KI\)/.test(titel)) throw new Error('Blatt nennt die KI nicht: ' + titel);
     if (!G('ui').botLock) throw new Error('Blatt während des KI-Zugs nicht gesperrt');
     if (!$('bot-next')) throw new Error('kein „Weiter"');
-    // Kartenansichten (v75 des Autors) wie beim Bot-Zug: Erträge aus Sicht des Menschen,
-    // kein Gründungsmodus
-    if (G('viewerOf')(G('S')) !== mensch) throw new Error('beim KI-Zug zählen die Erträge der KI');
+    // wie beim Bot-Zug: kein Gründungsmodus, „Fähigkeiten" zu und ohne Zahl (v87 – die
+    // Erträge der KI zeigte der Umschalter bis v86 aus Sicht des Menschen; er ist weg)
+    if (!$('a-abil').disabled || !$('a-abil-n').hidden) throw new Error('„Fähigkeiten" ist im KI-Zug frei');
     if (!$('a-found').disabled) throw new Error('„Stadt gründen" ist im KI-Zug frei');
     $('a-found').onclick();
     if (G('ui').mode === 'found') throw new Error('Gründungsmodus im KI-Zug');
@@ -3330,6 +3374,239 @@ step('Normales Spiel (v85): Griechenland und Methode wie bisher, Startausgleich 
   const zeilen = G('S').log.filter(l => /^Startausgleich/.test(l.m)).map(l => l.m);
   if (soll.length !== 2 || JSON.stringify(zeilen) !== JSON.stringify(soll)) throw new Error('Protokoll: ' + zeilen.join(' | ') + ' statt ' + soll.join(' | '));
   console.log('       ' + zeilen.join(' · ') + ' (Bot auf Platz ' + (platz(S.players.findIndex(p => p.kind === 'bot')) + 1) + ')');
+});
+
+/* ------------------------------------------------------------------ v87
+   Wunsch des Autors: „Weiter" oben und unten im Blatt eines Bot- oder KI-Zugs; „Fähigkeiten"
+   an der Stelle von „Erträge" – Zivilisationsfähigkeiten (Freie Forschung, Rückschau),
+   alle Städte wachsen (kostenlos und bezahlt), in allen Städten opfern, Kopieren, und an der
+   Leiste die Zahl der Arten kostenloser Aktionen. */
+// Frische Partie auf der Originalkarte, Griechenland (Platz 1) als Mensch mit `abil`, drei Bots,
+// ohne Ereignisse (ein Dunkles Zeitalter sperrte sonst zufällig die Freie Forschung)
+const griechenSpiel = abil => {
+  $('m-new').onclick();
+  $('setup-mode').querySelector('[data-mode=vier]').onclick();
+  $('setup-map').value = '0'; $('setup-map').onchange();
+  $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+  [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="bot"]').onclick());
+  const sel = $('setup-list').children[0].querySelector('[data-abil]');
+  sel.value = abil; sel.onchange();
+  $('setup-start').value = '0'; $('setup-start').onchange();
+  const mitEreignis = $('setup-events').checked;
+  $('setup-events').checked = false; $('setup-events').onchange();
+  $('setup-go').onclick();
+  $('setup-events').checked = mitEreignis; $('setup-events').onchange();
+  const S = G('S'), p = G('P')(S);
+  if (p.civ !== 'griechenland' || p.ability !== abil || p.kind !== 'human')
+    throw new Error(`am Zug: ${p.civ}/${p.ability}/${p.kind} statt Griechenland/${abil}`);
+  return S;
+};
+const zahlAbil = () => $('a-abil-n').hidden ? 0 : +$('a-abil-n').textContent;
+step('Bot- und KI-Blatt: „Weiter" oben und unten, beide führen weiter (v87)', () => {
+  const S = griechenSpiel('basis');
+  $('a-end').onclick();
+  if (!AUTO(G('P')(S))) throw new Error('kein Bot am Zug');
+  const oben = $('bot-next-top'), unten = $('bot-next');
+  if (!oben || !unten) throw new Error('nicht beide Knöpfe da');
+  if (oben.textContent !== unten.textContent) throw new Error('verschiedene Beschriftung: ' + oben.textContent + ' / ' + unten.textContent);
+  // oben = vor dem Protokoll (neben dem Titel), unten = danach
+  const alles = [...$('sheet-body').querySelectorAll('*')];
+  const zeilen = [...$('sheet-body').querySelectorAll('.logline, details')];
+  if (!zeilen.length) throw new Error('kein Protokoll im Blatt');
+  if (!(alles.indexOf(oben) < alles.indexOf(zeilen[0]) && alles.indexOf(zeilen[zeilen.length - 1]) < alles.indexOf(unten)))
+    throw new Error('die Knöpfe stehen nicht oben und unten');
+  if (!$('sheet-body').querySelector('.bot-head h3') || !$('sheet-body').querySelector('.bot-head #bot-next-top'))
+    throw new Error('oberer Knopf nicht neben dem Titel');
+  // Im Zug des Bots ist „Fähigkeiten" zu – und zeigt keine Zahl, auch wenn ER etwas gratis
+  // offen hätte (Internet mit etwas zum Kopieren)
+  const bot = G('P')(S), mensch = S.players.find(q => q.kind === 'human');
+  bot.techs.internet = true; mensch.techs.stadtmauern = true; delete bot.techs.stadtmauern;
+  G('redraw')();
+  if (!G('freeActions')(S, S.cur).length) throw new Error('Ausgangslage: der Bot hat nichts gratis offen');
+  if (!$('a-abil').disabled || !$('a-abil-n').hidden) throw new Error('„Fähigkeiten" im Bot-Zug frei oder mit Zahl');
+  // der obere führt weiter wie der untere – alle Bots über ihn, dann der Mensch ohne Sperre
+  const vorher = S.cur;
+  oben.onclick();
+  if (S.cur === vorher) throw new Error('der obere Knopf führt nicht weiter');
+  let n = 1;
+  while (AUTO(G('P')(S)) && !S.over && n++ < 8) $('bot-next-top').onclick();
+  if (!S.over && (AUTO(G('P')(S)) || G('ui').botLock || $('sheet').classList.contains('locked')))
+    throw new Error('nach den Bots hängt es');
+  if ($('sheet').classList.contains('open') && ($('bot-next-top') || $('bot-next')))
+    throw new Error('das Blatt eines Bot-Zugs steht noch');
+  console.log(`       „${unten.textContent}" oben und unten · ${n} Bot-Züge allein über den oberen Knopf`);
+});
+step('Fähigkeiten: in der Leiste an der Stelle von „Erträge", Zahl der Arten kostenloser Aktionen (v87)', () => {
+  const ids = [...$('screen-game').querySelectorAll('.actionbar button')].map(b => b.id);
+  if (ids.join() !== 'a-tech,a-found,a-power,a-abil,a-info,a-log,a-end') throw new Error('Leiste: ' + ids.join());
+  if (!G('TUT_BAR').includes('a-abil')) throw new Error('das Tutorial bindet „Fähigkeiten" nicht');
+  const S = griechenSpiel('gratistech'), pi = S.cur, p = G('P')(S);
+  if ($('a-abil').disabled) throw new Error('„Fähigkeiten" im eigenen Zug gesperrt');
+  if (zahlAbil() !== 1) throw new Error('Freie Forschung offen, Zahl ' + zahlAbil());
+  // Verbundwerkstoffe (kostenloses Wachstum, in jeder Stadt – eine Art) und Internet mit etwas zum Kopieren
+  p.techs.verbundwerkstoffe = true; p.techs.internet = true;
+  const o = (pi + 1) % S.players.length;
+  S.players[o].techs.stadtmauern = true; delete p.techs.stadtmauern;
+  G('redraw')();
+  if (zahlAbil() !== 3) throw new Error('drei Arten offen, Zahl ' + zahlAbil() + ' (' + G('freeActions')(S, pi) + ')');
+  p.techs.spionage = true; G('redraw')();
+  if (zahlAbil() !== 3) throw new Error('bezahltes Kopieren zählt mit: ' + zahlAbil());
+  // im Blatt sind genau diese drei Arten hervorgehoben
+  $('a-abil').onclick();
+  const arten = new Set([...$('sheet-body').querySelectorAll('.opt.free')].map(b => b.dataset.act.split(':')[0]));
+  if ([...arten].sort().join() !== 'forschung,kopie,wachsen') throw new Error('hervorgehoben: ' + [...arten].join(','));
+  if ($('sheet-body').querySelector('.opt.free[disabled]')) throw new Error('ein gesperrter Knopf ist als kostenlos hervorgehoben');
+  // Nutzen senkt die Zahl
+  $('sheet-body').querySelector('[data-act="wachsen:gratis"]').onclick();
+  if (zahlAbil() !== 2) throw new Error('nach dem kostenlosen Wachsen Zahl ' + zahlAbil());
+  G('closeSheet')();
+  console.log('       Zahl 1 → 3 (Freie Forschung, Wachstum, Internet), Spionage zählt nicht, nach dem Wachsen 2');
+});
+step('Fähigkeiten: Freie Forschung und Rückschau leben hier, nicht mehr im Technologiebogen (v87)', () => {
+  const S = griechenSpiel('gratistech'), pi = S.cur, p = G('P')(S);
+  $('a-tech').onclick();
+  if ($('ov-body').querySelector('[data-freetech], [data-backtech]') || /Freie Forschung/.test($('ov-body').textContent))
+    throw new Error('der Technologiebogen bietet noch die Freie Forschung an');
+  G('closeModal')();
+  $('a-abil').onclick();
+  const karte = $('sheet-body').querySelector('.abil-card');
+  if (!karte || !/Freie Forschung/.test(karte.textContent) || !/umsonst erforschen/.test(karte.textContent))
+    throw new Error('die eigene Fähigkeit steht nicht mit Wirkung da');
+  const soll = G('freeTechOptions')(S, pi).map(t => t.k);
+  const ist = [...$('sheet-body').querySelectorAll('[data-act^="forschung:"]')].map(b => b.dataset.act.slice(10));
+  if (!soll.length || ist.join() !== soll.join()) throw new Error('zur Wahl ' + ist + ' statt ' + soll);
+  $('sheet-body').querySelector(`[data-act="forschung:${ist[0]}"]`).onclick();
+  if (!p.techs[ist[0]]) throw new Error('nicht erforscht');
+  if ($('sheet-body').querySelector('[data-act^="forschung:"]')) throw new Error('ein zweites Mal in derselben Runde');
+  if (!/schon genutzt/.test($('sheet-body').textContent)) throw new Error('kein Hinweis „schon genutzt"');
+  if (zahlAbil()) throw new Error('Zahl bleibt nach der Freien Forschung');
+  G('closeSheet')();
+  // Rückschau: eine Technologie des Mittelalters erforschen – die Wahl steht unter „Fähigkeiten"
+  const S2 = griechenSpiel('rueckschau'), p2 = G('P')(S2);
+  if (zahlAbil()) throw new Error('Rückschau ohne Anlass gezählt');
+  const mittel = G('techPool')(S2).find(t => t.age === 1);
+  p2.avail[mittel.k] = true; p2.res.sci = 99;
+  $('a-tech').onclick();
+  $('ov-body').querySelector(`[data-tech="${mittel.k}"]`).onclick();
+  if (/Rückschau/.test($('ov-body').textContent)) throw new Error('die Rückschau steht noch im Bogen');
+  G('closeModal')();
+  if (zahlAbil() !== 1) throw new Error('keine Zahl nach der Rückschau');
+  $('a-abil').onclick();
+  const rk = [...$('sheet-body').querySelectorAll('[data-act^="rueckschau:"]')];
+  const rsoll = G('backPickOptions')(S2, S2.cur).map(t => t.k);
+  if (!rsoll.length || rk.map(b => b.dataset.act.slice(11)).join() !== rsoll.join())
+    throw new Error('Rückschau zur Wahl ' + rk.map(b => b.dataset.act) + ' statt ' + rsoll);
+  if (!$('sheet-body').textContent.includes(G('FIELDS')[mittel.f])) throw new Error('Feld der Rückschau nicht genannt');
+  rk[0].onclick();
+  if (!p2.techs[rsoll[0]]) throw new Error('Rückschau nicht übernommen');
+  if ($('sheet-body').querySelector('[data-act^="rueckschau:"]') || zahlAbil()) throw new Error('die Rückschau bleibt offen');
+  G('closeSheet')();
+  console.log(`       Freie Forschung: ${soll.length} zur Wahl · Rückschau nach ${mittel.n}: ${rsoll.length} zur Wahl`);
+});
+step('Fähigkeiten: alle Städte wachsen – kostenlos und bezahlt, am Knopf, was abgeht (v87)', () => {
+  const S = griechenSpiel('basis'), pi = S.cur, p = G('P')(S);
+  const cap = G('capitalOf')(S, pi);
+  // zwei weitere Städte, eine davon in dieser Runde gegründet (sie wächst erst nächste Runde)
+  const plaetze = G('within')(cap.r, cap.c, 7).filter(([r, c]) => !G('foundSiteError')(S, pi, r, c));
+  const a = plaetze[0], b = plaetze.find(([r, c]) => G('hexDistance')(r, c, a[0], a[1]) >= 3);
+  S.cities.push({ id: 8101, owner: pi, r: a[0], c: a[1], pop: 3, cap: false, grown: 0, born: 0 });
+  S.cities.push({ id: 8102, owner: pi, r: b[0], c: b[1], pop: 2, cap: false, grown: 0, born: S.round });
+  cap.pop = 2;
+  p.techs.massenmedien = true;             // keine Nahrungsgrenze – hier geht es um die Kosten
+  p.res = { sci: 0, food: 3, coins: 9 };   // Nahrung knapp: der Rest geht in Münzen
+  G('redraw')();
+  $('a-abil').onclick();
+  if ($('sheet-body').querySelector('[data-act="wachsen:gratis"]')) throw new Error('ohne Verbundwerkstoffe kostenlos angeboten');
+  const knopf = $('sheet-body').querySelector('[data-act="wachsen:bezahlt"]');
+  if (!knopf || knopf.disabled) throw new Error('„Alle Städte wachsen" fehlt oder ist gesperrt');
+  // Hauptstadt 2 + Stadt 3 = 5 Nahrung und 5 Münzen; mit 3 Nahrung zahlen 4 Münzen den Rest
+  const kosten = knopf.querySelector('.cost').textContent;
+  if (kosten !== '3🌾 9🪙') throw new Error('Kosten am Knopf ' + kosten + ' statt 3🌾 9🪙');
+  if (!/2 von 3 Städten/.test(knopf.textContent) || !/Neue Städte wachsen erst nächste Runde/.test(knopf.textContent))
+    throw new Error('Unterzeile: ' + knopf.querySelector('small').textContent);
+  // „Kosten ohne Umtausch anzeigen": dort der Preis selbst
+  G('prefs').listPrice = true; $('a-abil').onclick();
+  const liste = $('sheet-body').querySelector('[data-act="wachsen:bezahlt"] .cost').textContent;
+  G('prefs').listPrice = false; $('a-abil').onclick();
+  if (liste !== '5🌾 5🪙') throw new Error('Preis ohne Umtausch ' + liste);
+  $('sheet-body').querySelector('[data-act="wachsen:bezahlt"]').onclick();
+  if (JSON.stringify(G('citiesOf')(S, pi).map(c => c.pop)) !== '[3,4,2]') throw new Error('Bevölkerung danach ' + G('citiesOf')(S, pi).map(c => c.pop));
+  if (JSON.stringify(p.res) !== '{"sci":0,"food":0,"coins":0}') throw new Error('abgebucht: Rest ' + JSON.stringify(p.res));
+  if (!/Gewachsen: 2 von 3 Städten/.test($('toast').textContent)) throw new Error('Meldung: ' + $('toast').textContent);
+  const danach = $('sheet-body').querySelector('[data-act="wachsen:bezahlt"]');
+  if (!danach.disabled || !/schon gewachsen/.test(danach.textContent)) throw new Error('danach nicht gesperrt: ' + danach.textContent);
+  // Verbundwerkstoffe: kostenlos, ohne Abzug, und die Stadt dieser Runde wieder nicht
+  p.techs.verbundwerkstoffe = true;
+  G('redraw')(); $('a-abil').onclick();
+  const gratis = $('sheet-body').querySelector('[data-act="wachsen:gratis"]');
+  if (!gratis || gratis.disabled || gratis.querySelector('.cost').textContent !== 'gratis' || !gratis.classList.contains('free'))
+    throw new Error('„Alle Städte kostenlos wachsen" fehlt oder ist falsch');
+  if (!/2 von 3 Städten · Verbundwerkstoffe/.test(gratis.textContent)) throw new Error('Unterzeile: ' + gratis.querySelector('small').textContent);
+  p.res = { sci: 0, food: 5, coins: 5 };
+  gratis.onclick();
+  if (JSON.stringify(G('citiesOf')(S, pi).map(c => c.pop)) !== '[4,5,2]') throw new Error('kostenlos: ' + G('citiesOf')(S, pi).map(c => c.pop));
+  if (JSON.stringify(p.res) !== '{"sci":0,"food":5,"coins":5}') throw new Error('kostenlos, aber abgebucht: ' + JSON.stringify(p.res));
+  G('closeSheet')();
+  console.log(`       bezahlt: 2 von 3 Städten, am Knopf ${kosten} (Preis ${liste}), danach gesperrt · kostenlos: 2 von 3`);
+});
+step('Fähigkeiten: in allen Städten opfern, solange Sklaverei nicht obsolet ist (v87)', () => {
+  const S = griechenSpiel('basis'), pi = S.cur, p = G('P')(S);
+  const cap = G('capitalOf')(S, pi);
+  const a = G('within')(cap.r, cap.c, 7).find(([r, c]) => !G('foundSiteError')(S, pi, r, c));
+  S.cities.push({ id: 8201, owner: pi, r: a[0], c: a[1], pop: 1, cap: false, grown: 0, born: 0 });
+  cap.pop = 3; p.res.coins = 0;
+  $('a-abil').onclick();
+  if ($('sheet-body').querySelector('[data-act="opfern"]')) throw new Error('ohne Sklaverei angeboten');
+  p.techs.sklaverei = true; G('redraw')(); $('a-abil').onclick();
+  if (zahlAbil()) throw new Error('Sklaverei zählt als kostenlose Aktion');
+  const k = $('sheet-body').querySelector('[data-act="opfern"]');
+  if (!k || k.disabled) throw new Error('„In allen Städten opfern" fehlt oder ist gesperrt');
+  if (k.querySelector('.cost').textContent !== '+' + G('SLAVERY_COINS') + '🪙') throw new Error('Ertrag am Knopf ' + k.querySelector('.cost').textContent);
+  if (!/1 von 2 Städten/.test(k.textContent) || !/letzte Bevölkerung/.test(k.textContent)) throw new Error('Unterzeile: ' + k.textContent);
+  k.onclick();
+  if (cap.pop !== 2 || p.res.coins !== G('SLAVERY_COINS')) throw new Error(`danach Bevölkerung ${cap.pop}, Münzen ${p.res.coins}`);
+  if (!/Geopfert: 1 Bevölkerung/.test($('toast').textContent)) throw new Error('Meldung: ' + $('toast').textContent);
+  const k2 = $('sheet-body').querySelector('[data-act="opfern"]');
+  if (!k2.disabled || !/schon geopfert/.test(k2.textContent)) throw new Error('ein zweites Mal möglich: ' + k2.textContent);
+  // obsolet: mit der ersten Technologie der Moderne verschwindet der Knopf
+  p.techs.robotik = true; $('a-abil').onclick();
+  if ($('sheet-body').querySelector('[data-act="opfern"]')) throw new Error('Sklaverei in der Moderne noch angeboten');
+  G('closeSheet')();
+  console.log('       1 von 2 Städten (+' + G('SLAVERY_COINS') + ' Münzen), danach gesperrt, ab der Moderne weg');
+});
+step('Fähigkeiten: auf Englisch vollständig, kostenlose Technologie aus Wundern dabei (v87)', () => {
+  G('switchLang')('en');
+  G('clearMissing')();
+  const S = griechenSpiel('gratistech'), pi = S.cur, p = G('P')(S);
+  p.techs.verbundwerkstoffe = true; p.techs.internet = true; p.techs.kundschafterei = true;
+  const o = (pi + 1) % S.players.length;
+  S.players[o].techs.stadtmauern = true; delete p.techs.stadtmauern;
+  G('addFreePick')(S, pi, { n: 1, maxAge: 1, why: 'Test' });
+  G('redraw')();
+  if (!/^Abilities/.test($('a-abil').textContent)) throw new Error('Knopf: ' + $('a-abil').textContent);
+  if (zahlAbil() !== 4) throw new Error('vier Arten (mit der Wunder-Technologie), Zahl ' + zahlAbil());
+  $('a-abil').onclick();
+  const txt = $('sheet-body').textContent.replace(/\s+/g, ' ');
+  for (const t of ['Abilities', 'Your ability', 'Free research', 'Free technology', 'Grow all cities for free',
+    'Grow all cities', 'Copy technologies', 'once free via the Internet'])
+    if (!txt.includes(t)) throw new Error('fehlt: ' + t);
+  if (/[äöüß]/.test(txt.replace(/Test/g, ''))) throw new Error('deutscher Rest: ' + txt.match(/\S*[äöüß]\S*/)[0]);
+  const fehlt = G('missingStrings')();
+  if (fehlt.length) throw new Error('unübersetzt: ' + fehlt.join(' | '));
+  // die Wunder-Technologie lässt sich hier wählen
+  const w = $('sheet-body').querySelector('[data-act^="wunder:"]');
+  if (!w || !w.classList.contains('free')) throw new Error('keine kostenlose Technologie aus dem Wunder');
+  w.onclick();
+  if (G('freePick')(p)) throw new Error('Wunder-Technologie nicht verbraucht');
+  if (zahlAbil() !== 3) throw new Error('danach drei Arten, Zahl ' + zahlAbil());
+  G('closeSheet')();
+  // das Blatt eines Bot-Zugs: „Continue" oben und unten
+  const knopfEn = $('a-abil').childNodes[0].textContent.trim();
+  $('a-end').onclick();
+  if ($('bot-next-top').textContent !== 'Continue' || $('bot-next').textContent !== 'Continue') throw new Error('Bot-Blatt nicht übersetzt');
+  while (AUTO(G('P')(G('S'))) && !G('S').over && $('bot-next')) $('bot-next').onclick();
+  G('switchLang')('de');
+  console.log('       „' + knopfEn + '" · Blatt ohne fehlende Übersetzung, Wunder-Technologie gewählt, Bot-Blatt „Continue"');
 });
 
 step('kein abgefangener Fehler im Zugablauf', () => {
