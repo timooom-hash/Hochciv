@@ -25,13 +25,48 @@ function closeModal() {
   // Leseschritte im Tutorial warten darauf, dass das Fenster wieder zu ist.
   if (typeof tutMaybeAdvance === 'function' && ui && ui.tut) tutMaybeAdvance();
 }
+/* Ein frisch gezeigtes Blatt nimmt kurz keine Tipps an (v89). Gemeldet: „beim Öffnen von
+   Fähigkeiten wachsen manchmal alle Städte" – ohne Weg, es nachzustellen. Das Öffnen selbst
+   ändert am Spielstand nichts (geprüft über viele Spielstände). Nachstellen ließ sich aber
+   dies: Nach einer Aktion zeichnet sich das Blatt neu, und was oben verschwindet – die Liste
+   der Freien Forschung nach der Wahl, eine kopierte Technologie, „Kostenlos wachsen" im
+   Stadtblatt –, schiebt den Rest nach oben. Ein zweiter schneller Tipp an dieselbe Stelle
+   (Doppeltipp, oder weil der erste nicht zu wirken schien) traf dann „Alle Städte wachsen"
+   bzw. „Kopieren" – Aktionen, die man nie angetippt hat. Ebenso gleitet ein Blatt beim Öffnen
+   0,18 s lang ins Bild; ein früher Tipp trifft, was gerade vorbeizieht.
+   Deshalb zählt ein Tipp auf einen Knopf im Blatt erst SHEET_CALM_MS nach dem Öffnen oder
+   Neuzeichnen – außer auf DENSELBEN Knopf, der das Neuzeichnen ausgelöst hat (zweimal „+1
+   Macht", noch einmal „Bevölkerung wachsen": das ist gewollt und bleibt flott). Beim Öffnen
+   gilt keiner. Ausgenommen ist das Blatt eines Bot- oder KI-Zugs (`locked`): dort gibt es nur
+   „Weiter", und das soll sich zügig durchtippen lassen. */
+const SHEET_CALM_MS = 400;
+const sheetCalm = { until: 0, key: null, tapped: null };
+const nowMs = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+// Woran ein Knopf im Blatt erkannt wird: seine Aktion bzw. Beschriftung, nicht die Zufalls-id
+const tapKey = b => b.dataset.act || b.dataset.label || b.dataset.w || b.dataset.k || b.dataset.n ||
+  b.dataset.back || b.textContent.trim();
+// Erfassungsphase am Blatt: läuft vor dem onclick des Knopfs
+function sheetCalmGuard(e) {
+  const b = e.target && e.target.closest ? e.target.closest('#sheet-body button') : null;
+  if (!b) return;
+  const key = tapKey(b);
+  if (nowMs() < sheetCalm.until && key !== sheetCalm.key && !$('sheet').classList.contains('locked')) {
+    e.stopPropagation(); e.preventDefault();
+    return;
+  }
+  sheetCalm.tapped = key;          // zeichnet der Knopf das Blatt neu, darf er gleich wieder
+}
 /* `opts.power`: dieses Blatt ist das Machtblatt – nur solange es offen ist, zeigt die
    Karte die Machtringe (v75). Jedes andere Blatt beendet die Machtansicht. */
 function sheet(html, opts) {
   const machtAus = ui && ui.powerView && !(opts && opts.power);
   if (machtAus) ui.powerView = false;
+  const warOffen = $('sheet').classList.contains('open');
   $('sheet-body').innerHTML = html;
   $('sheet').classList.add('open');
+  // Neu gezeigt: kurz keine Tipps – außer auf den Knopf, dessen Tipp gerade neu zeichnet
+  sheetCalm.until = nowMs() + SHEET_CALM_MS;
+  sheetCalm.key = warOffen ? sheetCalm.tapped : null;
   // Im Tutorial sind auch Macht- und Armeeblatt an die Schienen gebunden. Hier zählt nur
   // die Beschriftung – die Feldprüfung macht openTile für das Aktionsblatt selbst.
   if (typeof ui !== 'undefined' && ui && ui.tut) tutGateSheet(null, null);
@@ -2409,6 +2444,9 @@ function boot() {
   $('ov-close').onclick = closeModal;
   $('overlay').onclick = e => { if (e.target === $('overlay')) closeModal(); };
   $('sheet-grip').onclick = closeSheet;
+  // Frisch gezeigte Blätter (v89): vor dem onclick prüfen, danach den getippten Knopf vergessen
+  $('sheet').addEventListener('click', sheetCalmGuard, true);
+  $('sheet').addEventListener('click', () => { sheetCalm.tapped = null; });
   $('sheet-close').onclick = closeSheet;
 
   $('setup-go').onclick = () => {

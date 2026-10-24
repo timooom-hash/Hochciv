@@ -570,7 +570,9 @@ function kiTechBonus(S, pi, k, K, y) {
   switch (k) {
     case 'keramik': return 0.5 * H * Math.min(cities, 6);
     case 'verbundwerkstoffe': return cities * H * Math.max(1, H) / 3;
-    case 'dampfmaschine': return 0.35 * H * cities * Math.max(1, popOf(S, pi) / Math.max(1, cities));
+    // keine Münzkosten fürs Wachsen, seit v89 dazu ein bezahlter Schritt mehr – der gewichtet wie Keramik
+    case 'dampfmaschine': return 0.35 * H * cities * Math.max(1, popOf(S, pi) / Math.max(1, cities)) +
+      0.5 * H * Math.min(cities, 6);
     case 'rad': return 1.2 * H * Math.max(0, cities - 1) + 2;
     case 'eisenbahn': return 1.0 * H * Math.max(0, cities - 1) + 2;
     case 'navigation': return 5;

@@ -1141,11 +1141,14 @@ function arriveAt(S, army, r, c, cost) {
 const moveBudget = a => a.halted ? -1 : a.mp;
 
 /* ------------------------------------------------------------ Aktionen */
-/* Wie oft eine Stadt pro Runde wachsen darf und wie oft davon kostenlos:
-   Keramik = 2× bezahlt, Verbundwerkstoffe = +1× gratis, beide zusammen bis 3×. */
+/* Wie oft eine Stadt pro Runde wachsen darf und wie oft davon kostenlos: ein bezahlter
+   Schritt, Keramik +1 und seit v89 (Anweisung des Autors) die Dampfmaschine +1 bezahlten
+   (bis v88 strich sie nur die Münzkosten); Verbundwerkstoffe +1 kostenlos. Alle drei
+   zusammen: 3 bezahlte und 1 kostenloser Schritt je Stadt und Runde. */
+const GROW_EXTRA_PAID = ['keramik', 'dampfmaschine'];   // je +1 bezahlter Schritt
 function growLimits(S, pi) {
   const p = S.players[pi];
-  const paid = has(p, 'keramik') ? 2 : 1;      // bezahlte Schritte je Runde
+  const paid = 1 + GROW_EXTRA_PAID.filter(k => has(p, k)).length;   // bezahlte Schritte je Runde
   const free = has(p, 'verbundwerkstoffe') ? 1 : 0;   // zusätzlich, und nur kostenlos
   return { max: paid + free, paid, free };
 }
