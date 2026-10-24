@@ -54,6 +54,8 @@ sonst behalten installierte Geräte die alte Fassung.
 | Städte auf der Karte | Scheibe mit der **Bevölkerung als Zahl** in der Farbe des Reichs (seit v84; vorher Reichssymbol und Striche); die Hauptstadt hat einen dunklen, dicken Ring. Armeen tragen weiter das Reichssymbol |
 | **Protokoll** | jede Aktion; die Würfe dahinter hängen eingeklappt an der Zeile und lassen sich antippen |
 | Züge von Bots und KI | Blatt mit dem, was sie getan haben; **Weiter** steht seit v87 oben neben dem Titel und unten – wer das Protokoll nicht lesen will, muss nicht ans Ende scrollen |
+| Kampf am Zugende (v90, Reihenfolge v91) | Nach **Zug beenden** – und im Zug eines Bots oder der KI vor ihrem Blatt – läuft **jeder Kampf einzeln eine Sekunde lang** ab, in der Reihenfolge der Regel: **erst die Städte, dann die Flankierungen** – eine Armee verteidigt ihre Stadt mit, auch wenn sie danach weggeflankt wird (v90 hatte die Reihenfolge umgedreht, seit v91 wieder wie zuvor; `ANNAHMEN.md`, Abschnitt 1). Das Kampffeld ist golden umrandet, die Felder des Angreifers in seiner Farbe; daneben stehen **⚔️ Angriff** (Farbe des Angreifers) und **🛡️ Verteidigung** (Farbe des Verteidigers), dazwischen **>** (der Angriff gewinnt) oder **≤** (die Verteidigung hält, auch bei Gleichstand), darüber etwa „Stadt 1/2 · hält" oder „Flanke 2/2 · Armee zerstört". Die Karte zeigt jeweils den Stand vor diesem Kampf. Die Werte stehen gut zwei Felder über oder unter dem Kampffeld und zeigen mit einem Strich darauf – auf der Seite, wo sie keine Figur des Angreifers verdecken; auf dem Telefon größer. Solange das läuft, ist die Leiste gesperrt; **ein Tipp auf die Karte überspringt** den Rest (bei mehreren Kämpfen steht der Hinweis über der Leiste), das Menü ☰ ebenso. Wer mitten im Nachspiel neu lädt, steht wieder vor „Zug beenden". Gerechnet ist alles schon vorher – das Nachspiel zeigt es nur |
+| Zugfolge (v90) | Wo der Aufbau **nummerierte Plätze** zeigt – auf der Plättchenkarte und bei weniger als vier Reichen (Drei Reiche, 1 gegen 1) –, ziehen die Reiche **in der Reihenfolge der Plätze**, ab dem Startspieler. Zweimal dieselbe Zivilisation zieht also dort, wo sie sitzt (bis v89 nach der Zivilisation: Platz 1 Russland, Platz 3 Russland, erst dann Platz 2). Die klassische Aufstellung mit allen vier Zivilisationen und der Marathon bleiben bei Russland → Griechenland → England → Wikinger – auf der Originalkarte Ost, Süd, West, Nord, also im Uhrzeigersinn |
 
 ## Spielende
 
@@ -256,7 +258,8 @@ node test.js           # prüft, dass beide zusammenpassen
 ```
 
 Die Reihenfolge in der JSON ist die **Anzeigereihenfolge** (Aufbau, Regelbogen), das Feld
-`order` die **Zugreihenfolge** im Spiel. Was die JSON nicht enthält, sind die Regeln: eine
+`order` die **Zugreihenfolge** im Spiel – seit v90 nur noch in der klassischen Aufstellung mit
+allen vier Zivilisationen und im Marathon; mit nummerierten Plätzen gilt deren Reihenfolge. Was die JSON nicht enthält, sind die Regeln: eine
 neue Alternativfähigkeit braucht zusätzlich Code in `js/engine.js`, der ihren Schlüssel
 über `isAbil(p, '…')` prüft – der Test meldet eine Fähigkeit, die nirgends geprüft wird.
 Grundfähigkeiten heißen bei allen Zivilisationen `basis` und werden deshalb immer mit der

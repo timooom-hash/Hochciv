@@ -429,6 +429,110 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     v.includes(`<b>${3 + SIEGE_BONUS} instead of 3</b>`))], [2, true], 'Tutorial (englisch): dieselben Zahlen');
 }
 
+/* --- Kampfphase (v91, Anweisung des Autors): erst die Städte, dann wird flankiert – wie bis
+   v89. v90 hatte es umgedreht, und dann fielen Städte, die verteidigt waren. Eine Armee an ihrer
+   Stadt verteidigt diese also mit, auch wenn sie im selben Zug noch weggeflankt wird. Dazu die
+   Einträge für das Nachspielen (`rec`, seit v90): Art, Feld, Werte, Ausgang, beteiligte Felder,
+   Stand davor – in der Reihenfolge, in der gerechnet wird. */
+{
+  // Englands Hauptstadt C, daneben Englands Armee E; Griechenland flankiert E von G1 und G2
+  // (gegenüber), G1 steht zugleich an C. Griechenland Macht 5, England 3, C mit 3 Bevölkerung:
+  // Verteidigung mit E 3 + 3 = 6 ≥ 5 – die Stadt hält; danach fällt E (5 > 3).
+  const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 9 });
+  const C = capitalOf(S, 1); C.pop = 3;
+  const frei = (r, c) => isLand(S, r, c) && !cityAt(S, r, c) && !armyAt(S, r, c);
+  let lage = null;
+  for (const [er, ec] of neighbors(C.r, C.c)) {
+    if (lage || !frei(er, ec)) continue;
+    for (const [g1r, g1c] of neighbors(er, ec)) {
+      if (lage || !frei(g1r, g1c) || hexDistance(g1r, g1c, C.r, C.c) !== 1) continue;
+      const g2 = neighbors(er, ec).find(([r, c]) => frei(r, c) && hexDistance(r, c, C.r, C.c) === 2 &&
+        hexOpposite(er, ec, g1r, g1c, r, c));
+      if (g2) lage = { E: [er, ec], G1: [g1r, g1c], G2: g2 };
+    }
+  }
+  eq(!!lage, true, 'Stellung gefunden: Armee an der Stadt, von zwei Seiten flankierbar');
+  const E = { id: 951, owner: 1, r: lage.E[0], c: lage.E[1], mp: 0, born: 0 };
+  S.armies.push(E,
+    { id: 952, owner: 0, r: lage.G1[0], c: lage.G1[1], mp: 0, born: 0 },
+    { id: 953, owner: 0, r: lage.G2[0], c: lage.G2[1], mp: 0, born: 0 });
+  S.players[0].power = 5; S.players[1].power = 3;
+  eq([defenseValue(S, C), attackValue(S, 0, attackersOn(S, 0, C).length)], [6, 5],
+    'vor dem Kampf: Verteidigung 6 (mit der Armee), Angriff 5');
+  const kopie = (mitArmee, belagerung) => {
+    const X = JSON.parse(JSON.stringify(Object.assign({}, S, { log: [] })));
+    if (mitArmee && !X.armies.some(a => a.id === 951)) X.armies.push(Object.assign({}, E));
+    X.sieges = belagerung ? { ['0|' + C.id]: belagerung } : {};
+    X.cur = 0;
+    return X;
+  };
+  S.cur = 0;
+  const rec = [], seq = S.logSeq;
+  finishTurn(S, rec);
+  eq([S.armies.includes(E), S.sieges['0|' + C.id] || 0], [false, 0],
+    'erst die Stadt: sie hält (5 ≤ 6, die Armee verteidigt mit) – dann wird die Armee weggeflankt (5 > 3)');
+  eq(logSince(S, seq).filter(l => l.c === 'fight').map(l => /flankiert/.test(l.m) ? 'flanke' : 'stadt'),
+    ['flanke'], 'im Protokoll nur die Flanke (eine Stadt, die ohne laufende Belagerung hält, steht dort nicht)');
+  eq(rec.map(e => [e.art, e.pi, e.gegner, e.r, e.c, e.a, e.d, e.sieg]),
+    [['stadt', 0, 1, C.r, C.c, 5, 6, false], ['flanke', 0, 1, E.r, E.c, 5, 3, true]], 'zwei Einträge: Stadt, dann Flanke');
+  eq([rec[0].von.map(String), rec[1].von.map(String).sort(), rec[0].zug || 0, !!rec[0].genommen, !!rec[0].gebrochen],
+    [[String(lage.G1)], [lage.G1, lage.G2].map(String).sort(), 0, false, false], 'beteiligte Felder und Ausgang');
+  eq([rec[0].snap.armies.some(a => a.id === 951), rec[1].snap.armies.some(a => a.id === 951)], [true, true],
+    'Stand davor: bei der Stadt und bei der Flanke steht die Armee noch');
+  eq(rec[0].snap.cities.find(x => x.id === C.id).pop, 3, '… und die Stadt mit ihrer Bevölkerung davor');
+  // Was der Autor ausschließen will: läuft die Belagerung schon (1/2), hält die verteidigte Stadt
+  // trotzdem – die Belagerung bricht ab, auch wenn ihre Armee danach weggeflankt wird.
+  {
+    const W = kopie(true, 1), r = [];
+    finishTurn(W, r);
+    eq([W.cities.find(x => x.id === C.id).owner, W.sieges['0|' + C.id], W.armies.some(a => a.id === 951), r[0].art, r[0].gebrochen],
+      [1, 0, false, 'stadt', true], 'Belagerung 1/2 und Armee an der Stadt: die Stadt hält, die Belagerung bricht, dann fällt die Armee');
+  }
+  // Zweiter Treffer ohne verteidigende Armee: erobert (3 − 2 = 1 bleibt) bzw. zerstört (bei 2)
+  const nochmal = pop => {
+    const X = kopie(false, 1);
+    X.cities.find(x => x.id === C.id).pop = pop;
+    const r = []; finishTurn(X, r);
+    const e = r.find(x => x.art === 'stadt');
+    return [e.zug, e.genommen, e.zerstoert];
+  };
+  eq([nochmal(3), nochmal(2)], [[2, true, false], [2, true, true]], 'zweiter Treffer: erobert bzw. zerstört');
+  // Ohne `rec` dasselbe Ergebnis (KI, Bots, Tests rechnen so)
+  const Y = kopie(true, 0);
+  finishTurn(Y);
+  eq([Y.armies.some(a => a.id === 951), Y.sieges['0|' + C.id] || 0], [false, 0], 'ohne Aufzeichnung derselbe Ausgang');
+  // Eine Flanke, für die die Macht nicht reicht, ist auch ein Kampf – sie hält
+  const Z = kopie(true, 0); Z.players[0].power = 3;
+  const rz = []; finishTurn(Z, rz);
+  const fz = rz.find(e => e.art === 'flanke');
+  eq([rz.map(e => e.art), fz.a, fz.d, fz.sieg, Z.armies.some(a => a.id === 951)], [['stadt', 'flanke'], 3, 3, false, true],
+    'Flanke 3 gegen 3: ein Kampf nach der Stadt, die Armee hält (Gleichstand hält)');
+}
+
+/* --- Zugfolge nach Plätzen (v90, Anweisung des Autors): mit cfg.seatOrder ziehen die Reiche in
+   der Reihenfolge der Plätze, ohne bleibt es bei Russland → Griechenland → England → Wikinger. */
+{
+  const plaetze = [{ civ: 'russland', kind: 'human' }, { civ: 'griechenland', kind: 'bot' }, { civ: 'russland', kind: 'bot' }];
+  // Plättchenkarte (nur dort sitzt eine Zivilisation doppelt): Hauptstädte nach Platz
+  const plan = tilePlan(plaetze.map(p => p.civ), 21), rnd = mapRng(22);
+  plan.seats.forEach(st => botPlaceSeat(plan, st, rnd));
+  const map = tileMap(plan);
+  const A = newGame({ seed: 3, map, players: plaetze.map(p => Object.assign({}, p)), seatOrder: true, startPlayer: 1 });
+  eq(A.players.map(p => [p.civ, p.slot]), [['russland', 0], ['griechenland', 1], ['russland', 2]], 'nach Plätzen: 1, 2, 3');
+  const folge = [];
+  for (let i = 0; i < 4; i++) { folge.push(A.players[A.cur].slot); A.cur = (A.cur + 1) % A.players.length; }
+  eq([A.startIdx, folge], [1, [1, 2, 0, 1]], 'ab dem Startspieler (Platz 2): 2 → 3 → 1 → 2');
+  const B = newGame({ seed: 3, map, players: plaetze.map(p => Object.assign({}, p)), startPlayer: 1 });
+  eq(B.players.map(p => [p.civ, p.slot]), [['russland', 0], ['russland', 2], ['griechenland', 1]],
+    'ohne Schalter nach Zivilisation (bis v89 überall): Platz 1, Platz 3, Platz 2');
+  eq(B.players[B.startIdx].slot, 1, '… der Startspieler bleibt der Platz, nicht die Zivilisation');
+  eq(A.players.map((p, i) => { const c = capitalOf(A, i); const e = map.capitals[p.slot]; return c.r === e.r && c.c === e.c; }),
+    [true, true, true], 'jede Hauptstadt steht auf dem Startfeld ihres Platzes');
+  const vier = CIVS.map(c => ({ civ: c.k, kind: 'bot' }));
+  eq(newGame({ seed: 3, map: MAP_ORIGINAL, players: vier }).players.map(p => p.civ), ORDER.slice(),
+    'klassisch: Russland → Griechenland → England → Wikinger');
+}
+
 /* ==================================================== Bot-Armeeprioritäten
    1 belagerte gegnerische Hauptstadt stürmen · 2 Angreifer auf die eigene Hauptstadt
    flankieren · 3 Hauptstadt verteidigen · 4/5 dasselbe für andere Städte (größte
