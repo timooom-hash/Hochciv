@@ -3648,9 +3648,11 @@ step('v88: Hauptmenü „Ne Runde Civ?", Ertragstechnologien in Bogen, Übersich
   if (meer && !reihen.some(r => r.includes('Meer') && r.includes('🌾' + meer.y[1]) && r.includes('🪙' + meer.y[2]) &&
     meer.y[1] === 2 * meer.count && meer.y[2] === 2 * meer.count))
     throw new Error('Meereszeile nicht 🌾2 🪙2 je Feld: ' + reihen.join(' | '));
-  for (const t of ['Wald: +3 Wissenschaft (inkl. Mathematik, Elektrizität)', 'Meer: +2 Nahrung, +1 Münze (inkl. Fischerei, Segeln)',
-    'Je Bevölkerung: +2 Münzen (inkl. Fließband)', '+3 Angriff gegen Städte'])
+  for (const t of ['Wald: +3 Wissenschaft', 'Meer: +2 Nahrung, +1 Münze', 'Je Bevölkerung: +2 Münzen', '+3 Angriff gegen Städte'])
     if (!body().includes(t)) throw new Error('Bogen: fehlt „' + t + '"');
+  // seit v89 ohne „(inkl. …)" auf den Kacheln (Anweisung des Autors)
+  const effs = [...$('ov-body').querySelectorAll('.tech .eff')].map(e => e.textContent);
+  if (effs.some(t => /inkl\./.test(t))) throw new Error('Kachel mit „inkl.": ' + effs.find(t => /inkl\./.test(t)));
   G('closeModal')();
   // Regelbogen: der erklärende Satz, die Texte, Singularität 120 – deutsch und englisch
   const regeln = () => {
@@ -3667,15 +3669,87 @@ step('v88: Hauptmenü „Ne Runde Civ?", Ertragstechnologien in Bogen, Übersich
     G('clearMissing')();
     const [en, singEn] = regeln();
     $('a-tech').onclick(); const bogenEn = body(); G('closeModal')();
-    for (const t of ['Yield technologies include the cheaper ones of their field', 'Forest: +3 science (incl. Mathematics, Electricity)', '+3 attack against cities'])
+    for (const t of ['Yield technologies include the cheaper ones of their field', 'Forest: +3 science', '+3 attack against cities'])
       if (!en.includes(t)) throw new Error('Regelbogen englisch: fehlt „' + t + '"');
-    if (!bogenEn.includes('Sea: +2 food, +1 coin (incl. Fishing, Sailing)')) throw new Error('Bogen englisch ohne Containerlogistik-Text');
+    if (!bogenEn.includes('Sea: +2 food, +1 coin') || /incl\./.test(bogenEn)) throw new Error('Bogen englisch: Containerlogistik-Text fehlt oder „incl." steht noch da');
     if (JSON.stringify(singEn) !== '["120","Singularity"]') throw new Error('Singularity englisch: ' + singEn.join(' '));
     const fehlt = G('missingStrings')();
     if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));
   } finally { G('switchLang')('de'); }
   console.log('       Menü DE/EN · Wald ' + (wald ? `×${wald.count} → 🔬${wald.y[0]}` : '–') +
     ' · Meer ' + (meer ? `×${meer.count} → 🌾${meer.y[1]} 🪙${meer.y[2]}` : '–') + ' · Texte in Bogen und Regelbogen DE/EN · Singularität 120');
+});
+
+/* ======================================================= v89
+   Gemeldet: „beim Öffnen von Fähigkeiten wachsen manchmal alle Städte" (nicht nachstellbar).
+   Nachgestellt in Chromium: nach einer Aktion zeichnet sich das Blatt neu, der Rest rutscht
+   nach oben, und ein Doppeltipp traf „Alle Städte wachsen". Jetzt zählt ein Tipp auf einen
+   Knopf erst 0,4 s nach dem Öffnen/Neuzeichnen – außer auf denselben Knopf. Hier mit echten
+   Klick-Ereignissen (die Erfassung am Blatt sieht nur die), die Zeit über sheetCalm.until. */
+step('v89: frisch gezeigte Blätter nehmen kurz keine Tipps an – außer auf denselben Knopf', () => {
+  const S = griechenSpiel('gratistech'), pi = S.cur, p = G('P')(S);
+  ['verbundwerkstoffe', 'keramik', 'spionage', 'gentechnik'].forEach(k => { p.techs[k] = true; });
+  G('techPool')(S).filter(t => t.age <= 1).forEach(t => { p.avail[t.k] = true; });
+  S.players.forEach((o, i) => { if (i !== pi) G('TECHS').slice(0, 40).forEach(t => { if (!p.techs[t.k]) o.techs[t.k] = true; }); });
+  p.res = { sci: 20, food: 40, coins: 40 };
+  G('redraw')();
+  const tippe = el => {
+    if (!el) throw new Error('Knopf fehlt');
+    el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+  };
+  const calm = G('sheetCalm');
+  const pops = () => G('citiesOf')(S, pi).map(c => c.pop).join(',');
+  const knopf = sel => $('sheet-body').querySelector(sel);
+  const vorher = pops();
+  // 1 Öffnen und sofort „Alle Städte wachsen" – das Blatt gleitet noch herein: zählt nicht
+  $('a-abil').onclick();
+  tippe(knopf('[data-act="wachsen:bezahlt"]'));
+  if (pops() !== vorher) throw new Error('Tipp gleich nach dem Öffnen hat gewirkt');
+  // 2 Freie Forschung wählen (nach der Pause) – wirkt. Der Doppeltipp, der danach auf
+  //   „Alle Städte wachsen" oder „Kopieren" fällt, nicht.
+  calm.until = 0;
+  const vorTech = Object.keys(p.techs).length;
+  tippe(knopf('[data-act^="forschung:"]'));
+  if (Object.keys(p.techs).length !== vorTech + 1) throw new Error('Freie Forschung ging nicht');
+  const coins = p.res.coins;
+  tippe(knopf('[data-act="wachsen:bezahlt"]'));
+  tippe(knopf('[data-act^="kopie:bezahlt:"]'));
+  if (pops() !== vorher || p.res.coins !== coins || Object.keys(p.techs).length !== vorTech + 1)
+    throw new Error('Doppeltipp nach dem Neuzeichnen hat gewirkt');
+  // 3 bewusst, nach der Pause: wirkt
+  calm.until = 0;
+  tippe(knopf('[data-act="wachsen:bezahlt"]'));
+  const nachher = pops();
+  if (nachher === vorher) throw new Error('bewusster Tipp auf „Alle Städte wachsen" ohne Wirkung');
+  // 4 derselbe Knopf darf gleich wieder: zweimal schnell „+1 Macht"
+  p.res.coins = 40;
+  $('a-power').onclick(); calm.until = 0;
+  const m = p.power;
+  tippe(knopf('[data-n="1"]'));
+  tippe(knopf('[data-n="1"]'));
+  if (p.power !== m + 2) throw new Error('zweimal „+1 Macht" gab +' + (p.power - m));
+  // 5 Stadtblatt: nach „Kostenlos wachsen" rückt „Bevölkerung wachsen" an seine Stelle –
+  //   der Doppeltipp darauf zählt nicht
+  G('closeSheet')();
+  const ct = G('citiesOf')(S, pi).find(c => G('freeGrowthAvailable')(S, pi, c));
+  if (!ct) throw new Error('keine Stadt mit kostenlosem Wachstum');
+  G('tapHex')(ct.r, ct.c); calm.until = 0;
+  const pop0 = ct.pop;
+  const nachLabel = l => [...$('sheet-body').querySelectorAll('.opt')].find(b => b.dataset.label === l);
+  tippe(nachLabel('Kostenlos wachsen'));
+  tippe(nachLabel('Bevölkerung wachsen'));
+  if (ct.pop !== pop0 + 1) throw new Error(`Stadtblatt: ${pop0} → ${ct.pop} statt +1`);
+  // 6 Blatt eines Bot- oder KI-Zugs: „Weiter" wirkt sofort
+  G('closeSheet')();
+  $('a-end').onclick();
+  if (!G('ui').botLock) $('a-end').onclick();          // eine Warnung bestätigen
+  if (!G('ui').botLock) throw new Error('kein Bot-Blatt nach dem Zugende');
+  const wer = G('S').cur;
+  tippe($('bot-next-top'));
+  if (G('S').cur === wer) throw new Error('„Weiter" im Bot-Blatt wirkte nicht sofort');
+  let guard = 0;
+  while (G('ui').botLock && guard++ < 10) $('bot-next').onclick();
+  console.log(`       Öffnen + Tipp: nichts · Freie Forschung + Doppeltipp: nur die Technologie · bewusst: ${vorher} → ${nachher} · 2× „+1 Macht": +2 · Stadtblatt: +1 · Bot-„Weiter" sofort`);
 });
 
 step('kein abgefangener Fehler im Zugablauf', () => {

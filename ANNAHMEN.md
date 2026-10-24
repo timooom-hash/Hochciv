@@ -254,6 +254,8 @@ Die früher „experimentell v2" genannten Regeln **sind** jetzt die Regeln. Das
   normale Technologien.
 - **Verbundwerkstoffe**: 1× zusätzliches, **kostenloses** Wachstum pro Stadt und Runde.
   Allein also 2×, mit Keramik bis 3×, davon eins gratis. Eigener Knopf „Kostenlos wachsen".
+  *(Seit v89 gibt auch die Dampfmaschine einen bezahlten Schritt mehr – mit Keramik und
+  Dampfmaschine bis 4×, davon eins gratis; siehe Abschnitt v89.)*
   Bezahltes und kostenloses Kontingent werden **getrennt** geführt (`growLimits().paid` bzw.
   `.free`, verbraucht über `city.grown` und `city.freeUsed`): das Gratis-Kontingent lässt
   sich nicht in einen zweiten **bezahlten** Schritt umwandeln. Vorher prüfte `canGrowPaid`
@@ -4345,7 +4347,8 @@ deutsch und englisch – Blatt, Zahl an der Leiste, beide „Weiter".
 * **Texte:** Die Techtexte nennen die Summe und die eingeschlossenen Technologien („Wald: +3
   Wissenschaft (inkl. Mathematik, Elektrizität)", englisch „Forest: +3 science (incl.
   Mathematics, Electricity)"); die ersten Glieder und die einzelnen bleiben, wie sie waren.
-  Der Regelbogen erklärt die Regel in einem Absatz unter der Geländetabelle.
+  Der Regelbogen erklärt die Regel in einem Absatz unter der Geländetabelle. *(Seit v89 ohne
+  „inkl. …" – Anweisung des Autors, siehe dort.)*
 
 ### Belagerungsmaschinen +3
 
@@ -4434,3 +4437,102 @@ Sichtkontrolle in Chromium (iPad quer, deutsch und englisch; Telefon quer): Haup
 Technologiebogen mit den längeren Texten (Kacheln brechen sauber um, wie schon bei längeren
 Texten), Ertragsübersicht mit Bürokratie ohne Zusatz, der Satz im Regelbogen unter der
 Geländetabelle.
+
+## Doppeltipp auf nachgerückte Knöpfe · Ertragstexte ohne „inkl." · Dampfmaschine: ein Wachstum mehr (v89)
+
+**Rückmeldung und Wunsch des Autors (24.10.):**
+1. „Beim Öffnen von Fähigkeiten wachsen manchmal alle Städte sofort ganz" – ohne Weg, es
+   nachzustellen.
+2. Die Zusätze „inkl. Mathematik" usw. von den Technologiekacheln entfernen.
+3. Die Dampfmaschine erlaubt ein zusätzliches Wachstum; Keramik im Wortlaut daran angleichen.
+
+### „Alle Städte wachsen" ohne Absicht (gemeldet, die Ursache nur eingegrenzt)
+
+* **Was es nicht ist:** Das Öffnen selbst ändert am Spielstand nichts. Geprüft in jsdom über
+  20 Partien mit je bis zu 8 Zügen, zufälligen Technologien (darunter Keramik,
+  Verbundwerkstoffe, Dampfmaschine, Gentechnik, Massenmedien, Sklaverei), Mitteln, Städten und
+  Griechenlands drei Fähigkeiten, gegen Bots und KI: Spielstand vor und nach dem Öffnen (zweimal) Zeichen für
+  Zeichen gleich. Die Vorschau der Sammelaktionen läuft auf einer Kopie (`growAllPlan`), die
+  Zahl an der Leiste (`freeActions`) liest nur. Ein Doppeltipp auf „Fähigkeiten" erreicht das
+  Blatt nicht: die Leiste liegt darüber (`z-index` 26 gegen 25), auch während das Blatt
+  hereingleitet (in Chromium in neun Fenstergrößen, hochkant und quer, nachgeprüft).
+* **Was sich nachstellen ließ** (Chromium, iPad quer 1180 × 820 und hochkant 810 × 1080, echte
+  Tipps): Griechenland mit Freier Forschung, ein langes Blatt (viele verfügbare Technologien,
+  Spionage mit vielen kopierbaren). Wer eine Technologie der Freien Forschung wählt und 0,12 s
+  später noch einmal an dieselbe Stelle tippt (Doppeltipp, oder weil der erste Tipp nicht zu
+  wirken schien), trifft – je nach Zeile – „Alle Städte wachsen" oder „Kopieren": Nach der Wahl
+  zeichnet sich das Blatt neu, die Liste der Freien Forschung verschwindet, und der Rest rückt
+  nach oben unter den Finger. Ebenso nach einer Kopie (die nächste rückt nach) und im
+  Stadtblatt nach „Kostenlos wachsen" („Bevölkerung wachsen" rückt an seine Stelle).
+  Außerdem gleitet jedes Blatt beim Öffnen 0,18 s lang ins Bild – ein früher Tipp trifft, was
+  gerade vorbeizieht.
+* **Ob das der gemeldete Fall war, ist nicht belegt** – die Meldung nennt keinen Tipp nach
+  dem Öffnen. Es ist der einzige Weg, der sich gefunden hat; mit Keramik zweimal getroffen,
+  wüchsen die Städte auch „ganz".
+* **Behebung:** Ein Knopf im Blatt zählt erst 0,4 s (`SHEET_CALM_MS`) nach dem Öffnen oder
+  Neuzeichnen (`sheet()` setzt `sheetCalm.until`; eine Erfassung am Blatt, `sheetCalmGuard`,
+  verwirft den Klick vor dem `onclick`). **Ausnahme 1:** derselbe Knopf, dessen Tipp das Blatt
+  neu gezeichnet hat (erkannt an `data-act`/`data-label`, nicht an der Zufalls-id) – zweimal
+  „+1 Macht" oder noch einmal „Bevölkerung wachsen" bleiben flott, das ist gewollt. **Ausnahme
+  2:** das Blatt eines Bot- oder KI-Zugs (`locked`) – dort gibt es nur „Weiter".
+  Nachgeprüft in Chromium: Tipp 0,25 s nach dem Öffnen auf „Alle Städte wachsen" – nichts;
+  Freie Forschung und Doppeltipp – nur die Technologie; bewusster Tipp danach – alle Städte
+  wachsen; zweimal schnell „+1 Macht" – +2.
+* **Auslegung – 0,4 s:** länger als der Abstand eines Doppeltipps, kürzer als die Zeit, ein neu
+  gezeichnetes Blatt zu lesen und bewusst zu tippen. Ein verworfener Tipp bleibt stumm.
+* **Nicht gemacht:** eine Rückfrage vor „Alle Städte wachsen" („Nochmal tippen") – sie hätte
+  auch den gefundenen Fall verhindert, macht aber jede bewusste Nutzung umständlicher.
+
+### Ertragstexte ohne „inkl."
+
+* Die Techtexte nennen nur noch die Summe, die das Glied setzt: „Wald: +3 Wissenschaft",
+  „Meer: +2 Nahrung, +1 Münze", englisch „Forest: +3 science" – auf den Kacheln, im Regelbogen
+  und überall, wo der Text steht (eine Quelle: TECHS und `DATA_EN`). Die Regel selbst erklärt
+  weiter der Absatz unter der Geländetabelle im Regelbogen.
+
+### Dampfmaschine: ein bezahltes Wachstum mehr
+
+* `growLimits`: ein bezahlter Schritt je Stadt und Runde, je einer mehr für Keramik und
+  Dampfmaschine (`GROW_EXTRA_PAID`), dazu einer kostenlos mit Verbundwerkstoffen. Alle drei:
+  3 bezahlte und 1 kostenloser Schritt. Die Dampfmaschine streicht weiter die Münzkosten –
+  auch für den zusätzlichen Schritt.
+* **Texte:** Keramik „1× zusätzliches Wachstum pro Stadt" (vorher „Bevölkerung 2× pro Runde
+  wachsen lassen"), Dampfmaschine „Keine Münzkosten für Bevölkerungswachstum; 1× zusätzliches
+  Wachstum pro Stadt" – im Stil von Verbundwerkstoffe („1× zusätzliches, kostenloses Wachstum
+  pro Stadt"). Englisch „One extra growth per city" bzw. „No coin cost for population growth;
+  one extra growth per city".
+* **Auslegung – „pro Stadt" heißt je Stadt und Runde**, wie bei Keramik und Verbundwerkstoffe.
+* **KI:** Sie wächst über die Regel (`canGrowPaid`), nutzt den Schritt also von selbst. Ihr
+  fester Zuschlag für die Dampfmaschine (`kiTechBonus`) bekommt den Anteil, den Keramik für
+  denselben Schritt hat (0,5 · H je Stadt, höchstens 6 Städte). Bots wachsen nach ihren
+  eigenen Würfelregeln und merken nichts davon.
+* **Gemessen** (`tools_ki.js`, dieselben Startwerte mit v88 und v89 – der Unterschied ist nur
+  die Dampfmaschine samt KI-Zuschlag):
+
+  | Reihe | v88 | v89 |
+  |---|---|---|
+  | `selbst 100` (KI gegen KI, Duell) | Forschung 43, Wirtschaft 29, Militär 28 | Forschung 39, Wirtschaft 36, Militär 25 |
+  | `selbst 40 reiche=4` | Militär 34, Forschung 6 | Militär 34, Forschung 6 |
+  | `duell 60 diff=david` | KI 29, Bot 31 · Militär 33, Wirtschaft 14, Forschung 13 | KI 30, Bot 30 · Militär 30, Wirtschaft 13, Forschung 17 |
+  | `vier 40 diff=koenig` | KI 14, Bots 26 · Militär 37, Forschung 3 | KI 14, Bots 26 · Militär 36, Forschung 4 |
+
+  Gegen Bots gewinnt die KI so oft wie vorher; KI gegen KI enden mehr Duelle mit dem
+  Wirtschaftssieg (29 → 36 von 100) – plausibel, mehr Wachstum heißt mehr Anteil an der
+  Weltbevölkerung. Endrunde überall unverändert (Median 5 bzw. 6). Kleine Reihen.
+
+### Abgesichert
+
+`test.js`: Dampfmaschine allein zwei bezahlte Schritte ohne Münzkosten, ein dritter nicht;
+alle drei Wachstumstechnologien 3 + 1 Schritte, in gemischter Reihenfolge, ein fünfter nicht;
+Keramik und Dampfmaschine drei bezahlte; „Alle Städte wachsen" dreimal je ein Schritt; die
+Texte deutsch und englisch, und genau die Technologien, deren Text den Schritt nennt, stehen in
+`GROW_EXTRA_PAID`. Ertragstexte: aus der Kette nachgerechnet ohne Zusatz, keiner sagt mehr
+„inkl."/„incl.".
+`smoke.js`, Schritt „v89" mit echten Klick-Ereignissen: Tipp gleich nach dem Öffnen auf „Alle
+Städte wachsen" – nichts; Freie Forschung, dann sofort „Alle Städte wachsen" und „Kopieren" –
+nur die Technologie; nach der Pause bewusst – wirkt; zweimal „+1 Macht" – +2; Stadtblatt:
+„Kostenlos wachsen", dann sofort „Bevölkerung wachsen" – +1; „Weiter" im Bot-Blatt sofort.
+Schritt „v88": die Kacheln ohne „inkl.", deutsch und englisch.
+Gegenproben (je eine Stelle absichtlich falsch): ohne Wache, alles sperren (auch denselben
+Knopf), das Bot-Blatt mitsperren, die Dampfmaschine nicht in `GROW_EXTRA_PAID`, Keramik mit
+altem Text, „incl." wieder an einem Text – jede schlägt an.

@@ -162,7 +162,8 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     }
   }
   eq([abw.slice(0, 2), n], [[], 2800], 'Gegenprobe: 400 zufällige Techstände × 7 Ziele wie nach der Regel gerechnet');
-  // Die Techtexte nennen die Summe ihrer Kette und was sie einschließen – deutsch und englisch
+  // Die Techtexte nennen die Summe, die ihr Glied setzt – deutsch und englisch. Seit v89 ohne
+  // „(inkl. …)" (Anweisung des Autors); die Regel steht im Regelbogen.
   const ZIEL = { de: { G: 'Grasland', W: 'Wald', B: 'Gebirge', F: 'Fluss', M: 'Meer', pop: 'Je Bevölkerung' },
     en: { G: 'Grassland', W: 'Forest', B: 'Mountains', F: 'River', M: 'Sea', pop: 'Per population' } };
   const ART = { de: [['Wissenschaft', 'Wissenschaft'], ['Nahrung', 'Nahrung'], ['Münze', 'Münzen']],
@@ -170,15 +171,16 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const de = k => DATA_DE ? DATA_DE.tech[k] : [TECH_BY_KEY[k].n, TECH_BY_KEY[k].e];
   const tx = (lang, k) => lang === 'de' ? de(k) : DATA_EN.tech[k];
   const soll = (lang, on, ch, i) => ZIEL[lang][on] + ': ' +
-    ch[i].y.map((v, j) => v ? `+${v} ${ART[lang][j][v > 1 ? 1 : 0]}` : '').filter(Boolean).join(', ') +
-    (i ? ` (${lang === 'de' ? 'inkl.' : 'incl.'} ${ch.slice(0, i).map(g => tx(lang, g.k)[0]).join(', ')})` : '');
+    ch[i].y.map((v, j) => v ? `+${v} ${ART[lang][j][v > 1 ? 1 : 0]}` : '').filter(Boolean).join(', ');
   const falsch = [];
   for (const on of Object.keys(YIELD_CHAINS)) for (const ch of YIELD_CHAINS[on]) ch.forEach((g, i) => {
     for (const lang of ['de', 'en']) if (tx(lang, g.k)[1] !== soll(lang, on, ch, i)) falsch.push(`${lang}:${g.k} „${tx(lang, g.k)[1]}" statt „${soll(lang, on, ch, i)}"`);
   });
-  eq(falsch, [], 'jeder Ertragstext (deutsch und englisch) nennt die Summe seiner Kette und was er einschließt');
-  eq(de('ki')[1], 'Wald: +3 Wissenschaft (inkl. Mathematik, Elektrizität)', 'so liest sich das: Künstliche Intelligenz');
-  eq(DATA_EN.tech.containerlogistik[1], 'Sea: +2 food, +1 coin (incl. Fishing, Sailing)', '… und Containerlogistik englisch');
+  eq(falsch, [], 'jeder Ertragstext (deutsch und englisch) nennt die Summe, die sein Glied setzt');
+  eq(de('ki')[1], 'Wald: +3 Wissenschaft', 'so liest sich das: Künstliche Intelligenz');
+  eq(DATA_EN.tech.containerlogistik[1], 'Sea: +2 food, +1 coin', '… und Containerlogistik englisch');
+  eq(TECHS.filter(t => /inkl\.|incl\./.test(de(t.k)[1] + ' ' + DATA_EN.tech[t.k][1])).map(t => t.k), [],
+    'kein Techtext sagt mehr „inkl." bzw. „incl." (v89)');
 }
 
 /* --- Griechische Technologiekosten aus dem Beispiel
@@ -983,6 +985,41 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(t.pop, 6, 'auch so drei Schritte');
 }
 
+/* Dampfmaschine (v89, Anweisung des Autors): wie Keramik ein bezahlter Wachstumsschritt mehr
+   je Stadt und Runde, dazu wie bisher keine Münzkosten. Alle drei Wachstumstechnologien
+   zusammen: 3 bezahlte und 1 kostenloser Schritt. */
+{
+  const S = mk('griechenland', ['dampfmaschine', 'gentechnik']);
+  const c = capitalOf(S, 0); c.pop = 3; c.grown = 0; c.freeUsed = 0; c.born = 0;
+  S.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq(growLimits(S, 0), { max: 2, paid: 2, free: 0 }, 'Dampfmaschine allein: zwei bezahlte Schritte');
+  eq(growPrice(S, 0, c), { food: 3, coins: 0 }, '… ohne Münzkosten wie bisher');
+  eq([growCity(S, 0, c, 'paid'), growCity(S, 0, c, 'paid')], [null, null], 'zweimal bezahlt gewachsen');
+  eq(canGrowPaid(S, 0, c), 'Diese Runde schon gewachsen.', 'ein dritter bezahlter Schritt nicht');
+  eq([c.pop, S.players[0].res.coins, S.players[0].res.food], [5, 999, 999 - 3 - 4], '3 → 5, nur Nahrung bezahlt');
+  const A = mk('griechenland', ['keramik', 'dampfmaschine', 'verbundwerkstoffe', 'gentechnik']);
+  const a = capitalOf(A, 0); a.pop = 2; a.grown = 0; a.freeUsed = 0; a.born = 0;
+  A.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq(growLimits(A, 0), { max: 4, paid: 3, free: 1 }, 'Keramik + Dampfmaschine + Verbundwerkstoffe: 3 bezahlt + 1 gratis');
+  eq([growCity(A, 0, a, 'paid'), growCity(A, 0, a, 'free'), growCity(A, 0, a, 'paid'), growCity(A, 0, a, 'paid')],
+    [null, null, null, null], 'vier Schritte in einer Runde, der kostenlose dazwischen');
+  eq([a.pop, canGrow(A, 0, a)], [6, 'Diese Runde schon gewachsen.'], '2 → 6, ein fünfter nicht');
+  eq(growLimits(mk('griechenland', ['keramik', 'dampfmaschine']), 0), { max: 3, paid: 3, free: 0 }, 'Keramik + Dampfmaschine: drei bezahlte');
+  // „Alle Städte wachsen" folgt von selbst: ein Schritt je Tipp, jetzt bis zu drei bezahlte
+  const B = mk('griechenland', ['keramik', 'dampfmaschine', 'gentechnik']);
+  capitalOf(B, 0).born = 0;
+  B.players[0].res = { sci: 0, food: 999, coins: 999 };
+  eq([1, 2, 3, 4].map(() => growAll(B, 0, 'paid').done), [1, 1, 1, 0], 'Sammelaktion: dreimal je ein Schritt, dann nicht mehr');
+  // Texte: Keramik und Dampfmaschine nennen den zusätzlichen Schritt gleich, deutsch und englisch
+  eq([TECH_BY_KEY.keramik.e, TECH_BY_KEY.dampfmaschine.e],
+    ['1× zusätzliches Wachstum pro Stadt', 'Keine Münzkosten für Bevölkerungswachstum; 1× zusätzliches Wachstum pro Stadt'],
+    'Texte deutsch: Keramik im Wortlaut der Dampfmaschine');
+  eq([DATA_EN.tech.keramik[1], DATA_EN.tech.dampfmaschine[1]],
+    ['One extra growth per city', 'No coin cost for population growth; one extra growth per city'], 'englisch ebenso');
+  eq(TECHS.filter(t => /1× zusätzliches Wachstum pro Stadt/.test(t.e)).map(t => t.k).sort(), GROW_EXTRA_PAID.slice().sort(),
+    'genau die Technologien, deren Text den Schritt nennt, geben ihn (GROW_EXTRA_PAID)');
+}
+
 /* nur Verbundwerkstoffe: normales Wachstum + 1x gratis = max 2 */
 {
   const S = mk('griechenland', ['verbundwerkstoffe']);
@@ -1399,7 +1436,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 
 /* Tech-Labels und Sortierung nach Kosten */
 {
-  eq(TECH_BY_KEY.keramik.e, 'Bevölkerung 2× pro Runde wachsen lassen', 'Keramik hat ein eigenständiges Label');
+  eq(TECH_BY_KEY.keramik.e, '1× zusätzliches Wachstum pro Stadt', 'Keramik hat ein eigenständiges Label (seit v89 im Wortlaut der Dampfmaschine)');
   eq(TECH_BY_KEY.verbundwerkstoffe.e, '1× zusätzliches, kostenloses Wachstum pro Stadt', 'Verbundwerkstoffe zeigt das Gratis-Wachstum');
   const prod = techsIn(1, 0).map(t => t.c);
   eq(prod, prod.slice().sort((a, b) => a - b), 'Techs sind nach Kosten sortiert');
