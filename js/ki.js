@@ -849,9 +849,9 @@ function kiWonderValue(S, pi, K) {
   return v;
 }
 
-/* Bewertung nach dem Zug: auf einer Wegwerfkopie die Kampfphase durchrechnen
-   (Belagerungen, Flankieren, Wirtschaftssieg), dann kiValue. So sieht die Bewertung, was
-   eine Aktion am Zugende auslöst. X wird dabei verändert – nur mit Kopien aufrufen. */
+/* Bewertung nach dem Zug: auf einer Wegwerfkopie die Kampfphase durchrechnen (Belagerungen,
+   dann Flankieren; dazu der Wirtschaftssieg), dann kiValue. So sieht die Bewertung, was eine
+   Aktion am Zugende auslöst. X wird dabei verändert – nur mit Kopien aufrufen. */
 function kiScore(X, pi, K) {
   if (!X.over) combatPhase(X, pi);
   // Wirtschaftssieg: geprüft am Rundenende (v85). Wer die Runde beschließt, für den ist das

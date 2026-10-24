@@ -11,7 +11,7 @@ function show(id) {
   if (typeof applyTurn === 'function') applyTurn();     // Drehung hängt am Bildschirm
 }
 function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  const t = $('toast'); t.textContent = msg; t.classList.remove('unten'); t.classList.add('show');
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200);
 }
 function modal(title, html) {
@@ -83,7 +83,8 @@ function closeSheet() {
    dieser Fassung oberhalb der Leiste (--bar-h), liegt also nicht mehr darauf, und
    die Menüpunkte unten bleiben durchweg bedienbar. */
 function lockBar() {
-  document.body.classList.toggle('blocked', !!(ui && ui.botLock));
+  // Gesperrt im Bot-Blatt und, seit v90, solange ein Kampf nachgespielt wird
+  document.body.classList.toggle('blocked', !!(ui && (ui.botLock || ui.combat)));
 }
 /* Echte Höhe von Kopf- und Aktionsleiste ins CSS spiegeln, damit das Blatt exakt
    darüber endet – die Leiste wächst mit Schriftgröße und Geräteeinfassung. */
@@ -529,9 +530,100 @@ function drawMap(svg, map, opts) {
     }
   }
   if (opts.state) orphanMarks(world, opts.state);
+  // 6b Kampf nachspielen (v90): Kampffeld, Angreiferfelder, beide Machtwerte – über allem
+  if (opts.fight && opts.state) fightMarks(world, opts.state, opts.fight, w, h);
   // 7 Auswahl
   if (opts.sel) markHexes([opts.sel], 'sel');
   return world;
+}
+
+/* Ein Kampf auf der Karte (v90): das Kampffeld golden, die Felder des Angreifers in seiner
+   Farbe umrandet, daneben beide Machtwerte – ⚔️ Angriff in der Farbe des Angreifers, 🛡️
+   Verteidigung in der des Verteidigers – und dazwischen, wer gewinnt (> der Angriff, ≤ die
+   Verteidigung: Gleichstand hält). Dazu, welcher Kampf es ist und wie er ausgeht.
+   Die Werte stehen gut zwei Felder über oder unter dem Kampffeld und zeigen mit einem Strich
+   darauf. Welche Seite (und ob um ein Feld seitlich versetzt), entscheidet, was dabei am
+   wenigsten von den Angreifern verdeckt; bei Gleichstand oben, und nie über den Kartenrand.
+   Auf kleinen Bildschirmen (Telefon) wachsen die Werte mit, damit die Zahl lesbar bleibt
+   (etwa 14 px). Der Maßstab ist der, mit dem die Karte eingepasst ist (das kleinere
+   Verhältnis von Breite und Höhe); ist die App hochkant gedreht, misst das Rechteck des
+   Browsers die Karte gedreht – dann sind seine Seiten vertauscht. */
+function fightMarks(world, S2, f, breite, hoehe) {
+  const att = civOf(S2.players[f.pi]), def = civOf(S2.players[f.gegner]);
+  const ohne = { 'pointer-events': 'none' };
+  f.von.forEach(([r, c]) => {
+    const [x, y] = hexCenter(r, c, HEX);
+    world.appendChild(svgEl('polygon', Object.assign({
+      points: hexPath(HEX - 3), transform: `translate(${x},${y})`, fill: 'none',
+      stroke: att.color, 'stroke-width': 4, 'stroke-linejoin': 'round', class: 'fight-from',
+    }, ohne)));
+  });
+  const [x0, y] = hexCenter(f.r, f.c, HEX);
+  world.appendChild(svgEl('polygon', Object.assign({
+    points: hexPath(HEX), transform: `translate(${x0},${y})`, fill: 'rgba(255,214,102,.30)',
+    stroke: '#b8860b', 'stroke-width': 4, 'stroke-linejoin': 'round', class: 'fight-field',
+  }, ohne)));
+  // Wie groß die Karte auf dem Schirm ist: daraus der Faktor für die Schrift
+  const svg = world.ownerSVGElement, box = svg && svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
+  let massstab = 1;
+  if (box && box.width && box.height) {
+    const [bw, bh] = turning() ? [box.height, box.width] : [box.width, box.height];
+    massstab = Math.min(bw / breite, bh / hoehe);
+  }
+  const k = Math.min(2.2, Math.max(1, 14 / (18 * massstab)));
+  const textA = '⚔️ ' + f.a, textD = '🛡️ ' + f.d;
+  const breiteVon = text => (22 + 10.5 * [...text].length) * k;
+  const halb = 40 * k, links = halb + breiteVon(textA) / 2, rechts = halb + breiteVon(textD) / 2;
+  // Abstand: die Plaketten bleiben frei von den Figuren der Nachbarfelder (Mitte 1,5 Felder
+  // entfernt, Figur gut ein halbes Feld groß)
+  const abstand = HEX * 2.07 + 17 * k, figur = HEX * 0.55;
+  const lage = (s, dx) => {
+    const x = Math.max(links + 4, Math.min(breite - rechts - 4, x0 + dx));
+    const by = y + s * abstand;
+    const oben = s < 0 ? by - 33 * k : by - 14 * k, unten = s < 0 ? by + 14 * k : by + 39 * k;
+    let kosten = oben < 0 || unten > hoehe ? 100 : 0;
+    for (const [r, c] of f.von) {
+      const [hx, hy] = hexCenter(r, c, HEX);
+      if (hx + figur > x - links && hx - figur < x + rechts && hy + figur > by - 14 * k && hy - figur < by + 14 * k) kosten++;
+    }
+    return { s, x, by, kosten };
+  };
+  const schritt = Math.sqrt(3) * HEX;
+  const wahl = [lage(-1, 0), lage(1, 0), lage(-1, -schritt), lage(-1, schritt), lage(1, -schritt), lage(1, schritt)]
+    .reduce((a, b) => (b.kosten < a.kosten ? b : a));
+  const { s, x, by } = wahl;
+  world.appendChild(svgEl('line', Object.assign({
+    x1: x, y1: by - s * 14 * k, x2: x0, y2: y + s * HEX * 0.8,
+    stroke: '#2a2721', 'stroke-width': 2.5, 'stroke-linecap': 'round', class: 'fight-line',
+  }, ohne)));
+  const plakette = (cx, text, farbe, cls) => {
+    const w = breiteVon(text);
+    world.appendChild(svgEl('rect', Object.assign({
+      x: cx - w / 2, y: by - 14 * k, width: w, height: 28 * k, rx: 9 * k, fill: farbe,
+      stroke: '#f7f1e0', 'stroke-width': 2.5, class: cls + '-box',
+    }, ohne)));
+    const t = svgEl('text', Object.assign({
+      x: cx, y: by + 6.5 * k, 'text-anchor': 'middle', 'font-size': 18 * k, 'font-weight': 700,
+      fill: '#fff', class: cls,
+    }, ohne));
+    t.textContent = text; world.appendChild(t);
+  };
+  plakette(x - halb, textA, att.color, 'fight-a');
+  plakette(x + halb, textD, def.color, 'fight-d');
+  const zeichen = svgEl('text', Object.assign({
+    x, y: by + 7 * k, 'text-anchor': 'middle', 'font-size': 20 * k, 'font-weight': 700,
+    fill: '#2a2721', stroke: '#f7f1e0', 'stroke-width': 4, 'paint-order': 'stroke', class: 'fight-sign',
+  }, ohne));
+  zeichen.textContent = f.sieg ? '>' : '≤';
+  world.appendChild(zeichen);
+  if (f.caption) {
+    const cx = Math.max(120 * k, Math.min(breite - 120 * k, x));
+    const t = svgEl('text', Object.assign({
+      x: cx, y: by + (s < 0 ? -22 : 36) * k, 'text-anchor': 'middle', 'font-size': 14 * k, 'font-weight': 700,
+      fill: '#2a2721', stroke: '#f7f1e0', 'stroke-width': 4, 'paint-order': 'stroke', class: 'fight-caption',
+    }, ohne));
+    t.textContent = f.caption; world.appendChild(t);
+  }
 }
 
 /* ------------------------------------------------------------------ Antippen
@@ -557,7 +649,10 @@ function redraw() {
   if (!human && ui.mode === 'found') ui.mode = null;     // Gründen gibt es nur im eigenen Zug
   const highlight = ui.army ? [...armyReach(S, ui.army).keys()].map(unkey) : [];
   const gruenden = ui.mode === 'found';
-  drawMap($('map'), S.map, {
+  // Während ein Kampf nachgespielt wird (v90), bleibt dessen Bild stehen – ein Neuzeichnen
+  // zwischendurch (etwa aus dem Tutorial) zeigte sonst schon den Stand nach allen Kämpfen.
+  if (ui.combat && ui.combat.i < ui.combat.kaempfe.length) combatDraw();
+  else drawMap($('map'), S.map, {
     state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : null,
     turn: isAuto(p) ? -1 : S.cur,
     // Erträge je Feld nur im Gründungsmodus – den gibt es nur im eigenen Zug (v87)
@@ -601,7 +696,9 @@ function redraw() {
   const frei = $('a-abil').disabled ? 0 : freeActions(S, S.cur).length;
   $('a-abil-n').textContent = frei ? String(frei) : '';
   $('a-abil-n').hidden = !frei;
-  saveGame();
+  // Nicht während eines Nachspiels (v90): im eigenen Zug ist dann schon gekämpft, aber der Zug
+  // noch nicht gewechselt – so gespeichert, käme der Kampf nach dem Neuladen ein zweites Mal.
+  if (!ui.combat) saveGame();
 }
 /* Die Knöpfe der Leiste, die das Tutorial an seine Schienen bindet – seit v87 alle: der
    Ansichtsschalter „Erträge", der als einziger immer frei war, ist entfallen. „Fähigkeiten"
@@ -637,6 +734,7 @@ function endTutorialPanel() {
   document.body.classList.remove('tut');
 }
 function tapHex(r, c) {
+  if (ui.combat) return endCombat();    // ein Tipp auf die Karte überspringt das Nachspiel (v90)
   if (S.over || isAuto(P(S))) return;
   ui.powerView = false;                 // ein Feld antippen beendet die Machtansicht
   if (ui.army) {
@@ -1235,10 +1333,84 @@ function sicher(was, fn) {
     return undefined;
   }
 }
+/* ------------------------------------------------ Kampf nachspielen (v90, Wunsch des Autors)
+   Am Ende jedes Zugs – des eigenen wie dem eines Bots oder der KI – wird jeder Kampf einzeln
+   gezeigt, in der Reihenfolge der Regel (erst die Städte, dann die Flanken; v90 kurz andersherum,
+   seit v91 wieder so): COMBAT_MS lang das Kampffeld mit den Machtwerten beider Seiten, dann der
+   nächste, der schon den Ausgang des vorigen zeigt. Die Reihenfolge der Bilder ist die der
+   Einträge – die Oberfläche ordnet nichts um. Gerechnet ist da alles schon (finishTurn mit
+   `rec`, combatPhase): jeder Eintrag trägt den Kartenstand davor (snap), gezeichnet wird also
+   nur. Bis zum letzten Bild ist alles gesperrt (ui.combat: Leiste wie im Bot-Blatt, „Zug
+   beenden", Karte); ein Tipp auf die Karte überspringt den Rest. Gespeichert wird währenddessen
+   nicht – lädt die App mitten im Nachspiel neu, steht der Zug wie vor dem Zugende da (bzw. das
+   Bot-Blatt). COMBAT_MS = 0 (smoke.js) spielt nichts nach und ruft `weiter` sofort. */
+let COMBAT_MS = 1000;
+function playCombat(kaempfe, weiter) {
+  if (!kaempfe || !kaempfe.length || COMBAT_MS <= 0) return weiter(false);
+  ui.combat = { kaempfe, i: 0, weiter, timer: null };
+  lockBar();
+  // Der Hinweis liegt über der gesperrten Aktionsleiste und bleibt, bis der Kampf vorbei ist.
+  // Oben, wo Toasts sonst stehen, verdeckte er Wert und Zeile von Kämpfen in den oberen Reihen
+  // (im Telefon-Querformat schon ab der dritten Reihe).
+  if (kaempfe.length > 1) {
+    const t = $('toast');
+    clearTimeout(t._t);
+    t.textContent = T('%s Kämpfe – Tippen auf die Karte überspringt', kaempfe.length);
+    t.classList.add('unten', 'show');
+  }
+  combatFrame();
+}
+function combatFrame() {
+  const k = ui.combat;
+  if (!k) return;
+  if (k.i >= k.kaempfe.length) return endCombat();
+  combatDraw();
+  k.timer = setTimeout(combatNext, COMBAT_MS);
+}
+// Das Bild des laufenden Kampfs: die Karte im Stand davor, darauf der Kampf
+function combatDraw() {
+  const k = ui.combat, f = k.kaempfe[k.i];
+  drawMap($('map'), S.map, {
+    state: Object.assign({}, S, f.snap), turn: -1,
+    fight: Object.assign({ caption: combatCaption(f, k.i, k.kaempfe.length) }, f),
+  });
+}
+function combatNext() {
+  const k = ui.combat;
+  if (!k) return;
+  clearTimeout(k.timer);
+  k.i++;
+  combatFrame();
+}
+function endCombat() {
+  const k = ui.combat;
+  if (!k) return;
+  clearTimeout(k.timer);
+  ui.combat = null;
+  // Den Hinweis ausblenden; nach unten gehört er erst wieder, wenn er ganz weg ist (sonst
+  // spränge er beim Ausblenden nach oben). Ein Toast gleich danach holt ihn selbst nach oben.
+  const t = $('toast');
+  if (t.classList.contains('unten')) {
+    t.classList.remove('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('unten'), 250);
+  }
+  lockBar();
+  k.weiter(true);
+}
+// Was unter den Werten steht: welcher Kampf, wievielter, und wie er ausgeht
+function combatCaption(f, i, n) {
+  const was = f.art === 'flanke' ? T('Flanke') : T('Stadt');
+  const aus = f.art === 'flanke' ? (f.sieg ? T('Armee zerstört') : T('hält'))
+    : f.genommen ? (f.zerstoert ? T('Stadt zerstört') : T('erobert'))
+      : f.sieg ? T('Belagerung %s/2', f.zug)
+        : f.gebrochen ? T('Belagerung gebrochen') : T('hält');
+  return `${was} ${i + 1}/${n} · ${aus}`;
+}
 function endHumanTurn() {
   // Nur im eigenen Zug und nie, solange das Blatt eines KI- oder Bot-Zugs offen ist: sonst
   // liefe dessen Kampf ein zweites Mal, und der Zug spränge an seinem „Weiter" vorbei.
-  if (!S || S.over || isAuto(P(S)) || ui.botLock) return;
+  // Ebenso nicht, solange der eigene Kampf noch nachgespielt wird (v90).
+  if (!S || S.over || isAuto(P(S)) || ui.botLock || ui.combat) return;
   // Harte Sperre: eine Armee, die noch in einer Stadt steht, verhindert das Zugende
   // ganz – da hilft kein Bestätigen, der Zustand ist schlicht ungültig.
   const stop = blockingIssues(S, S.cur);
@@ -1252,14 +1424,20 @@ function endHumanTurn() {
   ui.confirmedEnd = false; ui.army = null; ui.sel = null; ui.mode = null;
   closeSheet();
   const sinceSeq = S.logSeq || 0;
-  sicher('Kampf', () => finishTurn(S));                    // Kampf und Siegprüfung
+  const kaempfe = [];
+  sicher('Kampf', () => finishTurn(S, kaempfe));          // Kampf und Siegprüfung
   const fights = logSince(S, sinceSeq).filter(l => l.c === 'fight');
-  redraw();
-  if (S.over) return gameOver();
-  sicher('Zugwechsel', () => advanceTurn(S));
-  redraw();
-  runBots();
-  if (fights.length) toast(fights[fights.length - 1].m);
+  // Erst nachspielen (v90), dann wie bisher: Sieg, Zugwechsel, Bots
+  playCombat(kaempfe, gezeigt => {
+    redraw();
+    if (S.over) return gameOver();
+    sicher('Zugwechsel', () => advanceTurn(S));
+    redraw();
+    runBots();
+    // Der letzte Kampf als Meldung – nur, wenn er nicht eben nachgespielt wurde. Sonst wäre er
+    // doppelt, und oben verdeckte die Meldung den Anfang eines folgenden Bot-Kampfs.
+    if (fights.length && !gezeigt) toast(fights[fights.length - 1].m);
+  });
 }
 /* Züge, die ohne Eingabe laufen: Bots nach den Bot-Regeln, die KI nach den Regeln für
    Menschen (kiTurn in js/ki.js). Beide enden gleich – Kampf und Sieg in finishTurn, dann
@@ -1274,11 +1452,19 @@ function runBots() {
   if (!isAuto(p)) return humanTurnStart();
   const done = !!S.autoPlayed && S.autoPlayed.cur === S.cur && S.autoPlayed.round === S.round;
   const sinceSeq = done ? S.autoPlayed.seq : (S.logSeq || 0);
+  const kaempfe = [];
   if (!done) {
     S.autoPlayed = { cur: S.cur, round: S.round, seq: sinceSeq };
     sicher(p.kind === 'ki' ? 'KI-Zug' : 'Bot-Zug', () => { if (p.kind === 'ki') kiTurn(S, S.cur); else botTurn(S, S.cur); });
-    sicher('Kampf', () => finishTurn(S));    // Kampf des Bots bzw. der KI, einmal pro Zug
+    sicher('Kampf', () => finishTurn(S, kaempfe));    // Kampf des Bots bzw. der KI, einmal pro Zug
   }
+  // Gespeichert wird gleich (der Zug ist gezogen, S.autoPlayed steht), gezeichnet erst nach
+  // dem Nachspiel – sonst blitzte der Stand nach dem Kampf vor dem ersten Kampfbild auf.
+  saveGame();
+  playCombat(kaempfe, () => botSheet(p, sinceSeq));
+}
+// Das Blatt eines Bot- oder KI-Zugs: was er getan hat, und „Weiter"
+function botSheet(p, sinceSeq) {
   redraw();
   const entries = logSince(S, sinceSeq);
   const lines = entries.length
@@ -1382,6 +1568,7 @@ function startFromRecipe(rec) {
     startPlayer: rec.start === 'zufall' ? Math.floor(Math.random() * players.length)
       : Math.min(players.length - 1, Math.max(0, +rec.start || 0)),
     events: rec.events, eventMode: rec.eventMode, wonders: rec.wonders,
+    seatOrder: platzNummern(rec.mode, rec.mapPick, players.length),   // wie beim ersten Mal (v90)
     // Ein Rezept aus v70–v81 kann noch altTree tragen – egal: jede neue Partie läuft seit
     // v82 im (einzigen) Techtree, auch „Nochmal spielen" nach einer alten Partie.
   };
@@ -1799,6 +1986,12 @@ function fillMapSelect() {
 // mehrfach – auf den festen Karten sitzt jede Zivilisation genau einmal (feste
 // Startsterne, ein Stern je Reich).
 const freieCivWahl = () => setupMode !== 'marathon' && setupMapWanted === 'plaettchen';
+/* Nummerierte Plätze („Platz 1 …") hat der Aufbau auf der Plättchenkarte und bei weniger als
+   vier Reichen. Dort ziehen die Reiche seit v90 in der Reihenfolge der Plätze, ab dem
+   Startspieler (newGame mit cfg.seatOrder, Anweisung des Autors). Die klassische Aufstellung
+   mit allen vier Zivilisationen und der Marathon zeigen Zivilisationen statt Plätzen – dort
+   ist jede ihr eigener Platz, und es bleibt bei Russland → Griechenland → England → Wikinger. */
+const platzNummern = (mode, mapPick, n) => (mode !== 'marathon' && mapPick === 'plaettchen') || n < 4;
 function setupScreen() {
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
@@ -1827,13 +2020,13 @@ function renderSlots() {
   $('setup-duel-hint').hidden = !duel;
   fillMapSelect();
   const list = $('setup-list');
-  const frei = freieCivWahl();
+  const frei = freieCivWahl(), plaetze = platzNummern(setupMode, setupMapWanted, n);
   // Mensch/Bot und Fähigkeit überleben ein Neuzeichnen (Kartenwechsel, Zivilisationswahl)
   const alt = [...list.children].map(x => ({
     kind: x.querySelector('[data-kind].on').dataset.kind,
     abil: x.querySelector('[data-abil]').value,
   }));
-  const chosen = (frei || n < 4) ? pickChoice(n) : CIV_KEYS.slice();
+  const chosen = plaetze ? pickChoice(n) : CIV_KEYS.slice();
   // Feste Karte: Doppelungen auflösen, sonst säßen zwei Reiche auf einem Startstern
   if (!frei) for (let i = 0; i < n; i++)
     if (chosen.indexOf(chosen[i]) !== i)
@@ -1853,7 +2046,7 @@ function renderSlots() {
         .concat([{ k: 'zufall', n: T('Zufall'), e: T('Wird beim Spielstart ausgelost.') }]);
     const d = document.createElement('div');
     d.className = 'slot'; d.dataset.civ = civKey;
-    d.innerHTML = ((frei || n < 4)
+    d.innerHTML = (plaetze
       ? `<h3>${zufall ? '🎲' : SYM[civ.sym]} ${T('Platz %s', i + 1)}</h3>
          <label class="row"><span>${T('Zivilisation')}</span>
            <select data-civpick>${CIVS.map(c =>
@@ -2462,6 +2655,7 @@ function boot() {
         ? Math.floor(Math.random() * players.length) : +startWahl,
       events: recipe.events, eventMode: recipe.eventMode,
       wonders: recipe.wonders,
+      seatOrder: platzNummern(setupMode, pick, players.length),     // Zugfolge nach Plätzen (v90)
     };
     endTutorialPanel();
     // Marathon: Zufallskarte, dann sehen alle Karte und Starttechnologien und draften
@@ -2477,10 +2671,13 @@ function boot() {
   $('a-power').onclick = powerSheet;
   $('a-abil').onclick = () => abilSheet(true);
   $('a-info').onclick = worldModal;
-  $('hud-feed').onclick = () => { if (!isAuto(P(S)) && !S.over) foodSheet(); };
+  $('hud-feed').onclick = () => { if (!isAuto(P(S)) && !S.over && !ui.combat) foodSheet(); };
   $('a-log').onclick = () => { if (ui.tut) { ui.tutSawLog = true; renderTutPanel(); } logModal(); };
   $('a-end').onclick = endHumanTurn;
   $('g-menu').onclick = () => {
+    // Läuft gerade ein Kampf-Nachspiel (v90), ist es damit vorbei – wie mit einem Tipp auf die
+    // Karte. So zeigt (und exportiert) das Menü nie den halben Zugwechsel.
+    if (ui.combat) endCombat();
     // turnWanted() ist die gespeicherte Wahl – nicht html.turn, das zusätzlich vom
     // Bildschirm abhängt (gedreht wird nur das Spiel).
     const on = turnWanted();

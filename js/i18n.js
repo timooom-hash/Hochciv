@@ -679,6 +679,15 @@ const UI_EN = {
     'Barbarians are besieging %s city/cities.',
   'Belagerung %s/2':
     'Siege %s/2',
+  /* --- Kampf nachspielen (v90) */
+  '%s Kämpfe – Tippen auf die Karte überspringt': '%s fights – tap the map to skip',
+  'Flanke': 'Flank',
+  'Stadt': 'City',
+  'Armee zerstört': 'army destroyed',
+  'hält': 'holds',
+  'Stadt zerstört': 'city destroyed',
+  'erobert': 'captured',
+  'Belagerung gebrochen': 'siege broken',
   'Bev.':
     'Pop.',
   'Bevölkerung':
