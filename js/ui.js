@@ -11,7 +11,7 @@ function show(id) {
   if (typeof applyTurn === 'function') applyTurn();     // Drehung hängt am Bildschirm
 }
 function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.classList.remove('unten'); t.classList.add('show');
+  const t = $('toast'); t.textContent = msg; t.classList.remove('unten', 'anim'); t.classList.add('show');
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200);
 }
 function modal(title, html) {
@@ -85,8 +85,9 @@ function closeSheet() {
    dieser Fassung oberhalb der Leiste (--bar-h), liegt also nicht mehr darauf, und
    die Menüpunkte unten bleiben durchweg bedienbar. */
 function lockBar() {
-  // Gesperrt im Bot-Blatt und, seit v90, solange ein Kampf nachgespielt wird
-  document.body.classList.toggle('blocked', !!(ui && (ui.botLock || ui.combat)));
+  // Gesperrt im Bot-Blatt und, seit v90, solange ein Kampf nachgespielt wird – seit v94 auch,
+  // solange der Zug einer KI oder eines Bots nachgespielt wird
+  document.body.classList.toggle('blocked', !!(ui && (ui.botLock || ui.combat || ui.anim)));
 }
 /* Echte Höhe von Kopf- und Aktionsleiste ins CSS spiegeln, damit das Blatt exakt
    darüber endet – die Leiste wächst mit Schriftgröße und Geräteeinfassung. */
@@ -470,10 +471,14 @@ function drawMap(svg, map, opts) {
     markHexes(opts.highlight, 'reach');
     // 4b Tutorial-Hervorhebung: goldener Rahmen um die Felder, um die es gerade geht
     markHexes(opts.tutHl, 'tut');
+    // 4b' Szene eines KI- oder Bot-Zugs (v94): dieselben goldenen Felder, unter den Figuren
+    if (opts.anim) markHexes(opts.anim.felder, 'tut');
     // 4c Machtringe der Armeen, unter dem Armeesymbol
     if (opts.power) powerRings(world, S2, opts.power, 'armee');
-    // 5 Armeen
+    // 5 Armeen – die gerade ziehen (v94), zeichnet animMarks gleitend
+    const gleiten = new Set(opts.anim ? opts.anim.zuege.map(z => z.id) : []);
     S2.armies.forEach(a => {
+      if (gleiten.has(a.id)) return;
       const [x, y] = hexCenter(a.r, a.c, HEX);
       const civ = civOf(S2.players[a.owner]);
       // Symbol zweimal: erst als heller Umriss, dann gefüllt – so bleibt es auf
@@ -534,6 +539,8 @@ function drawMap(svg, map, opts) {
   if (opts.state) orphanMarks(world, opts.state);
   // 6b Kampf nachspielen (v90): Kampffeld, Angreiferfelder, beide Machtwerte – über allem
   if (opts.fight && opts.state) fightMarks(world, opts.state, opts.fight, w, h);
+  // 6c Szene eines KI- oder Bot-Zugs (v94): Züge, Ringe, +1/−1 – über allem
+  if (opts.anim && opts.state) animMarks(world, opts.state, opts.anim);
   // 7 Auswahl
   if (opts.sel) markHexes([opts.sel], 'sel');
   return world;
@@ -634,13 +641,15 @@ function fightMarks(world, S2, f, breite, hoehe) {
    wird direkt auf dem Sechseck ausgewertet. Das ist genauer als „nächster Mittelpunkt"
    (die Ecken gehören jetzt dem richtigen Feld) und funktioniert auch dann, wenn die
    App im Hochformat um 90° gedreht dargestellt wird. */
-function attachTaps(svg, onTap) {
+function attachTaps(svg, onTap, daneben) {
   svg.addEventListener('click', e => {
     const el = e.target.closest ? e.target.closest('[data-r]') : null;
-    if (!el) return;
+    if (!el) { if (daneben) daneben(); return; }
     onTap(+el.dataset.r, +el.dataset.c);
   });
 }
+// Ein Tipp neben die Felder (Kartenrand) überspringt ein Nachspiel ebenso wie einer auf ein Feld (v94)
+const kartenrandTipp = () => { if (ui.anim) endAnim(); else if (ui.combat) endCombat(); };
 
 /* ------------------------------------------------------------------ Spielansicht */
 function currentMap() { return customMap || DEFAULT_MAP; }
@@ -653,7 +662,9 @@ function redraw() {
   const gruenden = ui.mode === 'found';
   // Während ein Kampf nachgespielt wird (v90), bleibt dessen Bild stehen – ein Neuzeichnen
   // zwischendurch (etwa aus dem Tutorial) zeigte sonst schon den Stand nach allen Kämpfen.
-  if (ui.combat && ui.combat.i < ui.combat.kaempfe.length) combatDraw();
+  // Ebenso die Szene eines KI- oder Bot-Zugs (v94).
+  if (ui.anim && ui.anim.i < ui.anim.szenen.length) animDraw();
+  else if (ui.combat && ui.combat.i < ui.combat.kaempfe.length) combatDraw();
   else drawMap($('map'), S.map, {
     state: S, sel: ui.sel, highlight, tutHl: ui.tut ? tutHighlight() : ui.fg ? fgHighlight() : null,
     turn: isAuto(p) ? -1 : S.cur,
@@ -731,7 +742,14 @@ function endFoundMode() {
 /* Beim Start eines normalen Spiels darf kein Tutorial-Panel stehen bleiben. */
 function endTutorialPanel() {
   if (ui && ui.fg && ui.fg.timer) clearTimeout(ui.fg.timer);
+  // Ein laufendes Nachspiel (Kampf v90, Züge von KI und Bots v94) gehört zur alten Partie: sein
+  // Zeitgeber fände zwar nichts mehr (ui ist gleich neu), aber Satz und Sperre blieben stehen
+  if (ui && ui.anim) clearTimeout(ui.anim.timer);
+  if (ui && ui.combat) clearTimeout(ui.combat.timer);
+  const t = $('toast');
+  if (t && t.classList.contains('unten')) t.classList.remove('show', 'unten', 'anim');
   ui = { sel: null, army: null, mode: null, botTimer: null };
+  lockBar();
   const panel = $('tut-panel');
   if (panel) panel.hidden = true;
   document.body.classList.remove('tut', 'fg');
@@ -748,6 +766,7 @@ const FG_AKTION = {
   'Straße bauen': 'strasse', 'Eisenbahn bauen': 'strasse',
 };
 function tapHex(r, c) {
+  if (ui.anim) return endAnim();        // … ebenso den Rest eines KI- oder Bot-Zugs (v94)
   if (ui.combat) return endCombat();    // ein Tipp auf die Karte überspringt das Nachspiel (v90)
   if (S.over || isAuto(P(S))) return;
   ui.powerView = false;                 // ein Feld antippen beendet die Machtansicht
@@ -1388,6 +1407,7 @@ function playCombat(kaempfe, weiter) {
     const t = $('toast');
     clearTimeout(t._t);
     t.textContent = T('%s Kämpfe – Tippen auf die Karte überspringt', kaempfe.length);
+    t.classList.remove('anim');                           // kam direkt nach den Szenen eines Zugs (v94)
     t.classList.add('unten', 'show');
   }
   combatFrame();
@@ -1438,11 +1458,141 @@ function combatCaption(f, i, n) {
         : f.gebrochen ? T('Belagerung gebrochen') : T('hält');
   return `${was} ${i + 1}/${n} · ${aus}`;
 }
+/* ------------------------------------------------ Züge von KI und Bots nachspielen (v94)
+   Wunsch des Autors: wie beim Kampf, aber für alles, was KI und Bots tun – kein Blatt mehr zum
+   Durchtippen, das Protokoll behält alles. Nach dem eigenen Zugende laufen alle Züge von KI und
+   Bots durch, jeder als Folge von Szenen (js/anim.js: aufgenommen und gruppiert), danach sein
+   Kampf wie bisher (playCombat) – bis wieder ein Mensch dran ist. Gerechnet ist der Zug
+   jeweils schon (runBots), gezeichnet wird nur: die Karte im Stand der Szene (`bild`), darauf
+   was geschah (animMarks), darunter ein Satz (animCaption). Bis zum Ende ist alles gesperrt wie im
+   Kampf (Leiste, „Zug beenden"); ein Tipp auf die Karte überspringt den Rest dieses Zugs.
+   „Animationen" in den Einstellungen (prefs.anim, v95): Langsam (ab Werk), Schnell oder Keine –
+   dann die alte Fassung, das Blatt mit „Weiter" (botSheet). Das klassische Tutorial bleibt
+   immer dabei – seine Texte erklären dieses Blatt. ANIM_MS = 0 (smoke.js) spielt nichts und
+   läuft sofort weiter. */
+function animAn() { return prefs.anim !== 'aus' && ANIM_MS > 0 && !(ui && ui.tut); }
+// Die alte Fassung (Blatt mit „Weiter") – im Tutorial immer, sonst nach der Einstellung
+const animBlatt = () => prefs.anim === 'aus' || !!(ui && ui.tut);
+/* Takt je Szene = ANIM_MS × Faktor (gezogene Armeen das 1,4-Fache). Langsam (v95, Wunsch des
+   Autors: „etwa um die Hälfte langsamer"): 1,5, gleich für jede Szene. Schnell: der Takt von
+   v94 – bis 7 Szenen 1, bei längeren Zügen kürzer, höchstens bis auf 0,6. */
+const animFaktor = n => prefs.anim === 'schnell' ? Math.min(1, Math.max(0.6, 7 / n)) : 1.5;
+function playAnim(szenen, weiter) {
+  if (!szenen || !szenen.length || !animAn()) return weiter(false);
+  const tempo = animFaktor(szenen.length);
+  szenen.forEach(s => { s.tempo = tempo; });
+  ui.anim = { szenen, i: 0, weiter, timer: null };
+  lockBar();
+  animFrame();
+}
+function animFrame() {
+  const a = ui.anim;
+  if (!a) return;
+  if (a.i >= a.szenen.length) return endAnim();
+  animDraw();
+  animCaption();
+  // Züge brauchen etwas länger: erst gleiten, dann stehen
+  const s = a.szenen[a.i];
+  a.timer = setTimeout(animNext, Math.round(ANIM_MS * s.tempo * (s.zuege.length ? 1.4 : 1)));
+}
+function animDraw() {
+  const a = ui.anim, s = a.szenen[a.i];
+  drawMap($('map'), S.map, { state: Object.assign({}, S, s.bild || s.nach), turn: -1, anim: s });
+}
+function animNext() {
+  const a = ui.anim;
+  if (!a) return;
+  clearTimeout(a.timer);
+  a.i++;
+  animFrame();
+}
+function endAnim() {
+  const a = ui.anim;
+  if (!a) return;
+  clearTimeout(a.timer);
+  ui.anim = null;
+  const t = $('toast');
+  if (t.classList.contains('anim')) {
+    t.classList.remove('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('unten', 'anim'), 250);
+  }
+  lockBar();
+  a.weiter(true);
+}
+// Der Satz zur Szene – unten, über der gesperrten Leiste (wie der Hinweis beim Kampf)
+function animCaption() {
+  const a = ui.anim, s = a.szenen[a.i], p = S.players[s.pi], civ = civOf(p);
+  const wer = civ.n + (p.kind === 'ki' ? ' (' + T('KI') + ')' : p.kind === 'bot' ? ' (' + T('Bot') + ')' : '');
+  const t = $('toast');
+  clearTimeout(t._t);
+  t.innerHTML = `<b><i class="anim-dot" style="background:${civ.color}"></i>${esc(animText(s, wer))}</b>` +
+    `<small>${esc(T('Tippen auf die Karte überspringt'))} · ${a.i + 1}/${a.szenen.length}</small>`;
+  t.classList.add('unten', 'anim', 'show');
+}
+/* Eine Szene auf der Karte (v94). Die Felder sind schon golden (drawMap, unter den Figuren);
+   hier darüber: gezogene Armeen gleiten vom Feld davor aufs neue, eine gestrichelte Spur in
+   der Farbe des Reichs bleibt stehen; um Neues (Stadt, Armee, Wunder) ein Ring, der sich
+   weitet; an Städten, die gewachsen sind oder geopfert haben, +1 bzw. −1. Bewegung über SMIL
+   (<animate>, <animateTransform>) – wer reduzierte Bewegung eingestellt hat, sieht gleich das
+   Ende. */
+function animMarks(world, S2, s) {
+  const ohne = { 'pointer-events': 'none' };
+  const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const farbe = pi => civOf(S2.players[pi]).color;
+  const dauer = Math.max(200, Math.round(ANIM_MS * 0.6 * (s.tempo || 1))) + 'ms';
+  s.zuege.forEach(z => {
+    const [x0, y0] = hexCenter(z.von[0], z.von[1], HEX), [x1, y1] = hexCenter(z.nach[0], z.nach[1], HEX);
+    world.appendChild(svgEl('line', Object.assign({
+      x1: x0, y1: y0, x2: x1, y2: y1, stroke: farbe(z.owner), 'stroke-width': 3.5, 'stroke-dasharray': '6 5',
+      'stroke-linecap': 'round', opacity: 0.85, class: 'anim-spur',
+    }, ohne)));
+    // die Armee selbst: am Ziel gezeichnet, gleitet aber vom Feld davor dorthin
+    const g = svgEl('g', Object.assign({ transform: `translate(${x1},${y1})`, class: 'anim-armee' }, ohne));
+    for (const halo of [true, false]) {
+      const t = svgEl('text', {
+        x: 0, y: 8, 'text-anchor': 'middle', 'font-size': 25,
+        fill: halo ? 'none' : farbe(z.owner), stroke: halo ? '#f7f1e0' : 'none',
+        'stroke-width': halo ? 5 : 0, 'stroke-linejoin': 'round',
+      });
+      t.textContent = SYM[civOf(S2.players[z.owner]).sym]; g.appendChild(t);
+    }
+    const gleiten = still ? null : svgEl('animateTransform', {
+      attributeName: 'transform', type: 'translate', from: `${x0} ${y0}`, to: `${x1} ${y1}`,
+      dur: dauer, fill: 'freeze', calcMode: 'spline', keyTimes: '0;1', keySplines: '.4 0 .2 1', begin: 'indefinite',
+    });
+    if (gleiten) g.appendChild(gleiten);
+    world.appendChild(g);
+    // Die Uhr des SVG läuft seit dem Laden der Seite (drawMap leert es nur) – ohne eigenen Start
+    // wäre ein einmaliges Gleiten längst vorbei und die Armee stünde gleich am Ziel
+    if (gleiten && typeof gleiten.beginElement === 'function') gleiten.beginElement();
+  });
+  s.ringe.forEach(([r, c]) => {
+    const [x, y] = hexCenter(r, c, HEX);
+    const ring = svgEl('circle', Object.assign({
+      cx: x, cy: y, r: 19, fill: 'none', stroke: farbe(s.pi), 'stroke-width': 3, class: 'anim-ring',
+    }, ohne));
+    if (!still) {
+      ring.appendChild(svgEl('animate', { attributeName: 'r', values: '16;30', dur: '0.9s', repeatCount: 'indefinite' }));
+      ring.appendChild(svgEl('animate', { attributeName: 'opacity', values: '1;0', dur: '0.9s', repeatCount: 'indefinite' }));
+    }
+    world.appendChild(ring);
+  });
+  s.marken.forEach(m => {
+    const [x, y] = hexCenter(m.r, m.c, HEX);
+    const t = svgEl('text', Object.assign({
+      x: x + 17, y: y - 13, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700,
+      fill: m.text[0] === '+' ? farbe(s.pi) : '#9d3b2f', stroke: '#f7f1e0', 'stroke-width': 4,
+      'paint-order': 'stroke', class: 'anim-marke',
+    }, ohne));
+    t.textContent = m.text;
+    world.appendChild(t);
+  });
+}
 function endHumanTurn() {
   // Nur im eigenen Zug und nie, solange das Blatt eines KI- oder Bot-Zugs offen ist: sonst
   // liefe dessen Kampf ein zweites Mal, und der Zug spränge an seinem „Weiter" vorbei.
   // Ebenso nicht, solange der eigene Kampf noch nachgespielt wird (v90).
-  if (!S || S.over || isAuto(P(S)) || ui.botLock || ui.combat) return;
+  if (!S || S.over || isAuto(P(S)) || ui.botLock || ui.combat || ui.anim) return;
   // Harte Sperre: eine Armee, die noch in einer Stadt steht, verhindert das Zugende
   // ganz – da hilft kein Bestätigen, der Zustand ist schlicht ungültig.
   const stop = blockingIssues(S, S.cur);
@@ -1487,19 +1637,44 @@ function runBots() {
   const done = !!S.autoPlayed && S.autoPlayed.cur === S.cur && S.autoPlayed.round === S.round;
   const sinceSeq = done ? S.autoPlayed.seq : (S.logSeq || 0);
   const kaempfe = [];
+  const blatt = animBlatt();
+  let rec = null;
   if (!done) {
     S.autoPlayed = { cur: S.cur, round: S.round, seq: sinceSeq };
     // Im Ersten Spiel (v92) zieht England nach seinem Drehbuch, sonst die KI bzw. der Bot
-    sicher(p.kind === 'ki' ? 'KI-Zug' : 'Bot-Zug', () => {
+    const zug = () => {
       if (S.fg && typeof fgGegnerZug === 'function') fgGegnerZug(S);
       else if (p.kind === 'ki') kiTurn(S, S.cur); else botTurn(S, S.cur);
-    });
+    };
+    // v94: mit Animationen wird der Zug dabei aufgenommen (js/anim.js) – gerechnet wie immer
+    sicher(p.kind === 'ki' ? 'KI-Zug' : 'Bot-Zug', () => { if (blatt) zug(); else rec = animAufnahme(S, zug); });
     sicher('Kampf', () => finishTurn(S, kaempfe));    // Kampf des Bots bzw. der KI, einmal pro Zug
   }
   // Gespeichert wird gleich (der Zug ist gezogen, S.autoPlayed steht), gezeichnet erst nach
   // dem Nachspiel – sonst blitzte der Stand nach dem Kampf vor dem ersten Kampfbild auf.
   saveGame();
-  playCombat(kaempfe, () => botSheet(p, sinceSeq));
+  if (blatt) return playCombat(kaempfe, () => botSheet(p, sinceSeq));
+  // v94: erst die Szenen des Zugs, dann sein Kampf, dann gleich weiter – ohne Blatt. Wurde die
+  // App mitten im Nachspiel neu geladen, ist der Zug schon gezogen (done): dann ohne Szenen.
+  const szenen = rec ? animSzenen(rec, S.cur) : [];
+  playAnim(szenen, () => playCombat(kaempfe, weiterNachAuto));
+}
+/* Nach Szenen und Kampf eines KI- oder Bot-Zugs (v94, statt „Weiter" im Blatt): Sieg, Zugwechsel,
+   der nächste Zug von KI oder Bot – oder ein Mensch ist dran. Ist schon ein Mensch am Zug (eine
+   zweite, verspätete Kette), wird nichts übersprungen. Ohne Wartezeit (ANIM_MS = 0, Tests)
+   ruft sich das bis zum nächsten Menschen selbst auf; sitzt keiner mehr am Tisch, geht es nach
+   40 Zügen über einen Zeitgeber weiter, damit der Aufrufstapel nicht überläuft. */
+function weiterNachAuto() {
+  redraw();
+  if (S.over) return gameOver();
+  if (!isAuto(P(S))) return humanTurnStart();
+  sicher('Zugwechsel', () => advanceTurn(S));
+  redraw();
+  if (S.over) return gameOver();
+  if (!isAuto(P(S))) return humanTurnStart();
+  ui.autoKette = (ui.autoKette || 0) + 1;
+  if (ui.autoKette > 40) { ui.autoKette = 0; return setTimeout(runBots, 0); }
+  runBots();
 }
 // Das Blatt eines Bot- oder KI-Zugs: was er getan hat, und „Weiter"
 function botSheet(p, sinceSeq) {
@@ -1890,6 +2065,7 @@ function freePickModal() {
    aus dem Blatt eines KI- oder Bot-Zugs darf hier nicht mehr stehen (v80) – genau das war
    der gemeldete Zustand: der Mensch am Zug, das Blatt gesperrt, „Weiter" ohne Wirkung. */
 function humanTurnStart() {
+  ui.autoKette = 0;                     // v94: die Kette der KI- und Bot-Züge ist zu Ende
   if (ui.botLock || $('sheet').classList.contains('locked')) {
     ui.botLock = false;
     $('sheet').classList.remove('locked');
@@ -1933,10 +2109,15 @@ function loadModules() {
    was tatsächlich abgeht (costText). Geräteweit gemerkt, ändert am Spiel nichts. Eigener
    Schlüssel, damit die Module ihr gespeichertes Objekt behalten, wie es war. */
 const PREF_KEY = 'hochciv.prefs';
-const prefs = { listPrice: false };
+/* `anim` (v95; v94 hatte das Häkchen `noAnim`, „Keine Animationen"): wie Züge von KI und Bots
+   gezeigt werden – 'langsam' (ab Werk), 'schnell' oder 'aus' (wieder als Blatt mit „Weiter").
+   Ein von v94 gespeichertes `noAnim: true` wird zu 'aus', sonst gilt die Vorgabe. */
+const ANIM_STUFEN = ['langsam', 'schnell', 'aus'];
+const prefs = { listPrice: false, anim: 'langsam' };
 function loadPrefs() {
   const o = load(PREF_KEY) || {};
   prefs.listPrice = !!o.listPrice;
+  prefs.anim = ANIM_STUFEN.includes(o.anim) ? o.anim : o.noAnim ? 'aus' : 'langsam';
 }
 function optionsScreen() {
   MODULES.forEach(m => {
@@ -1950,6 +2131,9 @@ function optionsScreen() {
   const lp = $('opt-listprice');
   lp.checked = prefs.listPrice;
   lp.onchange = () => { prefs.listPrice = lp.checked; store(PREF_KEY, prefs); };
+  const an = $('opt-anim');
+  an.value = prefs.anim;
+  an.onchange = () => { prefs.anim = ANIM_STUFEN.includes(an.value) ? an.value : 'langsam'; store(PREF_KEY, prefs); };
 }
 /* Zeilen abgeschalteter Module aus dem Aufbau nehmen – und ihr Häkchen löschen. Ohne das
    Löschen könnte ein Modul, das jemand einmal eingeschaltet und angehakt hat, nach dem
@@ -2750,7 +2934,7 @@ function boot() {
     editMap.rows = out; drawEditor();
   };
 
-  attachTaps($('map'), tapHex);
+  attachTaps($('map'), tapHex, kartenrandTipp);
   attachTaps($('ed-map'), edTap);
   attachTaps($('pl-map'), plTap);
   $('pl-tech').onclick = placeTechView;

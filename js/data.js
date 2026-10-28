@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v93';
+const APP_VERSION = 'v95';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -476,7 +476,7 @@ const TIPS = [
   'Die kostenlose Armee der Wikinger kann sowohl offensiv als auch defensiv den entscheidenden Vorteil bringen.',
   'Ein erfolgreicher Beutezug kann mit der entsprechenden Wikingerfähigkeit ausreichen, um einen Schneeballeffekt auszulösen.',
   'Mit Kriegerkultur brauchen die Wikinger vor allem viele Armeen. Bedenke, dass dauerhafte Macht durch Armeen auch für die Machtreduktion zählt.',
-  'Russlands Taiga kann man entweder ausnutzen, indem man in den Wald siedelt, oder indem man zuerst alle anderen Plätze besiedelt, da der Wald für den Gegner auch weniger wert ist.',
+  'Mit Russlands Taiga bringt jedes Feld mindestens 1 Nahrung. Plätze zwischen Wald, Gebirge und Meer, die für andere kaum etwas taugen, ernähren Russland trotzdem – dort siedelt es ohne Konkurrenz.',
   'Die russischen Siedlertrecks erlauben es, in einer neu gegründeten Stadt sofort Sklaverei zu nutzen.',
   'Mit den russischen Siedlertrecks ist es umso wichtiger, die anfänglichen Siedlungen so zu planen, dass man in späteren Runden weiter expandieren kann.',
   'Russlands Fruchtbarkeit bringt im Allgemeinen früher größere Städte. Du solltest besonders früh nach Wachstums- und Stadttechnologien im Forschungs- und Produktionsfeld suchen.',

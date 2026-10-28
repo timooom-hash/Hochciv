@@ -24,10 +24,19 @@ function d6(S, why, ctx) {
   return v;
 }
 function pick(S, arr) { return arr[Math.floor(nextRand(S) * arr.length)]; }
-function log(S, cls, msg) {
+/* LOG_HOOK (v94): Wer zuhören will, was geschieht, setzt hier eine Funktion (S, Eintrag) –
+   bisher nur animAufnahme (js/anim.js), solange der Zug einer KI oder eines Bots aufgenommen
+   wird. Sie bekommt jeden Eintrag gleich nach der Aktion, die ihn schreibt; sie liest und
+   ändert nichts am Spiel. `art` (v95, nur bei Aktionen, wo der Unterschied im Stand täuschen
+   würde): was die Aktion für das Nachspielen ist – etwa 'gratisarmee' statt „gebaut". */
+let LOG_HOOK = null;
+function log(S, cls, msg, art) {
   S.logSeq = (S.logSeq || 0) + 1;
-  S.log.push({ c: cls, m: msg, r: S.round, seq: S.logSeq });
+  const e = { c: cls, m: msg, r: S.round, seq: S.logSeq };
+  if (art) e.art = art;
+  S.log.push(e);
   if (S.log.length > 600) S.log.shift();
+  if (LOG_HOOK) LOG_HOOK(S, e);
 }
 // Alle Log-Einträge ab einer Sequenznummer (stabil, auch wenn ältere weggekappt wurden).
 function logSince(S, seq) { return S.log.filter(e => e.seq > seq); }
@@ -460,8 +469,12 @@ function tileYield(S, pi, t) {
   if (evTerrainDead(S, pi, t)) return [0, 0, 0];       // Ereignis legt das Gelände lahm
   const y = yieldBonus(p, t, TERRAIN[t].yield.slice());    // Technologien: je Feld die höchste (v88)
   // Was nicht aus Technologien kommt, addiert sich wie bisher
-  if (t === 'W' && hasAbil(p, 'russland', 'basis')) y[1] += 1;                     // Taiga
   if (t === 'M' && hasWonder(S, pi, 'leuchtturm')) { y[0] += 1; y[1] += 1; y[2] += 1; }   // Großer Leuchtturm
+  /* Taiga (Russland) seit v95 (Anweisung des Autors): jedes Feld bringt mindestens 1 Nahrung –
+     eine Untergrenze nach allem anderen, kein Zuschlag (bis v94: +1 Nahrung im Wald). Was ein
+     Feld schon an Nahrung bringt, bleibt; Vulkan und vom Ereignis lahmgelegtes Gelände bringen
+     weiter nichts (oben), Bürokratie verdoppelt danach (tileYieldAt). */
+  if (y[1] < 1 && hasAbil(p, 'russland', 'basis')) y[1] = 1;
   return y;
 }
 /* Ertrag eines konkreten Feldes: wie tileYield, aber mit Bürokratie –
@@ -1572,7 +1585,7 @@ function spawnFreeArmies(S, pi) {
     log(S, 'act', stadt.cap
       ? T('%s: kostenlose Armee in der Hauptstadt – muss sie noch verlassen.', civOf(p).n)
       : T('%s: kostenlose Armee in der Stadt auf %s/%s – muss sie noch verlassen.',
-        civOf(p).n, stadt.r, stadt.c));
+        civOf(p).n, stadt.r, stadt.c), 'gratisarmee');
   }
   if (!p.freeArmies) p.freeArmyCity = null;
   return n;
@@ -1745,12 +1758,12 @@ function copyTech(S, pi, tk, mode) {
     if (!opt.freeOk || !internetAvailable(S, pi)) return T('Diese Runde schon per Internet kopiert.');
     p.internetUsed = S.round;
     p.techs[tk] = true;
-    log(S, 'act', T('%s: %s kopiert (Internet, gratis).', civOf(p).n, opt.tech.n));
+    log(S, 'act', T('%s: %s kopiert (Internet, gratis).', civOf(p).n, opt.tech.n), 'kopieren');
   } else {
     if (opt.paidCoins == null) return T('Kein bezahlter Kopierweg erforscht.');
     if (opt.paidCoins && !pay(S, pi, 'coins', opt.paidCoins)) return T('Zu wenig Münzen (%s nötig).', opt.paidCoins);
     p.techs[tk] = true;
-    log(S, 'act', T('%s: %s kopiert (%s Münzen).', civOf(p).n, opt.tech.n, opt.paidCoins));
+    log(S, 'act', T('%s: %s kopiert (%s Münzen).', civOf(p).n, opt.tech.n, opt.paidCoins), 'kopieren');
   }
   const same = techPool(S).filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
   if (same.length === 1) rollAvailability(S, pi, opt.tech.f, opt.tech.age + 1);
@@ -1800,27 +1813,30 @@ function attackersOn(S, pi, city) {
   const rng = attackRange(S, pi);
   return armiesOf(S, pi).filter(a => hexDistance(a.r, a.c, city.r, city.c) <= rng);
 }
-function attackValue(S, pi, count) {
+/* `pow` (v94): der Machtwert, mit dem gerechnet wird – in der Kampfphase der vom Anfang der
+   Phase (combatPhase), sonst der jetzige. */
+function attackValue(S, pi, count, pow) {
   const p = S.players[pi];
   if (count <= 0) return 0;
-  let per = powerOf(S, pi);
+  let per = pow != null ? pow : powerOf(S, pi);
   if (has(p, 'belagerung')) per += SIEGE_BONUS;      // v88: 3 (vorher 5)
   if (has(p, 'dynamit')) per *= 2;
   return per * (COMBAT.attackStacks ? count : 1);
 }
-function defenseValue(S, city) {
+function defenseValue(S, city, pow) {
   const o = S.players[city.owner], oi = city.owner;
   if (o.kind === 'barbar') return city.pop;      // Barbarenstädte verteidigen nur mit Bevölkerung
+  const macht = pow != null ? pow : powerOf(S, oi);      // v94: in der Kampfphase festgehalten
   // Die Große Mauer rechnet die Verteidigung mit der Gesamtbevölkerung des Reiches.
   const base = hasWonder(S, oi, 'mauer') ? popOf(S, oi) : city.pop;
   let d = base * (has(o, 'maschinengewehr') ? 3 : 1);
   if (has(o, 'stadtmauern')) d += 5;
-  if (has(o, 'burgenbau')) d += powerOf(S, oi);          // virtuelle Armee in der Stadt
+  if (has(o, 'burgenbau')) d += macht;                   // virtuelle Armee in der Stadt
   const rng = projectRange(S, oi);
   let helpers = 0;
   for (const a of armiesOf(S, oi))
     if (hexDistance(a.r, a.c, city.r, city.c) <= rng) helpers++;
-  if (helpers) d += powerOf(S, oi) * (COMBAT.defenseStacks ? helpers : 1);
+  if (helpers) d += macht * (COMBAT.defenseStacks ? helpers : 1);
   return d;
 }
 /* Flankieren – die Stellung. Aus combatPhase herausgelöst (v75), damit die Machtansicht
@@ -1877,8 +1893,13 @@ function powerView(S) {
    wird flankiert. So war es bis v89 und ist es wieder seit v91 (Anweisung des Autors): eine
    Armee an ihrer Stadt verteidigt diese mit, auch wenn sie im selben Zug noch weggeflankt
    wird. v90 hatte die Reihenfolge umgedreht – dann fielen Städte, die verteidigt waren.
-   Umgekehrt wirkt eine Eroberung schon auf das Flankieren desselben Zugs (eroberte Stadt mit
-   Burgenbau als Position, Kriegerkultur je Stadt, Zeus, Bot-Macht = Bevölkerung).
+   **Die Macht steht für die ganze Phase fest** (v94, Anweisung des Autors): Angreifer und
+   Verteidiger kämpfen mit dem Machtwert vom Anfang der Phase (`macht`). Bis v93 änderte eine
+   Eroberung ihn mitten in der Phase – Kriegerkultur der Wikinger mit Burgenbau zählt je Stadt
+   +2, Bots haben ihre Bevölkerung als Macht, die Zeusstatue wechselt mit der Stadt –, und
+   die folgenden Kämpfe rechneten schon mit dem neuen Wert. Jetzt gilt er erst danach. Eine
+   eroberte Stadt mit Burgenbau ist dagegen schon eine Position fürs Flankieren desselben
+   Zugs (das ist keine Macht, sondern eine Stellung).
    `rec` (nur die Oberfläche, seit v90): Hier hinein kommt jeder Kampf als Eintrag – Art, Feld,
    Angreifer und Verteidiger, beide Werte, Ausgang, die beteiligten Felder und der Stand der
    Karte davor (combatEntry), in der Reihenfolge, in der gerechnet wird. Daraus spielt die
@@ -1886,6 +1907,7 @@ function powerView(S) {
    durch, auch ohne `rec` (KI, Bots, Tests). */
 function combatPhase(S, pi, rec) {
   const p = S.players[pi];
+  const macht = S.players.map((_, i) => powerOf(S, i));    // für die ganze Phase (v94)
   // Wikinger "Beutezüge": Stand vor dem Kampf festhalten, Auszahlung nächste Runde
   if (isAbil(p, 'kampfertrag')) {
     const raid = raidYield(S, pi);
@@ -1898,7 +1920,7 @@ function combatPhase(S, pi, rec) {
     const sk = pi + '|' + city.id;
     const atk = attackersOn(S, pi, city);
     if (!atk.length) { delete S.sieges[sk]; continue; }
-    const a = attackValue(S, pi, atk.length), d = defenseValue(S, city);
+    const a = attackValue(S, pi, atk.length, macht[pi]), d = defenseValue(S, city, macht[city.owner]);
     const e = rec ? combatEntry(S, {
       art: 'stadt', pi, gegner: city.owner, r: city.r, c: city.c, a, d, sieg: a > d,
       von: atk.map(x => [x.r, x.c]),
@@ -1918,13 +1940,13 @@ function combatPhase(S, pi, rec) {
     }
     if (e) rec.push(e);
   }
-  // 2 Flankieren: Stellung (canFlank), dann der Machtvergleich – mit dem Stand nach den
-  //   Städten. Jede Stellung ist ein Kampf, auch wenn die Macht nicht reicht (dann bleibt die
-  //   Armee stehen).
+  // 2 Flankieren: Stellung (canFlank) mit dem Stand nach den Städten, dann der Machtvergleich –
+  //   mit der Macht vom Anfang der Phase. Jede Stellung ist ein Kampf, auch wenn die Macht
+  //   nicht reicht (dann bleibt die Armee stehen).
   const flankSpots = flankSpotsOf(S, pi);
   for (const enemy of S.armies.slice()) {
     if (enemy.owner === pi || !canFlank(S, pi, enemy, flankSpots)) continue;
-    const a = powerOf(S, pi), d = powerOf(S, enemy.owner);
+    const a = macht[pi], d = macht[enemy.owner];
     if (rec) rec.push(combatEntry(S, {
       art: 'flanke', pi, gegner: enemy.owner, r: enemy.r, c: enemy.c, a, d, sieg: a > d,
       von: flankersOf(S, pi, enemy, flankSpots),
