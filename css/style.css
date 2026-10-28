@@ -391,6 +391,12 @@ html.w-side body.tut .toast.show{transform:none}
 .toast.unten,html.w-side body.tut .toast.unten{left:50%;right:auto;top:auto;bottom:calc(11px + var(--safe-b));
   transform:translateX(-50%) translateY(18px);max-width:86%}
 .toast.unten.show,html.w-side body.tut .toast.unten.show{transform:translateX(-50%)}
+/* v94: der Satz zur Szene eines KI- oder Bot-Zugs – zwei Zeilen: was geschieht (mit einem
+   Punkt in der Farbe des Reichs), darunter klein, dass ein Tipp überspringt, und die wievielte */
+.toast.anim b{display:block;font-weight:600}
+.toast.anim small{display:block;font-size:11px;opacity:.72;margin-top:2px}
+.toast.anim .anim-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;
+  vertical-align:0;box-shadow:0 0 0 2px var(--paper)}
 
 /* Die folgenden Klassen setzt syncLayout() auf <html>. Bewusst keine Media Queries:
    im gedrehten Hochformat (html.turn) misst eine Media Query den ungedrehten Viewport
