@@ -52,16 +52,18 @@ const flag = k => args.includes(k);
    Flanken zuerst liefen (damals verglich der Haken mit „erst die Städte"). */
 if (flag('reihenfolge') || flag('kampflaenge')) {
   const echt = combatPhase;
+  // Macht wie in der Regel (seit v94) einmal für die ganze Phase – verglichen wird nur die Reihenfolge
   const anderePhase = (S, pi) => {
+    const macht = S.players.map((_, i) => powerOf(S, i));
     const spots = flankSpotsOf(S, pi);
     for (const enemy of S.armies.slice())
-      if (enemy.owner !== pi && canFlank(S, pi, enemy, spots) && powerOf(S, pi) > powerOf(S, enemy.owner))
+      if (enemy.owner !== pi && canFlank(S, pi, enemy, spots) && macht[pi] > macht[enemy.owner])
         S.armies = S.armies.filter(a => a !== enemy);
     for (const city of S.cities.slice()) {
       if (city.owner === pi) continue;
       const sk = pi + '|' + city.id, atk = attackersOn(S, pi, city);
       if (!atk.length) { delete S.sieges[sk]; continue; }
-      if (attackValue(S, pi, atk.length) > defenseValue(S, city)) {
+      if (attackValue(S, pi, atk.length, macht[pi]) > defenseValue(S, city, macht[city.owner])) {
         S.sieges[sk] = (S.sieges[sk] || 0) + 1;
         if (S.sieges[sk] >= 2) captureCity(S, pi, city);
       } else S.sieges[sk] = 0;

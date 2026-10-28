@@ -46,10 +46,11 @@ Datei beschreibt die Standardregeln; die experimentelle Variante v2 steht in Abs
 - **Reihenfolge am Zugende:** erst die Städte, dann das Flankieren – so bis v89 und wieder seit
   v91 (Anweisung des Autors). Eine Armee an ihrer Stadt verteidigt diese also mit, auch wenn sie
   im selben Zug noch weggeflankt wird; eine laufende Belagerung bricht dann ab, die Stadt fällt
-  nicht. Eine Eroberung wirkt dagegen schon auf das Flankieren desselben Zugs (eroberte Stadt mit
-  Burgenbau als Position, Kriegerkultur, Zeus, Bot-Macht = Bevölkerung). v90 hatte die
-  Reihenfolge umgedreht – dann fielen verteidigte Städte. Die Beutezüge der Wikinger werden vor
-  beidem festgehalten. Abschnitte „(v90)" und „(v91)" am Ende.
+  nicht. Eine Eroberung wirkt dagegen schon auf das Flankieren desselben Zugs – als **Position**
+  (eroberte Stadt mit Burgenbau). Die **Macht** beider Seiten steht seit v94 für die ganze Phase
+  fest (Anweisung des Autors): Kriegerkultur, Zeus und Bot-Macht = Bevölkerung ändern sich erst
+  danach. v90 hatte die Reihenfolge umgedreht – dann fielen verteidigte Städte. Die Beutezüge der
+  Wikinger werden vor beidem festgehalten. Abschnitte „(v90)", „(v91)" und „(v94)" am Ende.
 
 ## 2. Bewegung und Armeen
 
@@ -4341,7 +4342,7 @@ deutsch und englisch – Blatt, Zahl an der Leiste, beide „Weiter".
   billigeres Glied, das man **nach** einem teureren erforscht, keinen Ertrag mehr dazu
   (Mathematik nach KI: +0) – zählt aber weiter als Technologie (Punkte, Zeitalter,
   Rückschau usw.).
-* **Nicht aus Technologien:** Taiga (Russland, Wald +1 🌾) und der Große Leuchtturm (Meer
+* **Nicht aus Technologien:** Taiga (Russland, Wald +1 🌾; seit v95 eine Untergrenze – mindestens 1 🌾 je Feld, Abschnitt v95) und der Große Leuchtturm (Meer
   +1 auf alles) addieren sich wie bisher.
 * **Laufende Partien:** Die Regel gilt ab dem Laden auch für gespeicherte Spielstände (kein
   Schalter im Spielstand) – wie schon die Änderungen an Ökologie und Bürokratie in v86.
@@ -5046,3 +5047,247 @@ In Chromium (Einzeldatei; iPad quer und hochkant, Telefon quer und hochkant, daz
 Seite vor der Partie, Start mit Weg im Kopf, Würfel-Schritt mit goldenen blassen Kacheln, „noch
 nicht ausgewürfelt", durchgefallen mit Toast und Rückmeldung, Runde 3/4 vom Weg geführt, alle drei
 Wege bis „Gewonnen", danach die Seite mit Haken – ohne Seitenfehler.
+
+## Macht fest für die Kampfphase · Züge von KI und Bots nachspielen (v94)
+
+Zwei Anweisungen des Autors (28.10.):
+
+1. „In der Kampfphase soll sich die Macht von Angreifer und Verteidiger während der Phase nicht
+   ändern (manchmal, wenn die Wikinger mit ihrer Fähigkeit eine Stadt erobern und Burgen haben,
+   änderte sie sich), sondern erst danach."
+2. „Animationen wie beim Kampf, aber für alles, was KI und Bots tun, damit man leichter folgen
+   kann. Die Protokolle nicht mehr zum Durchklicken zeigen, aber im ausführlichen Protokoll
+   behalten. Nach dem Zugende einfach alle Züge von KI und Bots durchlaufen lassen, bis wieder
+   ein Spieler dran ist. Die alte Fassung hinter einem Häkchen „Keine Animationen" in den
+   Einstellungen behalten."
+
+### Die Macht steht für die ganze Kampfphase fest
+
+`combatPhase` nimmt die Macht aller Reiche einmal, bevor der erste Kampf aufgelöst wird
+(`powerOf` → `macht`), und rechnet jeden Kampf der Phase damit: den Angriff je Armee
+(`attackValue(S, pi, n, pow)`), die Verteidigung mit Burgenbau und mit eigenen Armeen neben der
+Stadt (`defenseValue(S, city, pow)`) und beide Seiten jeder Flanke. Ohne den neuen Parameter
+rechnen beide Funktionen wie bisher mit der Macht von jetzt – Machtblatt, Ringe, der Stand im
+Ersten Spiel und die Bewertungen der KI bleiben, wie sie waren.
+
+Bis v93 kam die Macht bei jedem Kampf neu aus dem Stand: Eroberten die Wikinger mit Kriegerkultur
+und Burgenbau eine Stadt, flankierten sie schon im selben Zug mit +2 (eine Stadt mehr); verloren
+sie eine, fehlten ihrer Flanke danach 2. Ebenso Zeus (+3, wechselt mit der Stadt den Besitzer)
+und Bots, deren Macht ihre Bevölkerung ist (die Eroberung nimmt dem einen 2 Bevölkerung und gibt
+dem anderen die Stadt).
+
+Auslegung: „Macht" ist der Machtwert (`powerOf`), mit dem jede Armee angreift, verteidigt und
+flankiert. **Wer** mitkämpft, ergibt sich weiter aus dem Stand: Eine eroberte Stadt mit Burgenbau
+flankiert schon in derselben Phase mit (wie seit v91). Fest steht nur, **wie stark** jede Seite
+ist. Die KI plant über `combatPhase` auf Kopien und folgt damit derselben Regel. Gemessen ist der
+Einfluss auf die Balance nicht; betroffen sind nur Phasen, in denen eine Stadt fällt und danach
+im selben Zug flankiert wird.
+
+### Züge von KI und Bots nachspielen
+
+**Ablauf.** Nach „Zug beenden" zuerst wie bisher der eigene Kampf (v90). Dann zieht die erste KI
+bzw. der erste Bot – gerechnet in einem Stück wie bisher und dabei aufgenommen –, danach laufen
+seine Szenen auf der Karte, dann sein Kampf, dann ist der Nächste dran, bis wieder ein Mensch
+am Zug ist (`runBots` → `playAnim` → `playCombat` → `weiterNachAuto`). Kein Blatt, kein
+„Weiter". Das Protokoll bekommt dieselben Zeilen wie bisher.
+
+**Aufnahme** (`js/anim.js`, ohne Oberfläche). Jede Aktion schreibt eine Protokollzeile der
+Klasse `act`, nachdem sie den Stand geändert hat. `animAufnahme` hängt sich dafür an `log`
+(`LOG_HOOK` in `engine.js`) und hält bei jeder solchen Zeile den Kartenstand fest (`animSnap`:
+Städte, Armeen, Straßen, gekaufte Felder, Wunder, Reiche) – nur auf dem echten Spielstand, nicht
+auf den Kopien, auf denen die KI ihre Züge plant. Danach ist der Haken wieder ab, auch nach einem
+Fehler im Zug.
+
+**Szenen** (`animSzenen`; seit v95 je Aktion eine, nichts mehr zusammengefasst – Abschnitt v95).
+Je Bild der Unterschied zum vorigen, in dieser Rangfolge: neue Stadt,
+neue Armee, gezogene Armee, verschwundene Armee (Atomschlag), gewachsene Stadt, geopferte
+Bevölkerung, Straße/Eisenbahn, gekauftes Feld, Wunder, Technologie, Macht – sonst steht der Satz
+aus dem Protokoll da. Damit ein Zug nicht zu lange dauert:
+* Bilder derselben Art hintereinander sind **eine** Szene (drei Städte wachsen = ein Bild). Armeen
+  bauen und ziehen zählt als eine Art: „baut eine Armee, zieht sie, baut die nächste, zieht sie"
+  wird „baut 2 Armeen und zieht sie" – die neuen gleiten aus ihrer Stadt.
+* **Forschen und Macht** ändern die Karte nicht. Sie sind je **eine Szene für den ganzen Zug**, an
+  der Stelle, an der zum ersten Mal geforscht bzw. Macht gekauft wurde, und unterbrechen keine
+  Gruppe (die KI forscht gern zwischen zwei Wachstumsschritten). Gezeichnet wird dabei der Stand
+  der Szene davor – die Karte springt nie zurück.
+* Was die Karte ändert, bleibt in der Reihenfolge des Zugs.
+
+Gemessen an 159 Zügen (sechs Partien zu viert mit je zwei KI und zwei Bots, bis zu 40 Züge je
+Partie): KI im Median 4 Szenen, in 9 von 10 Zügen höchstens 7, längster Zug 13; Bots im Median 3,
+höchstens 4. Ohne die beiden Zusammenfassungen waren es bei der KI 5, 12 und 24.
+
+**Abspielen** (`ui.js`). Je Szene `ANIM_MS` (900 ms; mit gezogenen Armeen das 1,4-Fache: erst
+gleiten, dann stehen); ein Zug mit mehr als 7 Szenen läuft schneller, höchstens bis 60 %
+(`animTempo`). Die Karte zeigt den Stand der Szene, das Neue golden umrandet, darauf
+`animMarks`: gezogene Armeen gleiten vom Feld davor aufs neue (SMIL, eigens gestartet – die Uhr
+des SVG läuft seit dem Laden der Seite), eine gestrichelte Spur in der Farbe des Reichs bleibt
+stehen, um Neues ein Ring, der sich weitet, an Städten +1 bzw. −1. Unten über der gesperrten
+Leiste der Satz (`animText`, mit einem Punkt in der Farbe des Reichs) und „Tippen auf die Karte
+überspringt · 2/5". Ein Tipp auf die Karte beendet den Rest **dieses** Zugs; sein Kampf und die
+folgenden Züge kommen trotzdem. Das gilt auch für einen Tipp auf den Rand neben den Feldern –
+seit v94 ebenso beim Nachspiel der Kämpfe, das bis dahin nur ein Tipp auf ein Feld beendete. Wer am Gerät reduzierte Bewegung eingestellt hat, sieht gleich
+den Stand am Ende jeder Szene. Gespeichert ist der Zug schon vor dem Nachspiel (samt
+`S.autoPlayed`): Lädt die App mittendrin neu, zieht dieselbe KI nicht noch einmal, es geht ohne
+ihre Szenen beim Nächsten weiter.
+
+**Keine Animationen** (Einstellungen, `prefs.noAnim`, geräteweit, ab Werk aus; seit v95 die Auswahl
+„Animationen" mit Langsam/Schnell/Keine – Abschnitt v95): genau der Ablauf
+von v93 – nach jedem Zug einer KI oder eines Bots sein Blatt mit „Weiter". Das **Nachspiel der
+Kämpfe** (v90) bleibt in beiden Fällen: Es gehörte schon zur alten Fassung und lässt sich mit
+einem Tipp überspringen.
+
+**Tutorial und Erstes Spiel.** Das klassische Tutorial bleibt immer beim Blatt: Seine Texte und
+Schienen erklären es. Im Ersten Spiel gilt die Einstellung; mit Animationen sagt das Panel in
+Englands Zug „Schau auf der Karte zu, was England tut" und „Ein Tipp auf die Karte überspringt",
+das Ziel davor „auf der Karte siehst du, was es tut".
+
+Auslegungen, zum Ändern angeboten: (a) Ein Tipp überspringt einen Zug, nicht alle bis zum
+nächsten Menschen. (b) Forschen und Macht zeigen nur ihren Satz, je einmal je Zug. (c) 0,9 s je
+Szene, schneller ab 8 Szenen – mit drei KI-Gegnern dauerte eine Runde (Runde 3–5) in sechs
+Probeläufen in Chromium 6–10 s, Kämpfe eingeschlossen; auf dem iPad nicht gemessen. (d) Das
+Tutorial behält das Blatt. (e) „Keine Animationen" schaltet das Nachspiel der Kämpfe nicht ab.
+
+### Abgesichert (v94)
+
+`test.js`: „Die Macht steht für die ganze Kampfphase fest" – die Wikinger erobern mit Burgenbau
+und flankieren mit 7 statt 9 (Englands Armee hält), England erobert eine Wikingerstadt und die
+Wikingerarmee hält mit 6 statt 4, ein Bot flankiert mit 4 statt 5; danach gilt jeweils der neue
+Wert. „Züge von KI und Bots nachspielen": Haken ab Werk leer und nach einem Fehler wieder ab; 24
+Bot-Züge – ein Bild je Aktion, das letzte ist der Stand danach, nie zwei Szenen derselben Art
+hintereinander, Forschen und Macht höchstens einmal, zusammen alle Bilder; zehn KI-Züge – nur
+Aktionen auf dem echten Spielstand; Forschen und Macht zusammengefasst, das Wachsen bleibt eine
+Gruppe, gezeichnet der Stand der Szene davor, die Technologie eines Wunders bei dessen Szene;
+jede Art einzeln (Zug von → nach, +2, −1, Eisenbahn, Technologie, Macht, Atomschlag, zwei
+Armeen aus einer Stadt, gebaut und gezogen, Feld, Wunder, nur Münzen); alle Sätze deutsch und
+englisch.
+`smoke.js`, Schritte „v94: …": die Einstellung (ab Werk aus, gemerkt, englisch); drei Bots in
+einem Rutsch ohne Blatt, alles im Protokoll; zwei Menschen am Tisch; Szene für Szene (Satz,
+Zähler, goldene Felder, Ringe, Marken, welche Armeen stehen und welche gleiten, Sperre, „Zug
+beenden" wirkt nicht, ein Tipp überspringt je Zug); eine gebaute Szene (die Armee gleitet mit
+Spur, +1, die neue Armee mit Ring, Stand nach der Szene statt Ende des Zugs, Tempo, ohne Bewegung,
+englisch); erst die Szenen, dann der Kampf; neu geladen mitten im Nachspiel; „Keine Animationen"
+über die Einstellungen und zurück; das Tutorial mit Blatt; das Erste Spiel mit Englands Zug auf
+der Karte und bis zum Sieg.
+Gegenproben (je eine Stelle absichtlich falsch, 27 Stück): die Macht wieder aus dem Stand, der
+Haken bleibt nach einem Fehler hängen, die Kopien der KI werden Bilder, keine Gruppen, ein Zug
+ohne Herkunft, Opfern als +, eine englische Fassung fehlt, Forschen unterbricht eine Gruppe,
+Forschen und Macht zeigen das Ende ihres letzten Bilds, Bauen und Ziehen getrennt, neue Armeen
+ohne ihre Stadt als Herkunft, Forschen nennt auch die Technologie eines Wunders – `test.js`
+schlägt bei jeder an (der Test „Fehler im Zug …" erst, seit er `LOG_HOOK === null` vergleicht:
+`JSON.stringify` machte aus der hängenden Funktion `null`); immer das Blatt, ein Tipp auf ein
+Feld überspringt nicht, ein Tipp auf den Rand überspringt nicht, die Einstellung zählt nicht, die
+Leiste bleibt frei, erst der Kampf und dann die Szenen, die Kette hält nach dem ersten Zug, das
+Ende des Zugs statt der Szene gezeichnet, der Satz bleibt über dem Kampf stehen, dieselbe KI zieht
+nach dem Neuladen noch einmal, die Texte im Ersten Spiel wie mit Blatt, Satz und Sperre der alten
+Partie bleiben stehen, kein Zähler, festes Tempo, das Tutorial spielt nach – `smoke.js` schlägt bei
+jeder an.
+In Chromium (Einzeldatei; iPad quer und hochkant, Telefon quer und hochkant, dazu englisch): die
+Einstellung; eine Partie gegen drei KI ab Runde 3 Szene für Szene bis „Griechenland ist am Zug"
+(6–10 s je Runde, Kämpfe eingeschlossen), gemessen Bild für Bild: die Armee gleitet in gut einer
+halben Sekunde vom alten aufs neue Feld; ein Tipp auf die Karte und einer auf den Rand neben den
+Feldern überspringen je einen Zug; mit „Keine Animationen" das Blatt; das Erste Spiel mit Englands
+Zug auf der Karte (Runde 1: gründen, wachsen; Runde 2: forschen, Armee bauen und ziehen, Kampf),
+danach Runde 2 bzw. „Belagert!" – ohne Seitenfehler. Ein Probelauf endete mit einem Militärsieg
+der KI über die tatenlose Testpartei: Das Nachspiel des Kampfs führte richtig ins Spielende.
+
+## Je Aktion eine Szene · Animationen langsam, schnell oder keine · Taiga: jedes Feld mindestens 1 Nahrung (v95)
+
+Drei Anweisungen des Autors (28.10.) nach v94:
+
+1. „Schon ziemlich gut, aber zu viel auf einmal (z. B. alle erforschten Technologien zusammen).
+   Bitte je Aktion ein ‚Zug', so wie ein Mensch ihn ausführen würde, statt alle Gründungen in
+   einem zusammenzufassen."
+2. „Es ist ziemlich schnell. Etwa um die Hälfte langsamer – die schnelle Fassung aber behalten,
+   die Einstellung als Auswahl: langsam / schnell / keine Animationen."
+3. „Russlands ‚Taiga' soll lauten: alle Felder bringen mindestens 1 Nahrung – statt +1 Nahrung im
+   Wald."
+
+### Je Aktion eine Szene
+
+`animSzenen` macht aus jeder Protokollzeile der Klasse `act` genau eine Szene, in der Reihenfolge
+des Zugs: jede gegründete Stadt, jede Technologie, jede gebaute und jede gezogene Armee, jedes
+Straßenfeld, jedes Wachstum. Nichts wird mehr zusammengefasst (v94: Gleiches hintereinander, Bauen
+und Ziehen, Forschen und Macht je einmal je Zug). Gezeichnet wird der Stand nach der Aktion, und
+die Szene zeigt alles, was die Aktion geändert hat (`animDetails`, nicht mehr nur das ihrer Art).
+
+Was eine Aktion ist, sagt meist der Unterschied zum Stand davor (`animUnterschied`). Wo der
+täuschen würde, sagt es die Aktion selbst: `log(S, 'act', satz, art)` legt die Art in der
+Protokollzeile ab – die kostenlosen Armeen (Seefahrer, Koloss) heißen „erhält eine kostenlose
+Armee" statt „baut", Kopieren (Spionage, Kundschafterei, Internet) „kopiert" statt „erforscht",
+und wo es dafür keinen eigenen Satz gibt, steht der Satz aus dem Protokoll da (Koloss, Pentagon –
+es schenkt Macht, kauft sie nicht –, die Übernahme freistehender Wunder). Neu ist auch „baut eine
+Straße": ein Straßenfeld je Aktion.
+
+Was das kostet, gemessen an 159 Zügen (sechs Partien zu viert, je zwei KI und zwei Bots, bis zu
+40 Züge je Partie): Ein Zug der KI hat im Median 7 Szenen, in 9 von 10 Zügen höchstens 17, der
+längste 41 (ein später Zug mit vielen Straßenfeldern und Forschungen); Bots im Median 6, höchstens
+12. Bei „Langsam" dauert ein Zug der KI damit im Median 9,4 s, in 9 von 10 Zügen höchstens 23,5 s,
+der längste 60 s; bei „Schnell" 6,3 s, 9,4 s und 24 s. In Chromium dauerte eine Runde mit drei
+KI-Gegnern (Runde 3–5) bei „Langsam" 17–33 s, Kämpfe eingeschlossen.
+
+### Animationen: Langsam, Schnell, Keine
+
+Die Einstellung ist eine Auswahl „Animationen" statt des Häkchens (`prefs.anim`: 'langsam' ab Werk,
+'schnell', 'aus'; ein von v94 gespeichertes Häkchen wird zu 'aus', sonst gilt die Vorgabe).
+**Schnell** ist der Takt von v94: 900 ms je Szene, mit gezogener Armee das 1,4-Fache, bei Zügen
+mit mehr als 7 Szenen kürzer, bis auf 60 %. **Langsam** ist das 1,5-Fache, immer, ohne Kürzen:
+1,35 s je Szene, mit gezogener Armee 1,89 s (die Armee gleitet 0,81 s). „Etwa um die Hälfte
+langsamer" ist dabei als „halb so lang noch einmal" gelesen – die Hälfte des Tempos wäre das
+Doppelte (1,8 s je Szene). **Keine**: das Blatt mit „Weiter" wie bis v93. Das Nachspiel der
+Kämpfe (v90) bleibt in allen drei Fällen.
+
+### Taiga: jedes Feld bringt mindestens 1 Nahrung
+
+`tileYield` hebt für Russland mit Taiga die Nahrung jedes Feldes auf mindestens 1 – nach den
+Ertragstechnologien und dem Großen Leuchtturm, als Untergrenze, nicht als Zuschlag. Ohne
+Technologie bringen damit Wald, Gebirge und Meer 1 Nahrung (Grasland, Fluss und Insel haben schon
+eine); wo schon Nahrung ist (Kunstdünger, Bewässerung, Fischerei, Segeln, Landwirtschaft …), ändert
+sich nichts. Bis v94 gab Taiga +1 Nahrung im Wald, auch zusätzlich zu Kunstdünger.
+
+Auslegungen: (a) „Alle Felder" heißt alle, die Erträge bringen – das Umland der Städte und
+gekaufte Felder; das Stadtfeld selbst bringt nichts, wie bisher. (b) Vulkan („kein Ertrag") und vom
+Ereignis lahmgelegtes Gelände (Waldbrand, Dürre …) bringen weiter nichts – so stand es auch bei
+der alten Taiga, die im lahmgelegten Wald nichts gab. (c) Bürokratie verdoppelt danach: ein
+Gebirge an der Hauptstadt bringt 2/2/2. (d) Bots haben keine Erträge, ihnen ändert sich nichts.
+
+Das Tutorial spielt Russland mit Taiga: Die vierte Stadt bringt dort jetzt **+5 🌾** statt +4 (das
+Gebirge daneben), und in Runde 4 sind es **20** Nahrung über den Verbrauch statt 19 – beide Texte
+sind angepasst, deutsch und englisch. Kein Test hatte die beiden Zahlen geprüft; `smoke.js` prüft
+sie jetzt gegen die Regelmaschine (Siedelertrag, Gründungskosten, Vorrat, Nahrung über den
+Verbrauch).
+
+Die Wahl der KI im Draft des Marathons zählt für Taiga jetzt Wald und Gebirge um die eigene
+Hauptstadt (je vier Felder ein Punkt, höchstens vier) statt nur den Wald. Der Grundwert (0) ist
+noch der gemessene der alten Taiga – nicht neu gemessen (dafür bräuchte es wieder Hunderte
+Marathonpartien). Die neue Taiga ist stärker, die KI wählt sie im Draft also eher zu selten. Auf
+die Balance gemessen ist die Änderung nicht.
+
+### Abgesichert (v95)
+
+`test.js`: „Züge von KI und Bots nachspielen (v94, v95)" – Bot- und KI-Züge: so viele Szenen wie
+Aktionen im Protokoll, in derselben Reihenfolge, jede mit dem Stand nach ihr, auch zwei gleiche
+hintereinander, je Technologie eine; eine gebaute Folge (wachsen, forschen, wachsen, Macht, Armee,
+forschen, Macht) bleibt sieben Szenen mit je ihrem Ertrag; die genannte Art geht vor (geschenkte
+Armee mit Ring, Kopie, Pentagon mit seinem Satz); eine Aktion, die zweierlei ändert (Wunder und
+Technologie), ist eine Szene mit beidem; alle Sätze deutsch und englisch. Taiga: Wald, Gebirge, Meer 0 → 1, der Rest wie ohne; mit Kunstdünger,
+Segeln, Bewässerung, Landwirtschaft nichts dazu; andere Fähigkeit oder anderes Reich: 0; Vulkan,
+Waldbrand: 0; Leuchtturm: nichts dazu; Bürokratie verdoppelt danach; der Siedelertrag zählt genau
+die gehobenen Felder; die Draftwahl der KI zählt Wald und Gebirge. `smoke.js`: die Auswahl (ab Werk
+Langsam, drei Einträge, gemerkt, das Häkchen von v94 übernommen, englisch), der Takt (Langsam
+1,5 × ANIM_MS, mit Zug 2,1, bei kurzen wie langen Zügen; Schnell 1 bzw. 1,4 und ab 8 Szenen
+gekürzt bis 0,6), „Keine" mit Blatt, „Schnell" und „Langsam" mit Nachspiel, die Tutorialzahlen.
+Gegenproben (je eine Stelle absichtlich falsch, 20 Stück): gezeichnet das Ende des Zugs statt
+der Aktion, die genannte Art übergangen, je ohne Art die geschenkte Armee, das Pentagon und die
+Kopie, Taiga als Zuschlag, Taiga wie bis v94, Taiga im Vulkan, Taiga vor dem Leuchtturm, Taiga im
+lahmgelegten Gelände, die Draftwahl zählt nur den Wald, „baut Straßen" für ein Feld – `test.js`
+schlägt bei jeder an; Langsam so schnell wie Schnell, ab Werk Schnell, das Häkchen von v94
+vergessen, die Auswahl nicht gemerkt, Schnell ohne Kürzen, die Tutorialtexte mit +4 🌾 bzw. 19,
+„Keine" ohne Blatt – `smoke.js` schlägt bei jeder an.
+In Chromium (Einzeldatei; iPad quer und hochkant, Telefon quer und hochkant, dazu englisch): die
+Auswahl in den Einstellungen; je eine Runde gegen drei KI bei „Langsam" und „Schnell", Bild für
+Bild gemessen – Langsam 1,36 s je Szene, mit gezogener Armee 1,9–2,0 s, eine Runde (Runde 3–5)
+17–33 s; Schnell 0,55–0,69 s bei langen Zügen; jede Technologie als eigene Szene („England (KI)
+erforscht Stadtmauern · 2/7"); das Erste Spiel mit Englands Zug als einzelne Aktionen (Runde 2:
+forschen, Armee bauen, ziehen, dann der Kampf); Russland mit Taiga – im Gründungsmodus tragen Wald,
+Gebirge und Meer 1 🌾, das Weltblatt nennt die neue Fähigkeit (deutsch und englisch) – ohne
+Seitenfehler.

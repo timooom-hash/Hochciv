@@ -72,5 +72,11 @@ const E = w.eval(`({ fg: !!S.fg, schritt: S.fg && S.fg.schritt, pfad: S.fg && S.
 console.log('Erstes Spiel:', oben.id, oben.classList.contains('primary') ? 'rot oben' : 'NICHT rot', '|', seite, 'Wege |', E.pfad, '|', E.schritt, '|', E.ziel);
 if (oben.id !== 'm-first' || seite !== 3 || !E.fg || E.pfad !== 'wissenschaft' || !E.panel || !E.ziel)
   { console.log('FEHLER: Erstes Spiel startet nicht wie vorgesehen'); process.exit(1); }
+// Züge von KI und Bots nachspielen (v94, v95): js/anim.js steckt in der Datei, die Auswahl
+// „Animationen" steht in den Einstellungen und steht ab Werk auf „Langsam"
+const A = w.eval(`({ wahl: $('opt-anim') && $('opt-anim').nodeName === 'SELECT' ? [...$('opt-anim').options].map(o => o.value).join('/') : null,
+  stufe: prefs.anim, anim: typeof animSzenen === 'function' && typeof playAnim === 'function' })`);
+console.log('Nachspielen (v95):', A.anim ? 'js/anim.js da' : 'js/anim.js FEHLT', '|', A.wahl ? 'Auswahl ' + A.wahl : 'KEINE Auswahl', '|', 'ab Werk ' + A.stufe);
+if (A.wahl !== 'langsam/schnell/aus' || A.stufe !== 'langsam' || !A.anim) { console.log('FEHLER: Nachspielen der KI- und Bot-Züge fehlt'); process.exit(1); }
 console.log('Fehler:', errs.length ? errs : 'keine');
 process.exit(errs.length?1:0);
