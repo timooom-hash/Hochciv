@@ -5291,3 +5291,199 @@ erforscht Stadtmauern · 2/7"); das Erste Spiel mit Englands Zug als einzelne Ak
 forschen, Armee bauen, ziehen, dann der Kampf); Russland mit Taiga – im Gründungsmodus tragen Wald,
 Gebirge und Meer 1 🌾, das Weltblatt nennt die neue Fähigkeit (deutsch und englisch) – ohne
 Seitenfehler.
+
+## Eisenbahn +4 · gekaufte Felder zählen zur Hauptstadt · Kacheln ohne Bürokratie-Zusatz · Wissenschaftliche Methode zuerst · laufender Vorrat beim Nachspielen (v96)
+
+Fünf Anweisungen des Autors (29.10., auf Englisch, hier übersetzt):
+
+1. „Handelsrouten über Eisenbahn sollen +4 auf alle Erträge bringen, nicht nur +2."
+2. „Per Kolonialismus gekaufte Felder zählen zur Hauptstadt (werden also von der Bürokratie
+   verdoppelt)."
+3. „Die Hinweise auf den Technologiekacheln, dass die Bürokratie xyz verdoppelt, entfernen – in den
+   ausführlichen Beschreibungen auf der Seite ‚Regeln & Technologien' aber behalten."
+4. „Die KI stärker machen, indem sie in einem Zug die Wissenschaftliche Methode vor den anderen
+   Technologien erforscht (da hatte sie eine schlechte Reihenfolge)."
+5. „Bei eingeschalteten Animationen für die KI oben rechts nicht nur das Gesamteinkommen zeigen,
+   sondern einen laufenden Stand (vielleicht mit einem −x, das aufploppt), wann immer sie etwas tut
+   (z. B. weniger Nahrung beim Gründen, weniger Wissenschaft beim Forschen)."
+
+### Eisenbahn +4
+
+`tradeRoutes`: Eine Stadt, die über durchgehende Eisenbahn an der Hauptstadt hängt, bringt +4 auf
+alle drei Erträge (bis v95 +2); über Straße oder eine gemischte Strecke weiter +1, mit Bürokratie
+das Doppelte (+8 bzw. +2). Die Zahlen stehen als `TRADE_ROAD_BONUS` und `TRADE_RAIL_BONUS` in
+`js/data.js`; Regelbogen und Straßenknöpfe („Bewegung kostenlos · Handelsroute +4") lesen sie über
+`%s`, die Tutorialtexte nennen +4 fest (geprüft in `smoke.js`). Im Abschlusstext des Tutorials hieß
+es „eine durchgehende Bahn verdoppelt den Handelsroutenbonus auf +2" – jetzt „hebt den
+Handelsroutenbonus von +1 auf +4".
+
+Die KI bewertet Straßen- und Bahnpläne über das Einkommen, sieht die +4 also von selbst. Der feste
+Zuschlag für die Technologie Eisenbahn (`kiTechBonus`, die Aussicht auf Bahnstrecken, solange noch
+keine liegen) zählt je Stadt, was die Bahn über die Straße hinaus bringt: (4 − 1) statt (2 − 1),
+also das Dreifache. Abgeleitet, nicht eigens gemessen.
+
+### Gekaufte Felder zählen zur Hauptstadt
+
+`tileYieldAt`: Mit Bürokratie bringt ein per Kolonialismus gekauftes Feld das Doppelte, wo es auch
+liegt – im Einkommen, in der Ertragsübersicht (bei seiner Geländeart), in der Unterzeile des
+Feldblatts und auf den Ertragschips des Gründungsmodus. `incomeBreakdown` legt die gekauften
+Felder dafür einmal als Menge an (`pre.kol`, nur mit Bürokratie) – sonst prüfte jedes Feld die
+ganze Liste, und im Marathon hatte ein Reich schon über 200 gekaufte Felder (Abschnitt v86).
+
+Auslegungen (zum Ändern angeboten):
+
+* (a) **Einmal doppelt**, auch wenn ein gekauftes Feld zugleich am Umland der Hauptstadt liegt –
+  im Spiel kaum möglich (gekauft wird nur Herrenloses), aber abgesichert.
+* (b) **Ohne Hauptstadt** (Marathon nach einer Eroberung) zählt es zu nichts: einfach, wie das
+  Umland. Ökologie und Gentechnik verdoppelt die Bürokratie auch dann (so seit v86).
+* (c) **Revolution** („die Hauptstadt produziert diese Runde nichts"): Gekaufte Felder produzieren
+  weiter, mit Bürokratie doppelt – so wie seit v86 Handelsrouten, Ökologie und Gentechnik, die der
+  Autor ebenfalls „zur Hauptstadt" gezählt hat. Wer sie bei einer Revolution ausfallen lassen will:
+  `deadTile` in `incomeBreakdown`.
+* (d) Sonst ändert sich für gekaufte Felder nichts: gründen ohne Siedlerweg, Entfernung als
+  Luftlinie (v84), nicht exklusiv.
+
+Die KI bewertet Kolonien über das Einkommen (`kiValue`), sieht das Doppelte also von selbst; beim
+Vorsortieren (`kiColonySpots`) zählt sie es mit Bürokratie jetzt ebenso. An der Reihenfolge der
+Kandidaten ändert das nichts, nur die Schwelle: Ein Feld mit 1 Ertrag kommt mit Bürokratie in Frage.
+
+### Kacheln ohne Bürokratie-Zusatz
+
+Die Kachel der Bürokratie sagt wieder „Hauptstadt produziert doppelt" (wie der gedruckte Bogen;
+englisch „The capital produces double"). Der Regelbogen („Regeln & Technologien") nennt den ganzen
+Text: „Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und gekaufte Felder".
+Kolonialismus ebenso: die Kachel unverändert, im Regelbogen dazu „Gekaufte Felder zählen zur
+Hauptstadt (mit Bürokratie doppelt)". Umgesetzt als zweites Textfeld `voll` an der Technologie
+(englisch an dritter Stelle in `DATA_EN.tech`), gelesen von `techEffectFull` – nur im Regelbogen;
+der Sprachwechsel trägt es mit (`applyDataLang`, `snapshotGerman`). Der Satz „Mit Bürokratie zählt
+das doppelt." hinter den Handelsrouten im Regelbogen bleibt.
+
+Auslegung: „Kacheln" heißt alles, was eine Technologie knapp anbietet – der Bogen (auch in der
+Legephase und im Draft), die Knöpfe unter „Fähigkeiten" (Freie Forschung, Rückschau, Kopieren,
+Wunder-Technologie) und das Fenster der Wunder-Technologien. Den ganzen Text hat nur der Regelbogen.
+
+### Wissenschaftliche Methode zuerst
+
+**Nachgestellt** (v95, KI Schwer gegen sich selbst, Plättchenkarte, die Startwerte von
+`tools_ki.js selbst`): In 40 Duellen zahlte die KI in 23 Zügen Technologien, während die Methode
+schon verfügbar war, und erforschte sie erst danach – 206 Wissenschaft verschenkt (der Rabatt, den
+die Technologien davor mit ihr gehabt hätten). In 37 weiteren Zügen war die Methode verfügbar **und
+bezahlbar** und blieb liegen, während andere Technologien voll bezahlt wurden (446 Wissenschaft
+Rabatt verpasst). Zu viert (20 Partien) 8 Züge (66) bzw. 20 Züge (172). (Gezählt mit den Regeln
+von v96 außer der Planerregel; die erste Nachstellung im Kommentar an `kiMethodeZuerst` – 18 von 35
+Zügen, 154 Wissenschaft – lief noch mit den Regeln von v95 und zählte gröber: jede Technologie vor
+der Methode, auch die, die sie erst verfügbar machte.)
+
+**Ursache:** Der Planer (`kiPlan`) wählt je Schritt die Aktion mit dem besten Nutzen je Kosten und
+bündelt dahinter, was fast so gut ist. Dass die Methode alles danach verbilligt, sieht diese
+Rechnung nicht: Ihr Nutzen ist der feste Zuschlag in `kiTechBonus`, ihre Kosten 15 – billige oder
+einträgliche Technologien hatten das bessere Verhältnis und kamen zuerst. Ein zweiter Weg: Die
+erste Technologie eines Zeitalters würfelt das nächste aus. Macht eine Forschung die Methode erst
+verfügbar, lief das schon geplante Bündel weiter und bezahlte noch Technologien zum vollen Preis.
+
+**Jetzt** (`kiMethodeZuerst`, `kiMethodeOffen`, `kiImBuendel` in `js/ki.js`):
+
+* Bezahlt ein Planungsschritt eine Technologie – als beste Aktion oder gebündelt – und lohnt die
+  Methode für sich (sie steht unter den bewerteten Kandidaten, Nutzen > 0), kommt sie zuerst: auf
+  dem Weg mit dem besten Verhältnis, den der Planer gefunden hat (bezahlt, Freie Forschung,
+  Rückschau, Wunder-Technologie, Kopie). Danach plant er neu, mit den neuen Preisen.
+* Macht eine Forschung die Methode eben erst verfügbar, bricht das Bündel ab und der Planer plant
+  neu – die Methode kommt damit gleich nach der Technologie, die sie freigeschaltet hat.
+* Alle Stufen: Wer weniger sieht (Leicht, `see`), übersieht auch die Methode öfter.
+* Abgeschaltet (beide Haken liefern nichts) plant `kiPlan` wie bis v95: einmal nachgeprüft an
+  zwölf Partien mit allen Stufen, zu zweit und zu viert – Zeichen für Zeichen dieselben Protokolle
+  wie der Planer von v95.
+
+Danach (dieselben Startwerte): In Zügen mit der Methode bezahlte die KI keine Technologie mehr,
+während die Methode schon verfügbar war (Duell 0, zu viert 0); dass sie bezahlbar liegen blieb,
+während anderes bezahlt wurde, kam im Duell nicht mehr vor, zu viert einmal (4 Wissenschaft
+Rabatt) – nach der Regel heißt das, ihr eigener Nutzen war dort nicht positiv (nicht einzeln
+nachgesehen). Was bleibt: Die Technologie,
+die die Methode erst freischaltet, kommt zwangsläufig vor ihr – und was davor im selben Zug
+erforscht wurde, als sie noch gar nicht verfügbar war (dafür müsste die KI vorausplanen, dass eine
+Forschung des Mittelalters die Methode auswürfeln könnte – 50 %).
+
+**Gemessen** (`node tools_ki.js methode …`, KI Schwer, gepaart: jeder Startwert zweimal, die
+Fassungen tauschen die Plätze, zu viert zwei gegen zwei; dieselben Regeln von v96 für beide):
+
+| | Siege v96 : bis v95 | Technologien nach Runde 4 je Reich | Wissenschaft in der Forschung |
+|---|---|---|---|
+| Duell, 1200 Partien | 619 : 581 (51,7 %, z = 1,15) | 14,58 : 13,87 (+0,70 ± 0,19) | 190 223 : 193 294 |
+| zu viert, 400 Partien | 217 : 183 (54,3 %, z = 1,70) | 13,78 : 13,17 (+0,61 ± 0,26) | 73 336 : 73 614 |
+
+(z: Abstand der Siege von der Hälfte in Standardabweichungen; „±": Standardfehler des
+Unterschieds, die Reiche grob als unabhängig gezählt.) Im Duell gewinnt der Startspieler drei von
+vier Partien (917 von 1200), das überdeckt viel: Wer beginnt, gewinnt mit v96 468 von 600, mit der
+Fassung bis v95 449. Beide Spielarten liegen in dieselbe Richtung, jede für sich im Rauschen;
+zusammengenommen gut eineinhalb bis zwei Standardabweichungen (p ≈ 0,04–0,07, je nach Gewichtung)
+– die KI ist wahrscheinlich etwas stärker, aber nur wenig. Klar ist der Unterschied in der
+Forschung: gut eine halbe Technologie mehr nach Runde 4 (im Duell 3,7 Standardfehler) bei etwas
+weniger eingesetzter Wissenschaft. Rechenzeit: Wird die Methode vorgezogen, plant die KI einen Schritt mehr; in den
+Messreihen (beide Fassungen zusammen) lag ein KI-Zug im Median bei 18–27 ms, der längste bei 1,6 s
+(zu viert) – nicht getrennt nach Fassung gemessen.
+
+**Die Stufen gegen Bots** (`node tools_ki.js duell 80 …`, dieselben Startwerte in v95 und v96 –
+also mit allen Änderungen von v96, nicht nur der Reihenfolge): Leicht gegen Prinz 63 → 61 von 80,
+Mittel gegen König 49 → 56, Schwer gegen David 43 → 46. Alles im Rauschen von 80 Partien (eine
+Standardabweichung gut 4 Siege); die Einordnung der Stufen (Leicht zwischen Prinz und König, Mittel
+etwas über König, Schwer etwas über David) gilt weiter.
+
+### Laufender Vorrat beim Nachspielen
+
+Bis v95 zeigte die Kopfzeile während der Szenen eines KI- oder Bot-Zugs den ganzen Zug lang, was
+das Reich zu Zugbeginn hatte – sein Einkommen (gezeichnet wurde die Kopfzeile zuletzt vor dem Zug;
+ausgegeben war da schon alles, gezeigt wurde es erst nach dem Nachspiel). Jetzt (`hudStand` in
+`js/ui.js`, `animKopf` in `js/anim.js`):
+
+* Je Szene zeigen Wissenschaft, Nahrung, Münzen und Macht den Stand nach ihrer Aktion, die
+  Bevölkerung in der Zeile darunter ebenso. Gründen für 5 Nahrung mit 3 im Vorrat: Nahrung −3,
+  Münzen −2; Forschen: Wissenschaft (und, wo Münzen einspringen, Münzen); Macht kaufen: Münzen
+  weniger, Macht mehr.
+* Unter jedem Kästchen, das sich ändert, erscheint eine Marke – „−3" rot, „+7" grün (Sklaverei,
+  gekaufte Macht) – und vergeht mit der Szene (Dauer = Takt der Szene). Unter dem Kästchen, nicht
+  darüber: oben ist der Rand des Bildschirms. Wer reduzierte Bewegung eingestellt hat, sieht die
+  Marke ohne Bewegung, bis die Szene wechselt.
+* Nach dem Nachspiel – auch beim Überspringen – steht wieder der Spielstand da (`endAnim` →
+  `hudStand`). Ein Neuzeichnen mitten in der Szene zeigt weiter ihren Stand.
+* Dafür trägt jedes Bild der Aufnahme seinen eigenen Vorrat: `animSnap` kopiert `res`. Bis v95
+  teilten sich alle Bilder den lebenden Vorrat – unsichtbar, weil ihn nichts las.
+
+Auslegungen (zum Ändern angeboten): (a) Die Zahl springt mit Beginn der Szene auf den Stand danach,
+die Marke erklärt den Sprung; den Stand zu Zugbeginn sieht man damit nur für einen Augenblick (die
+Kopfzeile zeigt ihn vor der ersten Szene). Eine Szene „Einkommen" vorweg (+12 🔬 +15 🌾 …) wäre
+möglich, verlängerte aber jeden Zug. (b) Auch die Macht läuft mit (bei Bots ist sie ihre
+Bevölkerung – die einzige Zahl, die sich bei ihnen bewegt; Bots zahlen nichts). (c) Gilt auch für
+Englands Drehbuch im Ersten Spiel – es zahlt wie ein Mensch.
+
+### Abgesichert (v96)
+
+`test.js`: Handelsroute Straße +1, Eisenbahn +4 (auch die Konstanten), zweimal +8, mit Bürokratie
++8, Revolution, Regelbogen-Block mit +4/+8, die Vergleichsfassung von v82 mit den Konstanten;
+gekaufte Felder: ohne Bürokratie einfach, mit doppelt (Einkommen und `tileYieldAt`), das
+Nachbarfeld einfach, gekauft und Umland nur doppelt, Revolution doppelt, ohne Hauptstadt einfach,
+Zeilen und Summe, die Kandidaten der KI; Texte: Kachel der Bürokratie kurz (deutsch und englisch),
+der ganze Text im Regelbogen, keine Kachel nennt die Bürokratie, `voll` genau bei Bürokratie und
+Kolonialismus und englisch genauso, der ganze Text beginnt mit der Kachel, Sprachwechsel hin und
+zurück; KI: in einer gebauten Lage die Methode zuerst und alles danach mit Rabatt, in einer zweiten
+die Methode gleich nach der Technologie, die sie freischaltet – mit abgeschalteten Haken jeweils
+später (Gegenprobe im Test); Nachspielen: jedes Bild mit eigenem Vorrat, `animKopf` nur mit
+Geändertem, zwölf KI-Züge lückenlos von Zugbeginn bis Zugende, Bots ohne Vorratsänderung.
+`smoke.js`: Ertragsübersicht +4/+8; Tutorial (Straßenschritt lang und kurz, Abschlusstext) und
+Kurzregeln mit +1/+4; „v96: Kacheln …" – Kacheln, Regelbogen, Straßenknöpfe, deutsch und englisch,
+Zurückschalten; „v96: laufender Vorrat …" – je Szene Zahlen und Marken (Art, Farbe, Kästchen),
+Bevölkerung, ein Neuzeichnen mittendrin, nach dem Nachspiel und nach dem Überspringen der richtige
+Stand ohne Marken, reduzierte Bewegung, Dauer der Marke, ein Gewinn grün mit „+" (Münzen, Macht).
+Gegenproben (je eine Stelle absichtlich falsch, 18 Stück): Eisenbahn wieder +2 (in der Regel, nur
+am Straßenknopf, nur im Tutorialtext), gekaufte Felder nicht doppelt, nur ohne `pre` doppelt,
+gekauft am Umland vierfach, ohne Hauptstadt doppelt, bei Revolution still, die Kachel der
+Bürokratie wieder lang, der Regelbogen ohne den ganzen Text, der Sprachwechsel ohne `voll`, die
+Methode nicht vorgezogen, nach dem Freischalten nicht neu geplant, Bilder mit geteiltem Vorrat,
+die Kopfzeile im Nachspiel mit dem Endstand, keine Marken, Marken bleiben nach dem Nachspiel
+stehen, „−" auch bei Gewinn – `test.js` bzw. `smoke.js` schlagen bei jeder an. Zwei davon blieben
+im ersten Anlauf grün und haben die Tests verbessert: Das Vierfache war so eingebaut, dass es nie
+greifen konnte (Probe falsch), und das Vorzeichen fiel nicht auf, weil der nachgespielte KI-Zug
+nur ausgab – `smoke.js` spielt jetzt eigens eine Szene mit Gewinn nach.
+In Chromium (iPad quer und hochkant, Telefon quer, deutsch und englisch): eine Runde gegen drei KI
+bei „Langsam" – die Kopfzeile zählt Szene für Szene herunter, die Marken stehen unter den
+Kästchen (hochkant mitgedreht); der Technologiebogen mit der kurzen Kachel der Bürokratie, der
+Regelbogen mit beiden ganzen Texten – ohne Seitenfehler.

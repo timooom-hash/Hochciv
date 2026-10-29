@@ -1376,7 +1376,7 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   if (JSON.stringify(z1.y) !== '[1,1,1]') throw new Error('falscher Bonus: ' + JSON.stringify(z1.y));
   S.roads[G('key')(nb[0], nb[1])] = 2;
   const z2 = zeile();
-  if (JSON.stringify(z2.y) !== '[2,2,2]') throw new Error('Eisenbahn gibt nicht +2');
+  if (JSON.stringify(z2.y) !== '[4,4,4]') throw new Error('Eisenbahn gibt nicht +4 (v96): ' + JSON.stringify(z2.y));
   // Und im Forschungsbogen muss die Zeile sichtbar sein
   $('a-tech').onclick();
   if (!/Handelsrouten/.test($('ov-body').textContent))
@@ -1385,7 +1385,7 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   /* Bürokratie verdoppelt sie (v86). Seit v88 (Anweisung des Autors) sagt die Übersicht das
      nicht mehr dazu: die Zeile heißt einfach „Handelsrouten", auch auf Englisch. */
   p.techs.buerokratie = true;
-  if (JSON.stringify(zeile().y) !== '[4,4,4]') throw new Error('Bürokratie verdoppelt die Handelsroute nicht: ' + JSON.stringify(zeile().y));
+  if (JSON.stringify(zeile().y) !== '[8,8,8]') throw new Error('Bürokratie verdoppelt die Handelsroute nicht: ' + JSON.stringify(zeile().y));
   const uebersicht = () => {
     $('a-tech').onclick();
     const reihen = [...$('ov-body').querySelectorAll('.yield-panel .yrow')]
@@ -1395,7 +1395,7 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
   };
   const de = uebersicht(), tr = de.find(([n]) => /Handelsrouten/.test(n));
   if (!tr || tr[0] !== 'Handelsrouten') throw new Error('Zeile heißt nicht schlicht „Handelsrouten": ' + de.map(r => r[0]).join(' | '));
-  if ((tr[1].match(/4/g) || []).length !== 3) throw new Error('Zeile zeigt nicht dreimal +4: ' + tr[1]);
+  if ((tr[1].match(/8/g) || []).length !== 3) throw new Error('Zeile zeigt nicht dreimal +8: ' + tr[1]);
   if (de.some(([n]) => /Bürokratie/.test(n))) throw new Error('eine Zeile nennt die Bürokratie: ' + de.map(r => r[0]).join(' | '));
   G('switchLang')('en');
   try {
@@ -1407,7 +1407,7 @@ step('Handelsrouten erscheinen in der Ertragsübersicht (neue Regel)', () => {
     if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));
   } finally { G('switchLang')('de'); }
   delete p.techs.buerokratie;
-  console.log('       Straße +1, Eisenbahn +2, mit Bürokratie +4 ohne Zusatz am Namen, Zeile im Forschungsbogen sichtbar (DE/EN)');
+  console.log('       Straße +1, Eisenbahn +4 (v96), mit Bürokratie +8 ohne Zusatz am Namen, Zeile im Forschungsbogen sichtbar (DE/EN)');
 });
 step('Zurückblättern springt nicht sofort wieder vor', () => {
   G('tutorialStart')();
@@ -1459,7 +1459,11 @@ step('Tutorialtext erklärt die Handelsrouten', () => {
   G('ui').tut.i = idx; G('tutEnter')();
   const t = schritt.html().replace(/<[^>]+>/g, ' ');
   if (!/Handelsrouten/.test(t)) throw new Error('Handelsrouten werden nicht erklärt');
-  if (!/\+2/.test(t) || !/\+1/.test(t)) throw new Error('die beiden Stufen fehlen');
+  // die beiden Stufen, wie die Regel sie rechnet (v96: Eisenbahn +4 statt +2)
+  const bahn = '+' + G('TRADE_RAIL_BONUS'), weg = '+' + G('TRADE_ROAD_BONUS');
+  if (!t.includes(bahn) || !t.includes(weg) || /\+2\b/.test(t)) throw new Error('die beiden Stufen fehlen oder +2 steht noch da: ' + bahn + '/' + weg);
+  const kurz = schritt.kurz().replace(/<[^>]+>/g, ' ');
+  if (!kurz.includes('Eisenbahn ' + bahn)) throw new Error('kurze Fassung: ' + kurz);
   if (!/Eisenbahn/.test(t)) throw new Error('Eisenbahn nicht erwähnt');
   // Im Abschlusstext soll die Erklärung NICHT mehr stehen
   const letzterT = G('TUT_STEPS')[G('TUT_STEPS').length - 1].html().replace(/<[^>]+>/g, ' ');
@@ -1470,8 +1474,15 @@ step('Tutorialtext erklärt die Handelsrouten', () => {
   G('rulesModal')();
   if (!/Handelsrouten/.test($('ov-body').textContent))
     throw new Error('Kurzregeln erwähnen die Handelsrouten nicht');
+  if (!$('ov-body').textContent.includes(`bringt ${weg} auf alle drei Erträge – über eine reine Eisenbahn ${bahn}.`))
+    throw new Error('Kurzregeln nennen die Stufen nicht wie die Regel');
   G('closeModal')();
-  console.log('       Abschlusstext und Kurzregeln nennen beide Stufen');
+  // Auch der Abschlusstext des Tutorials (lang und kurz) nennt die Bahn mit +4
+  const ende = G('TUT_STEPS')[G('TUT_STEPS').length - 1];
+  const endeTexte = [ende.html(), typeof ende.kurz === 'function' ? ende.kurz() : ''].map(x => x.replace(/<[^>]+>/g, ' '));
+  if (endeTexte.some(x => /Handelsroute(nbonus)? (auf )?\+2|\(Handelsroute \+2\)/.test(x)) || !endeTexte.every(x => x.includes(bahn)))
+    throw new Error('Abschlusstext: ' + endeTexte.map(x => x.slice(0, 80)).join(' | '));
+  console.log('       Straßenschritt (lang und kurz), Abschlusstext und Kurzregeln nennen beide Stufen: Straße ' + weg + ', Eisenbahn ' + bahn);
 });
 step('Techbogen zeigt, was andere Menschen erforschen könnten', () => {
   // Zwei Menschen aufsetzen: der Aufbau macht nur den ersten zum Menschen
@@ -4650,6 +4661,159 @@ step('v94: Erstes Spiel – Englands Zug auf der Karte, das Panel sagt es, dann 
     if (fgSpieleBis('ende') !== 'ende' || !G('S').over) throw new Error('kein Ende: ' + fgId());
     if (!/^Militärsieg/.test(G('S').over.how)) throw new Error(G('S').over.how);
     G('closeModal')();
+  });
+});
+
+/* ======================================================= v96
+   Anweisungen des Autors: Eisenbahn +4, gekaufte Felder zählen zur Hauptstadt, Kacheln ohne die
+   Hinweise, was die Bürokratie mitverdoppelt (im Regelbogen bleiben sie), laufender Stand in der
+   Kopfzeile, solange KI und Bots nachgespielt werden. */
+step('v96: Kacheln nennen die Bürokratie nicht – der Regelbogen nennt alles; Straßenknöpfe mit +1/+4; deutsch und englisch', () => {
+  frischesSpiel();
+  const S = G('S'), pi = S.cur, p = G('P')(S), TB = G('TECH_BY_KEY');
+  const pruefen = sprache => {
+    bogenMitWissenschaft();
+    const kacheln = [...$('ov-body').querySelectorAll('.techgrid .tech')].map(b => [b.querySelector('b').textContent, b.querySelector('.eff').textContent]);
+    G('closeModal')();
+    const kachel = k => (kacheln.find(([n]) => n === TB[k].n) || [])[1];
+    if (kachel('buerokratie') !== TB.buerokratie.e || kachel('kolonialismus') !== TB.kolonialismus.e)
+      throw new Error(sprache + ' Kacheln: ' + kachel('buerokratie') + ' | ' + kachel('kolonialismus'));
+    if (kacheln.some(([, e]) => /Bürokratie|Bureaucracy/.test(e))) throw new Error(sprache + ': eine Kachel nennt die Bürokratie');
+    G('rulesModal')();
+    const regel = [...$('ov-body').querySelectorAll('.rule-tech')].map(d => [d.querySelector('b').textContent, d.querySelector('i').textContent]);
+    G('closeModal')();
+    const zeile = k => (regel.find(([n]) => n === TB[k].n) || [])[1];
+    if (zeile('buerokratie') !== TB.buerokratie.voll || zeile('kolonialismus') !== TB.kolonialismus.voll || zeile('mathematik') !== TB.mathematik.e)
+      throw new Error(sprache + ' Regelbogen: ' + zeile('buerokratie') + ' | ' + zeile('kolonialismus'));
+    return [kachel('buerokratie'), zeile('buerokratie')];
+  };
+  const de = pruefen('deutsch');
+  if (de[0] !== 'Hauptstadt produziert doppelt' || !/Handelsrouten, Ökologie, Gentechnik und gekaufte Felder/.test(de[1])) throw new Error('deutsch: ' + de.join(' | '));
+  // Straßenknöpfe: die Zuschläge der Regel
+  p.techs.rad = true; p.techs.eisenbahn = true; p.res.coins = 20;
+  const cap = G('capitalOf')(S, pi);
+  const feld = G('neighbors')(cap.r, cap.c).find(([r, c]) => G('isLand')(S, r, c) && !G('cityAt')(S, r, c) && G('roadLevel')(S, r, c) === 0);
+  G('tapHex')(feld[0], feld[1]);
+  const knoepfe = () => [...$('sheet-body').querySelectorAll('.opt')].filter(b => /bauen/.test(b.dataset.label || '')).map(b => b.querySelector('small').textContent);
+  const k = knoepfe();
+  if (k.join(' / ') !== 'Bewegung ½ Punkt · Handelsroute +1 / Bewegung kostenlos · Handelsroute +4') throw new Error('Straßenknöpfe: ' + k.join(' / '));
+  G('closeSheet')();
+  G('clearMissing')();
+  G('switchLang')('en');
+  let en, ken;
+  try {
+    en = pruefen('englisch');
+    G('tapHex')(feld[0], feld[1]); ken = knoepfe(); G('closeSheet')();
+    if (G('missingStrings')().length) throw new Error('ohne Übersetzung: ' + G('missingStrings')().slice(0, 3).join(' | '));
+  } finally { G('switchLang')('de'); }
+  if (en[0] !== 'The capital produces double' || !/trade routes, ecology, genetic engineering and bought tiles/.test(en[1])) throw new Error('englisch: ' + en.join(' | '));
+  if (ken.join(' / ') !== 'movement ½ point · trade route +1 / movement free · trade route +4') throw new Error('englisch, Straßenknöpfe: ' + ken.join(' / '));
+  // zurück auf Deutsch: wieder die deutschen Texte (der Sprachwechsel trägt auch `voll`)
+  if (TB.buerokratie.voll !== de[1]) throw new Error('nach dem Zurückschalten: ' + TB.buerokratie.voll);
+  console.log(`       Kachel „${de[0]}" · Regelbogen „${de[1]}" · englisch „${en[0]}" · Knöpfe ${k.join(' / ')}`);
+});
+step('v96: laufender Vorrat in der Kopfzeile – je Szene der Stand danach und ein −x/+x am Kästchen; danach der echte Stand', () => {
+  mitAnimation(100000, () => {
+    // ein Mensch (beginnt) gegen drei KI auf der Originalkarte, ohne Ereignisse
+    $('m-new').onclick();
+    $('setup-mode').querySelector('[data-mode=vier]').onclick();
+    $('setup-map').value = '0'; $('setup-map').onchange();
+    $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
+    [1, 2, 3].forEach(i => $('setup-list').children[i].querySelector('[data-kind="ki"]').onclick());
+    $('setup-start').value = '0'; $('setup-start').onchange();
+    const mitEreignis = $('setup-events').checked;
+    $('setup-events').checked = false; $('setup-events').onchange();
+    $('setup-go').onclick();
+    $('setup-events').checked = mitEreignis; $('setup-events').onchange();
+    const S = G('S'), pi = S.cur;
+    if (S.players[pi].kind !== 'human') throw new Error('der Mensch beginnt nicht');
+    $('a-end').onclick();
+    if (!G('ui').anim && S.cur === pi) $('a-end').onclick();
+    const a = G('ui').anim;
+    if (!a || S.players[S.cur].kind !== 'ki') throw new Error('kein Nachspiel eines KI-Zugs');
+    const marken = () => [...$('screen-game').querySelectorAll('.hud-res .res-delta')]
+      .map(m => m.dataset.k + ':' + m.textContent + ':' + (m.classList.contains('minus') ? 'rot' : 'gruen') + ':' + m.parentElement.querySelector('b').id);
+    const id = { sci: 'hud-sci', food: 'hud-food', coins: 'hud-coins', power: 'hud-power' };
+    const zahlen = () => ['hud-sci', 'hud-food', 'hud-coins', 'hud-power'].map(x => $(x).textContent).join('/');
+    const bericht = [];
+    let mitMarke = 0;
+    for (let i = 0; i < a.szenen.length; i++) {
+      const s = a.szenen[i], k = G('animKopf')(S, s);
+      const soll = [k.nach.sci, k.nach.food + (k.nach.deficit ? ` (−${k.nach.deficit})` : ''), k.nach.coins, k.nach.power].join('/');
+      if (zahlen() !== soll) throw new Error(`Szene ${i + 1} (${s.art}): Kopfzeile ${zahlen()} statt ${soll}`);
+      const sollM = ['sci', 'food', 'coins', 'power'].filter(x => k.delta[x])
+        .map(x => `${x}:${k.delta[x] < 0 ? '−' : '+'}${Math.abs(k.delta[x])}:${k.delta[x] < 0 ? 'rot' : 'gruen'}:${id[x]}`);
+      if (marken().join() !== sollM.join()) throw new Error(`Szene ${i + 1} (${s.art}): Marken ${marken().join()} statt ${sollM.join()}`);
+      // die Bevölkerung in der Zeile darunter läuft mit
+      if (!$('hud-round').textContent.includes(`Bevölkerung ${k.pop}/${k.welt}`)) throw new Error('Bevölkerung: ' + $('hud-round').textContent);
+      if (sollM.length) mitMarke++;
+      bericht.push(s.art + (sollM.length ? ' ' + sollM.map(x => x.split(':').slice(0, 2).join('')).join(' ') : ''));
+      // ein Neuzeichnen zwischendurch zeigt weiter den Stand der Szene
+      G('redraw')();
+      if (zahlen() !== soll) throw new Error('nach redraw: ' + zahlen());
+      G('animNext')();
+    }
+    if (!mitMarke) throw new Error('keine Szene mit Ausgaben');
+    // der nächste KI-Zug läuft schon – ein Tipp je Zug, dann ist der Mensch wieder dran
+    let guard = 0;
+    while ((G('ui').anim || G('ui').combat) && guard++ < 12) G('tapHex')(0, 0);
+    if (S.cur !== pi) throw new Error('nicht wieder dran');
+    const p = S.players[pi];
+    if (marken().length || zahlen() !== [p.res.sci, p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : ''), p.res.coins, G('powerOf')(S, pi)].join('/'))
+      throw new Error('danach: ' + marken().join() + ' · ' + zahlen());
+    // Überspringen mitten im Zug: danach steht, was jetzt dran ist – die erste Szene der nächsten KI
+    // samt ihren Marken, oder (ganz am Ende) wieder der eigene Stand ohne Marken
+    const jetzt = () => {
+      const c = G('ui').anim;
+      if (c) {
+        const k = G('animKopf')(S, c.szenen[c.i]);
+        return [[k.nach.sci, k.nach.food + (k.nach.deficit ? ` (−${k.nach.deficit})` : ''), k.nach.coins, k.nach.power].join('/'),
+          Object.keys(k.delta).length];
+      }
+      const x = G('P')(S);
+      return [[x.res.sci, x.res.food + (x.foodDeficit ? ` (−${x.foodDeficit})` : ''), x.res.coins, G('powerOf')(S, S.cur)].join('/'), 0];
+    };
+    $('a-end').onclick();
+    if (!G('ui').anim && S.cur === pi) $('a-end').onclick();
+    if (!G('ui').anim) throw new Error('kein zweites Nachspiel');
+    guard = 0;
+    let uebersprungen = 0;
+    while (G('ui').anim && guard++ < 12) {
+      G('animNext')();                                        // eine Szene weiter, dann überspringen
+      if (!G('ui').anim) break;
+      G('endAnim')();
+      uebersprungen++;
+      const [soll, n] = jetzt();
+      if (zahlen() !== soll || marken().length !== n) throw new Error(`nach dem Überspringen: ${zahlen()} statt ${soll}, ${marken().length} Marken statt ${n}`);
+    }
+    while (G('ui').combat && guard++ < 24) G('tapHex')(0, 0);
+    if (!uebersprungen || S.cur !== pi || marken().length || zahlen() !== jetzt()[0]) throw new Error('am Ende: ' + zahlen() + ' / ' + marken().join());
+    // Reduzierte Bewegung: die Marke steht still; die Dauer folgt dem Takt der Szene
+    const mm = window.matchMedia;
+    const mitAusgabe = a.szenen.find(s => Object.keys(G('animKopf')(S, s).delta).length);
+    G('playAnim')([mitAusgabe], () => { });
+    const dauer = $('screen-game').querySelector('.res-delta').style.animationDuration;
+    G('endAnim')();
+    window.matchMedia = qy => ({ matches: /reduce/.test(qy) });
+    try {
+      G('playAnim')([mitAusgabe], () => { });
+      const still = [...$('screen-game').querySelectorAll('.res-delta')];
+      if (!still.length || still.some(m => !m.classList.contains('still') || m.style.animationDuration)) throw new Error('reduzierte Bewegung: ' + still.map(m => m.className).join());
+      G('endAnim')();
+    } finally { window.matchMedia = mm; }
+    if (dauer !== Math.round(G('ANIM_MS') * mitAusgabe.tempo * (mitAusgabe.zuege.length ? 1.4 : 1)) + 'ms') throw new Error('Dauer der Marke: ' + dauer);
+    // Was eine Aktion bringt, steht grün mit „+" da: Münzen aus der Sklaverei, gekaufte Macht (gegen Münzen)
+    const ki = S.players.findIndex(x => x.kind === 'ki'), kp = S.players[ki];
+    const vorG = G('animSnap')(S);
+    kp.res.coins += 7; kp.power += 2;
+    const nachG = G('animSnap')(S);
+    kp.res.coins -= 7; kp.power -= 2;
+    const gewinn = G('animSzenen')({ vor: vorG, bilder: [{ m: 'x', snap: nachG }] }, ki);
+    G('playAnim')(gewinn, () => { });
+    const gm = marken();
+    G('endAnim')();
+    if (!gm.includes('coins:+7:gruen:hud-coins') || !gm.includes('power:+2:gruen:hud-power')) throw new Error('Gewinn: ' + gm.join());
+    console.log(`       ${werIst(a.szenen[0].pi)}: ${bericht.join(' · ')} · danach wieder der eigene Stand`);
   });
 });
 
