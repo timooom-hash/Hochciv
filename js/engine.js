@@ -478,16 +478,24 @@ function tileYield(S, pi, t) {
   return y;
 }
 /* Ertrag eines konkreten Feldes: wie tileYield, aber mit Bürokratie –
-   die verdoppelt alles, was die Hauptstadt produziert, also auch ihr Umland. */
+   die verdoppelt alles, was die Hauptstadt produziert, also auch ihr Umland.
+   Seit v96 (Anweisung des Autors) zählen per Kolonialismus gekaufte Felder zur Hauptstadt:
+   Mit Bürokratie bringen sie ebenfalls das Doppelte, wo auch immer sie liegen – einmal, auch
+   wenn ein solches Feld zugleich an die Hauptstadt grenzt. Ohne Hauptstadt (Marathon nach
+   einer Eroberung) gibt es nichts, wozu sie zählen könnten: dann nicht doppelt, wie das
+   Umland. Bei einer Revolution produzieren sie weiter (wie Handelsrouten seit v86, siehe
+   incomeBreakdown) – sie hängen nicht am Umland der Hauptstadt. */
 // `pre` (v86, Tempo): für viele Felder hintereinander (incomeBreakdown) – Hauptstadt einmal
-// gesucht, der Ertrag je Geländeart einmal gerechnet. Ohne `pre` wie bisher.
+// gesucht, der Ertrag je Geländeart einmal gerechnet, seit v96 die gekauften Felder einmal als
+// Menge (`kol`, nur mit Bürokratie). Ohne `pre` wie bisher.
 function tileYieldAt(S, pi, r, c, pre) {
   const p = S.players[pi];
   const t = terrainAt(S, r, c);
   const y = pre ? (pre.y[t] || (pre.y[t] = tileYield(S, pi, t))).slice() : tileYield(S, pi, t);
   if (has(p, 'buerokratie')) {
     const cap = pre ? pre.cap : capitalOf(S, pi);
-    if (cap && hexDistance(cap.r, cap.c, r, c) === 1) return y.map(n => n * 2);
+    if (cap && (hexDistance(cap.r, cap.c, r, c) === 1 ||
+      (pre && pre.kol ? pre.kol.has(key(r, c)) : isColony(S, pi, r, c)))) return y.map(n => n * 2);
   }
   return y;
 }
@@ -573,7 +581,8 @@ function incomeBreakdown(S, pi) {
   // Feld nicht zusätzlich an eine andere eigene Stadt grenzt.
   const deadTile = (r, c) => revolution && cap && hexDistance(cap.r, cap.c, r, c) === 1 &&
     !citiesOf(S, pi).some(ct => !ct.cap && hexDistance(ct.r, ct.c, r, c) === 1);
-  const pre = { cap, y: {} };              // tileYieldAt: Hauptstadt und Geländeertrag einmal (v86)
+  // tileYieldAt: Hauptstadt und Geländeertrag einmal (v86), die gekauften Felder als Menge (v96)
+  const pre = { cap, y: {}, kol: has(p, 'buerokratie') ? new Set(S.bought[pi] || []) : null };
   for (const k of controlledTiles(S, pi)) {
     const [r, c] = unkey(k);
     if (deadTile(r, c)) continue;
@@ -590,7 +599,8 @@ function incomeBreakdown(S, pi) {
   const py = cityPopYield(S, pi);
   /* Bürokratie: die Hauptstadt produziert doppelt – ihre Felder (tileYieldAt), ihre
      Bevölkerung und seit v86 (Anweisung des Autors: „sie gehören eigentlich zur Hauptstadt")
-     auch Handelsrouten, Ökologie und der Nahrungsposten der Gentechnik, jeweils ganz. */
+     auch Handelsrouten, Ökologie und der Nahrungsposten der Gentechnik, jeweils ganz; seit
+     v96 auch die gekauften Felder (Kolonialismus, ebenfalls in tileYieldAt). */
   const buro = has(p, 'buerokratie') ? 2 : 1;
   let pop = 0, pyy = [0, 0, 0], sea = 0, ecoPop = 0;
   for (const city of citiesOf(S, pi)) {
@@ -617,8 +627,8 @@ function incomeBreakdown(S, pi) {
     name: T('Städte am Meer'), glyph: '⚓', count: sea,
     y: [SEA_CITY_BONUS * sea, SEA_CITY_BONUS * sea, SEA_CITY_BONUS * sea],
   });
-  // Handelsrouten: Städte, die über Straßen (+1) oder durchgehend Eisenbahn (+2) an
-  // der Hauptstadt hängen. Grundregel, gilt also auch für Bots.
+  // Handelsrouten: Städte, die über Straßen (+1) oder durchgehend Eisenbahn (+4, bis v95 +2)
+  // an der Hauptstadt hängen. Grundregel, gilt also auch für Bots.
   // Mit Bürokratie doppelt (v86). Die Übersicht sagt seit v88 nicht mehr dazu, warum
   // (Anweisung des Autors; v86/v87 hing „(Bürokratie ×2)" am Zeilennamen).
   const tr = tradeRoutes(S, pi);
@@ -1061,7 +1071,8 @@ function moveCost(S, r1, c1, r2, c2) {
 /* ------------------------------------------------------------ Handelsrouten
    Jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg aus
    Straßen mit ihr verbunden ist, bringt +1 auf alle drei Erträge; ist der Weg
-   durchgehend Eisenbahn, +2.
+   durchgehend Eisenbahn, +4 (seit v96, Anweisung des Autors; bis v95 +2) –
+   TRADE_ROAD_BONUS und TRADE_RAIL_BONUS in data.js.
 
    Umgesetzt als zwei getrennte Suchen von der Hauptstadt aus – einmal nur über
    Felder mit Eisenbahn, einmal über Felder mit mindestens Straße. Damit ergibt sich
@@ -1116,8 +1127,8 @@ function tradeRoutes(S, pi) {
   const perBahn = erreichbar(2), perWeg = erreichbar(1);
   for (const city of others) {
     const k = key(city.r, city.c);
-    if (perBahn.has(k)) { out.rail++; out.bonus += 2; }
-    else if (perWeg.has(k)) { out.road++; out.bonus += 1; }
+    if (perBahn.has(k)) { out.rail++; out.bonus += TRADE_RAIL_BONUS; }
+    else if (perWeg.has(k)) { out.road++; out.bonus += TRADE_ROAD_BONUS; }
   }
   out.count = out.rail + out.road;
   return out;
@@ -2043,6 +2054,10 @@ function techEffect(t, S) {
       [2, 4, 6, 8, 10].map(n => '−' + n * MARATHON_DISCOUNT_FACTOR).join('/'));
   return t.e;
 }
+/* Der ganze Wirkungstext für den Regelbogen (v96, Anweisung des Autors): `voll`, wo die Kachel
+   kürzer ist – die Kacheln nennen nicht, was die Bürokratie mitverdoppelt –, sonst derselbe Text
+   wie auf der Kachel (techEffect, also auch die Siegschwellen und der Marathon). */
+function techEffectFull(t, S) { return t.voll || techEffect(t, S); }
 /* Wirtschaftssieg eines Reichs, gerufen nur am Rundenende (checkEconomyRoundEnd). Seit v85
    auch in Runde 1 (Anweisung des Autors): die Sperre von v77 war nötig, weil der Startspieler
    damals am Ende seines eigenen Zuges anmelden konnte, bevor die anderen gezogen hatten –

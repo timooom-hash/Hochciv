@@ -682,21 +682,7 @@ function redraw() {
   const abils = abilInfos(p);
   $('hud-name').innerHTML = esc(civ.n) + (p.kind === 'bot' ? T(' · Bot') : p.kind === 'ki' ? T(' · KI') : '') +
     abils.map(a => `<span class="hud-abil" title="${esc(abilEffect(a, S))}">${esc(a.n)}</span>`).join('');
-  const ev = curEvent();
-  // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
-  // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet. Der aktuelle Stand:
-  // geprüft wird er seit v85 am Ende der Runde, wenn alle gezogen haben.
-  const mine = popOf(S, S.cur), all = worldPop(S);
-  const pct = all > 0 ? Math.round((mine / all) * 100) : 0;
-  // Ist ein Sieg angemeldet, läuft die Runde noch zu Ende – das muss in der Kopfzeile
-  // stehen, sonst wirkt das plötzliche Spielende willkürlich.
-  const letzte = S.endRound != null && !S.over
-    ? ' · ' + T('letzte Runde (%s)', (S.claims || []).map(c => civOf(S.players[c.pi]).n).join(', ')) : '';
-  $('hud-round').textContent = T('Runde %s · Bevölkerung %s/%s (%s %)', S.round, mine, all, pct) +
-    (ev ? ` · ${ev.n}` : '') + letzte;
-  $('hud-sci').textContent = p.res.sci;
-  $('hud-food').textContent = p.res.food + (p.foodDeficit ? ` (−${p.foodDeficit})` : '');
-  $('hud-coins').textContent = p.res.coins; $('hud-power').textContent = powerOf(S, S.cur);
+  hudStand();
   ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-end'].forEach(id => $(id).disabled = !human);
   if (ui.tut) {
     const bar = tutAllow().bar;
@@ -712,6 +698,33 @@ function redraw() {
   // Nicht während eines Nachspiels (v90): im eigenen Zug ist dann schon gekämpft, aber der Zug
   // noch nicht gewechselt – so gespeichert, käme der Kampf nach dem Neuladen ein zweites Mal.
   if (!ui.combat) saveGame();
+}
+/* Die Zahlen der Kopfzeile: Runde und Bevölkerung, Vorrat und Macht des Reichs am Zug. Seit v96
+   (Wunsch des Autors) läuft der Vorrat mit, solange ein Zug von KI oder Bot nachgespielt wird:
+   dann der Stand nach der Aktion der Szene (animKopf) statt des Endstands des Zugs – bis v95
+   stand dort den ganzen Zug über, was das Reich zu Zugbeginn hatte, also sein Einkommen.
+   Gibt die Werte der Szene zurück (oder null). */
+function hudStand() {
+  const p = P(S);
+  const a = ui.anim, kopf = a && a.i < a.szenen.length ? animKopf(S, a.szenen[a.i]) : null;
+  const ev = curEvent();
+  // Anteil an der Weltbevölkerung – die Siegschwelle ist ein Anteil, keine Stückzahl,
+  // also gehört die Prozentzahl gleich daneben. Kaufmännisch gerundet. Der aktuelle Stand:
+  // geprüft wird er seit v85 am Ende der Runde, wenn alle gezogen haben.
+  const mine = kopf ? kopf.pop : popOf(S, S.cur), all = kopf ? kopf.welt : worldPop(S);
+  const pct = all > 0 ? Math.round((mine / all) * 100) : 0;
+  // Ist ein Sieg angemeldet, läuft die Runde noch zu Ende – das muss in der Kopfzeile
+  // stehen, sonst wirkt das plötzliche Spielende willkürlich.
+  const letzte = S.endRound != null && !S.over
+    ? ' · ' + T('letzte Runde (%s)', (S.claims || []).map(c => civOf(S.players[c.pi]).n).join(', ')) : '';
+  $('hud-round').textContent = T('Runde %s · Bevölkerung %s/%s (%s %)', S.round, mine, all, pct) +
+    (ev ? ` · ${ev.n}` : '') + letzte;
+  const w = kopf ? kopf.nach
+    : { sci: p.res.sci, food: p.res.food, coins: p.res.coins, power: powerOf(S, S.cur), deficit: p.foodDeficit || 0 };
+  $('hud-sci').textContent = w.sci;
+  $('hud-food').textContent = w.food + (w.deficit ? ` (−${w.deficit})` : '');
+  $('hud-coins').textContent = w.coins; $('hud-power').textContent = w.power;
+  return kopf;
 }
 /* Die Knöpfe der Leiste, die das Tutorial an seine Schienen bindet – seit v87 alle: der
    Ansichtsschalter „Erträge", der als einziger immer frei war, ist entfallen. „Fähigkeiten"
@@ -975,7 +988,8 @@ function openTile(r, c) {
         '–🪙', () => { }, true);
     } else ziele.forEach(z => {
       btn(z === 2 ? 'Eisenbahn bauen' : 'Straße bauen',
-        z === 2 ? T('Bewegung kostenlos · Handelsroute +2') : T('Bewegung ½ Punkt · Handelsroute +1'),
+        // die Zuschläge aus der Regel (seit v96 Eisenbahn +4, bis v95 +2)
+        z === 2 ? T('Bewegung kostenlos · Handelsroute +%s', TRADE_RAIL_BONUS) : T('Bewegung ½ Punkt · Handelsroute +%s', TRADE_ROAD_BONUS),
         costText({ coins: roadPrice(S, pi, r, c, z) }, roadPrice(S, pi, r, c, z) + '🪙'),
         () => doRoad(r, c, z), available(S, pi, 'coins') < roadPrice(S, pi, r, c, z));
     });
@@ -1493,7 +1507,31 @@ function animFrame() {
   animCaption();
   // Züge brauchen etwas länger: erst gleiten, dann stehen
   const s = a.szenen[a.i];
-  a.timer = setTimeout(animNext, Math.round(ANIM_MS * s.tempo * (s.zuege.length ? 1.4 : 1)));
+  const ms = Math.round(ANIM_MS * s.tempo * (s.zuege.length ? 1.4 : 1));
+  animVorrat(hudStand(), ms);           // der laufende Stand in der Kopfzeile (v96)
+  a.timer = setTimeout(animNext, ms);
+}
+/* Was eine Szene am Vorrat ändert (v96, Wunsch des Autors: „vielleicht mit einem −x, das
+   aufploppt"): unter dem Kästchen der Kopfzeile ein „−10" (rot) bzw. „+7" (grün), das kurz
+   erscheint und mit der Szene vergeht; die Zahl darüber zeigt schon den Stand danach (hudStand).
+   Ohne `kopf` (Nachspiel vorbei) räumt es nur ab. Wer reduzierte Bewegung eingestellt hat, sieht
+   die Marke ohne Bewegung, bis die Szene wechselt. */
+const ANIM_KOPF_ID = { sci: 'hud-sci', food: 'hud-food', coins: 'hud-coins', power: 'hud-power' };
+function animVorrat(kopf, ms) {
+  document.querySelectorAll('#screen-game .hud-res .res-delta').forEach(e => e.remove());
+  if (!kopf) return;
+  const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (const k of ANIM_KOPF) {
+    const d = kopf.delta[k];
+    if (!d) continue;
+    const box = $(ANIM_KOPF_ID[k]).closest('.res');
+    const m = document.createElement('span');
+    m.className = 'res-delta ' + (d < 0 ? 'minus' : 'plus') + (still ? ' still' : '');
+    m.dataset.k = k;
+    m.textContent = (d < 0 ? '−' : '+') + Math.abs(d);
+    if (!still && ms) m.style.animationDuration = Math.max(400, ms) + 'ms';
+    box.appendChild(m);
+  }
 }
 function animDraw() {
   const a = ui.anim, s = a.szenen[a.i];
@@ -1511,6 +1549,8 @@ function endAnim() {
   if (!a) return;
   clearTimeout(a.timer);
   ui.anim = null;
+  animVorrat(null);                     // die Marken am Vorrat weg (v96) …
+  if (S) hudStand();                    // … und die Zahlen wieder vom Spielstand – auch beim Überspringen
   const t = $('toast');
   if (t.classList.contains('anim')) {
     t.classList.remove('show');
@@ -2974,7 +3014,7 @@ function rulesModal() {
     <p style="font-size:13px;margin:4px 0">${T('Jede Armee hat je Zug 3 Bewegungspunkte (mit Panzerschiff 6, mit Luftwaffe 9); ein Schritt aufs Nachbarfeld kostet 1. Armeen ziehen nicht auf Städte und nicht auf andere Armeen. Eine Armee, die in einer Stadt entsteht, muss sie im selben Zug verlassen.')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Straßen (ab Rad) und Eisenbahnen (ab Eisenbahn, auch ohne Rad) baust du, indem du ein Feld antippst – auf Land, in deinem Gebiet oder auf herrenlosen Feldern, nicht auf Städten. Straße 1 Münze, Eisenbahn 2 Münzen, auf einer Straße 1.')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Ein Schritt kostet ½, wenn beide Felder mindestens eine Straße haben, und nichts, wenn beide eine Eisenbahn haben: Auf einem zusammenhängenden Eisenbahnnetz kommt eine Armee mit übriger Bewegung beliebig weit. Ein Stadtfeld zählt als Straße bzw. Eisenbahn, sobald ein Nachbarfeld eine hat. Straßen und Eisenbahnen gehören niemandem – auch gegnerische Armeen fahren darauf.')}</p>
-    <p style="font-size:13px;margin:4px 0">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +1 auf alle drei Erträge – über eine reine Eisenbahn +2. Gemischte Strecken zählen als Straße. Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn.')} ${T('Mit Bürokratie zählt das doppelt.')}</p>
+    <p style="font-size:13px;margin:4px 0">${T('Handelsrouten: jede eigene Stadt außer der Hauptstadt, die über einen durchgehenden Weg mit ihr verbunden ist, bringt +%s auf alle drei Erträge – über eine reine Eisenbahn +%s. Gemischte Strecken zählen als Straße. Der Weg darf durch herrenloses und fremdes Gebiet führen; nur eine fremde Stadt unterbricht ihn.', TRADE_ROAD_BONUS, TRADE_RAIL_BONUS)} ${T('Mit Bürokratie zählt das doppelt.')}</p>
     <p class="sub">${T('Kontrollzone (Schießpulver)')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Mit Schießpulver hat jede deiner Armeen eine Kontrollzone: die sechs Felder ringsum, mit Raketentechnik auch den zweiten Ring. Mit Burgenbau gilt das auch für deine Städte.')}</p>
     <p style="font-size:13px;margin:4px 0">${T('Eine fremde Armee, die ein Feld in einer Kontrollzone betritt, hält dort an: Ihre übrige Bewegung verfällt für diesen Zug, auch auf Straße und Eisenbahn. Durch eine Kontrollzone kommt sie also nicht hindurch – eine Straße oder Eisenbahn, die hindurchführt, ist für sie dort unterbrochen.')}</p>
@@ -3005,7 +3045,8 @@ function rulesModal() {
         const list = techsIn(f, a, S);
         if (!list.length) return '';
         return `<p class="rule-age">${an}</p>` + list.map(t =>
-          `<div class="rule-tech"><span class="c">${techBase(S, t)}</span><b>${t.n}</b><i>${techEffect(t, S)}</i></div>`).join('');
+          // der ganze Text (v96): hier steht, was die Bürokratie mitverdoppelt, auf den Kacheln nicht
+          `<div class="rule-tech"><span class="c">${techBase(S, t)}</span><b>${t.n}</b><i>${techEffectFull(t, S)}</i></div>`).join('');
       }).join('')).join('')}
     <p class="rule-field">${T('Sieg')}</p>
     <div class="rule-tech"><span class="c">${techBase(S, SINGULARITY)}</span><b>${SINGULARITY.n}</b>

@@ -27,7 +27,9 @@
 
 let ANIM_MS = 900;                     // Takt einer Szene bei „Schnell" (Langsam: × 1,5, ui.js); Tests: 0 = nichts abspielen
 
-// Der Kartenstand, den eine Szene braucht: was gezeichnet wird und woran man Aktionen erkennt
+// Der Kartenstand, den eine Szene braucht: was gezeichnet wird und woran man Aktionen erkennt.
+// Seit v96 mit dem Vorrat jedes Reichs (`res` kopiert – bis v95 teilten sich alle Bilder den
+// lebenden Vorrat), für den laufenden Stand in der Kopfzeile (animKopf).
 function animSnap(S) {
   const bought = {};
   for (const k in (S.bought || {})) bought[k] = (S.bought[k] || []).slice();
@@ -37,8 +39,26 @@ function animSnap(S) {
     roads: Object.assign({}, S.roads),
     bought,
     wonders: (S.wonders || []).map(w => Object.assign({}, w)),
-    players: S.players.map(p => Object.assign({}, p, { techs: Object.assign({}, p.techs) })),
+    players: S.players.map(p => Object.assign({}, p, { techs: Object.assign({}, p.techs), res: Object.assign({}, p.res) })),
   };
+}
+/* Was die Kopfzeile während einer Szene zeigt (v96, Wunsch des Autors): „nicht nur das
+   Einkommen, sondern einen laufenden Stand – mit einem −x, wann immer sie etwas tun". Also der
+   Stand des Reichs NACH der Aktion – Vorrat, Macht, Bevölkerung (für die Zeile darunter) – und
+   was sich gegenüber dem Stand davor geändert hat (`delta`: nur, was sich geändert hat; Gründen
+   für 10 Nahrung mit 8 im Vorrat: { food: −8, coins: −4 }). Die Macht wie in der Kopfzeile
+   (powerOf, mit Zuschlägen; bei Bots die Bevölkerung). Gerechnet aus den Bildern der Szene, der
+   Spielstand selbst ist da längst am Ende des Zugs. */
+const ANIM_KOPF = ['sci', 'food', 'coins', 'power'];
+function animKopf(S, s) {
+  const A = Object.assign({}, S, s.vor), B = Object.assign({}, S, s.nach);
+  const wert = X => {
+    const q = X.players[s.pi];
+    return { sci: q.res.sci, food: q.res.food, coins: q.res.coins, power: powerOf(X, s.pi), deficit: q.foodDeficit || 0 };
+  };
+  const vor = wert(A), nach = wert(B), delta = {};
+  for (const k of ANIM_KOPF) if (nach[k] !== vor[k]) delta[k] = nach[k] - vor[k];
+  return { vor, nach, delta, pop: popOf(B, s.pi), welt: worldPop(B) };
 }
 /* `fn` ausführen und dabei aufnehmen: { vor, bilder: [{ m: Satz, art, snap }] }. Ein Fehler in
    `fn` geht weiter nach oben (runBots fängt ihn), der Haken ist dann trotzdem wieder ab. */
