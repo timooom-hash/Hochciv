@@ -189,11 +189,26 @@ function terrainGlyph(g, t, x, y) {
     for (let i = 0; i < 2; i++) add('path', {
       d: `M${x - 9},${y + i * 7 - 2} q4.5,-4 9,0 q4.5,4 9,0`, fill: 'none', stroke: '#6f97a8', 'stroke-width': 1.6
     });
-  } else if (t === 'F') add('path', { d: `M${x - 7},${y + 8} q7,-6 0,-8 q-7,-2 0,-8`, fill: 'none', stroke: '#4a7f9c', 'stroke-width': 2.2, 'stroke-linecap': 'round' });
-  else if (t === 'B') add('path', { d: `M${x - 8},${y + 6} L${x},${y - 7} L${x + 8},${y + 6} Z`, fill: '#f2ece0', stroke: '#7a6a58', 'stroke-width': 1 });
+  } else if (t === 'B') add('path', { d: `M${x - 8},${y + 6} L${x},${y - 7} L${x + 8},${y + 6} Z`, fill: '#f2ece0', stroke: '#7a6a58', 'stroke-width': 1 });
   else if (t === 'W') for (let i = -1; i <= 1; i++)
     add('path', { d: `M${x + i * 8 - 5},${y + 6} L${x + i * 8},${y - 4} L${x + i * 8 + 5},${y + 6} Z`, fill: '#3f5f38' });
-  else if (t === 'I') add('circle', { cx: x, cy: y, r: 5, fill: '#9fb37a', stroke: '#7c8a5a' });
+  else if (t === 'I') {
+    /* Insel (v99): ein Eiland mit Strand und Grün, rundum ein schmaler Wasserrand – das Feld selbst
+       trägt die Meerfarbe (drawMap). Die Küstenlinie ist leicht unregelmäßig, je Feld anders, aber
+       fest (aus der Lage berechnet, nicht ausgewürfelt). */
+    const k = Math.round(x * 7 + y * 13), pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * 2 * Math.PI, rr = HEX * (0.58 + 0.06 * (((k + i * 5) % 5) - 2) / 2);
+      pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.9]);
+    }
+    const m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    let d = `M${m(pts[9], pts[0]).join(',')}`;
+    pts.forEach((p, i) => { d += ` Q${p.join(',')} ${m(p, pts[(i + 1) % 10]).join(',')}`; });
+    add('path', { d, fill: 'none', stroke: '#eef6f6', 'stroke-width': 3.2, 'stroke-linejoin': 'round' });   // Brandung
+    add('path', { d: d + 'Z', fill: TERRAIN.I.color, stroke: '#b9a46c', 'stroke-width': 1 });
+    add('ellipse', { cx: x - 2, cy: y - 2, rx: HEX * 0.3, ry: HEX * 0.24, fill: '#86a95e' });
+    add('circle', { cx: x + 3, cy: y - 4, r: HEX * 0.1, fill: '#5f8a45' });
+  }
   else if (t === 'V') {            // Vulkan: Kegel mit glühendem Krater
     add('path', { d: `M${x - 9},${y + 7} L${x - 3.5},${y - 6} L${x + 3.5},${y - 6} L${x + 9},${y + 7} Z`,
       fill: '#3b322b', stroke: '#241f1a', 'stroke-width': 1 });
@@ -379,6 +394,58 @@ function powerRings(g, S2, view, was) {
       'stadt ' + city.r + '/' + city.c);
   });
 }
+/* Flussläufe (v99, Anweisung des Autors: Flüsse deutlicher und klar anders als Meer). Jedes
+   Flussfeld bekommt einen Wasserlauf von seiner Mitte zur Mitte der Kanten, an denen der Fluss
+   weiterläuft – zwei Flussfelder treffen sich so genau auf ihrer gemeinsamen Kante.
+   • Zusammenhängende Flussfelder werden wie ein Baum verbunden (feste Reihenfolge: Zeile, Spalte,
+     Richtung), damit drei aneinanderliegende Felder keinen Kreis bilden.
+   • Ein Ende des Laufs, an das Meer grenzt, mündet dort: in das Meerfeld, das dem übrigen Lauf am
+     weitesten gegenüberliegt. Ein Ende ohne Meer ist eine Quelle – der Lauf endet im Feld,
+     ohne die Kante zu berühren. Ein einzelnes Flussfeld ohne Nachbarn ist ein kurzer Bach.
+   Nur Zeichnung: an den Regeln (Fluss ist Land mit 🌾 und 🪙) ändert sich nichts. */
+function riverLines(g, rows) {
+  const R = rows.length, v = hexPoints(HEX);
+  const at = (r, c) => (r >= 0 && r < R && c >= 0 && c < rows[r].length) ? rows[r][c] : null;
+  const kante = d => { const a = v[(d + 1) % 6], b = v[(d + 2) % 6]; return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+  const abstand = (a, b) => Math.min((a - b + 6) % 6, (b - a + 6) % 6);
+  // Baum über alle Flussfelder (Union-Find), Kanten in fester Reihenfolge
+  const wurzel = {}, finde = k => (wurzel[k] === k ? k : (wurzel[k] = finde(wurzel[k])));
+  const lauf = {};
+  for (let r = 0; r < R; r++) for (let c = 0; c < rows[r].length; c++)
+    if (rows[r][c] === 'F') { wurzel[key(r, c)] = key(r, c); lauf[key(r, c)] = []; }
+  for (let r = 0; r < R; r++) for (let c = 0; c < rows[r].length; c++) {
+    if (rows[r][c] !== 'F') continue;
+    for (let d = 0; d < 3; d++) {                       // jede Nachbarschaft einmal (O, SO, SW)
+      const [nr, nc] = neighbor(r, c, d);
+      if (at(nr, nc) !== 'F') continue;
+      const a = finde(key(r, c)), b = finde(key(nr, nc));
+      if (a === b) continue;
+      wurzel[a] = b;
+      lauf[key(r, c)].push(d); lauf[key(nr, nc)].push((d + 3) % 6);
+    }
+  }
+  for (const k of Object.keys(lauf)) {
+    const [r, c] = unkey(k), enden = lauf[k].slice();
+    const [x, y] = hexCenter(r, c, HEX);
+    const meer = [];
+    for (let d = 0; d < 6; d++) if (at(...neighbor(r, c, d)) === 'M') meer.push(d);
+    if (enden.length <= 1 && meer.length)               // Mündung am Ende des Laufs
+      enden.push(meer.slice().sort((a, b) =>
+        (enden.length ? abstand(b, enden[0]) - abstand(a, enden[0]) : 0) || a - b)[0]);
+    let d = '';
+    const ast = (e, voll) => {
+      const [kx, ky] = kante(e), f = voll ? 1 : 0.55, mx = kx * f, my = ky * f, s = (e + r + c) % 2 ? 1 : -1;
+      // Kontrollpunkt auf halbem Weg, etwas zur Seite gedreht – so schlängelt sich der Lauf
+      const cx = x + mx * 0.5 - my * 0.3 * s, cy = y + my * 0.5 + mx * 0.3 * s;
+      d += `M${x + mx},${y + my} Q${cx},${cy} ${x},${y} `;
+    };
+    enden.forEach(e => ast(e, true));
+    if (enden.length === 1) ast((enden[0] + 3) % 6, false);          // Quelle im Feld
+    if (!enden.length) { const e = (r + c) % 3; ast(e, false); ast(e + 3, false); }   // Bach
+    g.appendChild(svgEl('path', { d, fill: 'none', stroke: '#3576b0', 'stroke-width': 6.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'pointer-events': 'none' }));
+    g.appendChild(svgEl('path', { d, fill: 'none', stroke: '#a6d0ec', 'stroke-width': 1.3, 'stroke-linecap': 'round', opacity: 0.75, 'pointer-events': 'none' }));
+  }
+}
 function drawMap(svg, map, opts) {
   opts = opts || {};
   svg.innerHTML = '';
@@ -419,13 +486,15 @@ function drawMap(svg, map, opts) {
     const off = isOff(t);
     if (off && !opts.showVoid) continue;
     const attrs = {
-      points: pts, transform: `translate(${x},${y})`, fill: TERRAIN[t].color,
+      points: pts, transform: `translate(${x},${y})`,
+      fill: t === 'I' ? TERRAIN.M.color : TERRAIN[t].color,     // Insel: Wasser rundum (v99)
       stroke: '#8a8258', 'stroke-width': 1, 'data-r': r, 'data-c': c
     };
     if (off) { attrs.opacity = 0.4; attrs['stroke-dasharray'] = '3 3'; }
     world.appendChild(svgEl('polygon', attrs));
     if (!off) terrainGlyph(world, t, x, y);
   }
+  riverLines(world, rows);
   // 2 Straßen / Eisenbahn
   if (opts.state) {
     const S2 = opts.state;
@@ -736,9 +805,6 @@ const TUT_BAR = ['a-tech', 'a-found', 'a-power', 'a-abil', 'a-info', 'a-log', 'a
 function toggleFoundMode() {
   if (!S || S.over || isAuto(P(S))) return;
   const an = ui.mode !== 'found';
-  // Marathon (v84): höchstens fünf Gründungen je Zug – dann gar nicht erst in den Modus
-  if (an && S.marathon && foundedThisTurn(S, S.cur) >= MARATHON_MAX_FOUNDS)
-    return toast(T('Höchstens %s neue Städte je Zug (Marathon).', MARATHON_MAX_FOUNDS));
   ui.mode = an ? 'found' : null;
   if (an) ui.army = null;
   closeSheet();
@@ -1249,16 +1315,13 @@ function abilSheet(oben) {
   abils.forEach(a => {
     rows.push(`<div class="abil-card"><b>${esc(a.n)}</b><small>${esc(abilEffect(a, S))}</small></div>`);
     if (a.k === 'gratistech') {
-      // seit v97 zweimal je Partie: wie viele noch offen sind, steht immer da
-      const rest = freeTechsLeft(p);
-      notiz(rest ? T('Noch %s von %s kostenlosen Forschungen in dieser Partie.', rest, FREE_TECH_USES)
-        : T('Die kostenlosen Forschungen dieser Partie sind verbraucht.'));
+      // seit v99 wieder einmal je Runde (wie bis v96), jetzt alles Erforschbare samt Singularität
       const ft = freeTechOptions(S, pi);
       ft.forEach(t => knopf('Freie Forschung', 'forschung:' + t.k, esc(t.n), techSub(t), T('gratis'),
         tu(() => useFreeTech(S, pi, t.k)), false, true));
-      if (!ft.length && rest) notiz(evActive(S, pi, 'dunkles_zeitalter')
-        ? T('Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.')
-        : T('Gerade ist keine passende Technologie verfügbar.'));
+      if (!ft.length) notiz(p.freeTechUsed === S.round ? T('Diese Runde schon genutzt.')
+        : evActive(S, pi, 'dunkles_zeitalter') ? T('Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.')
+          : T('Gerade ist keine passende Technologie verfügbar.'));
     }
     if (a.k === 'rueckschau') {
       const bp = backPickOptions(S, pi);
@@ -1794,8 +1857,14 @@ const kiLevelName = k => (KI_LEVELS.find(d => d.k === k) || KI_LEVELS[1]).n;
 const recipeHasKi = rec => (rec.players || []).some(p => p.kind === 'ki');
 const recipeKiLevel = rec => ((rec.players || []).find(p => p.kind === 'ki' && p.kiLevel) || {}).kiLevel || KI_DEFAULT_LEVEL;
 
+/* Rezepte von vor v99: drei Reiche konnten auf der festen oder einer eigenen Karte sitzen.
+   Das gibt es nicht mehr – „Nochmal spielen“ legt dann die Plättchenkarte. */
+function recipeNow(rec) {
+  if (rec.mode === 'drei' && rec.mapPick !== 'plaettchen') rec.mapPick = 'plaettchen';
+  return rec;
+}
 function rematch(harder) {
-  const rec = JSON.parse(JSON.stringify(S.recipe));
+  const rec = recipeNow(JSON.parse(JSON.stringify(S.recipe)));
   const frei = rec.mapPick === 'plaettchen';    // dort darf ein Reich doppelt sitzen
   rec.players.forEach((p, i) => {
     if (harder) p.diff = nextDiff(p.diff);
@@ -1818,6 +1887,7 @@ function rematch(harder) {
   startFromRecipe(rec);
 }
 function startFromRecipe(rec) {
+  recipeNow(rec);
   const frei = rec.mapPick === 'plaettchen';       // dort darf ein Reich doppelt sitzen
   const players = nameDoubles(resolveRandom(JSON.parse(JSON.stringify(rec.players)), frei));
   const cfg = {
@@ -1826,6 +1896,7 @@ function startFromRecipe(rec) {
       : Math.min(players.length - 1, Math.max(0, +rec.start || 0)),
     events: rec.events, eventMode: rec.eventMode, wonders: rec.wonders,
     seatOrder: platzNummern(rec.mode, rec.mapPick, players.length),   // wie beim ersten Mal (v90)
+    hexTiles: !!rec.hexTiles && rec.mode === 'vier',                   // Sechseck-Plättchen (v99)
     // Ein Rezept aus v70–v81 kann noch altTree tragen – egal: jede neue Partie läuft seit
     // v82 im (einzigen) Techtree, auch „Nochmal spielen" nach einer alten Partie.
   };
@@ -1927,24 +1998,35 @@ function curEvent() {
   return EVENT_BY_KEY[S.event.k];
 }
 /* „Welt": Ereignis dieser Runde, Weltwunder, Barbaren – alles auf einen Blick. */
+/* Die Reiche als Liste in Zugfolge, durchnummeriert (v99, Anweisung des Autors: „in
+   Spielerreihenfolge“ – bis v98 standen sie in der Reihenfolge des Spielstands, also etwa
+   Russland zuerst, auch wenn England anfing). Je Reich Farbe, Name und Fähigkeit(en); `self`
+   hebt eines hervor, `extra` hängt etwas an den Namen. Teilen sich die Weltansicht im Spiel und
+   die der Legephase. */
+function civRowsHTML(list, V) {
+  return '<div class="civ-list">' + list.map(({ x, self, extra }, n) => {
+    const c = civOf(x), as = abilInfos(x);
+    return `<div class="civ-row${self ? ' self' : ''}">
+        <span class="civ-chip" style="border-color:${c.color};color:${c.color}">${SYM[c.sym]}</span>
+        <span class="civ-n">${n + 1}. ${esc(c.n)}${extra || ''}</span>
+        <span class="civ-a">${as.length ? as.map(a => `<b>${esc(a.n)}</b><small>${esc(abilEffect(a, V))}</small>`).join('')
+        : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
+  }).join('') + '</div>';
+}
 function worldModal() {
   const pi = S.cur;
   // Wer ist wer: Reich, Farbe und Fähigkeit. Bei ausgelosten Fähigkeiten ist das die
   // Stelle, an der man in Ruhe nachliest, was man (und die anderen) bekommen hat.
-  let h = `<p class="sub">${T('Die Reiche')}</p><div class="civ-list">` +
-    S.players.filter(x => x.kind !== 'barbar').map((x, i) => {
-      const c = civOf(x), as = abilInfos(x);
-      // Marathon (v84): wie weit zum Militärsieg, und wer seine Hauptstadt schon verloren hat
-      const haupt = S.marathon && !x.dead ? [
-        capitalsTaken(x) ? T('%s von %s Hauptstädten erobert', capitalsTaken(x), capitalsToWin(S)) : '',
-        capitalOf(S, S.players.indexOf(x)) ? '' : T('ohne Hauptstadt'),
-      ].filter(Boolean).map(t => ' · ' + t).join('') : '';
-      return `<div class="civ-row${i === pi ? ' self' : ''}">
-        <span class="civ-chip" style="border-color:${c.color};color:${c.color}">${SYM[c.sym]}</span>
-        <span class="civ-n">${esc(c.n)}${x.dead ? ' · ' + T('ausgeschieden') : ''}${haupt}</span>
-        <span class="civ-a">${as.length ? as.map(a => `<b>${esc(a.n)}</b><small>${esc(abilEffect(a, S))}</small>`).join('')
-        : `<i>${T('Bots haben keine Fähigkeit')}</i>`}</span></div>`;
-    }).join('') + '</div>';
+  const reiche = S.players.map((x, i) => ({ x, i })).filter(({ x }) => x.kind !== 'barbar')
+    .sort((a, b) => turnPosition(S, a.i) - turnPosition(S, b.i));
+  let h = `<p class="sub">${T('Die Reiche in Zugfolge')}</p>` + civRowsHTML(reiche.map(({ x, i }) => {
+    // Marathon (v84): wie weit zum Militärsieg, und wer seine Hauptstadt schon verloren hat
+    const haupt = S.marathon && !x.dead ? [
+      capitalsTaken(x) ? T('%s von %s Hauptstädten erobert', capitalsTaken(x), capitalsToWin(S)) : '',
+      capitalOf(S, i) ? '' : T('ohne Hauptstadt'),
+    ].filter(Boolean).map(t => ' · ' + t).join('') : '';
+    return { x, self: i === pi, extra: (x.dead ? ' · ' + T('ausgeschieden') : '') + haupt };
+  }), S);
   if (oldTreeShown())
     h += `<p class="sub" style="margin-top:12px">${T('Alter Techtree')} · ${oldTreeText()}</p>`;
   if (S.ev) {
@@ -2212,16 +2294,31 @@ let setupMode = 'vier';
 const setupCount = () => setupMode === 'duell' ? 2 : setupMode === 'drei' ? 3 : 4;
 
 /* Kartenliste. Sie hängt an der Spielerzahl: die Plättchenkarte hat für zwei, drei und
-   vier Reiche eine eigene Form, die festen Karten haben vier Startsterne (bei drei
-   Reichen bleibt einer ungenutzt), und im Duell passen sie gar nicht. */
+   vier Reiche eine eigene Form; die feste Karte und eine eigene Karte gibt es nur bei vier
+   Reichen. Bis v98 standen sie auch bei drei zur Wahl (ein Startstern blieb leer) – seit v99
+   spielen drei Reiche immer auf der Plättchenkarte (Anweisung des Autors), wie das Duell. */
 function mapOptions() {
   const n = setupCount();
   const out = [];
-  if (n > 2) MAPS.forEach((m, i) => out.push([String(i), m.name]));
+  if (n === 4) MAPS.forEach((m, i) => out.push([String(i), m.name]));
   out.push(['plaettchen', TILE_SHAPES[n].name]);
-  if (customMap && n > 2) out.push(['eigene', T('Eigene Karte')]);
+  if (customMap && n === 4) out.push(['eigene', T('Eigene Karte')]);
   return out;
 }
+/* Die Karte, die der Aufbau gerade wirklich anbietet: die gemerkte Wahl, wenn es sie bei
+   dieser Spielerzahl gibt, sonst die erste der Liste (bei zwei und drei Reichen die
+   Plättchenkarte). Bis v98 fragten die Zivilisationswahl und die Platznummern die gemerkte
+   Wahl selbst – im Duell stand dann „Hier darf jeder Platz frei wählen“, gesperrt waren
+   Doppelte trotzdem, solange vorher nicht ausdrücklich die Plättchenkarte gewählt war. */
+function setupPick() {
+  const opts = mapOptions();
+  return opts.some(o => o[0] === setupMapWanted) ? setupMapWanted : opts[0][0];
+}
+/* Experimenteller Plättchenmodus (v99): nur vier Reiche auf der Plättchenkarte. Die Wahl
+   bleibt gemerkt wie die Karte; gilt nur, wo das Häkchen überhaupt zu sehen ist. */
+let setupHexWanted = false;
+const setupHexOffered = () => setupMode !== 'marathon' && setupCount() === 4 && setupPick() === 'plaettchen';
+const setupHex = () => setupHexOffered() && setupHexWanted;
 /* Die zuletzt bewusst gewählte Karte. Sie wird gemerkt, damit ein Ausflug in den
    Duellmodus (dort gibt es die festen Karten nicht) die Wahl nicht still umstellt. */
 let setupMapWanted = '0';
@@ -2233,11 +2330,12 @@ function fillMapSelect() {
   if (marathon) {
     $('setup-map-row').hidden = true;
     $('setup-tile-hint').hidden = true; $('setup-double-hint').hidden = true;
+    $('setup-hex-row').hidden = true; $('setup-hex-hint').hidden = true;
     return;
   }
   const opts = mapOptions();
   sel.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
-  sel.value = opts.some(o => o[0] === setupMapWanted) ? setupMapWanted : opts[0][0];
+  sel.value = setupPick();
   // Im Duell gibt es nur die Plättchenkarte – dann bleibt die Zeile weg statt einer
   // Auswahl mit einem einzigen Eintrag.
   $('setup-map-row').hidden = opts.length < 2;
@@ -2246,13 +2344,18 @@ function fillMapSelect() {
     setupMapWanted = sel.value;
     renderSlots();          // die Plättchenkarte lässt jede Zivilisation mehrfach zu
   };
-  $('setup-tile-hint').hidden = sel.value !== 'plaettchen';
+  const hex = $('setup-hex');
+  hex.checked = setupHexWanted;
+  hex.onchange = () => { setupHexWanted = hex.checked; fillMapSelect(); };
+  $('setup-hex-row').hidden = !setupHexOffered();
+  $('setup-hex-hint').hidden = !setupHex();
+  $('setup-tile-hint').hidden = sel.value !== 'plaettchen' || setupHex();
   $('setup-double-hint').hidden = sel.value !== 'plaettchen';
 }
 // Auf der Plättchenkarte darf jeder Platz frei wählen, auch dieselbe Zivilisation
 // mehrfach – auf den festen Karten sitzt jede Zivilisation genau einmal (feste
 // Startsterne, ein Stern je Reich).
-const freieCivWahl = () => setupMode !== 'marathon' && setupMapWanted === 'plaettchen';
+const freieCivWahl = () => setupMode !== 'marathon' && setupPick() === 'plaettchen';
 /* Nummerierte Plätze („Platz 1 …") hat der Aufbau auf der Plättchenkarte und bei weniger als
    vier Reichen. Dort ziehen die Reiche seit v90 in der Reihenfolge der Plätze, ab dem
    Startspieler (newGame mit cfg.seatOrder, Anweisung des Autors). Die klassische Aufstellung
@@ -2287,7 +2390,7 @@ function renderSlots() {
   $('setup-duel-hint').hidden = !duel;
   fillMapSelect();
   const list = $('setup-list');
-  const frei = freieCivWahl(), plaetze = platzNummern(setupMode, setupMapWanted, n);
+  const frei = freieCivWahl(), plaetze = platzNummern(setupMode, setupPick(), n);
   // Mensch/Bot und Fähigkeit überleben ein Neuzeichnen (Kartenwechsel, Zivilisationswahl)
   const alt = [...list.children].map(x => ({
     kind: x.querySelector('[data-kind].on').dataset.kind,
@@ -2404,6 +2507,7 @@ function kindRows() {
 function setupRecipe(mapPick, startWahl) {
   return {
     mode: setupMode, mapPick, start: startWahl,
+    hexTiles: setupHex(),                // experimenteller Plättchenmodus (v99)
     events: $('setup-events').checked, eventMode: $('setup-evmode').value,
     wonders: $('setup-wonders').checked,
     players: setupConfig(),
@@ -2465,8 +2569,9 @@ function resolveRandom(players, frei) {
 function startPlayers() {
   return nameDoubles(resolveRandom(setupConfig(), freieCivWahl()));
 }
-// Nur eine bewusste Wahl bleibt stehen; ohne sie richtet sich der Startspieler nach der
-// Besetzung (bei mehreren Menschen Zufall, sonst der einzige Mensch).
+// Nur eine bewusste Wahl bleibt stehen; ohne sie steht „Zufällig“ (seit v99, Anweisung des
+// Autors – bis v98 richtete sich die Vorauswahl nach der Besetzung: bei mehreren Menschen
+// Zufall, sonst der einzige Mensch).
 let startWanted = null;
 function refreshStart() {
   const cfg = setupConfig(), sel = $('setup-start');
@@ -2474,10 +2579,8 @@ function refreshStart() {
     : (CIV_BY_KEY[p.civ] ? CIV_BY_KEY[p.civ].n : p.civ);
   sel.innerHTML = `<option value="zufall">${T('Zufällig')}</option>` + cfg.map((p, i) =>
     `<option value="${i}">${label(p)}${kindTag(p)}</option>`).join('');
-  const menschen = cfg.filter(p => p.kind === 'human').length;
   sel.value = (startWanted != null && [...sel.options].some(o => o.value === startWanted))
-    ? startWanted
-    : menschen > 1 ? 'zufall' : String(Math.max(0, cfg.findIndex(p => p.kind === 'human')));
+    ? startWanted : 'zufall';
   sel.onchange = () => { startWanted = sel.value; };
 }
 
@@ -2505,7 +2608,8 @@ let placeState = null;
 
 function startPlacement(cfg) {
   const seed = Math.floor(Math.random() * 2 ** 31);
-  const plan = tilePlan(cfg.players.map(p => p.civ), seed);
+  // experimenteller Plättchenmodus (v99): Sechsecke statt Dreiecke, nur bei vier Reichen
+  const plan = tilePlan(cfg.players.map(p => p.civ), seed, { hex: !!cfg.hexTiles });
   if (!plan) return toast(T('Für diese Spielerzahl gibt es keine Plättchenkarte.'));
   /* Erst würfeln, dann legen (v66): Was jedes Reich zu Beginn erforschen kann und welche
      Wunder im Stapel liegen, hängt nicht an der Karte – also steht es schon fest, bevor
@@ -2526,7 +2630,7 @@ function startPlacement(cfg) {
   placeStep();
 }
 /* Erträge aller Wahlmöglichkeiten des Sitzes, der gerade legt, und welche davon dominiert
-   sind (placeYieldTable/dominatedCells in tiles.js). 3 × 15 Wegwerf-Partien – einmal je
+   sind (placeYieldTable/dominatedCells in tiles.js). Lagen × Felder Wegwerf-Partien – einmal je
    Sitz gerechnet und in placeState gemerkt; Drehen und Antippen ändern daran nichts. */
 function placeInfo(st, seat) {
   if (!st.info || st.info.idx !== seat.idx) {
@@ -2574,7 +2678,7 @@ function placeStep() {
 function drawPlace() {
   const st = placeState, plan = st.plan;
   const seat = placeSeatNow();
-  const shape = TILE_SHAPES[plan.n];
+  const shape = planShape(plan);
   const shown = shape.slots.map((_, i) => i)
     .filter(i => st.done || !isSeatSlot(plan, i) || (seat && seat.slot === i));
   const map = tileMap(plan, {
@@ -2593,31 +2697,22 @@ function drawPlace() {
   }
   drawMap($('pl-map'), map, opts);
   const note = $('pl-note');
-  // Beschriftung kommt aus index.html und wird von applyStaticLang übersetzt – hier
-  // steht nur, wann der Knopf überhaupt etwas zu zeigen hat.
-  $('pl-tech').hidden = st.done;
-  if (st.done) {
-    note.innerHTML = T('Alle Plättchen liegen offen. %s Reiche, %s Dreiecke.',
-      plan.n, shape.slots.length);
-    $('pl-rot').hidden = true;
-    $('pl-ok').textContent = T('Spiel beginnen');
-  } else {
-    // Kein Plättchenname mehr – er sagt nichts über das Feld, das man wählt. Dafür die
-    // Fähigkeit: bei ausgeloster Zivilisation ist das hier die erste Stelle, an der man
-    // sieht, was man spielt.
-    const civ = seatCiv(seat), abil = seatAbil(seat);
-    note.innerHTML = `<b>${SYM[civ.sym]} ${esc(civ.n)}</b>` +
-      (abil ? ` · <span class="pl-abil" title="${esc(abil.e)}">${esc(abil.n)}</span>` : '') +
-      ' · ' + T('Lage %s von 3', st.o + 1) + ' · ' +
-      (st.cell == null ? T('Hauptstadt auf ein markiertes Feld tippen')
-        : T('Hauptstadt gesetzt – „Fertig", wenn es passt')) +
-      // Legende nur, wenn überhaupt ein Feld rot umrandet ist
-      ((opts.dominated || []).length
-        ? ` <span class="pl-dom">${T('Rot umrandet: ein anderes Feld bringt von etwas mehr und von nichts weniger.')}</span>` : '') +
-      placeYield(plan, seat, st);
-    $('pl-rot').hidden = false;
-    $('pl-ok').textContent = T('Fertig');
-  }
+  // Beschriftungen kommen aus index.html und werden von applyStaticLang übersetzt. Einen Stand
+  // „alles gelegt“ zeichnet diese Seite seit v99 nicht mehr – dann beginnt gleich die Partie.
+  if (!seat) return;
+  // Kein Plättchenname mehr – er sagt nichts über das Feld, das man wählt. Dafür die
+  // Fähigkeit: bei ausgeloster Zivilisation ist das hier die erste Stelle, an der man
+  // sieht, was man spielt.
+  const civ = seatCiv(seat), abil = seatAbil(seat);
+  note.innerHTML = `<b>${SYM[civ.sym]} ${esc(civ.n)}</b>` +
+    (abil ? ` · <span class="pl-abil" title="${esc(abil.e)}">${esc(abil.n)}</span>` : '') +
+    ' · ' + T('Lage %s von %s', st.o + 1, planRotations(plan)) + ' · ' +
+    (st.cell == null ? T('Hauptstadt auf ein markiertes Feld tippen')
+      : T('Hauptstadt gesetzt – „Fertig", wenn es passt')) +
+    // Legende nur, wenn überhaupt ein Feld rot umrandet ist
+    ((opts.dominated || []).length
+      ? ` <span class="pl-dom">${T('Rot umrandet: ein anderes Feld bringt von etwas mehr und von nichts weniger.')}</span>` : '') +
+    placeYield(plan, seat, st);
 }
 /* Forschungsseite in der Legephase (v66). Gezeigt wird genau der Bogen aus dem Spiel,
    nur ohne Knöpfe: was dieser Platz zu Beginn erforschen könnte, ausgewürfelt VOR dem
@@ -2650,6 +2745,42 @@ function placeTechView() {
   modal(T('%s · Forschung vor dem Legen', civ.n), h);
   $('overlay').classList.add('wide');
 }
+/* Weltansicht in der Legephase (v99, Anweisung des Autors – wie „Forschung“ daneben): die
+   Reiche in Zugfolge mit ihren Fähigkeiten, dazu Ereignisse und Weltwunder dieser Partie. Die
+   Fähigkeiten aller sind kein Geheimnis – im Spiel zeigt „Welt“ dasselbe; verdeckt bleiben nur
+   die Startplättchen. Die Zugfolge steht schon fest: der Startspieler ist im Aufbau ausgelost
+   oder gewählt, seatingOrder rechnet wie newGame. */
+function placeWorldView() {
+  const st = placeState;
+  if (!st) return;
+  const seat = placeSeatNow();
+  const { ordered, startIdx } = seatingOrder(st.cfg);
+  const reihe = ordered.slice(startIdx).concat(ordered.slice(0, startIdx));
+  let h = `<p class="sub">${T('Die Reiche in Zugfolge')}</p>` + civRowsHTML(reihe.map(pl => ({
+    x: pl, self: !!seat && st.cfg.players.indexOf(pl) === seat.idx,
+  })), null);
+  if (st.cfg.events)
+    h += `<p class="sub" style="margin-top:12px">${T('Mit Ereignissen – das erste fällt zu Beginn der ersten Runde.')}</p>`;
+  if (st.cfg.wonders) {
+    // Wunderstapel wie in der Forschungsansicht: eine Wegwerf-Partie mit genau diesem Stapel
+    const pl = st.cfg.players[0] || {};
+    const V = newGame({
+      seed: 1, map: DEFAULT_MAP, wonders: true,
+      players: [{ civ: pl.civ, kind: 'human', ability: pl.ability }],
+      avail: [st.setup.avail[0]], wpool: st.setup.wpool,
+    });
+    for (const lvl of [1, 2, 3]) {
+      const pool = poolOf(V, lvl);
+      if (!pool.length) continue;
+      h += `<p class="sub" style="margin-top:10px">${T('Weltwunder im Stapel, Stufe %s', lvl)}</p>`;
+      h += pool.map(k => `<div class="tech avail"><span class="c">${WONDER_BY_KEY[k].lvl}</span>
+        <b>${WONDER_BY_KEY[k].n}</b><span class="eff">${WONDER_BY_KEY[k].e}</span></div>`).join('');
+    }
+  }
+  if (!st.cfg.events && !st.cfg.wonders)
+    h += `<p class="sub">${T('Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.')}</p>`;
+  modal(T('Welt'), h);
+}
 function plTap(r, c) {
   const st = placeState, seat = placeSeatNow();
   if (!seat) return;
@@ -2664,15 +2795,14 @@ function plTap(r, c) {
 function placeRotate() {
   const st = placeState, seat = placeSeatNow();
   if (!seat) return;
-  st.o = (st.o + 1) % 3;
+  st.o = (st.o + 1) % planRotations(st.plan);
   // Die Hauptstadt bleibt liegen, solange das Feld auch in der neuen Lage passt.
   if (st.cell != null && !placeOptions(st.plan, seat, st.o)[st.cell]) st.cell = null;
   drawPlace();
 }
 function placeConfirm() {
   const st = placeState;
-  if (!st) return;
-  if (st.done) return placeGo();
+  if (!st || st.done) return;
   const seat = placeSeatNow();
   if (st.cell == null) return toast(T('Erst die Hauptstadt setzen.'));
   const err = placeSeat(st.plan, seat, st.o, st.cell);
@@ -2680,12 +2810,15 @@ function placeConfirm() {
   st.at++;
   placeStep();
 }
+/* Alle haben gelegt: aufdecken und gleich losspielen. Bis v98 kam dazwischen ein eigener Schritt
+   – die ganze Karte offen und ein Knopf „Spiel beginnen“; seit v99 entfällt er (Anweisung des
+   Autors), die Karte zeigt die Partie ja ohnehin. */
 function placeReveal() {
   const st = placeState;
   // Sicherheitsnetz: wer (aus welchem Grund auch immer) nichts gelegt hat, wird gelegt.
   st.plan.seats.forEach(seat => { if (seat.cell == null) botPlaceSeat(st.plan, seat, st.rnd); });
   st.done = true; st.plan.revealed = true;
-  drawPlace();
+  placeGo();
 }
 function placeGo() {
   const st = placeState;
@@ -2917,7 +3050,7 @@ function boot() {
     const players = startPlayers();      // Zufall auflösen, dann Ziffern und Farben
     if (!players.some(p => p.kind === 'human')) return toast(T('Mindestens eine menschliche Zivilisation.'));
     const duel = setupMode === 'duell';
-    const pick = $('setup-map').value;
+    const pick = setupPick();
     const startWahl = $('setup-start').value;
     const recipe = setupRecipe(pick, startWahl);
     const cfg = {
@@ -2927,6 +3060,7 @@ function boot() {
       events: recipe.events, eventMode: recipe.eventMode,
       wonders: recipe.wonders,
       seatOrder: platzNummern(setupMode, pick, players.length),     // Zugfolge nach Plätzen (v90)
+      hexTiles: recipe.hexTiles,                                    // Sechseck-Plättchen (v99)
     };
     endTutorialPanel();
     // Marathon: Zufallskarte, dann sehen alle Karte und Starttechnologien und draften
@@ -2982,6 +3116,7 @@ function boot() {
   attachTaps($('ed-map'), edTap);
   attachTaps($('pl-map'), plTap);
   $('pl-tech').onclick = placeTechView;
+  $('pl-world').onclick = placeWorldView;
   $('pl-rot').onclick = placeRotate;
   $('pl-ok').onclick = placeConfirm;
   initOrientation();
@@ -3043,7 +3178,7 @@ function rulesModal() {
     <p class="sub">${T('Alle Technologien')}</p>
     <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Kosten links, Wirkung rechts. Verfügbar wird eine Technologie erst, wenn sie ausgewürfelt ist.')}</p>
     ${oldTreeShown() ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('In dieser Partie gilt noch der alte Techtree.')}</p>` : ''}
-    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität %s – die Kosten hier sind schon umgerechnet. Griechenlands Günstige Forschung und die Wissenschaftliche Methode ziehen doppelt ab. Höchstens %s neue Städte je Zug. Militärsieg erst mit %s eroberten Hauptstädten; eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt weiter.', MARATHON_SINGULARITY, MARATHON_MAX_FOUNDS, MARATHON_CAPITALS)}</p>` : ''}
+    ${S && S.marathon ? `<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">${T('Marathon: Technologien kosten je Zeitalter das Zwei-, Drei-, Vier- und Fünffache, die Singularität %s – die Kosten hier sind schon umgerechnet. Griechenlands Günstige Forschung und die Wissenschaftliche Methode ziehen doppelt ab. Militärsieg erst mit %s eroberten Hauptstädten; eine eroberte Hauptstadt ist danach eine gewöhnliche Stadt, ihr altes Reich spielt ohne Hauptstadt weiter.', MARATHON_SINGULARITY, MARATHON_CAPITALS)}</p>` : ''}
     ${FIELDS.map((fn, f) => `<p class="rule-field">${fn}</p>` +
       AGES.map((an, a) => {
         const list = techsIn(f, a, S);
