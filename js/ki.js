@@ -951,10 +951,17 @@ function kiCandidates(S, pi, K, memo, billig) {
   if (!billig) for (const m of kiMilitaryCandidates(S, pi, K, memo)) out.push(m);
   return out;
 }
-/* Freie Forschung: seit v99 wieder einmal je Runde (wie bis v96), jetzt alles Erforschbare samt
-   Singularität. Was nicht genutzt wird, verfällt mit der Runde – also erwägt die KI jede Runde
-   jede Möglichkeit, und kiValue entscheidet wie bei bezahlter Forschung; die Singularität ist
-   dort der Sieg. v97–v98 (zweimal je Partie) hob sie sie für die Moderne auf. */
+/* Freie Forschung: seit v101 (Anweisung des Autors) zweimal je Partie, höchstens einmal je Runde,
+   alles Erforschbare samt Singularität. Die KI erwägt sie, sobald sie geht, für alles, was zur
+   Wahl steht – kiValue entscheidet wie bei bezahlter Forschung, die Singularität ist dort der
+   Sieg. Sie hebt also nichts auf: Gemessen (tools_ki.js freie, je 400 Partien zu viert, gepaart)
+   gewann Griechenland so 20,5 % – mit Aufheben für die Moderne 12,8 %, dazu die letzte für die
+   Singularität 15,0 %, die erste sofort und die letzte für die Singularität 13,3 % (Abschnitt v101
+   in ANNAHMEN.md). Zwei frühe Technologien bringen in Partien, die im Median in Runde 5 enden, mehr
+   als eine späte teure; bis zur Moderne in jedem Feld kommt Griechenland selten. v99–v100 (einmal je
+   Runde) erwog sie genauso jede Runde alles; v97–v98 (zweimal je Partie) hob sie sie für die
+   Moderne auf. Funktionsdeklaration: tools_ki.js (Modus „freie") vergleicht damit die anderen
+   Arten zu wählen. */
 function kiFreeTechChoices(S, pi, K) {
   return freeTechOptions(S, pi);
 }

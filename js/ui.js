@@ -1315,13 +1315,17 @@ function abilSheet(oben) {
   abils.forEach(a => {
     rows.push(`<div class="abil-card"><b>${esc(a.n)}</b><small>${esc(abilEffect(a, S))}</small></div>`);
     if (a.k === 'gratistech') {
-      // seit v99 wieder einmal je Runde (wie bis v96), jetzt alles Erforschbare samt Singularität
-      const ft = freeTechOptions(S, pi);
-      ft.forEach(t => knopf('Freie Forschung', 'forschung:' + t.k, esc(t.n), techSub(t), T('gratis'),
-        tu(() => useFreeTech(S, pi, t.k)), false, true));
-      if (!ft.length) notiz(p.freeTechUsed === S.round ? T('Diese Runde schon genutzt.')
-        : evActive(S, pi, 'dunkles_zeitalter') ? T('Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.')
-          : T('Gerade ist keine passende Technologie verfügbar.'));
+      // seit v101 zweimal je Partie, höchstens einmal je Runde – alles Erforschbare samt Singularität
+      const ft = freeTechOptions(S, pi), rest = freeTechsLeft(p);
+      if (!rest) notiz(T('Die kostenlosen Forschungen dieser Partie sind verbraucht.'));
+      else {
+        notiz(T('Noch %s von %s kostenlosen Forschungen in dieser Partie.', rest, FREE_TECH_USES));
+        ft.forEach(t => knopf('Freie Forschung', 'forschung:' + t.k, esc(t.n), techSub(t), T('gratis'),
+          tu(() => useFreeTech(S, pi, t.k)), false, true));
+        if (!ft.length) notiz(p.freeTechUsed === S.round ? T('Diese Runde schon genutzt.')
+          : evActive(S, pi, 'dunkles_zeitalter') ? T('Dunkles Zeitalter: Diese Runde kann nicht geforscht werden.')
+            : T('Gerade ist keine passende Technologie verfügbar.'));
+      }
     }
     if (a.k === 'rueckschau') {
       const bp = backPickOptions(S, pi);
@@ -2730,6 +2734,8 @@ function placeTechView() {
     players: [{ civ: seat.civ, kind: 'human', ability: pl.ability }],
     avail: [st.setup.avail[seat.idx]], wpool: st.setup.wpool,
   });
+  // Siegschwellen der Partie, die gelegt wird (v101) – V selbst hat nur ein Reich
+  V.victoryMode = victoryMode(st.cfg);
   const civ = seatCiv(seat);
   let h = `<p class="sub">${T('Vor dem Legen ausgewürfelt – im Spiel steht genau das hier.')}</p>`;
   h += techBoardHTML(V, 0, { plain: true });
@@ -3143,8 +3149,7 @@ function rulesModal() {
       <li>${T('Aktionen in beliebiger Reihenfolge, beliebig oft.')}</li>
       <li>${T('Kampf: Angriff = Macht je Armee, Verteidigung = Bevölkerung + benachbarte Armeen. Zwei Züge in Folge stärker → Stadt erobert.')}</li>
       <li>${T('Sieg: Singularität · mehr als %s der Weltbevölkerung (UN %s, Theologie %s; geprüft am Ende jeder Runde, wenn alle gleich oft gezogen haben – dann endet das Spiel sofort) · gegnerische Hauptstadt · Weltwunder der Stufe 3. Außer beim Militärsieg endet das Spiel erst am Rundenende; mehrere Ansprüche entscheiden Punkte (Bevölkerung + Wunder + Technologien).',
-        victoryLabels(!!(S && S.duel)).base, victoryLabels(!!(S && S.duel)).un,
-        victoryLabels(!!(S && S.duel)).theologie)}</li>
+        victoryLabels(S).base, victoryLabels(S).un, victoryLabels(S).theologie)}</li>
     </ol>
     <p class="sub">${T('Ressourcen gelten nur für den laufenden Zug – nur Macht bleibt liegen. 2 Münzen zählen als 1 Nahrung oder 1 Wissenschaft.')}</p>
     <p class="sub">${startBonusText()}</p>

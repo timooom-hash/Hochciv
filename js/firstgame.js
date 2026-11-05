@@ -311,7 +311,7 @@ function fgSchwellenVeto(a) {
   else return null;
   const o = fgSchwelle(extra);
   const mine = popOf(S, FG_ICH) + plus, welt = worldPop(S) + plus;
-  if (!(welt > 0 && mine > welt * o.frac)) return null;
+  if (!(welt > 0 && victoryMet(o, mine, welt))) return null;
   return T('Damit hättest du mehr als %s der Weltbevölkerung – das wäre ein Wirtschaftssieg. Diesmal gewinnst du anders.', o.label);
 }
 // Die Prüfung selbst, ohne Nebenwirkung
@@ -783,13 +783,13 @@ const FG_STEPS = [
   {
     id: 'w_theologie', pfad: 'wirtschaft', t: 'Wirtschaftssieg', zug: true,
     info: () => T('Am Ende einer Runde brauchst du <b>mehr als %s</b> der Weltbevölkerung – im Duell. Mit <b>Theologie</b> reichen mehr als %s.',
-      victoryLabels(true).base, victoryLabels(true).theologie),
+      victoryLabels('duell').base, victoryLabels('duell').theologie),
     ziel: () => T('Erforsche Theologie.'),
     tipp: () => T('Theologie liegt im Feld Spezial im Mittelalter. Dieses Zeitalter öffnet sich mit einer Technologie der Antike im selben Feld: <b>Demokratie</b>.'),
     techs: () => ['demokratie', 'theologie'], leiste: ['#a-tech'],
     fertig: () => has(fgP(), 'theologie') || fgSieg(),
     erlaubt: '*', darf: a => fgFriedlich(a),
-    gut: () => T('Jetzt reichen dir mehr als %s. Deinen Anteil zeigt die Kopfzeile.', victoryLabels(true).theologie),
+    gut: () => T('Jetzt reichen dir mehr als %s. Deinen Anteil zeigt die Kopfzeile.', victoryLabels('duell').theologie),
     loesung: () => {
       for (const k of ['demokratie', 'theologie']) {
         if (has(fgP(), k)) continue;
@@ -805,7 +805,7 @@ const FG_STEPS = [
     stand: () => {
       const mine = popOf(S, FG_ICH), w = worldPop(S), o = victoryOption(S, fgP());
       return T('Du: <b>%s von %s</b> (%s %) · nötig: mehr als %s %', mine, w, Math.round(100 * mine / Math.max(1, w)), Math.round(100 * o.frac)) +
-        fgHaken(mine > w * o.frac);
+        fgHaken(victoryMet(o, mine, w));
     },
     tipp: () => T('Lass alle Städte wachsen (<b>Fähigkeiten</b> → <b>Alle Städte wachsen</b>) und gründe neue. Mit <b>Keramik</b> wächst jede Stadt zweimal pro Runde. Wird Nahrung knapp: <b>Landwirtschaft</b>.'),
     leiste: ['#a-abil', '#a-found'], techs: () => ['keramik', 'landwirtschaft'], knopf: () => ['Alle Städte wachsen'],
@@ -923,7 +923,7 @@ function fgNeuGewuerfelt(f, a) {
 // Der gewählte Weg in einem Satz (erster Schritt)
 function fgWegSatz() {
   return fgJe(T('Dein Weg: <b>Militärsieg</b> – erobere Englands Hauptstadt.'),
-    T('Dein Weg: <b>Wirtschaftssieg</b> – am Ende einer Runde mehr als %s der Weltbevölkerung.', victoryLabels(true).base),
+    T('Dein Weg: <b>Wirtschaftssieg</b> – am Ende einer Runde mehr als %s der Weltbevölkerung.', victoryLabels('duell').base),
     T('Dein Weg: <b>Forschungssieg</b> – erforsche die Singularität.'));
 }
 /* Blasse Kachel im Bogen (nur im Ersten Spiel antippbar, techBoardHTML): warum blass?
@@ -1310,7 +1310,7 @@ function fgNavKnopf() {
 function fgWahlHtml(fertig) {
   const wege = [
     ['militaer', '⚔︎ ' + T('Militärsieg'), T('Erobere Englands Hauptstadt – das Spiel endet sofort.')],
-    ['wirtschaft', '🌾 ' + T('Wirtschaftssieg'), T('Hab am Ende einer Runde mehr als %s der Weltbevölkerung.', victoryLabels(true).base)],
+    ['wirtschaft', '🌾 ' + T('Wirtschaftssieg'), T('Hab am Ende einer Runde mehr als %s der Weltbevölkerung.', victoryLabels('duell').base)],
     ['wissenschaft', '🔬 ' + T('Forschungssieg'), T('Erforsche die Singularität.')],
   ];
   return `<div class="fg-wahl">${wege.map(([k, n, e]) =>

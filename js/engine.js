@@ -335,9 +335,13 @@ function migrateState(S) {
   if (S.oldTree === undefined) S.oldTree = !S.altTree;
   delete S.altTree;
   delete S.roundPop; delete S.roundPops;   // Stand zu Rundenbeginn (v83/v84), seit v85 ungenutzt
-  // Freie Forschung: v97–v98 gezählt (p.freeTechsUsed), seit v99 wieder wie bis v96 die Runde
-  // der letzten Nutzung (p.freeTechUsed) – der Zähler bedeutet nichts mehr
-  for (const p of S.players || []) delete p.freeTechsUsed;
+  /* Freie Forschung (v101): zweimal je Partie, höchstens einmal je Runde – gezählt in
+     p.freeTechsUsed, die Runde der letzten Nutzung in p.freeTechUsed. Ein Stand von v97/v98 trägt
+     den Zähler schon, er bedeutet wieder dasselbe (v99/v100 löschten ihn beim Laden). v99/v100 und
+     bis v96 zählten nicht, sie vermerkten nur die Runde: Wer die Freie Forschung dort schon genutzt
+     hat, hat mindestens eine verbraucht – wie viele genau, weiß der Spielstand nicht. */
+  for (const p of S.players || [])
+    if (p.freeTechsUsed === undefined && typeof p.freeTechUsed === 'number') p.freeTechsUsed = 1;
   // Gründungen je Zug (v84–v99, für die Grenze im Marathon) – seit v100 ohne Grenze, ungenutzt
   for (const p of S.players || []) { delete p.foundRound; delete p.foundCount; }
   return S;
@@ -406,18 +410,24 @@ function grantTech(S, pi, tk, quelle, opts) {
   applyTech(S, pi, tech, quelle, opts);
   return null;
 }
-/* Griechenland "Freie Forschung": seit v99 (Anweisung des Autors) einmal je Runde eine
-   erforschbare Technologie umsonst – aus jedem Zeitalter, auch die Singularität (sobald sie
-   erforschbar ist: je Feld eine Technologie der Moderne; dann ist es der Forschungssieg, gewonnen
-   wie jeder am Rundenende), in jeder Spielart, auch im Marathon. Angeboten wird genau, was der
-   Bogen erforschbar nennt (researchable).
-   v97–v98: zweimal je Partie aus jedem Zeitalter, ohne die Singularität. Bis v96: einmal je
-   Runde bis zur Industrialisierung (im Marathon v85–v96 bis ins Mittelalter).
-   Ein Dunkles Zeitalter sperrt sie wie jede Forschung. p.freeTechUsed = Runde der letzten
-   Nutzung. */
+/* Griechenland "Freie Forschung": seit v101 (Anweisung des Autors) höchstens zweimal je Partie
+   und höchstens einmal je Runde eine erforschbare Technologie umsonst – aus jedem Zeitalter, auch
+   die Singularität (sobald sie erforschbar ist: je Feld eine Technologie der Moderne; dann ist es
+   der Forschungssieg, gewonnen wie jeder am Rundenende), in jeder Spielart, auch im Marathon.
+   Angeboten wird genau, was der Bogen erforschbar nennt (researchable).
+   v99–v100: einmal je Runde, ohne Grenze je Partie. v97–v98: zweimal je Partie aus jedem
+   Zeitalter, ohne die Singularität, auch zweimal im selben Zug. Bis v96: einmal je Runde bis zur
+   Industrialisierung (im Marathon v85–v96 bis ins Mittelalter).
+   Ein Dunkles Zeitalter sperrt sie wie jede Forschung. Vermerkt werden die Runde der letzten
+   Nutzung (p.freeTechUsed) und die Zahl der Nutzungen (p.freeTechsUsed, FREE_TECH_USES).
+   freeTechsLeft ist eine Funktionsdeklaration: tools_ki.js (Modus „freie") hebt die Grenze je
+   Partie für einen Vergleich mit v100 auf. */
+function freeTechsLeft(p) {
+  return Math.max(0, FREE_TECH_USES - (p.freeTechsUsed || 0));
+}
 function freeTechOptions(S, pi) {
   const p = S.players[pi];
-  if (!isAbil(p, 'gratistech') || p.freeTechUsed === S.round) return [];
+  if (!isAbil(p, 'gratistech') || p.freeTechUsed === S.round || freeTechsLeft(p) <= 0) return [];
   if (evActive(S, pi, 'dunkles_zeitalter')) return [];
   return researchable(S, pi);
 }
@@ -427,6 +437,7 @@ function useFreeTech(S, pi, tk) {
   const err = grantTech(S, pi, tk, 'Freie Forschung');
   if (err) return err;
   p.freeTechUsed = S.round;
+  p.freeTechsUsed = (p.freeTechsUsed || 0) + 1;
   return null;
 }
 /* Griechenland "Rückschau": beliebige Tech eines früheren Zeitalters, auch nicht freigeschaltet. */
@@ -2047,28 +2058,51 @@ function captureCity(S, pi, city) {
 }
 
 /* ------------------------------------------------------------ Sieg & Zugende */
-/* Alle verfügbaren Siegschwellen. UN und Theologie senken die Standardschwelle von ⅔;
+/* Spielart für die Siegschwellen (VICTORY_THRESHOLDS, js/data.js): 'duell' – der Modus
+   „1 gegen 1" (S.duel) –, 'vier' – vier Reiche, auch Marathon und Tutorial –, sonst 'drei'.
+   Seit v101 (Anweisung des Autors) hat das Spiel zu viert eigene Schwellen; bis v100 galten zu
+   dritt und zu viert dieselben. Gezählt werden die Reiche der Aufstellung (empireCount: ohne
+   Barbaren, ausgeschiedene zählen mit) – wer zu viert beginnt, behält die Schwellen zu viert.
+   Ohne Spielstand (Regelbogen aus dem Hauptmenü) gilt die Vorgabe des Aufbaus: vier Reiche.
+   `S.victoryMode` übersteuert die Zählung – nur für die Wegwerf-Partie der Legephase
+   (placeTechView): sie hat ein einziges Reich, ihr Bogen soll aber die Schwellen der Partie
+   zeigen, die gerade gelegt wird. Ein Aufbau (cfg mit players und duel) zählt wie ein Spielstand. */
+function victoryMode(S) {
+  if (!S) return 'vier';
+  if (S.victoryMode) return S.victoryMode;
+  if (S.duel) return 'duell';
+  return Array.isArray(S.players) && empireCount(S) < 4 ? 'drei' : 'vier';
+}
+// Beschriftungen der drei Schwellen („4/7" …): für eine Spielart oder einen Spielstand
+function victoryLabels(x) {
+  const t = VICTORY_THRESHOLDS[typeof x === 'string' ? x : victoryMode(x)];
+  return { base: t.base.join('/'), theologie: t.theologie.join('/'), un: t.un.join('/') };
+}
+/* Alle verfügbaren Siegschwellen der Spielart. UN und Theologie senken die Grundschwelle;
    es gilt immer die niedrigste. Alle Schwellen sind „mehr als" – seit v77 auch der
    Standard (Anweisung des Autors: 4 von 6 sind nicht mehr als 2/3). Bis v74 galt dort
-   „mindestens", und im Spiel zu dritt reichten so 4 von 6 schon in Runde 1. */
+   „mindestens", und im Spiel zu dritt reichten so 4 von 6 schon in Runde 1.
+   Zurück kommt die Schwelle mit Zähler und Nenner (num, den), dem Bruch (frac – für
+   Anteile und Prozente) und ihrer Beschriftung (label). */
 function victoryOption(S, p) {
-  const duel = !!(S && S.duel);
-  // Im Duell liegen alle Schwellen höher: >3/4 statt >2/3, Theologie 7/10, UN 2/3
-  const L = victoryLabels(duel);
-  const opts = duel
-    ? [{ frac: DUEL_VICTORY_FRAC, strict: true, label: L.base }]
-    : [{ frac: VICTORY_FRAC, strict: true, label: L.base }];
-  if (has(p, 'un'))
-    opts.push({ frac: duel ? DUEL_UN_FRAC : UN_FRAC, strict: true, label: L.un });
-  if (has(p, 'theologie'))
-    opts.push({ frac: duel ? DUEL_THEOLOGY_FRAC : THEOLOGY_FRAC, strict: true, label: L.theologie });
+  const t = VICTORY_THRESHOLDS[victoryMode(S)];
+  const opt = k => ({ num: t[k][0], den: t[k][1], frac: t[k][0] / t[k][1], strict: true, label: t[k].join('/') });
+  const opts = [opt('base')];
+  if (has(p, 'un')) opts.push(opt('un'));
+  if (has(p, 'theologie')) opts.push(opt('theologie'));
   return opts.sort((a, b) => a.frac - b.frac)[0];
 }
+/* Reicht die Bevölkerung `mine` von `w` für die Schwelle o (victoryOption)? Ganzzahlig
+   verglichen (v101): mit dem Bruch rechnete die Gleitkommazahl an manchen Grenzen falsch –
+   im Duell mit Theologie galten 63 von 90 als „mehr als 7/10". */
+function victoryMet(o, mine, w) {
+  return o.strict ? mine * o.den > w * o.num : mine * o.den >= w * o.num;
+}
 /* Wirkungstext einer Technologie. Theologie und Vereinte Nationen senken die
-   Siegschwelle, und im Duell auf andere Werte als im normalen Spiel – der Bogen zeigte
-   dort bisher die Zahlen des Vierspielerspiels. */
+   Siegschwelle – je Spielart auf andere Werte (victoryMode); der Bogen zeigte im Duell
+   früher die Zahlen des Vierspielerspiels. */
 function techEffect(t, S) {
-  const L = victoryLabels(!!(S && S.duel));
+  const L = victoryLabels(S);
   if (t.k === 'theologie') return T('>%s der Bevölkerung zum Sieg', L.theologie);
   if (t.k === 'un') return T('>%s der Bevölkerung zum Sieg', L.un);
   // Marathon (v85): die Wissenschaftliche Methode wirkt doppelt
@@ -2093,8 +2127,7 @@ function checkVictory(S, pi) {
   // gerufen am Rundenende (checkEconomyRoundEnd, v85) – mit dem Stand von dort
   const p = S.players[pi], w = worldPop(S), mine = popOf(S, pi);
   const o = victoryOption(S, p);
-  const enough = o.strict ? mine > w * o.frac : mine >= w * o.frac;
-  if (w > 0 && enough && S.cities.length > 1)
+  if (w > 0 && victoryMet(o, mine, w) && S.cities.length > 1)
     claimVictory(S, pi, T('Wirtschaftssieg (%s von %s Weltbevölkerung, Schwelle %s)', mine, w, o.label), { rundenende: true });
   return S.over;
 }

@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v100';
+const APP_VERSION = 'v101';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -118,14 +118,14 @@ const TECHS = [
   { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 8, e: 'Hauptstadt produziert doppelt',
     voll: 'Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und gekaufte Felder' },
   { k: 'kartografie', n: 'Kartografie', f: 3, c: 9, e: 'Keine Distanzkosten beim Gründen' },
-  { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>3/5 der Bevölkerung zum Sieg' },
+  { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>1/2 der Bevölkerung zum Sieg' },
   { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten = 2 × Anzahl' },
   { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
   { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 13, e: 'Kein Bevölkerungsverlust beim Erobern' },
   { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen',
     voll: 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen. Gekaufte Felder zählen zur Hauptstadt (mit Bürokratie doppelt)' },
   { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Eine Münze ernährt drei Bevölkerung' },
-  { k: 'un', n: 'Vereinte Nationen', f: 3, c: 17, e: '>1/2 der Bevölkerung zum Sieg' },
+  { k: 'un', n: 'Vereinte Nationen', f: 3, c: 17, e: '>2/5 der Bevölkerung zum Sieg' },
   { k: 'oekologie', n: 'Ökologie', f: 3, c: 18, e: '+1 auf alle Erträge je 2 Bevölkerung im ganzen Reich (abrunden)' },
   { k: 'internet', n: 'Internet', f: 3, c: 19, e: '1 Tech/Runde kopieren' },
 ];
@@ -156,9 +156,7 @@ const FEED_COIN_RATE = 3;
 /* Gentechnik: so viel Wissenschaft aus dem Rundeneinkommen ergibt zu Zugbeginn eine
    Nahrung, abgerundet (v64: 2, v66: 4). Kommt zum Füttern 1:1 hinzu, ersetzt es nicht. */
 const GENE_SCI_PER_FOOD = 4;
-const VICTORY_FRAC = 2 / 3;        // Standard-Siegschwelle
-const THEOLOGY_FRAC = 3 / 5;       // mit Theologie
-const UN_FRAC = 1 / 2;             // mit Vereinte Nationen
+// Siegschwellen des Wirtschaftssiegs: VICTORY_THRESHOLDS weiter unten (seit v101 je Spielart)
 const BOT_RESEARCH_TWICE = true;
 const SLAVERY_OBSOLETE_IN_MODERN = true;
 const SLAVERY_COINS = 7;     // Sklaverei: Münzen je geopferter Bevölkerung (bis v83: 10)
@@ -168,10 +166,11 @@ const SLAVERY_COINS = 7;     // Sklaverei: Münzen je geopferter Bevölkerung (b
      die Wissenschaftliche Methode 2/3/4/5/10 (bis v96 2/4/6/8/10). Im Marathon zählen beide
      doppelt (MARATHON_DISCOUNT_FACTOR). Der alte Techtree behält die alte Methode
      (OLD_METHOD_DISCOUNT) – sonst ginge der feste Ablauf des Tutorials nicht mehr auf.
-   · Griechenlands Freie Forschung: seit v99 (Anweisung des Autors) einmal je Runde jede
-     erforschbare Technologie, auch die Singularität, in jeder Spielart (v97–v98 zweimal je
-     Partie aus jedem Zeitalter, ohne die Singularität; bis v96 einmal je Runde bis zur
-     Industrialisierung, im Marathon bis ins Mittelalter). Keine eigene Zahl mehr.
+   · Griechenlands Freie Forschung: seit v101 (Anweisung des Autors) höchstens FREE_TECH_USES-mal
+     je Partie und höchstens einmal je Runde jede erforschbare Technologie, auch die Singularität,
+     in jeder Spielart (v99–v100 einmal je Runde ohne Grenze je Partie; v97–v98 zweimal je Partie
+     aus jedem Zeitalter, ohne die Singularität; bis v96 einmal je Runde bis zur
+     Industrialisierung, im Marathon bis ins Mittelalter).
    · Kriegerkultur der Wikinger: +1 Macht je Armee, mit Burgenbau auch je Stadt (bis v96 +2).
    Dazu, ohne eigene Zahl (js/engine.js): Siedlertrecks wachsen zum Preis einer um 1 kleineren
    Stadt (growPrice), Fruchtbarkeit bringt ein bezahltes Wachstum mehr (growLimits).
@@ -179,6 +178,7 @@ const SLAVERY_COINS = 7;     // Sklaverei: Münzen je geopferter Bevölkerung (b
    zusammen. */
 const GREEK_DISCOUNT = [1, 1, 2, 2, 5];
 const METHOD_DISCOUNT = [2, 3, 4, 5, 10];
+const FREE_TECH_USES = 2;          // Freie Forschung: Nutzungen je Partie (v101; v97–v98 auch 2)
 const WARRIOR_POWER = 1;           // Kriegerkultur: Macht je Armee (mit Burgenbau je Stadt)
 
 const TECH_BY_KEY = {};
@@ -285,7 +285,8 @@ const MARATHON_SINGULARITY = 300;
 const MARATHON_CAPITALS = 2;        // eroberte Hauptstädte für den Militärsieg
 /* Seit v85 (Anweisung des Autors): Griechenlands Günstige Forschung und die Wissenschaftliche
    Methode wirken doppelt. Die Freie Forschung reichte v85–v96 im Marathon nur bis ins
-   Mittelalter; seit v99 gilt sie einmal je Runde für alles Erforschbare, auch hier. */
+   Mittelalter; seit v99 gilt sie für alles Erforschbare, auch hier – seit v101 zweimal je
+   Partie, höchstens einmal je Runde, wie überall. */
 const MARATHON_DISCOUNT_FACTOR = 2;
 /* Startausgleich (v85, Anweisung des Autors): im allerersten Zug bekommt der Zweite in der
    Zugfolge Münzen dazu, der Dritte mehr, der Vierte noch mehr – je Platz in der Zugfolge.
@@ -461,15 +462,22 @@ function mapRng(seed) {
   return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
 }
 
-/* Siegschwellen im Duell: 3/4 statt 2/3, mit Theologie 7/10, mit Vereinten Nationen 2/3 */
-const DUEL_VICTORY_FRAC = 3 / 4;
-const DUEL_THEOLOGY_FRAC = 7 / 10;
-const DUEL_UN_FRAC = 2 / 3;
-/* Beschriftungen der Siegschwellen – eine Quelle für Regelrechnung und Anzeige, damit
-   der Technologiebogen im Duell nicht die Werte des normalen Spiels zeigt. */
-const VICTORY_LABEL = { base: '2/3', theologie: '3/5', un: '1/2' };
-const DUEL_VICTORY_LABEL = { base: '3/4', theologie: '7/10', un: '2/3' };
-const victoryLabels = duel => duel ? DUEL_VICTORY_LABEL : VICTORY_LABEL;
+/* Siegschwellen des Wirtschaftssiegs je Spielart, als [Zähler, Nenner]: mehr als so viel der
+   Weltbevölkerung, mit Theologie oder Vereinten Nationen weniger – es gilt die niedrigste, die
+   ein Reich hat (victoryOption). Welche Spielart eine Partie hat, sagt victoryMode (js/engine.js).
+   · duell – der Modus „1 gegen 1": 3/4, mit Theologie 7/10, mit Vereinten Nationen 2/3.
+   · vier – vier Reiche, auch Marathon und Tutorial: seit v101 (Anweisung des Autors) 4/7, mit
+     Theologie 1/2, mit Vereinten Nationen 2/5 (bis v100 wie zu dritt).
+   · drei – drei Reiche (und was sonst weder Duell noch vier Reiche ist): 2/3, 3/5, 1/2.
+   Eine Quelle für Rechnung und Anzeige (Technologiebogen, Regelbogen, Protokoll, Erstes Spiel):
+   Bruch und Beschriftung kommen aus denselben zwei Zahlen, und verglichen wird ganzzahlig
+   (victoryMet). Bis v100 standen Brüche (VICTORY_FRAC, DUEL_…_FRAC) und Beschriftungen
+   (VICTORY_LABEL, DUEL_VICTORY_LABEL) getrennt. */
+const VICTORY_THRESHOLDS = {
+  duell: { base: [3, 4], theologie: [7, 10], un: [2, 3] },
+  vier: { base: [4, 7], theologie: [1, 2], un: [2, 5] },
+  drei: { base: [2, 3], theologie: [3, 5], un: [1, 2] },
+};
 
 /* ---------------------------------------------------------------- Spieltipps
    Kurze Ratschläge zum Spielen, wörtlich aus der Tippsammlung des Autors. Sie stehen
@@ -489,7 +497,7 @@ const TIPS = [
   'Es ist nicht immer korrekt durch Griechenlands Basisfähigkeit kostenlose Technologien sofort zu erforschen. Durch Philosophie kann ein späteres Forschen auch wertvoll sein.',
   'Griechenlands Rückschau hat einen langsamen Start, aber wird zum Ende hin immer besser.',
   'Der Schlüssel zu Griechenlands Rückschau ist es, frühestmöglich eine Technologie des Mittelalters forschen zu können.',
-  'Griechenlands Freie Forschung gilt jede Runde für jede erforschbare Technologie – auch für die Singularität, also den Forschungssieg. Wer in allen vier Feldern die Moderne erreicht, braucht dafür keine Wissenschaft mehr.',
+  'Griechenlands Freie Forschung gibt es nur zweimal je Partie und höchstens einmal je Runde. Früh genutzt bringt sie Tempo; wer eine aufhebt, kann mit ihr die Singularität umsonst erforschen, sobald in allen vier Feldern die Moderne erreicht ist – den Forschungssieg.',
   'Englands Handelsreich erlaubt hohe Flexibilität.',
   'Mit Englands Seemacht kann das Siedeln am Meer besser sein als Binnenstädte, muss es aber nicht.',
   'Englands Kolonisten haben nur einen Vorteil, solange es noch Platz zum Siedeln auf der Karte gibt. Plane dementsprechend.',
