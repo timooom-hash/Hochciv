@@ -1199,6 +1199,24 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     [[ohne, ohne], [mit]], '… englisch ebenso');
 }
 
+/* Das Tutorial spielt zu viert: sein Siegtext nennt die Schwelle zu viert (seit v101 4/7) und dazu
+   die zu dritt und im Duell – aus VICTORY_THRESHOLDS, lang und kurz, deutsch und englisch. */
+{
+  const st = TUT_STEPS.find(s => s.t === 'Die drei Wege zu gewinnen');
+  const L = m => victoryLabels(m).base;
+  const pruefe = (txt, satz) => [satz.every(x => txt.includes(x)), /zwei Drittel|two thirds/.test(txt)];
+  eq([L('vier'), L('drei'), L('duell')], ['4/7', '2/3', '3/4'], 'Grundschwellen zu viert, zu dritt, im Duell');
+  eq([pruefe(st.html(), ['mehr als 4/7 der Weltbevölkerung', 'zu dritt braucht es mehr als 2/3', 'im Duell mehr als 3/4']),
+    pruefe(st.kurz(), ['mehr als 4/7 der Weltbevölkerung', 'zu dritt 2/3, im Duell 3/4'])],
+    [[true, false], [true, false]], 'Tutorial: Siegtext lang und kurz mit 4/7 (zu viert), 2/3 und 3/4');
+  setLang('en', { quiet: true });
+  try {
+    eq([pruefe(st.html(), ['more than 4/7 of the world population', 'with three you need more than 2/3', 'in a duel more than 3/4']),
+      pruefe(st.kurz(), ['more than 4/7 of the world population', '2/3 with three, 3/4 in a duel'])],
+      [[true, false], [true, false]], '… englisch ebenso');
+  } finally { setLang('de', { quiet: true }); }
+}
+
 /* Griechenland hat keinen Würfelbonus mehr, der Kostenrabatt bleibt */
 {
   const S = mk('griechenland');
@@ -1216,12 +1234,27 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(techsIn(3, 1).map(t => t.k).includes('theologie'), true, 'Theologie: Spezial/Mittelalter');
 }
 
-/* Theologie senkt die Siegschwelle auf 3/5, UN gewinnt bei Gleichstand die niedrigere */
+/* Theologie und UN senken die Siegschwelle, die niedrigste gilt – je Spielart: zu viert seit v101
+   (Anweisung des Autors) 4/7 · Theologie 1/2 · UN 2/5, zu dritt weiter 2/3 · 3/5 · 1/2. */
 {
-  const S = mk('griechenland', ['theologie']);
-  eq(victoryOption(S, S.players[0]).frac, 3 / 5, 'Theologie setzt Schwelle auf 3/5');
-  S.players[0].techs.un = true;
-  eq(victoryOption(S, S.players[0]).frac, 0.5, 'UN (1/2) schlägt Theologie (3/5)');
+  const V = newGame({ seed: 7, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) }), p = V.players[0];
+  eq([victoryMode(V), victoryOption(V, p).label, victoryOption(V, p).frac], ['vier', '4/7', 4 / 7],
+    'zu viert: Grundschwelle 4/7 (bis v100 2/3)');
+  p.techs.theologie = true;
+  eq([victoryOption(V, p).label, victoryOption(V, p).frac], ['1/2', 1 / 2], 'zu viert mit Theologie 1/2 (bis v100 3/5)');
+  p.techs.un = true;
+  eq([victoryOption(V, p).label, victoryOption(V, p).frac], ['2/5', 2 / 5], 'zu viert: UN (2/5) schlägt Theologie (1/2) (bis v100 1/2)');
+  delete p.techs.theologie;
+  eq(victoryOption(V, p).label, '2/5', 'UN allein: 2/5');
+  const D = newGame({ seed: 7, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
+  const q = D.players[0];
+  eq([victoryMode(D), victoryOption(D, q).label], ['drei', '2/3'], 'zu dritt: Grundschwelle weiter 2/3');
+  q.techs.theologie = true;
+  eq(victoryOption(D, q).frac, 3 / 5, 'zu dritt mit Theologie weiter 3/5');
+  q.techs.un = true;
+  eq(victoryOption(D, q).frac, 0.5, 'zu dritt: UN (1/2) schlägt Theologie (3/5)');
+  // Zähler und Nenner stehen an der Schwelle – verglichen wird ganzzahlig (victoryMet)
+  eq([victoryOption(V, p).num, victoryOption(V, p).den], [2, 5], 'die Schwelle trägt Zähler und Nenner');
 }
 
 /* Keramik + Verbundwerkstoffe: bis 3x wachsen, davon 1x gratis */
@@ -3411,6 +3444,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   // --- Technologiekosten
   const M = newGame({ seed: 3, map: marathonMap(3), marathon: true, players: CIVS.map(c => ({ civ: c.k, kind: 'human', drafted: ['england:basis', 'russland:basis'] })) });
   const N = newGame({ seed: 3, players: CIVS.map(c => ({ civ: c.k, kind: 'human', ability: 'gratistech' })) });
+  eq([victoryMode(M), victoryOption(M, M.players[0]).label], ['vier', '4/7'], 'Marathon: vier Reiche, also die Siegschwellen zu viert (v101)');
   const k4 = ['mathematik', 'papier', 'chemie', 'computertechnik'].map(k => TECH_BY_KEY[k]);
   eq(k4.map(t => techCost(M, 0, t)), k4.map((t, i) => techCost(N, 0, t) * [2, 3, 4, 5][i]),
     'Marathon: Antike ×2, Mittelalter ×3, Industrialisierung ×4, Moderne ×5');
@@ -3696,10 +3730,22 @@ const duellKarte = (civA, civB, seed) => {
   eq(victoryOption(S, p).label, '7/10', 'mit Theologie >7/10');
   p.techs.un = true;
   eq(victoryOption(S, p).label, '2/3', 'mit Vereinten Nationen >2/3, die niedrigste gilt');
-  // im normalen Spiel bleiben die alten Schwellen
-  const N = mk('griechenland', ['theologie', 'un']);
-  eq(victoryOption(N, N.players[0]).label, '1/2', 'ohne Duell weiter UN 1/2');
-  eq(victoryOption(N, mk('griechenland').players[0]).label, '2/3', 'und Grundschwelle 2/3');
+  eq(victoryMode(S), 'duell', 'Spielart Duell');
+  // ohne Duell: zu dritt die Schwellen von bis v100, zu viert seit v101 eigene
+  const drei = techs => {
+    const X = newGame({ seed: 8, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
+    techs.forEach(t => { X.players[0].techs[t] = true; });
+    return victoryOption(X, X.players[0]).label;
+  };
+  const vier = techs => {
+    const X = newGame({ seed: 8, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
+    techs.forEach(t => { X.players[0].techs[t] = true; });
+    return victoryOption(X, X.players[0]).label;
+  };
+  eq([drei([]), drei(['theologie']), drei(['theologie', 'un'])], ['2/3', '3/5', '1/2'], 'zu dritt: 2/3, Theologie 3/5, UN 1/2');
+  eq([vier([]), vier(['theologie']), vier(['theologie', 'un'])], ['4/7', '1/2', '2/5'], 'zu viert (v101): 4/7, Theologie 1/2, UN 2/5');
+  // zwei Reiche ohne den Duellmodus gibt es im Aufbau nicht – sie zählen wie drei (nicht vier)
+  eq(victoryOption(mk('griechenland'), mk('griechenland').players[0]).label, '2/3', 'zwei Reiche ohne Duellmodus: wie zu dritt');
 }
 /* Wirtschaftssieg im Duell greift erst über 3/4 */
 {
@@ -3715,15 +3761,51 @@ const duellKarte = (civA, civB, seed) => {
   a.pop = 4;                                 // 4/5 > 3/4
   checkEconomyRoundEnd(S);
   eq(S.claims.map(c => c.pi), [0], 'über 3/4 wird der Sieg angemeldet');
-  // im Vier-Reiche-Spiel hätte 3/4 schon gereicht – dort gilt „mehr als 2/3" (seit v77
-  // strikt wie alle anderen Schwellen; bis v74 genügten genau 2/3)
+  // ganzzahlig verglichen (v101): im Duell mit Theologie sind 63 von 90 genau 7/10 – bis v100 galt
+  // das mit dem Gleitkommabruch als „mehr als"
+  const G7 = (eigen, fremd) => {
+    const X = newGame({ seed: 9, duel: true, map: duellKarte('griechenland', 'england', 9),
+      players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+    X.players[0].techs.theologie = true;
+    capitalOf(X, 0).pop = eigen; capitalOf(X, 1).pop = fremd;
+    checkEconomyRoundEnd(X);
+    return X.claims.length;
+  };
+  eq([63 > 90 * (7 / 10), G7(63, 27), G7(64, 26)], [true, 0, 1],
+    'Duell mit Theologie: 63 von 90 (genau 7/10) reichen nicht, 64 schon – der Bruch allein hätte sich verrechnet');
+  eq([victoryMet({ num: 7, den: 10, strict: true }, 63, 90), victoryMet({ num: 7, den: 10, strict: false }, 63, 90)],
+    [false, true], 'victoryMet: „mehr als" und „mindestens" an der Grenze');
+  // Zu viert hätte 3/4 schon gereicht – dort gilt seit v101 „mehr als 4/7" (seit v77 strikt wie
+  // alle anderen Schwellen; bis v74 genügten genau 2/3, v77–v100 mehr als 2/3)
   const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
-  N.cities.forEach(c => { c.pop = c.owner === 0 ? 6 : 1; });   // 6 von 9 = genau 2/3
+  N.cities.forEach(c => { c.pop = c.owner === 0 ? 4 : 1; });   // 4 von 7 = genau 4/7
   checkEconomyRoundEnd(N);
-  eq(N.claims.length, 0, 'ohne Duell reichen genau 2/3 nicht mehr (mehr als 2/3, v77)');
-  N.cities.forEach(c => { c.pop = c.owner === 0 ? 7 : 1; });   // 7 von 10 > 2/3
+  eq(N.claims.length, 0, 'zu viert reichen genau 4/7 nicht (mehr als 4/7, v101)');
+  N.cities.forEach(c => { c.pop = c.owner === 0 ? 8 : c.owner === 1 ? 4 : 1; });   // 8 von 14 = genau 4/7
   checkEconomyRoundEnd(N);
-  eq(N.claims.map(c => c.pi), [0], 'mehr als 2/3 wird angemeldet');
+  eq(N.claims.length, 0, '… auch 8 von 14 nicht');
+  N.cities.forEach(c => { c.pop = c.owner === 0 ? 5 : 1; });   // 5 von 8 > 4/7 (bis v100 zu wenig: < 2/3)
+  checkEconomyRoundEnd(N);
+  eq(N.claims.map(c => c.pi), [0], 'mehr als 4/7 wird angemeldet – 5 von 8 (bis v100 erst über 2/3)');
+  // zu viert mit Theologie: genau 1/2 nicht, mehr schon; mit UN: genau 2/5 nicht, mehr schon
+  const vierMit = (tech, eigen, rest) => {
+    const X = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
+    X.players[0].techs[tech] = true;
+    X.cities.forEach(c => { c.pop = c.owner === 0 ? eigen : rest; });
+    checkEconomyRoundEnd(X);
+    return X.claims.length;
+  };
+  eq([vierMit('theologie', 3, 1), vierMit('theologie', 4, 1)], [0, 1], 'zu viert mit Theologie: 3 von 6 (genau 1/2) nicht, 4 von 7 schon');
+  eq([vierMit('un', 2, 1), vierMit('un', 4, 2), vierMit('un', 3, 1)], [0, 0, 1],
+    'zu viert mit UN: 2 von 5 und 4 von 10 (genau 2/5) nicht, 3 von 6 schon');
+  // zu dritt weiter mehr als 2/3
+  const D = newGame({ seed: 9, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
+  D.cities.forEach(c => { c.pop = c.owner === 0 ? 4 : 1; });   // 4 von 6 = genau 2/3
+  checkEconomyRoundEnd(D);
+  eq(D.claims.length, 0, 'zu dritt reichen genau 2/3 weiter nicht');
+  D.cities.forEach(c => { c.pop = c.owner === 0 ? 5 : 1; });   // 5 von 7 > 2/3
+  checkEconomyRoundEnd(D);
+  eq(D.claims.map(c => c.pi), [0], 'zu dritt: mehr als 2/3 wird angemeldet');
 }
 /* Wirtschaftssieg am Rundenende (v85, Anweisung des Autors): einmal je Runde, an ihrem Ende –
    wenn alle gleich oft gezogen haben –, mit der Bevölkerung von dort. Wer gewinnt, gewinnt
@@ -3734,7 +3816,7 @@ const duellKarte = (civA, civB, seed) => {
     players: ['russland', 'griechenland', 'england', 'wikinger'].map(k => ({ civ: k, kind: 'human' })) });
   const S = vier();
   endTurn(S);                                                     // Russland fertig
-  capitalOf(S, 1).pop = 9;                                        // Griechenland: 9 von 12 > 2/3
+  capitalOf(S, 1).pop = 9;                                        // Griechenland: 9 von 12 > 4/7
   endTurn(S); endTurn(S);                                         // Griechenland, England
   eq([S.claims.length, S.over], [0, null], 'während der Runde wird nichts angemeldet');
   endTurn(S);                                                     // Wikinger: Rundenende
@@ -3751,7 +3833,7 @@ const duellKarte = (civA, civB, seed) => {
   const U = vier();
   endTurn(U);                                                     // Russland
   claimVictory(U, 1, 'Forschungssieg (Singularität)');            // Griechenland in seinem Zug
-  capitalOf(U, 2).pop = 12;                                       // England: 12 von 15 > 2/3
+  capitalOf(U, 2).pop = 12;                                       // England: 12 von 15 > 4/7
   for (let i = 0; i < 3; i++) endTurn(U);
   eq([U.claims.map(c => c.pi), !!U.over, U.over && U.over.score && U.over.score.length], [[1, 2], true, 2],
     'Wirtschaftssieg am Rundenende neben der Singularität derselben Runde: die Punkte entscheiden');
@@ -3965,8 +4047,9 @@ const duellKarte = (civA, civB, seed) => {
 }
 
 /* Griechenland: Alternativen ersetzen den Kostenrabatt.
-   Freie Forschung seit v99 (Anweisung des Autors): einmal je Runde jede erforschbare Technologie,
-   aus jedem Zeitalter und auch die Singularität – also der Forschungssieg. v97–v98 zweimal je
+   Freie Forschung seit v101 (Anweisung des Autors): höchstens zweimal je Partie und höchstens
+   einmal je Runde jede erforschbare Technologie, aus jedem Zeitalter und auch die Singularität –
+   also der Forschungssieg. v99–v100 einmal je Runde ohne Grenze je Partie, v97–v98 zweimal je
    Partie ohne die Singularität, bis v96 einmal je Runde und nur bis zur Industrialisierung. */
 {
   const S = mkA('griechenland', 'gratistech'), p = S.players[0];
@@ -3978,15 +4061,28 @@ const duellKarte = (civA, civB, seed) => {
   eq(useFreeTech(S, 0, 'chemie'), T('Nicht möglich.'), '… und nicht Verfügbares geht auch nicht');
   eq(freeTechOptions(S, 0).map(t => t.k).sort(), researchable(S, 0).map(t => t.k).sort(),
     'zur Wahl steht genau, was der Bogen erforschbar nennt');
+  eq([FREE_TECH_USES, freeTechsLeft(p)], [2, 2], 'zweimal je Partie, beide offen');
   const vorrat = JSON.stringify(p.res);
   eq(useFreeTech(S, 0, 'papier'), null, 'Gratisforschung klappt');
-  eq([has(p, 'papier'), JSON.stringify(p.res) === vorrat, p.freeTechUsed], [true, true, S.round],
-    'Tech ist erforscht, nichts bezahlt, die Runde ist vermerkt');
-  eq([freeTechOptions(S, 0).length, useFreeTech(S, 0, 'robotik')], [0, T('Nicht möglich.')],
-    'einmal je Runde: eine zweite im selben Zug geht nicht');
+  eq([has(p, 'papier'), JSON.stringify(p.res) === vorrat, p.freeTechUsed, p.freeTechsUsed, freeTechsLeft(p)],
+    [true, true, S.round, 1, 1], 'Tech ist erforscht, nichts bezahlt, Runde und Zahl sind vermerkt – noch eine offen');
+  eq([freeTechOptions(S, 0).length, useFreeTech(S, 0, 'robotik'), p.freeTechsUsed], [0, T('Nicht möglich.'), 1],
+    'höchstens einmal je Runde: eine zweite im selben Zug geht nicht (und zählt nicht)');
   S.round += 1;
   eq(freeTechOptions(S, 0).some(t => t.k === 'robotik'), true, 'in der nächsten Runde wieder');
-  eq([useFreeTech(S, 0, 'robotik'), has(p, 'robotik')], [null, true], 'nächste Runde: Robotik (Moderne) umsonst');
+  eq([useFreeTech(S, 0, 'robotik'), has(p, 'robotik'), freeTechsLeft(p)], [null, true, 0],
+    'nächste Runde: Robotik (Moderne) umsonst – damit sind beide verbraucht');
+  p.avail.chemie = true;
+  for (const r of [1, 2, 5]) {
+    S.round += r;
+    eq([freeTechOptions(S, 0).length, useFreeTech(S, 0, 'chemie'), has(p, 'chemie')], [0, T('Nicht möglich.'), false],
+      `zweimal je Partie: auch ${r} Runde(n) später keine dritte`);
+  }
+  // was sonst kostenlos kommt (etwa aus einem Wunder), verbraucht keine Freie Forschung
+  const O = mkA('griechenland', 'gratistech'), o = O.players[0];
+  o.avail.papier = true;
+  eq([grantTech(O, 0, 'papier', 'Oxford'), freeTechsLeft(o), o.freeTechUsed], [null, 2, undefined],
+    'eine Technologie aus einem Wunder zählt nicht mit');
   // die Singularität auch, sobald sie erforschbar ist – das ist der Forschungssieg
   const G = mkA('griechenland', 'gratistech'), q = G.players[0];
   eq(freeTechOptions(G, 0).some(t => t.k === 'singularitaet'), false, 'ohne die Moderne in jedem Feld keine Singularität');
@@ -4004,24 +4100,45 @@ const duellKarte = (civA, civB, seed) => {
   D.players[0].avail.papier = true;
   setEvent(D, 'dunkles_zeitalter');
   eq([evActive(D, 0, 'dunkles_zeitalter'), freeTechOptions(D, 0).length], [true, 0], 'Dunkles Zeitalter: keine Freie Forschung');
-  // Spielstand von v97/v98: der Zähler (p.freeTechsUsed) bedeutet nichts mehr
+  // … und verbraucht nichts: die Freie Forschung bleibt für die nächste Runde
+  eq([D.players[0].freeTechsUsed, freeTechsLeft(D.players[0])], [undefined, 2], 'ein Dunkles Zeitalter verbraucht keine');
+  // Spielstand von v97/v98: der Zähler (p.freeTechsUsed) bedeutet wieder dasselbe – zwei verbraucht
   const A = mkA('griechenland', 'gratistech');
   A.players[0].freeTechsUsed = 2;
   A.players[0].avail.papier = true;
   migrateState(A);
-  eq(['freeTechsUsed' in A.players[0], freeTechOptions(A, 0).some(t => t.k === 'papier')], [false, true],
-    'Spielstand von v97/v98: der Zähler verschwindet, die Freie Forschung ist wieder offen');
-  // Spielstand von v96: die Runde der letzten Nutzung gilt weiter (dieselbe Bedeutung wie heute)
+  eq([A.players[0].freeTechsUsed, freeTechOptions(A, 0).length], [2, 0],
+    'Spielstand von v97/v98: der Zähler bleibt (bis v100 gelöscht), beide sind verbraucht');
+  const A1 = mkA('griechenland', 'gratistech');
+  A1.players[0].freeTechsUsed = 1; A1.players[0].avail.papier = true;
+  migrateState(A1);
+  eq([freeTechsLeft(A1.players[0]), freeTechOptions(A1, 0).some(t => t.k === 'papier')], [1, true],
+    'Spielstand von v97/v98 mit einer genutzten: eine offen');
+  // Spielstand von v99/v100 (und bis v96): nur die Runde der letzten Nutzung – mindestens eine verbraucht
   const B = mkA('griechenland', 'gratistech');
   B.players[0].freeTechUsed = B.round; B.players[0].avail.papier = true;
   migrateState(B);
-  eq(freeTechOptions(B, 0).length, 0, 'Spielstand von v96: in dieser Runde schon genutzt – bleibt so');
+  eq([freeTechOptions(B, 0).length, B.players[0].freeTechsUsed], [0, 1],
+    'Spielstand von v99/v100: in dieser Runde schon genutzt – bleibt so, und eine zählt als verbraucht');
+  B.round += 1;
+  eq([useFreeTech(B, 0, 'papier'), freeTechsLeft(B.players[0])], [null, 0], '… in der nächsten Runde die zweite, dann keine mehr');
+  const C = mkA('griechenland', 'gratistech');
+  C.round = 4; C.players[0].freeTechUsed = 2; C.players[0].avail.papier = true;
+  migrateState(C);
+  eq([freeTechsLeft(C.players[0]), freeTechOptions(C, 0).some(t => t.k === 'papier')], [1, true],
+    'Spielstand von v99/v100, in Runde 2 genutzt: in Runde 4 noch eine offen');
+  const U = mkA('griechenland', 'gratistech');
+  migrateState(U); migrateState(U);
+  eq([U.players[0].freeTechsUsed, freeTechsLeft(U.players[0])], [undefined, 2], 'nie genutzt: beide offen, auch nach zweimal migrateState');
+  migrateState(B);
+  eq(B.players[0].freeTechsUsed, 2, 'migrateState ändert einen neuen Spielstand nicht');
 }
 
 /* Marathon (v85, Anweisung des Autors): Griechenlands Günstige Forschung und die
    Wissenschaftliche Methode ziehen doppelt ab – seit v97 also 2/2/4/4/10 bzw. 4/6/8/10/20. Die
    Freie Forschung reichte im Marathon nur bis ins Mittelalter; seit v97 gilt sie überall gleich
-   (v99: einmal je Runde, alles Erforschbare). Im normalen Spiel zieht nichts doppelt ab. */
+   (v99: alles Erforschbare; v101: zweimal je Partie, höchstens einmal je Runde). Im normalen Spiel
+   zieht nichts doppelt ab. */
 {
   const spiel = (marathon, ab) => {
     const S = newGame({ seed: 7, map: marathon ? marathonMap(7) : undefined, marathon,
@@ -4086,9 +4203,12 @@ const duellKarte = (civA, civB, seed) => {
   const minus = METHOD_DISCOUNT.map(n => '−' + n).join('/');
   eq([TECH_BY_KEY.wiss_methode.e.includes(minus), DATA_EN.tech.wiss_methode[1].includes(minus)], [true, true],
     `Wissenschaftliche Methode nennt ${minus}, deutsch und englisch`);
-  eq([ab('griechenland:gratistech').e.startsWith('1× pro Runde') && ab('griechenland:gratistech').e.includes('auch die Singularität'),
-    en('griechenland', 'gratistech').startsWith('Once per round') && en('griechenland', 'gratistech').includes('the Singularity included')],
-    [true, true], 'Freie Forschung: einmal je Runde, auch die Singularität (v99), deutsch und englisch');
+  const wie = { 2: 'Twice' }[FREE_TECH_USES] || FREE_TECH_USES + ' times';
+  eq([ab('griechenland:gratistech').e.startsWith(FREE_TECH_USES + '× pro Partie, höchstens 1× pro Runde') &&
+    ab('griechenland:gratistech').e.includes('auch die Singularität'),
+    en('griechenland', 'gratistech').startsWith(wie + ' per game, at most once per round') &&
+    en('griechenland', 'gratistech').includes('the Singularity included')],
+    [true, true], `Freie Forschung: ${FREE_TECH_USES}× je Partie, höchstens einmal je Runde, auch die Singularität (v101), deutsch und englisch`);
   eq([ab('wikinger:armeemacht').e.includes('+' + WARRIOR_POWER + ' Macht'), en('wikinger', 'armeemacht').includes('+' + WARRIOR_POWER + ' power')],
     [true, true], `Kriegerkultur nennt +${WARRIOR_POWER} Macht`);
   eq([ab('russland:wachstum').e, en('russland', 'wachstum')].map(t => /zusätzliches Wachstum|extra growth/.test(t)), [true, true],
@@ -5122,13 +5242,17 @@ const duellKarte = (civA, civB, seed) => {
 {
   const art = (S) => freeActions(S, 0);
   // Griechenland, Freie Forschung
-  // (seit v99 wieder einmal je Runde: genutzt zählt sie nicht mehr, in der nächsten Runde wieder)
+  // (seit v101 zweimal je Partie, höchstens einmal je Runde: genutzt zählt sie in dieser Runde
+  // nicht mehr, in der nächsten wieder – nach der zweiten nie mehr)
   const S = mkA('griechenland', 'gratistech');
   eq(art(S), ['forschung'], 'Freie Forschung offen: eine Art');
   eq(useFreeTech(S, 0, freeTechOptions(S, 0)[0].k), null, 'Freie Forschung genutzt');
   eq(art(S), [], 'diese Runde genutzt – keine Art mehr');
   S.round++;
   eq(art(S), ['forschung'], 'in der nächsten Runde wieder eine Art');
+  eq(useFreeTech(S, 0, freeTechOptions(S, 0)[0].k), null, 'die zweite genutzt');
+  S.round++;
+  eq(art(S), [], 'beide verbraucht – auch in der nächsten Runde keine Art mehr');
   // Verbundwerkstoffe in drei Städten: EINE Art; an der Nahrungsgrenze keine
   const W = mkA('russland', 'basis', ['verbundwerkstoffe']);
   W.map.rows = W.map.rows.map(z => 'G'.repeat(z.length));
@@ -5237,6 +5361,7 @@ const duellKarte = (civA, civB, seed) => {
       const st = TUT_STEPS[i];
       const txt = (st.html() + ' ' + (st.task || '')).replace(/<[^>]+>/g, ' ')
         .replace(/Zug 1\/2/g, '')                        // Belagerungszähler ist keine Koordinate
+        .replace(/(mehr als|zu dritt|im Duell) \d+\/\d+/g, '$1')   // Siegschwellen (v101: mehr als 4/7 …) auch nicht
         .replace(/\d+(\/\d+)+\)/g, ')');                 // Kostenstaffeln wie (1/3/6/10) auch nicht
       if (/\b\d{1,2}\/\d{1,2}\b/.test(txt)) bad.push(st.t);
       if (st.goal && !st.goal()) st.auto();
@@ -7008,16 +7133,38 @@ for (const n of [2, 3, 4]) {
     seed: 1, duel: true,
     players: [{ civ: 'england', kind: 'bot' }, { civ: 'russland', kind: 'bot' }],
   });
-  eq(techEffect(T, N), '>3/5 der Bevölkerung zum Sieg', 'Theologie normal: 3/5');
-  eq(techEffect(U, N), '>1/2 der Bevölkerung zum Sieg', 'Vereinte Nationen normal: 1/2');
+  eq(techEffect(T, N), '>1/2 der Bevölkerung zum Sieg', 'Theologie zu viert: 1/2 (v101; bis v100 3/5)');
+  eq(techEffect(U, N), '>2/5 der Bevölkerung zum Sieg', 'Vereinte Nationen zu viert: 2/5 (v101; bis v100 1/2)');
   eq(techEffect(T, D), '>7/10 der Bevölkerung zum Sieg', 'Theologie im Duell: 7/10');
   eq(techEffect(U, D), '>2/3 der Bevölkerung zum Sieg', 'Vereinte Nationen im Duell: 2/3');
   eq(techEffect(TECH_BY_KEY.rad, D), TECH_BY_KEY.rad.e, 'andere Technologien bleiben, wie sie sind');
-  eq(techEffect(T, null), '>3/5 der Bevölkerung zum Sieg', 'ohne Spielstand die Normalwerte');
+  eq(techEffect(T, null), '>1/2 der Bevölkerung zum Sieg', 'ohne Spielstand die Werte zu viert (die Vorgabe im Aufbau)');
+  eq([T.e, U.e], [techEffect(T, null), techEffect(U, null)], 'der Text am Bogen (TECHS) nennt dieselben Werte');
+  eq([DATA_EN.tech.theologie[1], DATA_EN.tech.un[1]], ['>1/2 of the population to win', '>2/5 of the population to win'],
+    '… englisch ebenso');
+  const Z = newGame({ seed: 1, players: ['england', 'russland', 'wikinger'].map(k => ({ civ: k, kind: 'bot' })) });
+  eq([techEffect(T, Z), techEffect(U, Z)], ['>3/5 der Bevölkerung zum Sieg', '>1/2 der Bevölkerung zum Sieg'],
+    'zu dritt weiter 3/5 und 1/2');
   // die Anzeige muss zur Rechnung passen
   const pT = { civ: 'england', techs: { theologie: true }, kind: 'human', ability: 'basis' };
   eq(victoryOption(D, pT).label, '7/10', 'Rechnung und Anzeige nennen dieselbe Schwelle');
-  eq(victoryOption(N, pT).label, '3/5', 'auch im normalen Spiel');
+  eq([victoryOption(N, pT).label, victoryOption(Z, pT).label], ['1/2', '3/5'], 'auch zu viert und zu dritt');
+  for (const X of [N, D, Z]) {
+    const L = victoryLabels(X);
+    eq([L.base, L.theologie, L.un], [victoryOption(X, { techs: {} }).label, victoryOption(X, { techs: { theologie: true } }).label,
+      victoryOption(X, { techs: { un: true } }).label], `Beschriftungen und Rechnung aus einer Quelle (${victoryMode(X)})`);
+  }
+  // Spielart: Barbaren zählen nicht, Ausgeschiedene schon; ein Aufbau zählt wie ein Spielstand
+  const B = newGame({ seed: 2, events: true, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
+  barbIndex(B);                                                    // die Barbaren erscheinen (Ereignis)
+  eq([B.players.length, victoryMode(B)], [4, 'drei'], 'Barbaren machen aus drei Reichen keine vier');
+  N.players[3].dead = true;
+  eq(victoryMode(N), 'vier', 'wer zu viert beginnt, behält die Schwellen zu viert, auch wenn ein Reich ausscheidet');
+  eq([victoryMode({ duel: true, players: [{ kind: 'human' }, { kind: 'ki' }] }),
+    victoryMode({ players: [{ kind: 'human' }, { kind: 'ki' }, { kind: 'bot' }] }),
+    victoryMode({ players: [{ kind: 'human' }, { kind: 'ki' }, { kind: 'bot' }, { kind: 'bot' }] })],
+    ['duell', 'drei', 'vier'], 'ein Aufbau (players, duel) zählt wie ein Spielstand');
+  eq(victoryMode({ victoryMode: 'drei', players: [{ kind: 'human' }] }), 'drei', 'S.victoryMode übersteuert die Zählung (Legephase)');
 }
 
 /* ============================================================ Sprachen (i18n)
@@ -7892,9 +8039,9 @@ function kiAbwehrLage(popKI, gross) {
   eq([kiMethodeAnteil(N), kiMethodeAnteil(O)], [12 / 18, 1], 'KI: Zuschlag der Methode auf zwei Drittel, im alten Techtree wie bisher');
 }
 {
-  /* --- v99: Freie Forschung einmal je Runde – die KI erwägt jede Runde alles, was zur Wahl steht
-     (bis v98 hob sie die zwei Freien Forschungen je Partie für die Moderne auf), und mit der
-     Moderne in jedem Feld holt sie sich die Singularität umsonst. */
+  /* --- v101: Freie Forschung zweimal je Partie, höchstens einmal je Runde – die KI erwägt sie,
+     sobald sie geht, für alles, was zur Wahl steht (wie v99–v100; gemessen besser als Aufheben,
+     ANNAHMEN.md v101), und mit der Moderne in jedem Feld holt sie sich die Singularität umsonst. */
   const lage = (runde, avail) => {
     const S = newGame({ seed: 5, players: [{ civ: 'griechenland', kind: 'ki', kiLevel: 'schwer', ability: 'gratistech' }, { civ: 'england', kind: 'bot' }] });
     const pi = S.players.findIndex(p => p.kind === 'ki'), p = S.players[pi];
@@ -7907,12 +8054,24 @@ function kiAbwehrLage(popKI, gross) {
   eq(kiFreeTechChoices(a.S, a.pi, K).map(t => t.k).sort(), freeTechOptions(a.S, a.pi).map(t => t.k).sort(),
     'die KI erwägt jede Freie Forschung, die zur Wahl steht');
   kiTurn(a.S, a.pi);
-  eq(a.p.freeTechUsed, 2, 'ein Zug der KI: die Freie Forschung dieser Runde ist genutzt');
+  eq([a.p.freeTechUsed, a.p.freeTechsUsed], [2, 1], 'ein Zug der KI: die Freie Forschung dieser Runde ist genutzt, eine verbraucht');
+  eq(kiFreeTechChoices(a.S, a.pi, kiContext(a.S, a.pi)), [], '… und im selben Zug erwägt sie keine zweite');
+  a.p.freeTechsUsed = 2; a.S.round = 3;
+  eq(kiFreeTechChoices(a.S, a.pi, kiContext(a.S, a.pi)), [], 'beide verbraucht: auch in der nächsten Runde keine');
   const b = lage(3, {});
   for (const f of [0, 1, 2, 3]) b.p.techs[TECHS.find(t => t.f === f && t.age === 3).k] = true;
+  b.p.freeTechsUsed = 1; b.p.freeTechUsed = 2;          // die letzte
   kiTurn(b.S, b.pi);
-  eq([has(b.p, 'singularitaet'), (b.S.claims || []).some(c => c.pi === b.pi)], [true, true],
-    'mit der Moderne in jedem Feld: die KI nimmt die Singularität umsonst und meldet den Forschungssieg an');
+  eq([has(b.p, 'singularitaet'), (b.S.claims || []).some(c => c.pi === b.pi), b.p.freeTechsUsed], [true, true, 2],
+    'mit der Moderne in jedem Feld: die KI nimmt mit der letzten Freien Forschung die Singularität und meldet den Forschungssieg an');
+  // eine ganze Partie (KI gegen KI): nie mehr als zwei, nie zwei in derselben Runde
+  const G = newGame({ seed: 41, startPlayer: 0, players: [{ civ: 'griechenland', kind: 'ki', kiLevel: 'schwer', ability: 'gratistech' },
+    { civ: 'england', kind: 'ki', kiLevel: 'schwer', ability: 'basis' }] });
+  for (let i = 0; i < 24 && !G.over; i++) { kiTurn(G, G.cur); if (G.over) break; endTurn(G); }
+  const frei = G.log.filter(l => /\(Freie Forschung\)\.$/.test(l.m));
+  const gr = G.players.find(p => p.civ === 'griechenland');
+  eq([frei.length <= FREE_TECH_USES, new Set(frei.map(l => l.r)).size === frei.length, gr.freeTechsUsed || 0],
+    [true, true, frei.length], `eine Partie der KI: ${frei.length} Freie Forschung(en) in Runde ${frei.map(l => l.r).join(', ') || '–'} – höchstens zwei, je Runde eine`);
 }
 {
   // --- Entschlossener Angreifer (Menschen): sein Budget enthält Alchemie, wenn er sie diesen

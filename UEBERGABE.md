@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 4.11., `sw.js` v100)
+# Hochzeivilization — Projekt-Übergabe (Stand 5.11., `sw.js` v101)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v100)
+## Letzte Sitzungen auf einen Blick (v61 → v101)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -55,6 +55,12 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v98 | Anweisung des Autors: **Startausgleich 2/4/6** Münzen für den Zweiten, Dritten und Vierten (bis v97 1/2/3), **zu zweit der Zweite 4** (bis v97 1; `START_BONUS_DUEL`, „zu zweit" = zwei Reiche ohne Barbaren), zu dritt 2 und 4. Der Satz im Regelbogen kommt aus den Zahlen (`startBonusText`) | Regel |
 | v99 | Zehn Anweisungen des Autors: **große Karte entfernt**; Startspieler ab Werk **„Zufällig"**; **Freie Forschung einmal je Runde**, jede erforschbare Technologie **samt Singularität**, in jeder Spielart (`freeTechOptions` = `researchable`, `p.freeTechUsed` = Runde); **drei Reiche nur auf der Plättchenkarte** (dort und im Duell sind damit Doppelte erlaubt, `setupPick`); **experimenteller Plättchenmodus** für vier Reiche: 10 von 20 **Sechsecken** zu 19 Feldern, schräg 3/4/3, Start an den Enden der Dreierreihen, sechs Lagen (`HEX_POOL`, `TILE_SHAPES.hex4`); **Flüsse** als Wasserlauf auf grünem Flusstal, **Inseln** mit Wasserrand (`riverLines`); **Welt in Zugfolge** und als Knopf in der **Legephase**; nach dem Legen **kein Schritt „Spiel beginnen"** mehr; Erstes Spiel: **Basiskosten 1/3/6/10** im Schritt „Eine zweite Stadt" | Regel + Modus + Oberfläche |
 | v100 | Zwei Anweisungen des Autors: Englands **Kolonisten halbieren die Gründungskosten, aufgerundet** – Stadtkosten plus Weg, mit Kartografie nur die Stadtkosten (`foundCostOf`, für Regel und KI; bis v99 keine Stadtkosten und mit Kartografie die günstigere der beiden – diese Sonderregel ist weg; das doppelte Wachstum bleibt); **Marathon ohne Grenze von fünf Gründungen je Zug** (`MARATHON_MAX_FOUNDS`, `foundedThisTurn`, `p.foundRound`/`p.foundCount` weg, `migrateState` räumt den Zähler aus alten Ständen) | Regel |
+| v101 | Zwei Anweisungen des Autors: Griechenlands **Freie Forschung höchstens zweimal je Partie und höchstens einmal je Runde**, weiter alles Erforschbare samt Singularität (`FREE_TECH_USES`, `freeTechsLeft`, `p.freeTechsUsed` neben `p.freeTechUsed`; die KI nutzt sie, sobald sie geht – gemessen besser als Aufheben: Griechenland 20,5 % statt 30,3 % mit v100, gleiche Chance 25 %); **Wirtschaftssieg zu viert über 4/7, mit Theologie 1/2, mit Vereinten Nationen 2/5** (zu dritt weiter 2/3 · 3/5 · 1/2, im Duell 3/4 · 7/10 · 2/3; `VICTORY_THRESHOLDS`, `victoryMode`, auch Marathon und Tutorial). Beim Umbau: ganzzahliger Vergleich (`victoryMet` – im Duell galten 63 von 90 als „mehr als 7/10"), der Bogen der Legephase zeigt die Schwellen der Partie (im Duell vorher 3/5 statt 7/10). Messmodi `tools_ki.js freie` und `wirtschaft` | Regel + KI |
+
+Neu in v101: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Freie Forschung zweimal je Partie · Wirtschaftssieg zu viert 4/7 (v101)"), die
+Fragilitäten zu den Siegschwellen, den Spielerzahlen und der Freien Forschung neu gefasst, `tools_ki.js`
+mit den Modi `freie` und `wirtschaft`, die offenen Punkte 60 und 61.
 
 Neu in v100: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Kolonisten halbieren, Marathon ohne Gründungsgrenze (v100)"), Fragilität „Gründungen je
@@ -173,7 +179,9 @@ seit v92 Punkt 46 und 47 (Erstes Spiel), seit v94 Punkt 48 (Auslegungen zu v94),
 Stärke der neuen Forschungsreihenfolge nur knapp messbar), seit v97 Punkt 52 (Auslegungen zu v97:
 Siedlertrecks bei 1 Bevölkerung, Freie Forschung ohne Singularität, Kriegerkultur auch je Burgstadt),
 53 (Balance und Draftwerte der fünf Fähigkeiten nicht gemessen) und 54 (ein einmaliger Smoke-Fehler,
-Schritt unbekannt), seit v98 Punkt 55 (Auslegungen zum Startausgleich zu zweit).
+Schritt unbekannt), seit v98 Punkt 55 (Auslegungen zum Startausgleich zu zweit), seit v101 Punkt 60
+(Auslegungen zu v101: Singularität weiter wählbar, Marathon und Tutorial zählen als vier Reiche, zu
+dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und was nicht).
 
 ## Wo alles liegt
 
@@ -201,28 +209,28 @@ Schritt unbekannt), seit v98 Punkt 55 (Auslegungen zum Startausgleich zu zweit).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1640 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1643 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 533 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 541 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 444 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 2255 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
+| `js/engine.js` | 2288 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 489 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1935 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ki.js` | 1942 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/anim.js` | 165 | **Züge von KI und Bots nachspielen** (v94, ohne Oberfläche): Aufnahme über `LOG_HOOK` (`animAufnahme`, `animSnap`), seit v95 je Aktion eine Szene (`animSzenen`; Art aus `log(…, art)` oder `animUnterschied`, Inhalt `animDetails`), Sätze (`animText`); abgespielt in `ui.js` (`playAnim`, `animFaktor`, `animDraw`, `animMarks`, `animCaption`) |
-| `js/marathon.js` | 323 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
-| `js/ui.js` | 3205 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Gründungsmodus samt Erträgen, Machtringe (v75, ein Stück je Punkt seit v76) · Blatt „Fähigkeiten" (`abilSheet`, v87) |
+| `js/marathon.js` | 328 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
+| `js/ui.js` | 3210 | SVG-Karte, Antippen, Aktionsblätter, Technologiebogen, Nahrungsfenster, Aufbau (inkl. 1-gegen-1, Sitzart Mensch / KI / Bot), Editor, Kurzregeln , Legephase (`screen-place`) · Kartenansichten: Gründungsmodus samt Erträgen, Machtringe (v75, ein Stück je Punkt seit v76) · Blatt „Fähigkeiten" (`abilSheet`, v87) |
 | `js/tutorial.js` | 692 | Geführtes Übungsspiel: **29 Schritte** (19 mit Aufgabe), feste Würfelfolge, Schienen, feste Texte |
 | `js/firstgame.js` | 1461 | **Erstes Spiel** (v92, v93): Seite vor der Partie mit der Wahl des Wegs (`fgSeite`), Karte, Verfügbarkeit und Würfel (`FG_SPAETER`, `fgVerfuegbar`, `fgWurf`, `fgNextDie`), Englands Drehbuch (`fgGegnerZug`), Schritte `FG_STEPS` (Ziel, Stand, Tipp, Rückmeldung, Schienen, Musterlösung; vom Weg geführt über `fgJe`, `fgRestSchritt`), blasse Kacheln (`fgBlass`), Schienen (`fgVeto`), Panel (`fgRenderPanel`), Spielende |
-| `test.js` | 8010 | **2020 Assertions**, `node test.js` |
-| `smoke.js` | 4996 | **185 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 8169 | **2065 Assertions**, `node test.js` |
+| `smoke.js` | 5033 | **185 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 21 / 83 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 69 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 72 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
-| `tools_ki.js` | 374 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI, nachgestellte Vorstöße samt Ausgaben vor/nach dem ersten Treffer (`node tools_ki.js duell 40 diff=david`, `… vorstoss 40 art=droh` …); seit v90 die Schalter `reihenfolge` (Kampfphase zusätzlich in der Reihenfolge bis v89, Unterschiede) und `kampflaenge` (Kämpfe je Phase) |
+| `tools_ki.js` | 482 | Messreihen mit der KI: Duell gegen Bots, eine KI gegen drei Bots, Stufen gepaart, KI gegen KI, nachgestellte Vorstöße samt Ausgaben vor/nach dem ersten Treffer (`node tools_ki.js duell 40 diff=david`, `… vorstoss 40 art=droh` …); seit v90 die Schalter `reihenfolge` (Kampfphase zusätzlich in der Reihenfolge bis v89, Unterschiede) und `kampflaenge` (Kämpfe je Phase); seit v101 die Modi `freie` (Freie Forschung: Regel von v100 und vier Arten zu wählen, gepaart) und `wirtschaft` (Siegschwellen zu viert v100 gegen v101, gepaart) |
 | `tools_startplaettchen_dump.js` / `tools_startplaettchen_pdf.py` | 34 / 176 | Druckbogen `Startplaettchen.pdf` aus `js/tiles.js` (A4 quer, 3 Seiten, Spieloptik, verzahnt mit 4 mm Luft, ohne Umriss) |
 | `ANNAHMEN.md` | — | **Alle Regelauslegungen und Entscheidungen.** Bei Regelfragen zuerst hier nachsehen. |
 
@@ -245,6 +253,29 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v101 auf einen Blick.** Freie Forschung: `FREE_TECH_USES` 2 (`js/data.js`), `freeTechsLeft(p)`,
+  `freeTechOptions` sperrt mit `p.freeTechUsed === S.round` oder ohne Rest, `useFreeTech` setzt
+  `p.freeTechUsed` und zählt `p.freeTechsUsed`; `migrateState` löscht den Zähler nicht mehr und
+  rechnet einem Stand von v99/v100 mit Rundenvermerk eine als verbraucht an; `abilSheet` nennt den
+  Rest (zwei Sätze in `UI_EN`); KI: `kiFreeTechChoices` gibt weiter alles zurück, was zur Wahl steht
+  (Aufheben für die Moderne oder die Singularität gemessen und verworfen, `tools_ki.js freie`);
+  `KI_DRAFT_BASE` Freie Forschung 12 → 5 (geschätzt). Texte: `data/civs.json` (→ `node
+  tools_civs.js`), `DATA_EN.abil`, Spieltipp 3 in beiden Sprachen. Siegschwellen: `VICTORY_THRESHOLDS`
+  (`js/data.js`, je Spielart Zähler und Nenner) statt
+  `VICTORY_FRAC`/`THEOLOGY_FRAC`/`UN_FRAC`/`DUEL_…` und `VICTORY_LABEL`/`DUEL_VICTORY_LABEL`; in
+  `js/engine.js` `victoryMode(S)` ('duell' / 'vier' / 'drei', `S.victoryMode` übersteuert),
+  `victoryLabels(x)` (Spielart oder Spielstand; bis v100 in data.js mit `true` fürs Duell),
+  `victoryOption` mit `num`/`den`, `victoryMet` (ganzzahlig, in `checkVictory` und im Ersten Spiel).
+  Texte: `TECHS`/`DATA_EN` Theologie „>1/2", UN „>2/5"; Regelbogen über `victoryLabels(S)`; Tutorial
+  „Die drei Wege zu gewinnen" lang und kurz mit `%s` aus `VICTORY_THRESHOLDS`; `placeTechView` setzt
+  `V.victoryMode`. Tests: `test.js` Freie Forschung (zwei, je Runde eine, danach keine, Wunder zählen
+  nicht, Spielstände von v96–v100), „Fähigkeiten"-Zahl bis zur zweiten, Texte mit `FREE_TECH_USES`, KI
+  (erwägt alles, eine je Zug, nach zweien keine, nimmt mit der letzten die Singularität; eine ganze
+  Partie: höchstens zwei, je Runde eine), Siegschwellen je Spielart samt Grenzfällen (4 von 7, 8 von
+  14, 5 von 8; Theologie, UN; zu dritt; im Duell 63 von 90), Bogen und Rechnung aus einer Quelle,
+  Marathon, Barbaren, Ausgeschiedene, Aufbau als Spielstand, Tutorialtext; `smoke.js` Regelbogen im
+  Marathon (4/7 · 2/5 · 1/2, neuer Fähigkeitstext, deutsch und englisch), Blatt „Fähigkeiten" (2 von 2
+  → 1 von 2 → verbraucht, englisch), Bogen der Legephase (Duell 7/10 · 2/3, zu viert 1/2 · 2/5).
 - **v100 auf einen Blick.** Gründungskosten: `foundCostOf(p, stadt, dist)` (`js/engine.js`) –
   Kartografie streicht den Weg, Kolonisten halbiert den Rest, aufgerundet, nie unter 1; `foundCost`
   und `kiSitesAll` (`js/ki.js`, bis v99 mit eigener Kopie der Regel) rufen sie. Marathon:
@@ -618,16 +649,23 @@ Gedächtnis rekonstruieren.
   („Zufall", aufgelöst erst beim Start in `resolveRandom`); bei mehr als einem Menschen ist
   der zufällige Startspieler die Vorgabe. Doppelgänger bekommen **je eine der vier
   Zivilisationsfarben**, keine Schattierungen.
-- **Siegschwellen:** `VICTORY_LABEL` / `DUEL_VICTORY_LABEL` in `js/data.js` sind die eine
-  Quelle für Rechnung (`victoryOption`) und Anzeige (`techEffect`, Regelübersicht). Im
-  Duell zeigte der Bogen vorher die Werte des Vierspielerspiels.
+- **Siegschwellen:** `VICTORY_THRESHOLDS` in `js/data.js` (seit v101; vorher `VICTORY_LABEL` /
+  `DUEL_VICTORY_LABEL` und getrennte Brüche) ist die eine Quelle für Rechnung (`victoryOption`,
+  verglichen ganzzahlig in `victoryMet`) und Anzeige (`victoryLabels`, `techEffect`,
+  Regelübersicht, Tutorial, Erstes Spiel) – je Spielart Zähler und Nenner: `duell` 3/4 · 7/10 ·
+  2/3, `vier` 4/7 · 1/2 · 2/5 (seit v101), `drei` 2/3 · 3/5 · 1/2. Welche gilt, sagt
+  `victoryMode(S)`: Duellmodus, sonst die Zahl der Reiche der Aufstellung (`empireCount`, ohne
+  Barbaren, Ausgeschiedene zählen mit); ohne Spielstand `vier`. Eine Wegwerf-Partie mit weniger
+  Reichen als die echte (die „Forschung" der Legephase) setzt `V.victoryMode`. Im Duell zeigte
+  der Bogen bis v50 die Werte des Vierspielerspiels.
 - **Zivilisationen (v51):** Auf Plättchenkarten darf jeder Platz frei wählen, **auch
   mehrfach dieselbe** (Doppelgänger: „Russland I/II/III", eigene Farbschattierung). Auf
   festen Karten bleibt jede Zivilisation einmalig. Identität ist damit `p.slot`, nicht
   `p.civ`: Plättchenkarten führen `map.capitals` als **Liste** `[{civ,r,c}]`, feste Karten
   weiter als Objekt; `capitalSpot()` kennt beide.
-- **Spielerzahlen 2, 3 und 4.** „Drei Reiche" ist neu (Standard-Siegschwellen, nicht die
-  des Duells); freie Zivilisationswahl bei 2 und 3.
+- **Spielerzahlen 2, 3 und 4.** „Drei Reiche" ist neu (Siegschwellen wie bis v100 zu viert –
+  2/3, 3/5, 1/2 –, nicht die des Duells; zu viert seit v101 4/7, 1/2, 2/5); freie
+  Zivilisationswahl bei 2 und 3.
 - **1 gegen 1:** zwei frei gewählte Reiche, immer die Plättchenkarte aus sechs Dreiecken
   (die Kartenzeile bleibt deshalb weg), Wirtschaftssieg erst über 3/4 (Theologie 7/10,
   UN 2/3).
@@ -1041,7 +1079,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 2020 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 2065 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (185 Schritte), inklusive
@@ -1452,10 +1490,14 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   oder das Tutorial auf den heutigen umstellt, muss die Texte „2 in der Antike, 4 im Mittelalter …",
   „2/4/6/8" und „Burgenbau (3)" und den Ablauf neu rechnen – `test.js` bindet die Texte an
   `OLD_METHOD_DISCOUNT`, `smoke.js` spielt das Tutorial durch.
-- **Die Freie Forschung zählt in `p.freeTechsUsed`** (seit v97, je Partie): nichts setzt den Zähler
-  zurück. Wer sie wieder je Runde haben will, braucht wieder eine Runde (bis v96 `p.freeTechUsed`,
-  das `migrateState` jetzt löscht). Die KI nimmt sie nur über `kiFreeTechChoices` – ein neuer Weg zu
-  einer Gratistechnologie, der dasselbe Kontingent verbraucht, gehört dorthin.
+- **Die Freie Forschung hat zwei Vermerke** (seit v101): `p.freeTechsUsed` zählt die Nutzungen der
+  Partie (nichts setzt ihn zurück, `FREE_TECH_USES` ist die Grenze, `freeTechsLeft` der Rest),
+  `p.freeTechUsed` ist die Runde der letzten Nutzung (sperrt eine zweite in derselben Runde). Beide
+  setzt nur `useFreeTech`. `migrateState` rechnet einem Stand von v99/v100 mit Rundenvermerk und ohne
+  Zähler eine als verbraucht an – wer die Bedeutung eines der beiden Felder ändert, ändert das mit.
+  Die KI nimmt sie nur über `kiFreeTechChoices` – ein neuer Weg zu einer Gratistechnologie, der
+  dasselbe Kontingent verbraucht, gehört dorthin. `freeTechsLeft` und `kiFreeTechChoices` sind
+  Funktionsdeklarationen, weil `tools_ki.js freie` sie für seine Vergleiche ersetzt.
 - **`tradeRoutes` rechnet mit einer eigenen Stadttabelle** (seit v83, Tempo): wer ändert, wie
   Städte Wege sperren oder als Straße zählen, ändert es dort mit – `effectiveRoad` allein
   reicht nicht. `test.js` vergleicht über eine ganze Marathonpartie mit der Fassung bis v82.
@@ -2211,6 +2253,18 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Chance 25 %. Duell, drei Reiche, Originalkarte und Marathon nicht gemessen; der Draftwert im
    Marathon (7) ist geschätzt, ebenso, wie sich der Marathon ohne Gründungsgrenze spielt (eine
    Testpartie: höchstens 5 Gründungen in einem Zug).
+60. **Getroffene Auslegungen (v101) – zum Ändern angeboten.** (a) Die Freie Forschung darf weiter die
+   Singularität sein (seit v99) – genannt war nur, wie oft. (b) „Zu viert" heißt vier Reiche der
+   Aufstellung, gleich ob Mensch, KI oder Bot: auch der Marathon und das Tutorial; wer zu viert
+   beginnt, behält die Schwellen, auch wenn ein Reich ausscheidet. (c) Zu dritt bleibt es bei 2/3 ·
+   3/5 · 1/2. (d) Spielstände von v99/v100, in denen die Freie Forschung schon genutzt wurde, zählen
+   eine als verbraucht (die genaue Zahl steht nicht im Spielstand). (e) Die KI nutzt beide, sobald es geht, statt sie aufzuheben – drei Arten aufzuheben wurden gemessen und waren schwächer (12,8–15,0 % gegen 20,5 %, Punkt 61).
+61. **Messung zu v101 nur zu viert, mit der KI.** Freie Forschung (`tools_ki.js freie`, je 400 Partien,
+   Dreiecke, gepaart): Griechenland gewinnt mit ihr 20,5 % statt 30,3 % unter v100 – gleiche Chance
+   25 %, also jetzt darunter; Aufheben (für die Moderne oder die Singularität) war für die KI
+   schwächer (12,8–15,0 %). Wirtschaftssieg (`tools_ki.js wirtschaft`, je 400 Partien, gepaart):
+   auf den Dreiecken 35 statt 3 Wirtschaftssiege, auf den Sechsecken 45 statt 7. Nicht gemessen: Duell, drei Reiche,
+   Originalkarte, Marathon (Draftwert der Freien Forschung geschätzt 5), und wie Menschen spielen.
 
 ## Arbeitsweise, die der Autor schätzt
 

@@ -5954,3 +5954,174 @@ für Gründungen weg.
   jede Stadt nur den Weg kostete. In der Marathonpartie von `test.js` (vier KI Schwer, Draft)
   gründete die KI ohne Grenze höchstens 5 Städte in einem Zug; der längste KI-Zug dauerte
   2,3 s (Grenze im Test 10 s). Eine Partie, keine Messung.
+
+## Freie Forschung zweimal je Partie · Wirtschaftssieg zu viert 4/7 (v101)
+
+Zwei Anweisungen des Autors (5.11., auf Englisch, hier übersetzt):
+
+1. „Griechenlands ‚Freie Forschung' soll anders funktionieren: höchstens zweimal je Partie und
+   höchstens einmal je Runde."
+2. „Den Wirtschaftssieg zu viert neu skalieren: ohne Technologie mehr als 4/7 der
+   Weltbevölkerung, mit Theologie mehr als 1/2, mit Vereinten Nationen mehr als 2/5."
+
+### Freie Forschung: zweimal je Partie, höchstens einmal je Runde
+
+* **Regel:** `freeTechOptions` bietet wie seit v99 an, was `researchable` liefert – jedes
+  Zeitalter und die Singularität, sobald sie erforschbar ist –, aber nur, solange von
+  `FREE_TECH_USES` (2) noch eine offen ist (`freeTechsLeft`) und in dieser Runde noch keine
+  genutzt wurde (`p.freeTechUsed === S.round` sperrt). `useFreeTech` vermerkt beides: die Runde
+  und die Zahl (`p.freeTechsUsed`). Ein Dunkles Zeitalter sperrt sie wie bisher und verbraucht
+  nichts; was sonst gratis kommt (Bibliothek, Oxford, Raumfahrt, Rückschau, Internet), zählt nicht
+  mit.
+* **Auslegungen** (zum Ändern angeboten): (a) Die **Singularität bleibt wählbar** – sie kam in v99
+  auf Anweisung des Autors dazu, und die neue Anweisung ändert nur, wie oft. Eine der beiden
+  Freien Forschungen kann also der Forschungssieg sein. Wer das nicht will: in `freeTechOptions`
+  `techPool` statt `researchable` (wie v97–v98). (b) Gezählt werden Nutzungen, nicht Runden.
+  (c) Wie bisher gilt sie in jeder Spielart, auch im Marathon.
+* **Spielstände:** `migrateState` löscht den Zähler nicht mehr (v99/v100 löschten ihn beim Laden).
+  Ein Stand von v97/v98 trägt ihn und behält ihn – er bedeutet dasselbe. v99/v100 (und bis v96)
+  vermerkten nur die Runde der letzten Nutzung: Wer die Freie Forschung dort schon genutzt hat,
+  bekommt **eine als verbraucht** angerechnet, mehr weiß der Spielstand nicht; wer sie nie genutzt
+  hat, hat beide. Auslegung: Die Zahl aus dem Protokoll zu lesen wäre genauer, aber das Protokoll
+  hält nur die letzten 600 Zeilen, als fertige Sätze in der Sprache von damals.
+* **Blatt „Fähigkeiten":** über den Knöpfen „Noch 2 von 2 kostenlosen Forschungen in dieser
+  Partie."; nach der ersten „Noch 1 von 2 …" und „Diese Runde schon genutzt."; nach beiden „Die
+  kostenlosen Forschungen dieser Partie sind verbraucht." (englisch „%s of %s free researches left
+  in this game." und „The free researches of this game are used up."). Die Zahl an der Leiste zählt
+  sie wie bisher, solange etwas zur Wahl steht.
+* **Texte:** `data/civs.json` „2× pro Partie, höchstens 1× pro Runde: eine erforschbare Technologie
+  beliebigen Zeitalters umsonst erforschen, auch die Singularität", englisch „Twice per game, at
+  most once per round: research one researchable technology of any age for free, the Singularity
+  included". Der Spieltipp (Index 3) sagte „gilt jede Runde"; jetzt: „Griechenlands Freie Forschung
+  gibt es nur zweimal je Partie und höchstens einmal je Runde. Früh genutzt bringt sie Tempo; wer eine
+  aufhebt, kann mit ihr die Singularität umsonst erforschen, sobald in allen vier Feldern die
+  Moderne erreicht ist – den Forschungssieg." (englisch an derselben Stelle). Bewusst ohne Rat,
+  was besser ist – das hängt an der Partie (siehe die Messung unten).
+* **KI:** Sie erwägt die Freie Forschung, sobald sie geht, für alles, was zur Wahl steht –
+  `kiFreeTechChoices` gibt wie in v99/v100 `freeTechOptions` zurück, `kiValue` entscheidet. Sie hebt
+  also nichts auf, obwohl das bei zwei Nutzungen naheläge (v97–v98 hob sie sie für die Moderne auf).
+  Grund ist die Messung (`tools_ki.js freie`, neu): vier KI Schwer auf der Dreiecks-Plättchenkarte,
+  ein Platz Griechenland mit Freier Forschung (der Platz wandert, die anderen drei Reiche und
+  Fähigkeiten wechseln), je Art 400 Partien mit denselben Startwerten – gepaart. Griechenland gewann:
+
+  | Regel | wie die KI wählt | Siege | Freie Forschungen je Partie | wofür |
+  |---|---|---|---|---|
+  | v100 (einmal je Runde) | alles, jede Runde | **30,3 %** | 4,75 | alle Zeitalter, 30 × Singularität |
+  | v101 | alles, sobald es geht (so spielt sie jetzt) | **20,5 %** | 2,00 | Antike und Mittelalter, Runde 1–2 |
+  | v101 | nur Moderne und Singularität | 12,8 % | 1,23 | Moderne |
+  | v101 | dazu die letzte nur für die Singularität | 15,0 % | 0,90 | Moderne, 56 × Singularität |
+  | v101 | die erste sofort, die letzte nur für die Singularität | 13,3 % | 1,17 | Antike, 50 × Singularität |
+
+  Die drei Arten mit Aufheben riefen gegen Ende alles ab (nicht mehr Runden übrig als Freie
+  Forschungen offen). Gepaart gegen „die erste sofort …": v100 +17,0 Punkte (± 4,3), „alles"
+  +7,2 (± 4,0), „nur Moderne" −0,5 (± 3,9), „die letzte für die Singularität" +1,8 (± 4,1). Die
+  Partien enden im Median in Runde 5; zwei frühe Technologien bringen da mehr als eine späte teure,
+  und bis zur Moderne in jedem Feld kam Griechenland nur in gut jeder achten Partie (so oft holte es
+  sich die Singularität umsonst, wenn es eine aufhob). Gleiche Chance wäre 25 %: **Mit der neuen
+  Regel liegt Griechenland mit Freier Forschung darunter**, knapp 10 Punkte unter v100. Was das
+  nicht sagt: wie Menschen sie nutzen, und wie es im Duell, zu dritt, auf den Sechsecken, der
+  Originalkarte oder im Marathon aussieht – nicht gemessen.
+* **Marathon:** Der Draftwert der KI (`KI_DRAFT_BASE`) ist **geschätzt 5** (v99: 12, geschätzt für
+  „jede Runde"): Die KI nutzt beide früh, wie zu viert gemessen; das ist der Fassung von v97–v98
+  (zweimal je Partie, geschätzt 4,5) näher als der jeder Runde. Im Marathon nicht gemessen.
+
+### Wirtschaftssieg zu viert: 4/7 · 1/2 · 2/5
+
+* **Regel:** `VICTORY_THRESHOLDS` (`js/data.js`) hält je Spielart Zähler und Nenner der drei
+  Schwellen: `duell` 3/4 · 7/10 · 2/3, `vier` **4/7 · 1/2 · 2/5** (bis v100 wie zu dritt), `drei`
+  2/3 · 3/5 · 1/2. Es gilt weiter die niedrigste, die ein Reich hat, und überall „mehr als".
+  `victoryMode(S)` sagt die Spielart: Duellmodus (`S.duel`) → `duell`; vier Reiche der Aufstellung
+  → `vier`; sonst `drei`. Gezählt wird mit `empireCount` (ohne Barbaren, Ausgeschiedene zählen
+  mit). Ohne Spielstand – der Regelbogen aus dem Hauptmenü vor der ersten Partie – gilt `vier`, die
+  Vorgabe des Aufbaus.
+* **Auslegungen** (zum Ändern angeboten): (a) „Zu viert" heißt vier Reiche, gleich ob Mensch, KI
+  oder Bot – also auch der **Marathon** (immer vier Reiche) und das **Tutorial** (Russland gegen drei
+  Bots). Wer den Marathon ausnehmen will: in `victoryMode` vor der Zählung `if (S.marathon) return
+  'drei'`. (b) **Zu dritt bleibt alles wie bisher** (2/3, 3/5, 1/2) – genannt war nur das Spiel zu
+  viert. (c) Wer zu viert beginnt, behält die Schwellen zu viert, auch wenn ein Reich ausscheidet.
+  (d) Barbaren sind kein Reich; ihre Bevölkerung zählt wie bisher zur Weltbevölkerung. (e) Zwei
+  Reiche ohne den Duellmodus gibt es im Aufbau nicht (nur in Tests und Werkzeugen) – sie zählen wie
+  drei.
+* **Wie weit das die Schwelle senkt:** Haben die drei anderen je 1 Bevölkerung, reichen jetzt 5 (5 von
+  8; bis v100 erst 7 von 10), mit Theologie 4 von 7 (statt 5 von 8), mit Vereinten Nationen 3 von 6
+  (statt 4 von 7). Bei 15 Weltbevölkerung reichen 9 statt 11. Bei gleich großen Reichen hat jedes
+  ein Viertel; 4/7 sind knapp 2,3 Viertel (2/3 waren 2,7).
+* **Ganzzahlig verglichen** (beim Umbau gefunden): `victoryMet(o, mine, w)` rechnet
+  `mine · Nenner > w · Zähler`. Bis v100 wurde mit dem Bruch gerechnet; zu viert und zu dritt ging
+  das immer richtig aus (nachgerechnet bis 400 Weltbevölkerung, auch für 4/7 und 2/5), im Duell mit
+  Theologie aber nicht – 63 von 90, 119 von 170 … (genau 7/10) galten als „mehr als 7/10".
+  Behoben, auch im Ersten Spiel (Stand im Ziel und die Schiene gegen den Wirtschaftssieg auf
+  anderen Wegen).
+* **Eine Quelle:** Bis v100 standen die Brüche (`VICTORY_FRAC`, `THEOLOGY_FRAC`, `UN_FRAC`,
+  `DUEL_…_FRAC`) und die Beschriftungen (`VICTORY_LABEL`, `DUEL_VICTORY_LABEL`) getrennt; jetzt
+  kommen beide aus denselben zwei Zahlen. `victoryLabels(x)` nimmt eine Spielart oder einen
+  Spielstand (bis v100: `true` fürs Duell); `victoryOption` gibt zusätzlich `num` und `den` zurück.
+* **Legephase** (beim Umbau gefunden): Der Bogen hinter „Forschung" rechnet auf einer
+  Wegwerf-Partie mit einem einzigen Reich – im Duell zeigte er deshalb bis v100 die Theologie mit
+  3/5 statt 7/10. Die Wegwerf-Partie trägt jetzt die Spielart der Partie, die gelegt wird
+  (`V.victoryMode = victoryMode(st.cfg)`).
+* **Texte:** Theologie „>1/2 der Bevölkerung zum Sieg", Vereinte Nationen „>2/5 …" in `TECHS` und
+  `DATA_EN` – der Text ohne Spielstand, also die Werte zu viert; im Spiel rechnet `techEffect` wie
+  bisher die Werte der Partie aus. Der Regelbogen nennt die Schwellen der Partie. Das **Tutorial**
+  spielt zu viert: „mehr als 4/7 der Weltbevölkerung, hast du gewonnen – so zu viert wie hier; zu
+  dritt braucht es mehr als 2/3, im Duell mehr als 3/4" (bis v100 „mehr als zwei Drittel"), kurz
+  „(so zu viert wie hier; zu dritt 2/3, im Duell 3/4)" – die Zahlen kommen aus
+  `VICTORY_THRESHOLDS`, englisch ebenso. Der Test „keine Feldkoordinaten in den Texten" lässt
+  Brüche nach „mehr als", „zu dritt" und „im Duell" durch (sie sehen aus wie Koordinaten). Der
+  Hinweis zum Duell im Aufbau („dafür Wirtschaftssieg erst über 3/4") stimmt weiter. Die Partien
+  zu dritt bekommen keinen eigenen Hinweis – der Bogen zeigt ihre Werte.
+* **KI:** Sie rechnet über `victoryOption` (`kiVictory`: Anteil an der Schwelle, steil zum Ende hin)
+  und strebt den Wirtschaftssieg zu viert damit früher an; geändert ist an ihr nichts.
+* **Gemessen** (`tools_ki.js wirtschaft`, neu): vier KI Schwer, Fähigkeiten wechselnd, je 400 Partien
+  mit denselben Startwerten, einmal mit den Schwellen von v100 (zu viert 2/3 · 3/5 · 1/2) – gepaart.
+
+  | Karte | Schwellen | Militär | Forschung | Wirtschaft | Endrunde (Median) | Startspieler gewinnt |
+  |---|---|---|---|---|---|---|
+  | Dreiecke | v100 | 337 | 60 | **3** | 5 | 36,3 % |
+  | Dreiecke | v101 | 311 | 54 | **35** | 5 | 35,5 % |
+  | Sechsecke | v100 | 290 | 103 | **7** | 6 | 29,5 % |
+  | Sechsecke | v101 | 273 | 82 | **45** | 5 | 32,8 % |
+
+  Auf den Dreiecken endet jetzt etwa jede elfte Partie mit einem Wirtschaftssieg (bis v100 etwa
+  jede 130.), auf den Sechsecken jede neunte (bis v100 jede 57.); sie fallen in Runde 4–7, meist 5
+  und 6. Auf den Dreiecken gingen 118 der 400 Partien anders aus (Siegart oder Runde), 32 davon
+  wurden zum Wirtschaftssieg (20 statt eines Militär-, 12 statt eines Forschungssiegs); auf den
+  Sechsecken 120, davon 39 zum Wirtschaftssieg (21 statt eines Militär-, 18 statt eines
+  Forschungssiegs), und dort enden die Partien im Median eine Runde früher. Wie oft der Startspieler
+  gewinnt, ändert sich nicht mehr, als der Zufall erklärt (−0,8 und +3,3 Punkte, bei je 400
+  Partien). Was das nicht sagt: wie Menschen auf die niedrigere Schwelle spielen (und dagegen), und
+  wie es auf der Originalkarte und im Marathon aussieht – nicht gemessen.
+
+### Abgesichert (v101)
+
+`test.js`: Freie Forschung – zwei je Partie, höchstens eine je Runde (eine zweite im selben Zug geht nicht
+und zählt nicht), danach auch Runden später keine dritte; eine Technologie aus einem Wunder zählt nicht
+mit; ein Dunkles Zeitalter verbraucht nichts; Spielstände von v97/v98 (Zähler 2: verbraucht, Zähler 1:
+eine offen), v99/v100 (in dieser Runde genutzt: gesperrt und eine angerechnet, dann noch eine; in einer
+früheren Runde genutzt: eine offen; nie genutzt: beide), `migrateState` zweimal ändert nichts; die Zahl
+an „Fähigkeiten" bis zur zweiten; die Texte deutsch und englisch an `FREE_TECH_USES` gebunden; KI
+– sie erwägt alles, was zur Wahl steht, im selben Zug keine zweite, nach zweien keine mehr, mit der
+letzten die Singularität samt Sieganmeldung; eine ganze Partie KI gegen KI: höchstens zwei, je Runde eine.
+Siegschwellen – je Spielart (zu viert 4/7 · 1/2 · 2/5, zu dritt 2/3 · 3/5 · 1/2, Duell
+3/4 · 7/10 · 2/3, zwei Reiche ohne Duellmodus wie drei); Grenzfälle zu viert (4 von 7 und 8 von 14 nicht, 5
+von 8 schon; Theologie 3 von 6 nicht, 4 von 7 schon; UN 2 von 5 und 4 von 10 nicht, 3 von 6 schon), zu
+dritt (4 von 6 nicht, 5 von 7 schon), im Duell mit Theologie 63 von 90 nicht, 64 schon (der Bruch allein
+hätte sich verrechnet), `victoryMet` mit „mehr als" und „mindestens"; Marathon zählt zu viert; Bogen
+und Rechnung aus einer Quelle je Spielart, Texte ohne Spielstand und `TECHS`/`DATA_EN` zu viert, zu
+dritt 3/5 und 1/2; Barbaren machen aus drei Reichen keine vier, Ausgeschiedene zählen, ein Aufbau zählt
+wie ein Spielstand, `S.victoryMode` übersteuert; der Siegtext des Tutorials (lang und kurz, deutsch und
+englisch) nennt 4/7, 2/3 und 3/4 und nicht mehr „zwei Drittel". `smoke.js`: Regelbogen im Marathon
+(„mehr als 4/7 der Weltbevölkerung (UN 2/5, Theologie 1/2", der neue Fähigkeitstext, deutsch und
+englisch, kein alter Text), im normalen Spiel der neue Fähigkeitstext; Blatt „Fähigkeiten" – „Noch 2 von
+2", nach der ersten „Noch 1 von 2" und „Diese Runde schon genutzt.", die Zahl an der Leiste fällt, in
+der nächsten Runde die zweite, danach „verbraucht" und keine Zahl mehr, englisch übersetzt; der Bogen
+der Legephase zeigt im Duell 7/10 und 2/3, zu viert (Sechsecke) 1/2 und 2/5.
+Gegenproben (je eine Stelle absichtlich falsch, 14 Stück, `test.js` bzw. `smoke.js` schlägt bei jeder an):
+Freie Forschung ohne Grenze je Partie, ohne Grenze je Runde, Nutzung nicht gezählt; `migrateState`
+löscht den Zähler wie v99/v100, `migrateState` ohne Anrechnung für v99/v100; zu viert die Schwellen von
+v100, zu dritt auch 4/7; Barbaren zählen als Reich, Ausgeschiedene zählen nicht, Marathon nicht zu
+viert; Vergleich mit dem Bruch wie bis v100; Tutorial mit dem alten Text; Legephase ohne die Spielart
+(smoke); Blatt „Fähigkeiten" ohne den Rest (smoke).
+In Chromium (Einzeldatei, iPad quer): das Blatt „Fähigkeiten" mit „Noch 2 von 2 …" und nach einer
+Nutzung „Noch 1 von 2 …" und „Diese Runde schon genutzt.", der Regelbogen einer Partie zu viert mit
+„mehr als 4/7 der Weltbevölkerung (UN 2/5, Theologie 1/2; …" – ohne Seitenfehler.

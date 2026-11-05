@@ -2760,7 +2760,7 @@ step('Techtree: „Nochmal spielen" – auch ein Rezept aus v70–v81 mit altTre
     if (G('S').oldTree !== false) throw new Error('Rezept mit altTree ' + schalter + ': alter Techtree');
   }
 });
-step('Techtree: auch der Bogen in der Legephase – und die Partie danach', () => {
+step('Techtree: auch der Bogen in der Legephase – und die Partie danach (v101: mit den Siegschwellen des Duells)', () => {
   $('m-new').onclick();
   $('setup-mode').querySelector('[data-mode=duell]').onclick();       // Duell: immer Plättchen
   $('setup-list').children[0].querySelector('[data-kind="human"]').onclick();
@@ -2770,6 +2770,10 @@ step('Techtree: auch der Bogen in der Legephase – und die Partie danach', () =
   $('pl-tech').onclick();
   const fo = bogenSpalte(0).map(x => x[0]).join(', ');
   if (fo !== techNamen(NEU_FO)) throw new Error('Legephase: ' + fo);
+  // v101: die Siegschwellen des Duells – bis v100 zeigte die Legephase hier 3/5 und 1/2
+  const bogen2 = $('ov-body').textContent;
+  if (!bogen2.includes('>7/10 der Bevölkerung zum Sieg') || !bogen2.includes('>2/3 der Bevölkerung zum Sieg'))
+    throw new Error('Legephase im Duell: Theologie/UN nicht 7/10 und 2/3');
   const fo2 = bogenSpalte(8).map(x => x[0]).join(', ');
   if (fo2 !== techNamen(NEU_FO2)) throw new Error('Legephase, Industrialisierung: ' + fo2);
   G('closeModal')();
@@ -3344,19 +3348,21 @@ step('Marathon (v100): Gründen ohne Grenze je Zug, eroberte Hauptstädte im Wel
   } finally { delete p.capTaken; kap.cap = true; }
   G('redraw')();
 });
-step('Marathon (v85, v97, v100): Regelbogen mit doppeltem Rabatt, Freie Forschung wie sonst, Startausgleich, ohne Gründungsgrenze', () => {
+step('Marathon (v85, v97, v100, v101): Regelbogen mit doppeltem Rabatt, Freie Forschung wie sonst, Startausgleich, ohne Gründungsgrenze, Siegschwellen zu viert', () => {
   const S = G('S');
   if (!S.marathon) throw new Error('kein Marathon');
   const soll = {
     de: ['Techs 2/2/4/4/10 günstiger (je Zeitalter, im Marathon doppelt)',
-      '1× pro Runde eine erforschbare Technologie beliebigen Zeitalters umsonst erforschen, auch die Singularität',
+      '2× pro Partie, höchstens 1× pro Runde: eine erforschbare Technologie beliebigen Zeitalters umsonst erforschen, auch die Singularität',
+      'mehr als 4/7 der Weltbevölkerung (UN 2/5, Theologie 1/2;',
       'Techkosten −4/−6/−8/−10/−20 (je Zeitalter, im Marathon doppelt)',
       'Startausgleich: Im allerersten Zug bekommen der Zweite, Dritte und Vierte',
       'geprüft am Ende jeder Runde, wenn alle gleich oft gezogen haben',
       'Griechenlands Günstige Forschung und die Wissenschaftliche Methode ziehen doppelt ab. Militärsieg erst mit 2',
       'Städte gründen kostet nur die Hälfte (aufgerundet). Bevölkerungswachstum kostet doppelt'],
     en: ['Techs 2/2/4/4/10 cheaper (by age, doubled in marathon)',
-      'Once per round, research one researchable technology of any age for free, the Singularity included',
+      'Twice per game, at most once per round: research one researchable technology of any age for free, the Singularity included',
+      'more than 4/7 of the world population (UN 2/5, Theology 1/2;',
       'Tech costs −4/−6/−8/−10/−20 (by age, doubled in marathon)',
       'Starting compensation: on their very first turn',
       'checked at the end of every round, when everyone has had the same number of turns',
@@ -3366,7 +3372,7 @@ step('Marathon (v85, v97, v100): Regelbogen mit doppeltem Rabatt, Freie Forschun
   const lesen = () => { G('rulesModal')(); const t = $('ov-body').textContent.replace(/\s+/g, ' '); G('closeModal')(); return t; };
   const de = lesen();
   for (const t of soll.de) if (!de.includes(t)) throw new Error('fehlt: ' + t);
-  if (/oder früher umsonst|reicht nur bis ins Mittelalter|2\/4\/6\/8\/10 günstiger|−4\/−8\/−12|neue Städte je Zug|günstigere der beiden/.test(de)) throw new Error('alter Text im Regelbogen');
+  if (/oder früher umsonst|reicht nur bis ins Mittelalter|2\/4\/6\/8\/10 günstiger|−4\/−8\/−12|neue Städte je Zug|günstigere der beiden|1× pro Runde eine erforschbare|mehr als 2\/3 der Weltbevölkerung|>3\/5 der Bevölkerung/.test(de)) throw new Error('alter Text im Regelbogen');
   G('switchLang')('en');
   try {
     G('clearMissing')();
@@ -3424,7 +3430,7 @@ step('Normales Spiel (v85): Griechenland und Methode wie bisher, Startausgleich 
   G('rulesModal')();
   const txt = $('ov-body').textContent.replace(/\s+/g, ' ');
   G('closeModal')();
-  for (const t of ['Techs 1/1/2/2/5 günstiger', '1× pro Runde eine erforschbare Technologie beliebigen Zeitalters umsonst erforschen',
+  for (const t of ['Techs 1/1/2/2/5 günstiger', '2× pro Partie, höchstens 1× pro Runde: eine erforschbare Technologie beliebigen Zeitalters umsonst erforschen',
     'Techkosten −2/−3/−4/−5/−10 (je Zeitalter)',
     'Startausgleich: Im allerersten Zug bekommen der Zweite, Dritte und Vierte in der Zugfolge 2, 4 bzw. 6 Münzen dazu – zu zweit bekommt der Zweite 4.',
     'Bevölkerungswachstum kostet keine Nahrung; 1× zusätzliches Wachstum pro Stadt',
@@ -3544,13 +3550,37 @@ step('Fähigkeiten: Freie Forschung und Rückschau leben hier, nicht mehr im Tec
   const soll = G('freeTechOptions')(S, pi).map(t => t.k);
   const ist = [...$('sheet-body').querySelectorAll('[data-act^="forschung:"]')].map(b => b.dataset.act.slice(10));
   if (!soll.length || ist.join() !== soll.join()) throw new Error('zur Wahl ' + ist + ' statt ' + soll);
-  // seit v99 wieder einmal je Runde: nach der Nutzung nichts mehr in dieser Runde, die Zahl fällt
+  if (!/Noch 2 von 2 kostenlosen Forschungen in dieser Partie/.test($('sheet-body').textContent)) throw new Error('kein „Noch 2 von 2“');
+  // seit v101 zweimal je Partie, höchstens einmal je Runde: nach der Nutzung nichts mehr in dieser
+  // Runde, die Zahl fällt; in der nächsten Runde die zweite, danach keine mehr
   $('sheet-body').querySelector(`[data-act="forschung:${ist[0]}"]`).onclick();
   if (!p.techs[ist[0]]) throw new Error('nicht erforscht');
   if ($('sheet-body').querySelector('[data-act^="forschung:"]')) throw new Error('eine zweite Freie Forschung in derselben Runde');
   if (!/Diese Runde schon genutzt/.test($('sheet-body').textContent)) throw new Error('kein Hinweis „diese Runde schon genutzt“');
+  if (!/Noch 1 von 2 kostenlosen Forschungen in dieser Partie/.test($('sheet-body').textContent)) throw new Error('kein „Noch 1 von 2“');
   if (zahlAbil()) throw new Error('Zahl bleibt nach der Freien Forschung dieser Runde');
   G('closeSheet')();
+  S.round++; G('redraw')();                                // nächste Runde (nur die Zahl, kein Zugwechsel)
+  if (zahlAbil() !== 1) throw new Error('in der nächsten Runde keine Zahl: ' + zahlAbil());
+  $('a-abil').onclick();
+  const zweite = $('sheet-body').querySelector('[data-act^="forschung:"]');
+  if (!zweite) throw new Error('keine zweite Freie Forschung in der nächsten Runde');
+  zweite.onclick();
+  if ($('sheet-body').querySelector('[data-act^="forschung:"]') || !/Die kostenlosen Forschungen dieser Partie sind verbraucht/.test($('sheet-body').textContent))
+    throw new Error('nach der zweiten nicht „verbraucht“');
+  G('closeSheet')();
+  S.round++; G('redraw')();
+  if (zahlAbil()) throw new Error('nach beiden Freien Forschungen noch eine Zahl');
+  S.round -= 2;
+  // englisch: beide Sätze übersetzt
+  G('switchLang')('en');
+  try {
+    G('clearMissing')();
+    $('a-abil').onclick();
+    if (!/The free researches of this game are used up/.test($('sheet-body').textContent)) throw new Error('englisch: ' + $('sheet-body').textContent.slice(0, 160));
+    G('closeSheet')();
+    if (G('missingStrings')().length) throw new Error('ohne Übersetzung: ' + G('missingStrings')().join(' | '));
+  } finally { G('switchLang')('de'); }
   // Rückschau: eine Technologie des Mittelalters erforschen – die Wahl steht unter „Fähigkeiten"
   const S2 = griechenSpiel('rueckschau'), p2 = G('P')(S2);
   if (zahlAbil()) throw new Error('Rückschau ohne Anlass gezählt');
@@ -4896,7 +4926,7 @@ step('v97: Siedlertrecks wachsen zum Preis der kleineren Stadt, Fruchtbarkeit zw
     G('rulesModal')();
     const txt = $('ov-body').textContent.replace(/\s+/g, ' ');
     G('closeModal')();
-    for (const t of ['Techs cost 1/1/2/2/5 less', 'Once per round, research one researchable technology of any age for free, the Singularity included',
+    for (const t of ['Techs cost 1/1/2/2/5 less', 'Twice per game, at most once per round: research one researchable technology of any age for free, the Singularity included',
       'Population growth costs no food; one extra growth per city', 'grow at the price of a city one size smaller',
       'Each of your armies grants +1 power', 'Tech costs −2/−3/−4/−5/−10 (by age)'])
       if (!txt.includes(t)) throw new Error('fehlt auf Englisch: ' + t);
@@ -4931,7 +4961,7 @@ step('v99: Aufbau – keine große Karte, „Zufällig“ als Startspieler, Häk
   if (!$('setup-hex').checked || $('setup-hex-row').hidden) throw new Error('die Wahl ging beim Moduswechsel verloren');
   console.log('       Karten: ' + [...$('setup-map').options].map(o => o.text).join(' · ') + ' · Startspieler Zufällig · Häkchen nur bei vier Reichen');
 });
-step('v99: Sechsecke legen – sechs Lagen, Welt in Zugfolge, danach gleich das Spiel', () => {
+step('v99: Sechsecke legen – sechs Lagen, Welt in Zugfolge, Bogen mit den Schwellen zu viert (v101), danach gleich das Spiel', () => {
   // Platz 1 Mensch, die übrigen KI; Startspieler bleibt „Zufällig“
   [...$('setup-list').children].forEach((x, i) => x.querySelector(i ? '[data-kind="ki"]' : '[data-kind="human"]').onclick());
   $('setup-go').onclick();
@@ -4952,6 +4982,13 @@ step('v99: Sechsecke legen – sechs Lagen, Welt in Zugfolge, danach gleich das 
   if (namen.join('|') !== soll.join('|')) throw new Error('Welt in der Legephase: ' + namen.join(', ') + ' statt ' + soll.join(', '));
   if ($('ov-body').querySelectorAll('.civ-row.self').length !== 1) throw new Error('der legende Platz ist nicht hervorgehoben');
   G('closeModal')();
+  // v101: der Bogen der Legephase zeigt die Siegschwellen zu viert, obwohl seine Wegwerf-Partie
+  // nur ein Reich hat
+  $('pl-tech').onclick();
+  const bogen4 = $('ov-body').textContent;
+  G('closeModal')();
+  if (!bogen4.includes('>1/2 der Bevölkerung zum Sieg') || !bogen4.includes('>2/5 der Bevölkerung zum Sieg') || /3\/5 der Bev/.test(bogen4))
+    throw new Error('Legephase zu viert: Theologie/UN nicht 1/2 und 2/5');
   // Hauptstadt setzen, Fertig – und schon läuft die Partie
   const rcs = legeHelfer.rcs(), frei = legeHelfer.frei();
   G('plTap')(rcs[frei.indexOf(true)][0], rcs[frei.indexOf(true)][1]);
