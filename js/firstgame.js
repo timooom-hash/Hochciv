@@ -84,7 +84,7 @@ const FG_KEY = 'hochciv.fg';            // auf dem Gerät: { geschafft: [Wege, d
 let FG_AUTO_MS = 900;                   // Weiterschalten nach erreichtem Ziel; Tests: 0
 
 /* ------------------------------------------------------------------ Würfel
-   d6() fragt tutNextDie(ctx); im Ersten Spiel landet das hier. Gewürfelt wird nur die
+   d6() fragt im Ersten Spiel hier nach (fgNextDie). Gewürfelt wird nur die
    Verfügbarkeit (ctx.tech) und – wenn nichts verfügbar wurde – die eine, die es dann gibt
    (ctx.pick: die erste gewünschte, sonst die erste). Die Augen passen zum Ergebnis: 4–6 für
    verfügbar, 1–3 für nicht (mit Philosophie-Bonus entsprechend weniger), je Technologie
@@ -383,7 +383,7 @@ const fgInReichweite = (r, c, rng, ohneHaupt) => citiesOf(S, FG_ER)
 const fgRaketenNah = ohneHaupt => (a) => (a.art === 'forschen' || a.art === 'gratis') && a.k === 'raketentechnik' &&
   armiesOf(S, FG_ICH).some(x => fgInReichweite(x.r, x.c, 2, ohneHaupt).length);
 /* Militärweg: Ziel ist die Hauptstadt. Fiele Englands andere Stadt zuerst, hätte Griechenland
-   am Rundenende leicht mehr als 3/4 der Weltbevölkerung – ein Wirtschaftssieg, bevor die
+   am Rundenende leicht die Schwelle des Duells überschritten – ein Wirtschaftssieg, bevor die
    Hauptstadt fällt. Gesperrt ist deshalb jedes Feld, von dem aus eine Armee die andere
    Stadt angriffe (auch mit Raketentechnik). Englands Städte liegen 3 Felder auseinander:
    neben der Hauptstadt bleiben genug Felder frei. */
@@ -1347,7 +1347,6 @@ function fgRenderWahl() {
   $('tut-body').innerHTML = `<p class="tut-task fg-ziel"><b>${T('Ziel:')}</b> ${T('Wähle deinen Weg zum Sieg.')}</p>` + fgWahlHtml(fgGeschafft());
   fgKnoepfeVerdrahten($('tut-body'));
   $('tut-task').hidden = true;
-  $('tut-prev').hidden = true;
   $('tut-count').textContent = '';
   const nx = $('tut-next');
   nx.textContent = '💡 ' + T('Tipp anzeigen');
@@ -1386,7 +1385,6 @@ function fgRenderPanel() {
   $('tut-body').innerHTML = teile.join('');
   fgKnoepfeVerdrahten($('tut-body'));
   $('tut-task').hidden = true;
-  $('tut-prev').hidden = true;
   $('tut-count').textContent = `${i + 1}/${reihe.length}`;
   $('tut-bar-fill').style.width = Math.round(((i + 1) / reihe.length) * 100) + '%';
   const nx = $('tut-next');

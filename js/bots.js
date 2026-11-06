@@ -479,9 +479,6 @@ function botResearch(S, pi, avoidFields = []) {
     idx = 0;
   }
   let tech = idx ? list[idx - 1] : list.find(t => !p.techs[t.k]);
-  // Im Tutorial darf ein Feld vorgegeben sein. Gewürfelt wird trotzdem ganz normal –
-  // nur das Ergebnis wird getauscht, damit die feste Würfelfolge unberührt bleibt.
-  if (typeof tutBotTech === 'function') tech = tutBotTech(S, pi, field) || tech;
   p.techs[tech.k] = true;
   log(S, 'act', T('%s erforscht %s.', civOf(p).n, tech.n));
   return field;   // Bots bestimmen ihr Zeitalter aus den erforschten Techs, kein avail nötig

@@ -7,7 +7,7 @@
    „Animationen": Langsam (ab Werk), Schnell (der Takt von v94), Keine.
 
    Dieser Teil kennt keine Oberfläche (test.js lädt ihn): Er nimmt einen Zug auf und macht
-   daraus Szenen. Gezeichnet und abgespielt wird in js/ui.js (playAnim, animMarks).
+   daraus Szenen. Gezeichnet und abgespielt wird in js/ui/turns.js (playAnim, animMarks).
 
    Aufnahme (animAufnahme): Jede Aktion schreibt ins Protokoll, Klasse 'act' – forschen,
    gründen, wachsen, Armee bauen oder ziehen, Macht kaufen, Straßen … Genau dann wird der
@@ -25,7 +25,7 @@
    geändert hat (animDetails): eine gezogene Armee gleitet vom Feld davor aufs neue. Was sich
    nicht zuordnen lässt, zeigt den Satz aus dem Protokoll. */
 
-let ANIM_MS = 900;                     // Takt einer Szene bei „Schnell" (Langsam: × 1,5, ui.js); Tests: 0 = nichts abspielen
+let ANIM_MS = 900;                     // Takt einer Szene bei „Schnell" (Langsam: × 1,5, js/ui/turns.js); Tests: 0 = nichts abspielen
 
 // Der Kartenstand, den eine Szene braucht: was gezeichnet wird und woran man Aktionen erkennt.
 // Seit v96 mit dem Vorrat jedes Reichs (`res` kopiert – bis v95 teilten sich alle Bilder den

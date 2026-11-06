@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v101';
+const APP_VERSION = 'v102';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -60,7 +60,7 @@ const TECHS = [
   { k: 'schrift', n: 'Schrift', f: 0, c: 4, e: 'Je Bevölkerung: +1 Wissenschaft' },
   { k: 'mathematik', n: 'Mathematik', f: 0, c: 1, e: 'Wald: +1 Wissenschaft' },
   { k: 'astronomie', n: 'Astronomie', f: 0, c: 2, e: 'Meer: +1 Wissenschaft' },
-  { k: 'philosophie', n: 'Philosophie', f: 0, c: 3, e: '+1 beim Auswürfeln von Techverfügbarkeit' },
+  { k: 'philosophie', n: 'Philosophie', f: 0, c: 3, e: '+1/6 Chance auf Techverfügbarkeit' },
   { k: 'papier', n: 'Papier', f: 0, c: 6, e: 'Grasland: +1 Wissenschaft' },
   { k: 'alchemie', n: 'Alchemie', f: 0, c: 8, e: '1:1 Wissenschaft → Münzen' },
   { k: 'buchdruck', n: 'Buchdruck', f: 0, c: 9, e: 'Fluss: +1 Wissenschaft' },
@@ -465,16 +465,15 @@ function mapRng(seed) {
 /* Siegschwellen des Wirtschaftssiegs je Spielart, als [Zähler, Nenner]: mehr als so viel der
    Weltbevölkerung, mit Theologie oder Vereinten Nationen weniger – es gilt die niedrigste, die
    ein Reich hat (victoryOption). Welche Spielart eine Partie hat, sagt victoryMode (js/engine.js).
-   · duell – der Modus „1 gegen 1": 3/4, mit Theologie 7/10, mit Vereinten Nationen 2/3.
-   · vier – vier Reiche, auch Marathon und Tutorial: seit v101 (Anweisung des Autors) 4/7, mit
-     Theologie 1/2, mit Vereinten Nationen 2/5 (bis v100 wie zu dritt).
-   · drei – drei Reiche (und was sonst weder Duell noch vier Reiche ist): 2/3, 3/5, 1/2.
-   Eine Quelle für Rechnung und Anzeige (Technologiebogen, Regelbogen, Protokoll, Erstes Spiel):
-   Bruch und Beschriftung kommen aus denselben zwei Zahlen, und verglichen wird ganzzahlig
-   (victoryMet). Bis v100 standen Brüche (VICTORY_FRAC, DUEL_…_FRAC) und Beschriftungen
-   (VICTORY_LABEL, DUEL_VICTORY_LABEL) getrennt. */
+   · duell – der Modus „1 gegen 1"
+   · vier – vier Reiche, auch Marathon
+   · drei – drei Reiche (und was sonst weder Duell noch vier Reiche ist)
+   Die einzige Stelle dieser Zahlen (v102): Rechnung und Anzeige (Kopfzeile, Technologiebogen,
+   Regeln, Protokoll, Erstes Spiel) lesen sie von hier, verglichen wird ganzzahlig (victoryMet).
+   Texte und Dokumente nennen keine eigenen Brüche; test.js hält die Tabelle in genau einem
+   Schnappschuss fest. Eine Regeländerung ist also: diese Zeile plus der Schnappschuss. */
 const VICTORY_THRESHOLDS = {
-  duell: { base: [3, 4], theologie: [7, 10], un: [2, 3] },
+  duell: { base: [4, 5], theologie: [3, 4], un: [2, 3] },
   vier: { base: [4, 7], theologie: [1, 2], un: [2, 5] },
   drei: { base: [2, 3], theologie: [3, 5], un: [1, 2] },
 };

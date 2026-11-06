@@ -10,7 +10,7 @@
 
    Diese Datei: Kartengenerator, Hauptstädte, Draft-Vorrat und -Reihenfolge, die Wahl der
    KI. Die Regeln selbst (Kosten, mehrere Fähigkeiten) stehen in data.js und engine.js, die
-   Oberfläche des Drafts in ui.js. */
+   Oberfläche des Drafts in js/ui/draft.js. */
 
 /* ------------------------------------------------------------------ Karte
    Höhenfeld aus geglättetem Rauschen (drei Oktaven, am Rand abfallend) → die tiefsten 30 %

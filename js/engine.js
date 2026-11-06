@@ -13,12 +13,10 @@ function nextRand(S) {
 }
 /* `ctx` (v92): wofür gewürfelt wird, als Daten – { pi, tech } bei der Verfügbarkeit einer
    Technologie, { pi, pick } beim Auswürfeln, wenn nichts verfügbar wurde. Nur das Erste Spiel
-   liest es (tutNextDie): dort fallen die Würfe so, wie die geführte Partie es braucht. Das
+   liest es (fgNextDie): dort fallen die Würfe so, wie die geführte Partie es braucht. Das
    Protokoll zeigt sie wie jeden anderen Wurf. */
 function d6(S, why, ctx) {
-  // Im Tutorial kommen die Würfe aus einer festen Folge (tutNextDie), damit die Partie –
-  // inklusive aller Bot-Entscheidungen – bei jedem Durchlauf identisch abläuft.
-  let v = (typeof tutNextDie === 'function') ? tutNextDie(ctx) : null;
+  let v = (typeof ui !== 'undefined' && ui && ui.fg && typeof fgNextDie === 'function') ? fgNextDie(ctx) : null;
   if (!v) v = 1 + Math.floor(nextRand(S) * 6);
   log(S, 'roll', '🎲 ' + v + (why ? ' — ' + why : ''));
   return v;
@@ -2073,7 +2071,7 @@ function victoryMode(S) {
   if (S.duel) return 'duell';
   return Array.isArray(S.players) && empireCount(S) < 4 ? 'drei' : 'vier';
 }
-// Beschriftungen der drei Schwellen („4/7" …): für eine Spielart oder einen Spielstand
+// Beschriftungen der drei Schwellen („Zähler/Nenner"): für eine Spielart oder einen Spielstand
 function victoryLabels(x) {
   const t = VICTORY_THRESHOLDS[typeof x === 'string' ? x : victoryMode(x)];
   return { base: t.base.join('/'), theologie: t.theologie.join('/'), un: t.un.join('/') };
