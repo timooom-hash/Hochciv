@@ -6125,3 +6125,127 @@ viert; Vergleich mit dem Bruch wie bis v100; Tutorial mit dem alten Text; Legeph
 In Chromium (Einzeldatei, iPad quer): das Blatt „Fähigkeiten" mit „Noch 2 von 2 …" und nach einer
 Nutzung „Noch 1 von 2 …" und „Diese Runde schon genutzt.", der Regelbogen einer Partie zu viert mit
 „mehr als 4/7 der Weltbevölkerung (UN 2/5, Theologie 1/2; …" – ohne Seitenfehler.
+
+## Vereinfacht: Oberfläche, Tutorial, Einstellungen, eine Stelle für Zahlen (v102)
+
+Anweisungen des Autors (6.11.): zuerst ein Grundsatz – „so vollkommen wie die Website von Linear
+oder Apple Notes: einfacher Zweck, einfacher Aufbau, einfache Gestaltung, einfache Umsetzung.
+Untertitel, Hinweistexte und Nebenbeschriftungen streichen. Braucht ein Bildschirm sie, um
+verständlich zu sein, das Layout ändern. Jede Entscheidung soll Bedienung, Entwicklung und
+Arbeit mit Agenten zugleich verbessern, ohne etwas kaputtzumachen." Daraus ein Vorschlag in
+vierzehn Punkten; umzusetzen waren 1, 2, 4, 5 („aber den Tipp am Spielende behalten"),
+6 („das alte Tutorial streichen"), 7, 8, 9, 11, 13 und 14. Nicht umgesetzt: git und npm-Befehle
+(3), die Geschichte aus Kommentaren und Dokumenten nehmen (10), ein gemeinsames Blatt
+„Einkommen" (12). Dazu zwei Regeln: Wirtschaftssieg zu zweit „4/5 (ohne Technologie), 75 %
+(Theologie), 2/3 (Vereinte Nationen)" und Philosophie mit dem Text „+1/6 chance for tech
+availability".
+
+### Regeln
+
+* **Duell:** `VICTORY_THRESHOLDS.duell` ist jetzt `[4, 5]`, Theologie `[3, 4]`, Vereinte Nationen
+  `[2, 3]` (75 % als 3/4 geschrieben, damit Rechnung und Anzeige ganzzahlig bleiben). Gilt auch für
+  das Erste Spiel (1 gegen 1): sein Wirtschaftsweg siegt mit der Musterlösung jetzt in Runde 7
+  statt 6 – Englands Drehbuch reicht so weit (der Forschungsweg siegt schon seit v97 in Runde 7),
+  die Texte lesen die Schwellen aus `victoryLabels('duell')`. Kein Text musste geändert werden.
+* **Philosophie:** „+1/6 Chance auf Techverfügbarkeit", englisch „+1/6 chance for tech
+  availability". Die Regel selbst bleibt: +1 auf den Würfel der Verfügbarkeit, also bei 4–6 eine
+  Seite mehr.
+* **Eine Stelle für die Brüche (Punkt 9):** Rechnung und Anzeige lasen schon seit v101 aus der
+  Tabelle; jetzt auch die Tests (ein einziger Schnappschuss, alles andere – Grenzfälle je
+  Spielart und Technologie, Texte im Bogen, Legephase, Regelbogen im Marathon – aus
+  `VICTORY_THRESHOLDS`) und die Dokumente, die den heutigen Stand beschreiben (README,
+  UEBERGABE). Geschichtliche Abschnitte wie dieser nennen die Zahlen weiter, die damals galten.
+  Die Spielarten stehen in den Regeln (`spielartenHtml`) mit Zahlen aus den Tabellen
+  (`VICTORY_THRESHOLDS`, `MARATHON_TECH_FACTOR`, `MARATHON_SINGULARITY`,
+  `MARATHON_DISCOUNT_FACTOR`, `MARATHON_CAPITALS`).
+
+### Oberfläche – wie ausgelegt
+
+* **Leiste (1):** Forschen, Stadt gründen, Macht, Fähigkeiten, Zug beenden. Die Welt öffnet der
+  Reichsname in der Kopfzeile (mit ▾) und – weil sie die Bevölkerung vergleicht – auch das
+  Bevölkerungskästchen; gesperrt, solange die Leiste gesperrt ist (Bot-Blatt, Nachspiel). Das
+  Protokoll steht im Spielmenü ☰.
+* **Kopfzeile (2):** ohne „Wissen/Nahrung/Münzen/Macht" (schmale Geräte blendeten sie schon
+  aus) und ohne Fähigkeit neben dem Namen. Die Zeile „Runde 3 · Bevölkerung 1/4 (25 %)" wird zum
+  ersten Kästchen: eigene / Weltbevölkerung, darunter ein Balken in der Reichsfarbe bis zu einem
+  Strich an der Schwelle, die für dieses Reich gerade gilt (`victoryOption`: die niedrigste aus
+  ohne / Theologie / Vereinte Nationen). Die Prozentzahl entfällt – der Balken zeigt das
+  Verhältnis, der Strich das Ziel. Während ein KI- oder Bot-Zug nachgespielt wird, zeigt das
+  Kästchen wie der übrige Vorrat den Stand der Szene.
+* **Zugbeginn (13):** kein Hinweis „Griechenland ist am Zug" mehr; er wiederholte die Kopfzeile
+  und lag 2,2 s über dem Titel eines Blatts, das zu Zugbeginn aufgeht. Das Ereignis der Runde
+  stand schon neben der Runde. Sitzen mindestens zwei Menschen am Gerät, pulsiert beim Wechsel
+  einmal das Zeichen des Reichs (Ausgelegt: „mehrere Menschen" = Plätze mit `kind: 'human'`, die
+  noch im Spiel sind; die KI zählt nicht). Der Hinweis „Nahrungsdefizit …" zu Zugbeginn bleibt –
+  er meldet einen Zustand, keinen Wechsel.
+* **Blätter (5):** *Macht* – Titel mit dem Stand, darunter die Käufe; was nicht bezahlbar ist, ist
+  gesperrt (bis v101 löste der Knopf eine Fehlermeldung aus, darunter stand „Nicht genug
+  Münzen."). Kurs, Halbierung zu Zugbeginn und die Legende der Ringe stehen in den Regeln (neuer
+  Abschnitt „Machtringe auf der Karte"); den Kurs nennt jeder Knopf. Der Zusatz „alles ausgeben"
+  am dritten Kauf entfällt. *Fähigkeiten* – ohne „Deine Fähigkeit", der Stand der Freien
+  Forschung als zwei Punkte auf der Karte der Fähigkeit (gefüllt = offen; „verbraucht" sind zwei
+  leere), kein „gratis" an kostenlosen Knöpfen (sie sind als kostenlos hervorgehoben). Ausgelegt:
+  Sätze, die einen Zustand erklären, der sonst rätselhaft wäre – „Diese Runde schon genutzt.",
+  „Dunkles Zeitalter …", die Zeilen zu Rückschau, Wunder-Technologie und Kopieren –, bleiben.
+  *Spielende* – das Ergebnis ist der Titel („Griechenland gewinnt"), darunter wie gewonnen
+  wurde und **der Tipp (Anweisung)**; der Satz unter „Nochmal spielen" entfällt, die Stufe der
+  nächsten Partie steht im Knopf („Nochmal spielen · Schwer"; nach einer Niederlage dieselbe, an
+  der höchsten Stufe diese). Die Punktetafel bei mehreren Ansprüchen bleibt.
+* **Tutorial (6):** entfernt samt `js/tutorial.js`, Menüknopf, Haken in der Oberfläche
+  (`ui.tut`, `tutAllow`, `tutGateSheet`, `tutBotTech` in den Bots), 105 Übersetzungen, den
+  Texttafel-Stilen und seinen Tests (rund 95 Assertions, 16 Smoke-Schritte). Der Würfel des
+  Ersten Spiels lief über `tutNextDie`; `d6` fragt jetzt `fgNextDie` direkt, nur mit `ui.fg`. Das
+  Panel unter bzw. neben der Karte gehört allein dem Ersten Spiel (der Zurück-Knopf war dort
+  immer verborgen und ist weg). Der **alte Techtree** bleibt: Spielstände von vor v82 laufen
+  weiter mit ihm.
+* **Aufbau (7):** je Platz eine Zeile – Reich (bzw. die Wahl des Reichs, wo sie frei ist),
+  Mensch/KI/Bot, Fähigkeit. „Platz 1 …" entfällt: die Reihenfolge der Zeilen ist die Zugfolge
+  (steht in den Regeln). „Alternative 2: …" entfällt: die Auswahl der Fähigkeit zeigt jede mit
+  ihrer Wirkung, die gewählte markiert; der Wert bleibt im versteckten Select (`[data-abil]`),
+  damit Rezept, „Nochmal spielen" und Tests unverändert lesen. Bots: Auswahl gesperrt, „—".
+  Darunter Karte, KI, Bots, Beginnt, Ereignisse (+ Ereignisstärke), Weltwunder und
+  Sechseck-Plättchen als Kärtchen; „Spiel beginnen" ist immer zu sehen. Die sechs Hinweise
+  (Duell, Plättchenkarte, Sechsecke, Marathon, Doppelte, KI) stehen jetzt als „Spielarten" in den
+  Regeln. Kurze Beschriftungen: „KI", „Bots", „Beginnt".
+* **Einstellungen (8):** der Bildschirm entfällt. Ereignisse und Weltwunder waren schon je Partie
+  zu wählen – jetzt immer im Aufbau, ab Werk aus. Animationen ins Spielmenü ☰ (Langsam, Schnell,
+  Keine; gemerkt wie bisher, `hochciv.prefs`). Fest auf den bisherigen Vorgaben: Kosten zeigen
+  immer, was tatsächlich abgeht (der Schalter „Kosten ohne Umtausch" ist weg), und im Hochformat
+  dreht sich das Spiel immer quer (der Schalter „Hochkant drehen" ist weg). Gespeicherte Wahlen
+  `hochciv.opts` und `hochciv.noturn` löscht `boot`; ein altes `listPrice` in `hochciv.prefs` wird
+  nicht mehr gelesen.
+* **Menü (11):** Titel, „Erstes Spiel" (rot) und „Neues Spiel"; ist ein Spiel gespeichert, steht
+  „Spiel fortsetzen" oben und trägt das Rot. Darunter eine ruhige Zeile: Regeln, Karte
+  bearbeiten, Spielstand laden. Ohne Zeile über dem Titel und ohne Satz darunter; die Version
+  ohne den Namen davor.
+
+### Umsetzung
+
+* **ui.js je Bildschirm (14):** `js/ui/base.js`, `map.js`, `game.js`, `sheets.js`, `turns.js`,
+  `end.js`, `world.js`, `setup.js`, `place.js`, `draft.js`, `editor.js`, `boot.js` – in der alten
+  Reihenfolge geschnitten, Inhalt zeilengleich (geprüft). Alle Skripte teilen einen globalen
+  Gültigkeitsbereich; Code, der beim Laden läuft, gibt es nur am Ende (`boot()`), deshalb ändert
+  der Schnitt nichts. **Die Skriptliste steht nur noch in `index.html`:** `build_single.py`,
+  `sw.js` (holt bei der Installation `index.html`), `tools_version.js`, `test.js` und `smoke.js`
+  lesen die `<script>`-Tags. Bis v101 stand sie fünfmal.
+* **Tests (4):** grün je eine Zeile, rot die FAIL-Zeilen, `--verbose` für alles; `tools_docs.js`
+  liest die Zahlen aus der grünen Zeile. `smoke.js` würfelt mit festem Startwert (`SMOKE_SEED`).
+  Dabei gefunden: der Schritt „Animationen Keine/Schnell/Langsam" war rot, wenn ein Bot in den
+  nachgespielten Zügen gewann – das zählt jetzt als Ende des Nachspiels.
+
+### Abgesichert (v102)
+
+`test.js`: der Schnappschuss der Siegschwellen; je Spielart und Technologie die niedrigste Schwelle
+(Beschriftung, Bruch, Zähler, Nenner); je Spielart und Technologie genau auf der Schwelle keine
+Anmeldung, eine Bevölkerung mehr schon; `victoryMet` an der Grenze; Duell gewinnt in Runde 1 mit einer
+mehr als genau; Bogen-Texte je Spielart aus der Tabelle; Erstes Spiel, Wirtschaftsweg in Runde 7;
+`d6` ohne Erstes Spiel würfelt echt. `smoke.js`: fünf Knöpfe, Welt über Name und Bevölkerung,
+Protokoll im ☰; fünf Kästchen ohne Beschriftung, Bevölkerung, Balken und Strich (auch nach
+Theologie), Runde ohne Bevölkerung; kein Hinweis „… ist am Zug", der Satz der Szenen verschwindet;
+Macht ohne Erklärtext, Legende in den Regeln; Punkte der Freien Forschung (2, 1, 0, englisch „0 of 2
+left"); kein „gratis"; Spielende mit Ergebnis als Titel und Stufe im Knopf; Aufbau ohne Hinweise,
+Ereignisse und Weltwunder ab Werk aus, Auswahl der Fähigkeit mit Wirkung; Marathon in den Regeln;
+Animationen im ☰ samt Übernahme alter Wahlen und Englisch; Menü mit und ohne Spielstand; Drehung im
+Spiel immer, ohne Schalter. `check_single.js` in der Einzeldatei (24 Skripte). In Chromium (iPad
+quer): Menü, Aufbau (vier Reiche, Duell, Auswahl der Fähigkeit), Spiel, Macht, Fähigkeiten, Spielmenü,
+Welt, Regeln (Spielarten), Spielende – ohne Seitenfehler.

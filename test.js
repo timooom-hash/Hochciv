@@ -1,13 +1,23 @@
 /* Prüft die Regelmaschine gegen die Beispiele aus dem Regelheft. */
 const fs = require('fs'), vm = require('vm');
-for (const f of ['js/data.js', 'js/civs.js', 'js/i18n.js', 'js/hex.js', 'js/tiles.js', 'js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ki.js', 'js/marathon.js', 'js/anim.js', 'js/tutorial.js', 'js/firstgame.js'])
+/* Die eine Skriptliste (v102): die <script>-Tags in index.html. Geladen wird alles außer der
+   Oberfläche (js/ui/…) – die fährt smoke.js; ihre Quelltexte liest dieser Test als Text. */
+const SKRIPTE = [...fs.readFileSync(__dirname + '/index.html', 'utf8').matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+const UI_SKRIPTE = SKRIPTE.filter(f => f.startsWith('js/ui/'));
+const uiQuelle = () => UI_SKRIPTE.map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
+for (const f of SKRIPTE.filter(f => !UI_SKRIPTE.includes(f)))
   vm.runInThisContext(fs.readFileSync(__dirname + '/' + f, 'utf8'));
 
-let fails = 0;
+/* Ausgabe (v102): grün nur eine Zeile („test  2065 passed"), rot jede FAIL-Zeile. Alles andere –
+   „ok"-Zeilen und die eingerückten Messwerte – nur mit `node test.js --verbose`. */
+const VERBOSE = process.argv.includes('--verbose') || process.argv.includes('-v');
+const say = console.log;
+if (!VERBOSE) console.log = (...a) => { const z = a.join(' '); if (z.startsWith('FAIL')) say(z); };
+let fails = 0, passed = 0;
 const eq = (got, want, label) => {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) { fails++; console.log(`FAIL ${label}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); }
-  else console.log(`  ok  ${label}`);
+  else { passed++; console.log(`  ok  ${label}`); }
 };
 
 // Bringt die Zielzivilisation auf Index 0, indem Spieler samt Städte/Armeen umnummeriert
@@ -159,7 +169,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const glieder = Object.values(YIELD_CHAINS).flat();
   eq(glieder.flat().map(g => g.k).sort(), keys.slice().sort(), 'jede Ertragstechnologie steht in genau einer Kette');
   eq(glieder.filter(ch => new Set(ch.map(g => TECH_BY_KEY[g.k].f)).size !== 1).length, 0, 'eine Kette bleibt in ihrem Feld');
-  // Sortiert wird nach t.c – im alten Techtree (Tutorial) und im Marathon muss es dieselbe Reihe sein
+  // Sortiert wird nach t.c – im alten Techtree und im Marathon muss es dieselbe Reihe sein
   const reihe = (X, ch) => ch.map(g => TECH_BY_KEY[g.k]).sort((a, b) => techBase(X, a) - techBase(X, b)).map(t => t.k).join();
   eq([null, { oldTree: true }, { marathon: true }].map(X => glieder.filter(ch => reihe(X, ch) !== ch.map(g => g.k).join()).length),
     [0, 0, 0], 'Reihenfolge jeder Kette: Standard, alter Techtree und Marathon gleich');
@@ -210,7 +220,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
 
 /* --- Griechische Technologiekosten aus dem Beispiel
    Das Beispiel im Regelheft rechnet mit den alten Kosten (Schrift 1, Biologie 15). Die gelten
-   seit v82 nur noch im Tutorial – das Beispiel läuft deshalb im alten Techtree. Dieselben
+   seit v82 nur noch in alten Spielständen – das Beispiel läuft deshalb im alten Techtree. Dieselben
    Abzüge auf die heutigen Kosten prüft der Abschnitt „Techtree" weiter unten.
    Seit v97 (Anweisung des Autors) zieht Griechenland 1/1/2/2/5 ab statt 1/2/3/4/5 wie im
    Regelheft: Papier und Alchemie (Mittelalter) kosten 1 mehr als dort, Biologie
@@ -535,15 +545,6 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const de = DATA_DE ? DATA_DE.tech.belagerung[1] : TECH_BY_KEY.belagerung.e;
   eq([de, DATA_EN.tech.belagerung[1]], [`+${SIEGE_BONUS} Angriff gegen Städte`, `+${SIEGE_BONUS} attack against cities`],
     'Techtext nennt den Bonus, deutsch und englisch');
-  /* Das Tutorial rechnet ihn vor: Belagerungsmaschinen und 3 Macht gegen Verteidigung 3. Die
-     Zahlen stehen fest im Text (deutsch in tutorial.js, englisch in i18n.js) – hier gebunden. */
-  const tut = fs.readFileSync(__dirname + '/js/tutorial.js', 'utf8');
-  const enTut = Object.entries(UI_EN).filter(([k]) => /Belagerungsmaschinen<\/b> forschen \(/.test(k)).map(([, v]) => v);
-  eq([[...tut.matchAll(/Belagerungsmaschinen<\/b> forschen \(\+(\d+) Angriff gegen Städte\)/g)].map(m => +m[1]),
-    [...tut.matchAll(/greift deine Armee mit <b>(\d+) statt 3<\/b>/g)].map(m => +m[1])],
-    [[SIEGE_BONUS, SIEGE_BONUS], [3 + SIEGE_BONUS, 3 + SIEGE_BONUS]], 'Tutorial (deutsch, lang und kurz): +3, also 6 statt 3');
-  eq([enTut.length, enTut.every(v => v.includes(`(+${SIEGE_BONUS} attack against cities)`) &&
-    v.includes(`<b>${3 + SIEGE_BONUS} instead of 3</b>`))], [2, true], 'Tutorial (englisch): dieselben Zahlen');
 }
 
 /* --- Kampfphase (v91, Anweisung des Autors): erst die Städte, dann wird flankiert – wie bis
@@ -1182,39 +1183,12 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const S = mk('griechenland');
   eq(SINGULARITY.c, 120, 'Singularität-Grundkosten 120');
   eq(techCost(S, 0, SINGULARITY), 115, 'griechischer Rabatt auch auf Singularität');
-  /* Das Tutorial (Russland, alter Techtree) nennt die Kosten fest im Text: ohne und mit der
-     Wissenschaftlichen Methode. Hier an die Regel gebunden, deutsch und englisch. */
+  /* Im alten Techtree (Spielstände von vor v82): ohne und mit der Wissenschaftlichen Methode. */
   const T0 = newGame({ seed: 7, oldTree: true, players: [{ civ: 'russland', kind: 'human' }, { civ: 'griechenland', kind: 'bot' }] });
   const ohne = techCost(T0, 0, SINGULARITY);
   T0.players[0].techs.wiss_methode = true;
   const mit = techCost(T0, 0, SINGULARITY);
-  eq([T0.oldTree, ohne, mit], [true, 120, 110], 'Tutorial: Singularität 120, mit der Methode 110');
-  const tut = fs.readFileSync(__dirname + '/js/tutorial.js', 'utf8');
-  eq([[...tut.matchAll(/<b>Singularität<\/b>: (\d+) Wissenschaft/g)].map(m => +m[1]),
-    [...tut.matchAll(/mit der wissenschaftlichen Methode (\d+)\./g)].map(m => +m[1])],
-    [[ohne, ohne], [mit]], 'Tutorialtexte (lang und kurz) nennen dieselben Kosten');
-  const en = Object.values(UI_EN).join('\n');
-  eq([[...en.matchAll(/<b>Singularity<\/b>: (\d+) science/g)].map(m => +m[1]),
-    [...en.matchAll(/, (\d+) with the scientific method\./g)].map(m => +m[1])],
-    [[ohne, ohne], [mit]], '… englisch ebenso');
-}
-
-/* Das Tutorial spielt zu viert: sein Siegtext nennt die Schwelle zu viert (seit v101 4/7) und dazu
-   die zu dritt und im Duell – aus VICTORY_THRESHOLDS, lang und kurz, deutsch und englisch. */
-{
-  const st = TUT_STEPS.find(s => s.t === 'Die drei Wege zu gewinnen');
-  const L = m => victoryLabels(m).base;
-  const pruefe = (txt, satz) => [satz.every(x => txt.includes(x)), /zwei Drittel|two thirds/.test(txt)];
-  eq([L('vier'), L('drei'), L('duell')], ['4/7', '2/3', '3/4'], 'Grundschwellen zu viert, zu dritt, im Duell');
-  eq([pruefe(st.html(), ['mehr als 4/7 der Weltbevölkerung', 'zu dritt braucht es mehr als 2/3', 'im Duell mehr als 3/4']),
-    pruefe(st.kurz(), ['mehr als 4/7 der Weltbevölkerung', 'zu dritt 2/3, im Duell 3/4'])],
-    [[true, false], [true, false]], 'Tutorial: Siegtext lang und kurz mit 4/7 (zu viert), 2/3 und 3/4');
-  setLang('en', { quiet: true });
-  try {
-    eq([pruefe(st.html(), ['more than 4/7 of the world population', 'with three you need more than 2/3', 'in a duel more than 3/4']),
-      pruefe(st.kurz(), ['more than 4/7 of the world population', '2/3 with three, 3/4 in a duel'])],
-      [[true, false], [true, false]], '… englisch ebenso');
-  } finally { setLang('de', { quiet: true }); }
+  eq([T0.oldTree, ohne, mit], [true, 120, 110], 'alter Techtree: Singularität 120, mit der Methode 110');
 }
 
 /* Griechenland hat keinen Würfelbonus mehr, der Kostenrabatt bleibt */
@@ -1232,29 +1206,6 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(!!TECH_BY_KEY.theologie, true, 'Theologie ist eine normale Technologie');
   eq(techsIn(1, 0).map(t => t.k).includes('keramik'), true, 'Keramik: Produktion/Antike');
   eq(techsIn(3, 1).map(t => t.k).includes('theologie'), true, 'Theologie: Spezial/Mittelalter');
-}
-
-/* Theologie und UN senken die Siegschwelle, die niedrigste gilt – je Spielart: zu viert seit v101
-   (Anweisung des Autors) 4/7 · Theologie 1/2 · UN 2/5, zu dritt weiter 2/3 · 3/5 · 1/2. */
-{
-  const V = newGame({ seed: 7, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) }), p = V.players[0];
-  eq([victoryMode(V), victoryOption(V, p).label, victoryOption(V, p).frac], ['vier', '4/7', 4 / 7],
-    'zu viert: Grundschwelle 4/7 (bis v100 2/3)');
-  p.techs.theologie = true;
-  eq([victoryOption(V, p).label, victoryOption(V, p).frac], ['1/2', 1 / 2], 'zu viert mit Theologie 1/2 (bis v100 3/5)');
-  p.techs.un = true;
-  eq([victoryOption(V, p).label, victoryOption(V, p).frac], ['2/5', 2 / 5], 'zu viert: UN (2/5) schlägt Theologie (1/2) (bis v100 1/2)');
-  delete p.techs.theologie;
-  eq(victoryOption(V, p).label, '2/5', 'UN allein: 2/5');
-  const D = newGame({ seed: 7, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
-  const q = D.players[0];
-  eq([victoryMode(D), victoryOption(D, q).label], ['drei', '2/3'], 'zu dritt: Grundschwelle weiter 2/3');
-  q.techs.theologie = true;
-  eq(victoryOption(D, q).frac, 3 / 5, 'zu dritt mit Theologie weiter 3/5');
-  q.techs.un = true;
-  eq(victoryOption(D, q).frac, 0.5, 'zu dritt: UN (1/2) schlägt Theologie (3/5)');
-  // Zähler und Nenner stehen an der Schwelle – verglichen wird ganzzahlig (victoryMet)
-  eq([victoryOption(V, p).num, victoryOption(V, p).den], [2, 5], 'die Schwelle trägt Zähler und Nenner');
 }
 
 /* Keramik + Verbundwerkstoffe: bis 3x wachsen, davon 1x gratis */
@@ -3158,8 +3109,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
    Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 · Produktion Bewässerung 1,
    Landwirtschaft 5 · Forschung in der Industrialisierung Chemie 11, Biologie 12,
    Wissenschaftliche Methode 15. Die alten Kosten (bis v81 der Standard) gibt es nur noch
-   im Tutorial (S.oldTree, OLD_TECH_COSTS) und in Partien, die vor v82 damit begonnen
-   haben. Feld, Zeitalter und Wirkung sind in beiden gleich.                           */
+   in Partien, die vor v82 begonnen haben (S.oldTree, OLD_TECH_COSTS). Feld, Zeitalter und Wirkung sind in beiden gleich.                           */
 {
   const auf = civ => [{ civ, kind: 'human' }, { civ: 'wikinger', kind: 'bot' }];
   const mkT = (civ, old, techs = [], extra = {}) => {
@@ -3186,7 +3136,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(leiter(STD, 2), ['taktik', 'stadtmauern', 'eisenverarbeitung', 'belagerung'],
     'Standard: Militär/Antike nach Kosten 1, 2, 4, 5');
   eq(leiter(OLD, 2), ['taktik', 'eisenverarbeitung', 'belagerung', 'stadtmauern'],
-    'alter Techtree (Tutorial): Militär/Antike wie bis v83'); 
+    'alter Techtree: Militär/Antike wie bis v83'); 
   eq([STD.oldTree, OLD.oldTree], [false, true], 'der alte Techtree steht als Schalter im Spielstand');
   eq(newGame({ seed: 7, players: auf('england') }).oldTree, false, 'ohne Angabe gilt der (neue) Standard');
   eq(newGame({ seed: 7, players: auf('england'), altTree: false }).oldTree, false,
@@ -3341,17 +3291,6 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     eq(migrateState(migrateState(JSON.parse(JSON.stringify(OLD)))).oldTree, true, 'zweimal migriert ändert nichts');
   }
 
-  // Das Tutorial läuft im alten Techtree – Texte und Aufgaben sind darauf zugeschnitten
-  {
-    // tutorialSetup schreibt das globale S und ui – danach wieder wie vorher, sonst griffe
-    // der Tutorial-Haken (tutBotTech) in die Bot-Partien gleich darunter ein.
-    const merkS = typeof S !== 'undefined' ? S : undefined, merkUi = typeof ui !== 'undefined' ? ui : undefined;
-    tutorialSetup();
-    eq([S.oldTree, leiter(S, 0)[0], techCost(S, 0, TECH_BY_KEY.schrift)], [true, 'schrift', 1],
-      'Tutorial: alter Techtree (Schrift 1 vorn auf der Leiter)');
-    S = merkS; ui = merkUi;
-  }
-
   // Bots forschen auf denselben Leitern – je zehn vollständige Partien ohne Ausnahme
   for (const old of [false, true]) {
     let fertig = 0;
@@ -3400,8 +3339,8 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   const ki = K.players.findIndex(p => p.civ === 'russland');
   eq(growPrice(K, ki, capitalOf(K, ki)), { food: 0, coins: 2 }, 'Kolonisten und Fruchtbarkeit zusammen: keine Nahrung, doppelte Münzen');
   // keine Prüfung der Grundfähigkeit ohne Zivilisation mehr im Quelltext
-  const quelle = ['engine', 'expansion', 'bots', 'ki', 'marathon', 'ui']
-    .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8')).join('\n');
+  const quelle = ['engine', 'expansion', 'bots', 'ki', 'marathon']
+    .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8')).join('\n') + uiQuelle();
   eq((quelle.match(/isAbil\([^)]*'basis'\)/g) || []).length, 0, "kein isAbil(…, 'basis') mehr im Quelltext");
 }
 
@@ -3444,7 +3383,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   // --- Technologiekosten
   const M = newGame({ seed: 3, map: marathonMap(3), marathon: true, players: CIVS.map(c => ({ civ: c.k, kind: 'human', drafted: ['england:basis', 'russland:basis'] })) });
   const N = newGame({ seed: 3, players: CIVS.map(c => ({ civ: c.k, kind: 'human', ability: 'gratistech' })) });
-  eq([victoryMode(M), victoryOption(M, M.players[0]).label], ['vier', '4/7'], 'Marathon: vier Reiche, also die Siegschwellen zu viert (v101)');
+  eq([victoryMode(M), victoryOption(M, M.players[0]).label], ['vier', VICTORY_THRESHOLDS.vier.base.join('/')], 'Marathon: vier Reiche, also die Siegschwellen zu viert (v101)');
   const k4 = ['mathematik', 'papier', 'chemie', 'computertechnik'].map(k => TECH_BY_KEY[k]);
   eq(k4.map(t => techCost(M, 0, t)), k4.map((t, i) => techCost(N, 0, t) * [2, 3, 4, 5][i]),
     'Marathon: Antike ×2, Mittelalter ×3, Industrialisierung ×4, Moderne ×5');
@@ -3715,97 +3654,69 @@ const duellKarte = (civA, civB, seed) => {
       `${a.n} gegen ${b.n} bekommt zwei Startpunkte`);
   }
 }
-/* Siegschwellen im Duell: >3/4, mit Theologie >7/10, mit UN >2/3 – niedrigste gilt */
+/* Siegschwellen des Wirtschaftssiegs (v102: eine Stelle für die Zahlen). Dies ist der EINZIGE Test,
+   der sie nennt – ein Schnappschuss der Tabelle in js/data.js. Eine Regeländerung ändert dort die
+   Zeile und hier den Schnappschuss; alle anderen Tests unten rechnen aus VICTORY_THRESHOLDS. */
+eq(VICTORY_THRESHOLDS, {
+  duell: { base: [4, 5], theologie: [3, 4], un: [2, 3] },
+  vier: { base: [4, 7], theologie: [1, 2], un: [2, 5] },
+  drei: { base: [2, 3], theologie: [3, 5], un: [1, 2] },
+}, 'Siegschwellen: der Schnappschuss (zuletzt geändert v102 im Duell, v101 zu viert – Anweisungen des Autors)');
+
+/* Aus der Tabelle gerechnet (v102): Beschriftung, Bruch, Zähler/Nenner, die niedrigste gilt. */
+const VT = VICTORY_THRESHOLDS;
+const bruch = t => t.join('/');
+const niedrigste = (mode, ...ks) => ks.map(k => VT[mode][k]).sort((x, y) => x[0] / x[1] - y[0] / y[1])[0];
+// Spiele je Spielart: vier und drei Reiche, das Duell auf seiner Plättchenkarte
+const spielArt = mode => mode === 'duell'
+  ? newGame({ seed: 9, duel: true, map: duellKarte('griechenland', 'england', 9),
+    players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }] })
+  : newGame({ seed: 9, players: (mode === 'vier' ? CIVS.map(c => c.k) : ['russland', 'griechenland', 'england']).map(k => ({ civ: k, kind: 'human' })) });
 {
-  const S = newGame({
-    seed: 8, duel: true, map: duellKarte('griechenland', 'england', 8),
-    players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }],
-  });
-  eq(S.duel, true, 'der Duellmodus steht im Spielstand');
-  eq(S.players.length, 2, 'nur zwei Reiche');
-  const p = S.players[0];
-  const o = victoryOption(S, p);
-  eq([o.frac, o.strict, o.label], [3 / 4, true, '3/4'], 'Grundschwelle im Duell ist >3/4');
-  p.techs.theologie = true;
-  eq(victoryOption(S, p).label, '7/10', 'mit Theologie >7/10');
-  p.techs.un = true;
-  eq(victoryOption(S, p).label, '2/3', 'mit Vereinten Nationen >2/3, die niedrigste gilt');
-  eq(victoryMode(S), 'duell', 'Spielart Duell');
-  // ohne Duell: zu dritt die Schwellen von bis v100, zu viert seit v101 eigene
-  const drei = techs => {
-    const X = newGame({ seed: 8, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
-    techs.forEach(t => { X.players[0].techs[t] = true; });
-    return victoryOption(X, X.players[0]).label;
-  };
-  const vier = techs => {
-    const X = newGame({ seed: 8, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
-    techs.forEach(t => { X.players[0].techs[t] = true; });
-    return victoryOption(X, X.players[0]).label;
-  };
-  eq([drei([]), drei(['theologie']), drei(['theologie', 'un'])], ['2/3', '3/5', '1/2'], 'zu dritt: 2/3, Theologie 3/5, UN 1/2');
-  eq([vier([]), vier(['theologie']), vier(['theologie', 'un'])], ['4/7', '1/2', '2/5'], 'zu viert (v101): 4/7, Theologie 1/2, UN 2/5');
-  // zwei Reiche ohne den Duellmodus gibt es im Aufbau nicht – sie zählen wie drei (nicht vier)
-  eq(victoryOption(mk('griechenland'), mk('griechenland').players[0]).label, '2/3', 'zwei Reiche ohne Duellmodus: wie zu dritt');
+  for (const mode of ['vier', 'drei', 'duell']) {
+    const X = spielArt(mode), p = X.players[0];
+    for (const techs of [[], ['theologie'], ['un'], ['theologie', 'un']]) {
+      p.techs = {}; techs.forEach(t => { p.techs[t] = true; });
+      const soll = niedrigste(mode, 'base', ...techs), o = victoryOption(X, p);
+      eq([victoryMode(X), o.label, o.frac, o.num, o.den, o.strict], [mode, bruch(soll), soll[0] / soll[1], soll[0], soll[1], true],
+        `${mode}${techs.length ? ' mit ' + techs.join(' und ') : ''}: die niedrigste Schwelle der Tabelle gilt`);
+    }
+  }
 }
-/* Wirtschaftssieg im Duell greift erst über 3/4 */
+
+/* Spielarten (v102 ohne eigene Brüche): der Duellmodus steht im Spielstand; zwei Reiche ohne ihn
+   (gibt es im Aufbau nicht) zählen wie drei. */
 {
-  const S = newGame({
-    seed: 9, duel: true, map: duellKarte('griechenland', 'england', 9),
-    players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }],
-  });
-  const a = capitalOf(S, 0), b = capitalOf(S, 1);
-  // seit v85 geprüft am Rundenende (checkEconomyRoundEnd), auch schon in Runde 1
-  a.pop = 3; b.pop = 1;                     // genau 3/4
-  checkEconomyRoundEnd(S);
-  eq(S.claims.length, 0, 'genau 3/4 reicht nicht (strikt größer)');
-  a.pop = 4;                                 // 4/5 > 3/4
-  checkEconomyRoundEnd(S);
-  eq(S.claims.map(c => c.pi), [0], 'über 3/4 wird der Sieg angemeldet');
-  // ganzzahlig verglichen (v101): im Duell mit Theologie sind 63 von 90 genau 7/10 – bis v100 galt
-  // das mit dem Gleitkommabruch als „mehr als"
-  const G7 = (eigen, fremd) => {
-    const X = newGame({ seed: 9, duel: true, map: duellKarte('griechenland', 'england', 9),
-      players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
-    X.players[0].techs.theologie = true;
-    capitalOf(X, 0).pop = eigen; capitalOf(X, 1).pop = fremd;
-    checkEconomyRoundEnd(X);
-    return X.claims.length;
+  const S = spielArt('duell');
+  eq([S.duel, S.players.length, victoryMode(S)], [true, 2, 'duell'], 'der Duellmodus steht im Spielstand, zwei Reiche');
+  eq(victoryMode(mk('griechenland')), 'drei', 'zwei Reiche ohne Duellmodus: wie zu dritt');
+}
+/* Am Rundenende angemeldet, wer MEHR als die Schwelle hat – genau auf ihr reicht nicht. Je Spielart
+   und Technologie: Bevölkerung genau auf der Schwelle der Tabelle, dann eine mehr. Die Fremden
+   verteilen sich auf ihre Hauptstädte, je mindestens 1. */
+{
+  const setze = (X, eigen, fremd) => {
+    const andere = X.cities.filter(c => c.owner !== 0);
+    andere.forEach((c, i) => { c.pop = 1 + (i === 0 ? fremd - andere.length : 0); });
+    X.cities.filter(c => c.owner === 0).forEach(c => { c.pop = eigen; });
   };
-  eq([63 > 90 * (7 / 10), G7(63, 27), G7(64, 26)], [true, 0, 1],
-    'Duell mit Theologie: 63 von 90 (genau 7/10) reichen nicht, 64 schon – der Bruch allein hätte sich verrechnet');
-  eq([victoryMet({ num: 7, den: 10, strict: true }, 63, 90), victoryMet({ num: 7, den: 10, strict: false }, 63, 90)],
-    [false, true], 'victoryMet: „mehr als" und „mindestens" an der Grenze');
-  // Zu viert hätte 3/4 schon gereicht – dort gilt seit v101 „mehr als 4/7" (seit v77 strikt wie
-  // alle anderen Schwellen; bis v74 genügten genau 2/3, v77–v100 mehr als 2/3)
-  const N = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
-  N.cities.forEach(c => { c.pop = c.owner === 0 ? 4 : 1; });   // 4 von 7 = genau 4/7
-  checkEconomyRoundEnd(N);
-  eq(N.claims.length, 0, 'zu viert reichen genau 4/7 nicht (mehr als 4/7, v101)');
-  N.cities.forEach(c => { c.pop = c.owner === 0 ? 8 : c.owner === 1 ? 4 : 1; });   // 8 von 14 = genau 4/7
-  checkEconomyRoundEnd(N);
-  eq(N.claims.length, 0, '… auch 8 von 14 nicht');
-  N.cities.forEach(c => { c.pop = c.owner === 0 ? 5 : 1; });   // 5 von 8 > 4/7 (bis v100 zu wenig: < 2/3)
-  checkEconomyRoundEnd(N);
-  eq(N.claims.map(c => c.pi), [0], 'mehr als 4/7 wird angemeldet – 5 von 8 (bis v100 erst über 2/3)');
-  // zu viert mit Theologie: genau 1/2 nicht, mehr schon; mit UN: genau 2/5 nicht, mehr schon
-  const vierMit = (tech, eigen, rest) => {
-    const X = newGame({ seed: 9, players: CIVS.map(c => ({ civ: c.k, kind: 'human' })) });
-    X.players[0].techs[tech] = true;
-    X.cities.forEach(c => { c.pop = c.owner === 0 ? eigen : rest; });
+  const anmelden = (mode, techs, eigen, fremd) => {
+    const X = spielArt(mode);
+    techs.forEach(t => { X.players[0].techs[t] = true; });
+    setze(X, eigen, fremd);
     checkEconomyRoundEnd(X);
-    return X.claims.length;
+    return X.claims.map(c => c.pi);
   };
-  eq([vierMit('theologie', 3, 1), vierMit('theologie', 4, 1)], [0, 1], 'zu viert mit Theologie: 3 von 6 (genau 1/2) nicht, 4 von 7 schon');
-  eq([vierMit('un', 2, 1), vierMit('un', 4, 2), vierMit('un', 3, 1)], [0, 0, 1],
-    'zu viert mit UN: 2 von 5 und 4 von 10 (genau 2/5) nicht, 3 von 6 schon');
-  // zu dritt weiter mehr als 2/3
-  const D = newGame({ seed: 9, players: ['russland', 'griechenland', 'england'].map(k => ({ civ: k, kind: 'human' })) });
-  D.cities.forEach(c => { c.pop = c.owner === 0 ? 4 : 1; });   // 4 von 6 = genau 2/3
-  checkEconomyRoundEnd(D);
-  eq(D.claims.length, 0, 'zu dritt reichen genau 2/3 weiter nicht');
-  D.cities.forEach(c => { c.pop = c.owner === 0 ? 5 : 1; });   // 5 von 7 > 2/3
-  checkEconomyRoundEnd(D);
-  eq(D.claims.map(c => c.pi), [0], 'zu dritt: mehr als 2/3 wird angemeldet');
+  for (const mode of ['vier', 'drei', 'duell']) for (const techs of [[], ['theologie'], ['un']]) {
+    const [n, d] = niedrigste(mode, 'base', ...techs), andere = mode === 'vier' ? 3 : mode === 'drei' ? 2 : 1;
+    const k = Math.ceil(andere / (d - n));          // genug fremde Bevölkerung für alle Hauptstädte
+    eq([anmelden(mode, techs, k * n, k * (d - n)), anmelden(mode, techs, k * n + 1, k * (d - n))], [[], [0]],
+      `${mode}${techs.length ? ' mit ' + techs[0] : ''}: genau ${k * n} von ${k * d} nicht, ${k * n + 1} von ${k * d + 1} schon`);
+  }
+  // ganzzahlig verglichen (v101): 63 von 90 sind genau 7/10 – mit dem Gleitkommabruch galt das bis
+  // v100 als „mehr als" (eine reine Rechenprobe, keine Regelzahl)
+  eq([63 > 90 * (7 / 10), victoryMet({ num: 7, den: 10, strict: true }, 63, 90), victoryMet({ num: 7, den: 10, strict: false }, 63, 90)],
+    [true, false, true], 'victoryMet: der Bruch allein hätte sich verrechnet; „mehr als" und „mindestens" an der Grenze');
 }
 /* Wirtschaftssieg am Rundenende (v85, Anweisung des Autors): einmal je Runde, an ihrem Ende –
    wenn alle gleich oft gezogen haben –, mit der Bevölkerung von dort. Wer gewinnt, gewinnt
@@ -3816,7 +3727,8 @@ const duellKarte = (civA, civB, seed) => {
     players: ['russland', 'griechenland', 'england', 'wikinger'].map(k => ({ civ: k, kind: 'human' })) });
   const S = vier();
   endTurn(S);                                                     // Russland fertig
-  capitalOf(S, 1).pop = 9;                                        // Griechenland: 9 von 12 > 4/7
+  capitalOf(S, 1).pop = 9;                                        // Griechenland: 9 von 12, über der Schwelle
+  eq(victoryMet(victoryOption(S, S.players[1]), 9, 12), true, 'Vorbedingung: 9 von 12 liegen über der Schwelle zu viert');
   endTurn(S); endTurn(S);                                         // Griechenland, England
   eq([S.claims.length, S.over], [0, null], 'während der Runde wird nichts angemeldet');
   endTurn(S);                                                     // Wikinger: Rundenende
@@ -3833,7 +3745,7 @@ const duellKarte = (civA, civB, seed) => {
   const U = vier();
   endTurn(U);                                                     // Russland
   claimVictory(U, 1, 'Forschungssieg (Singularität)');            // Griechenland in seinem Zug
-  capitalOf(U, 2).pop = 12;                                       // England: 12 von 15 > 4/7
+  capitalOf(U, 2).pop = 12;                                       // England: 12 von 15, über der Schwelle
   for (let i = 0; i < 3; i++) endTurn(U);
   eq([U.claims.map(c => c.pi), !!U.over, U.over && U.over.score && U.over.score.length], [[1, 2], true, 2],
     'Wirtschaftssieg am Rundenende neben der Singularität derselben Runde: die Punkte entscheiden');
@@ -3845,12 +3757,12 @@ const duellKarte = (civA, civB, seed) => {
   const S = newGame({ seed: 8, duel: true, map: duellKarte('russland', 'england', 8),
     players: [{ civ: 'russland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
   eq(S.round, 1, 'das Spiel beginnt in Runde 1');
-  const a = capitalOf(S, 0), b = capitalOf(S, 1);
-  a.pop = 4; b.pop = 1;                              // 4 von 5 – über 3/4
+  const a = capitalOf(S, 0), b = capitalOf(S, 1), [n, d] = VT.duell.base;
+  a.pop = n + 1; b.pop = d - n;                      // eine mehr als genau auf der Schwelle
   endTurn(S);                                         // erster Spieler fertig
   eq([S.claims.length, S.over], [0, null], 'nach dem ersten Zug noch nichts – der zweite zieht noch');
   endTurn(S);                                         // zweiter fertig: Ende von Runde 1
-  eq([!!S.over, S.over && S.over.winner, S.round], [true, 0, 1], 'am Ende von Runde 1 gewinnt 4 von 5');
+  eq([!!S.over, S.over && S.over.winner, S.round], [true, 0, 1], `am Ende von Runde 1 gewinnt ${n + 1} von ${d + 1}`);
 }
 /* Eine vollständige 1-gegen-1-Partie Mensch gegen Bot läuft durch */
 {
@@ -4901,7 +4813,7 @@ const duellKarte = (civA, civB, seed) => {
 
 /* ==================================================== Siedelertrag (settleGain)
    Was eine gedachte Stadt der Größe 1 auf einem Feld einbrächte. Die Oberfläche zeigt
-   das im Feldblatt an; das Tutorial rechnet damit seine Beispielzahlen aus. */
+   das im Feldblatt an. */
 {
   const S = mk('russland');
   const pi = 0, cap = capitalOf(S, pi);
@@ -5042,65 +4954,6 @@ const duellKarte = (civA, civB, seed) => {
     'Städte ohne fremde Armeen in Reichweite: kein Angreifer');
   S.players[wi].dead = true;
   eq(powerView(S).cities.find(x => x.city === cap).atk.map(a => a.pi), [en], 'ein ausgeschiedenes Reich greift nicht an');
-}
-/* Der Protokollschritt im Tutorial darf beim Weiterschalten nicht das offene Fenster
-   wegreißen – dafür gibt es keepOpen. */
-{
-  const look = TUT_STEPS.filter(st => st.keepOpen);
-  eq(look.length, 1, 'genau ein Leseschritt ist als keepOpen markiert');
-  eq(look.every(st => !!st.goal), true, 'der Leseschritt hat ein Ziel');
-  eq(TUT_STEPS[TUT_STEPS.length - 1].goal, undefined,
-    'der letzte Schritt hat keine Aufgabe – sonst würde er sich selbst beenden');
-}
-
-/* Bots forschen zufällig – nur im Tutorial liegt das Ergebnis fest.
-   Der Hook tauscht ausschließlich das ERGEBNIS im Militärfeld; gewürfelt wird normal
-   weiter, damit sich die feste Würfelfolge nicht verschiebt. */
-{
-  // Außerhalb des Tutorials greift der Hook nicht.
-  // ACHTUNG: hier keine lokale Konstante `S` anlegen – tutorialSetup() schreibt in die
-  // globale, eine Schattenvariable würde stillschweigend auf ein anderes Spiel zeigen.
-  ui = { tut: null };
-  {
-    const frei = mk('russland');
-    eq(tutBotTech(frei, 0, 2), null, 'ohne laufendes Tutorial keine Vorgabe');
-  }
-  // Im Tutorial: nur Griechenland, nur das Militärfeld
-  tutorialSetup();
-  const gi = S.players.findIndex(p => p.civ === 'griechenland');
-  const ri = S.players.findIndex(p => p.civ === 'russland');
-  eq(tutBotTech(S, gi, 2).k, 'eisenverarbeitung', 'Griechenland bekommt zuerst Eisenverarbeitung');
-  eq(tutBotTech(S, gi, 0), null, 'in anderen Feldern gibt es keine Vorgabe');
-  eq(tutBotTech(S, ri, 2), null, 'andere Reiche sind nicht betroffen');
-  S.players[gi].techs.eisenverarbeitung = true;
-  eq(tutBotTech(S, gi, 2).k, 'stahl', 'danach Stahl');
-  S.players[gi].techs.stahl = true;
-  eq(tutBotTech(S, gi, 2), null, 'danach greift wieder der Würfel');
-
-  // Zwei komplette Durchläufe: Griechenland forscht jedes Mal dasselbe
-  const durchlauf = () => {
-    tutorialSetup();
-    for (let i = 0; i < TUT_STEPS.length; i++) {
-      ui.tut.i = i; tutEnter();
-      const st = TUT_STEPS[i];
-      if (st.goal && !st.goal()) st.auto();
-    }
-    const g = S.players.findIndex(p => p.civ === 'griechenland');
-    return {
-      techs: Object.keys(S.players[g].techs).filter(k => S.players[g].techs[k]).sort().join(','),
-      wuerfel: ui.tut.die,
-      alle: S.players.map(p => Object.keys(p.techs).filter(k => p.techs[k]).sort().join(',')).join('|'),
-    };
-  };
-  const a1 = durchlauf(), a2 = durchlauf();
-  eq(a1.techs, a2.techs, 'Griechenland forscht in beiden Durchläufen dasselbe');
-  eq(a1.alle, a2.alle, 'auch alle anderen Reiche forschen identisch');
-  eq(a1.wuerfel, a2.wuerfel, 'und es werden gleich viele Würfel verbraucht');
-  eq(a1.techs.includes('eisenverarbeitung') && a1.techs.includes('stahl'), true,
-    'Eisenverarbeitung und Stahl sind dabei: ' + a1.techs);
-  eq(a1.techs.includes('stadtmauern') || a1.techs.includes('burgenbau'), false,
-    'Stadtmauern und Burgenbau nicht: ' + a1.techs);
-  ui = { sel: null, army: null, mode: null, botTimer: null };
 }
 
 /* ==================================================== Fähigkeiten: Sammelaktionen (v87)
@@ -5325,8 +5178,8 @@ const duellKarte = (civA, civB, seed) => {
      über die zwischengespeicherten Dateien, den dieser Test nachrechnet. */
   {
     const crypto = require('crypto');
-    const liste = [...sw.match(/const FILES = \[([\s\S]*?)\];/)[1]
-      .matchAll(/'\.\/([^']+)'/g)].map(x => x[1])
+    const liste = [...sw.match(/const STATIC = \[([\s\S]*?)\];/)[1]
+      .matchAll(/'\.\/([^']+)'/g)].map(x => x[1]).concat(SKRIPTE)
       .filter(f => f && !/^icons\//.test(f) && f !== 'manifest.webmanifest');
     const h = crypto.createHash('sha1');
     liste.slice().sort().forEach(f => { h.update(f); h.update(fs.readFileSync(__dirname + '/' + f)); });
@@ -5334,156 +5187,6 @@ const duellKarte = (civA, civB, seed) => {
     const soll = (sw.match(/const BUILD_HASH = '([^']*)'/) || [])[1];
     eq(ist, soll, `sw.js kennt den Stand der Dateien (sonst: node tools_version.js)`);
   }
-}
-
-/* ==================================================== Tutorial
-   Geführtes Übungsspiel auf Schienen. Geprüft wird: Aufbau der Schritte, dass jede Aufgabe
-   erfüllbar ist, dass der Verlauf deterministisch ist und dass die im Text genannten Zahlen
-   aus dem Spielstand stammen. Den Durchlauf über die Oberfläche fährt smoke.js. */
-{
-  eq(TUT_STEPS.length >= 20, true, `${TUT_STEPS.length} Tutorialschritte`);
-  eq(TUT_STEPS.every(st => st.t && typeof st.html === 'function'), true,
-    'jeder Schritt hat Titel und Text');
-  eq(TUT_STEPS.some(st => st.sub), false,
-    'die Zugablauf-Einordnung ist überall entfernt');
-  eq(TUT_STEPS.every(st => !st.goal || st.auto), true, 'jede Aufgabe hat einen Ausweg');
-  eq(TUT_STEPS.every(st => !st.task || st.goal), true, 'jede Aufgabenzeile hat ein Ziel');
-  eq(TUT_STEPS.every(st => !st.task || st.allow), true, 'jede Aufgabe schaltet gezielt frei');
-  const tasks = TUT_STEPS.filter(st => st.goal);
-  eq(tasks.length >= 10, true, `${tasks.length} Aufgaben zum Selbermachen`);
-  // jede Aufgabe sagt, wo man tippen muss
-  // Keine Koordinaten in den Texten – es wird über die goldene Umrandung gesprochen
-  {
-    tutorialSetup();
-    const bad = [];
-    for (let i = 0; i < TUT_STEPS.length; i++) {
-      ui.tut.i = i; tutEnter();
-      const st = TUT_STEPS[i];
-      const txt = (st.html() + ' ' + (st.task || '')).replace(/<[^>]+>/g, ' ')
-        .replace(/Zug 1\/2/g, '')                        // Belagerungszähler ist keine Koordinate
-        .replace(/(mehr als|zu dritt|im Duell) \d+\/\d+/g, '$1')   // Siegschwellen (v101: mehr als 4/7 …) auch nicht
-        .replace(/\d+(\/\d+)+\)/g, ')');                 // Kostenstaffeln wie (1/3/6/10) auch nicht
-      if (/\b\d{1,2}\/\d{1,2}\b/.test(txt)) bad.push(st.t);
-      if (st.goal && !st.goal()) st.auto();
-    }
-    eq(bad.length, 0, 'keine Feldkoordinaten in den Texten: ' + bad.join(', '));
-    ui = { sel: null, army: null, mode: null, botTimer: null };
-  }
-  // Keine Erwähnung der Erweiterungen. Ausnahme: der Siegschritt muss sagen, wie der
-  // Punktvergleich am Rundenende rechnet – und dort zählen Weltwunder mit (ohne die
-  // Erweiterung sind es null für alle). Nur dieser eine Schritt darf das Wort führen.
-  {
-    const text = st => [st.html, st.kurz].filter(x => typeof x === 'function')
-      .map(f => f.toString()).join(' ');
-    const sieg = TUT_STEPS.filter(s2 => /Wege zu gewinnen/.test(s2.t));
-    eq(sieg.length, 1, 'es gibt genau einen Siegschritt');
-    const andere = TUT_STEPS.filter(s2 => !/Wege zu gewinnen/.test(s2.t)).map(text).join(' ');
-    const all = TUT_STEPS.map(text).join(' ');
-    for (const w of ['Ereignis', 'Kultursieg', '1 gegen 1', 'Zufallskarte', 'Karteneditor'])
-      eq(all.includes(w), false, `„${w}" kommt im Tutorial nicht vor`);
-    eq(andere.includes('Weltwunder'), false, '„Weltwunder" nur im Siegschritt');
-    eq(/Bevölkerung \+ Weltwunder \+ Technologien/.test(text(sieg[0])), true,
-      'der Siegschritt nennt die Punkte für den Vergleich am Rundenende');
-    eq(/sofort/.test(text(sieg[0])), true, 'und dass nur der Militärsieg sofort endet');
-  }
-  // Jede Aktionsart wird mindestens einmal mit Klickweg erklärt (Wiederholungen sind raus)
-  const all = TUT_STEPS.map(st => st.html.toString()).join(' ');
-  for (const kind of ['gründest', 'forschst', 'wächst', 'baust', 'bewegst', 'beendest', 'kaufst', 'liest'])
-    eq(new RegExp('So ' + kind + ' du').test(all), true, `Klickweg für „${kind}" erklärt`);
-  // und keine Aktionsart wird zweimal erklärt
-  for (const kind of ['gründest', 'wächst', 'baust', 'bewegst', 'kaufst'])
-    eq((all.match(new RegExp('So ' + kind + ' du', 'g')) || []).length, 1,
-      `Klickweg für „${kind}" steht nur einmal da`);
-  // kein Verweis auf die Beispielpartie des Autors
-  const body = TUT_STEPS.map(st => st.html.toString()).join(' ');
-  eq(/im Protokoll (gewonnen|angefangen|hat Russland)/.test(body), false,
-    'kein „so wie im Protokoll" im Text');
-}
-/* Der komplette Ablauf, zweimal gestartet – identischer Verlauf */
-function tutRun() {
-  tutorialSetup();                       // genau derselbe Aufbau wie in der App
-  const ru = S.players.findIndex(p => p.civ === 'russland');
-  const trace = [];
-  for (let i = 0; i < TUT_STEPS.length; i++) {
-    ui.tut.i = i;
-    const st = TUT_STEPS[i];
-    if (st.enter && !ui.tut.seen[i]) { ui.tut.seen[i] = true; st.enter(); }
-    const text = st.html();
-    if (st.goal && !st.goal()) { st.auto(); trace.push(i + ':' + st.t); }
-    trace.push(`${i}|${text.length}|${st.goal ? (st.goal() ? 'ok' : 'offen') : '-'}`);
-  }
-  return { trace: trace.join(';'), ru };
-}
-{
-  const a = tutRun();
-  const state = () => {
-    const ru = a.ru;
-    return JSON.stringify({
-      round: S.round, cities: citiesOf(S, ru).map(c => [c.r, c.c, c.pop]),
-      techs: Object.keys(S.players[ru].techs).sort(), power: S.players[ru].power,
-    });
-  };
-  const after1 = state();
-  eq(a.trace.includes('offen'), false, 'jede Aufgabe im Durchlauf wurde erfüllt');
-  eq(S.round >= 3, true, 'das Übungsspiel läuft bis Runde 3');
-  eq(citiesOf(S, a.ru).length >= 3, true, 'drei Städte gegründet');
-  eq(has(S.players[a.ru], 'schrift') && has(S.players[a.ru], 'papier') &&
-    has(S.players[a.ru], 'wiss_methode') && has(S.players[a.ru], 'stadtmauern'), true,
-    'die vorgesehenen Technologien sind erforscht');
-  eq(has(S.players[a.ru], 'fischerei') && has(S.players[a.ru], 'eisenverarbeitung'), true,
-    'die beiden Gratis-Technologien sind dabei');
-  eq(!S.over, true, 'das Spiel ist danach offen');
-  const b = tutRun();
-  eq(b.trace, a.trace, 'zweiter Durchlauf nimmt genau denselben Verlauf');
-  eq(state(), after1, 'und endet in genau demselben Zustand');
-  ui = { sel: null, army: null, mode: null, botTimer: null };
-}
-/* Schienen: nur die vorgesehenen Felder, Knöpfe und Technologien */
-{
-  S = newGame({
-    seed: TUT_SEED, map: MAP_ORIGINAL, startPlayer: 0,
-    players: [{ civ: 'russland', kind: 'human', ability: 'basis' },
-      { civ: 'griechenland', kind: 'bot', diff: 'david' }],
-  });
-  ui = { tut: { i: 0, seen: {} } };
-  // Leseschritt: nur Nachschlagen erlaubt
-  eq(tutAllow().bar, ['a-info', 'a-log'], 'im Leseschritt sind nur Welt und Protokoll offen');
-  // Gründungsschritt
-  ui.tut.i = TUT_STEPS.findIndex(st => /zweite Stadt/.test(st.t));
-  // v75: gegründet wird über „Stadt gründen" in der Leiste – nur dieser Knopf ist frei
-  eq(tutAllow().bar, ['a-found'], 'beim Gründen ist nur „Stadt gründen" in der Leiste offen');
-  eq(tutAllow().labels.map(String), ['/Hier gründen/'], 'und im Blatt nur „Hier gründen"');
-  eq(tutHexOk(...TUT_CITY_1), true, 'das Zielfeld ist freigegeben');
-  eq(tutHexOk(0, 0), false, 'andere Felder nicht');
-  // Forschungsschritt – über die Freigabe gesucht, nicht über den Titel: die Texte
-  // werden umgeschrieben, die Schienen bleiben.
-  ui.tut.i = TUT_STEPS.findIndex(st => st.allow && (st.allow.techs || []).includes('schrift'));
-  eq(tutAllow().techs, ['schrift'], 'im Forschungsschritt ist nur Schrift freigegeben');
-  eq(tutAllow().bar, ['a-tech'], 'und nur der Forschen-Knopf');
-  // Armeeschritt: Zugziel ist gebunden
-  ui.tut.i = TUT_STEPS.findIndex(st => /Armee bewegen/.test(st.t));
-  ui.tutArmyTo = [5, 12];
-  eq(tutMoveOk(5, 12), true, 'das Wachfeld ist als Zug erlaubt');
-  eq(tutMoveOk(5, 11), false, 'andere Zielfelder nicht');
-  ui = { sel: null, army: null, mode: null, botTimer: null };
-}
-/* Die Begründungen rechnen mit echten Werten */
-{
-  S = newGame({ seed: TUT_SEED, map: MAP_ORIGINAL, startPlayer: 0,
-    players: [{ civ: 'russland', kind: 'human', ability: 'basis' },
-      { civ: 'griechenland', kind: 'bot', diff: 'david' }] });
-  const ru = S.players.findIndex(p => p.civ === 'russland');
-  const before = income(S, ru);
-  const g = tutGain(...TUT_CITY_1);
-  S.players[ru].res = { sci: 0, food: 99, coins: 0 };
-  eq(foundCity(S, ru, ...TUT_CITY_1), null, 'Stadt gegründet');
-  const after = income(S, ru);
-  eq([g.sci, g.food, g.coins], [after.sci - before.sci, after.food - before.food, after.coins - before.coins],
-    'die im Text genannte Verbesserung entspricht dem echten Einkommenszuwachs');
-  eq(tutNeighbourText(...TUT_CITY_1).includes('Wald'), true, 'die Geländeaufstellung nennt den Wald');
-  eq(S.cities.length >= 2, true, 'Stadt steht');
-  ui = { sel: null, army: null, mode: null, botTimer: null };
-  S = null;
 }
 
 /* --- Vollständige Partien: 4 Bots, keine Ausnahmen, Spiel endet */
@@ -5605,7 +5308,7 @@ function tutRun() {
    den Verlauf verlassen würde, und dass sie auch zufälliges Spiel aushalten, ohne dass eine
    Lektion übersprungen wird. Die Oberfläche (Seite vor der Partie, blasse Kacheln) fährt
    smoke.js.
-   ACHTUNG: fgSetup schreibt die globalen S und ui (wie tutorialSetup) – am Ende wird ui
+   ACHTUNG: fgSetup schreibt die globalen S und ui – am Ende wird ui
    zurückgesetzt, sonst griffen die Würfel des Ersten Spiels (fgNextDie) in spätere Partien. */
 // Spielt bis zum Ende oder bis zum Schritt `bis` (dort wird angehalten, bevor er gelöst wird)
 function fgLauf(pfad, opts) {
@@ -5639,7 +5342,8 @@ const FG_GEMEINSAM = FG_STEPS.filter(st => !st.pfad && !st.ende).map(st => st.id
     ['hauptstadt', true, false], 'v93: keine Wahl mehr in Runde 5 – der Würfel kommt gleich nach dem kostenlosen Forschen');
   // Würfel nur im Ersten Spiel: ohne ui.fg bleibt es beim echten Wurf
   ui = { sel: null, army: null, mode: null, botTimer: null };
-  eq(tutNextDie({ pi: 0, tech: 'schrift' }), null, 'ohne Erstes Spiel lenkt tutNextDie keinen Wurf');
+  { const W = mk('griechenland'), vorher = W.seed, v = d6(W, 'Test');
+    eq([v >= 1 && v <= 6, W.seed !== vorher], [true, true], 'ohne Erstes Spiel würfelt d6 echt (der Startwert läuft weiter)'); }
 }
 {
   fgSetup('militaer');
@@ -5725,8 +5429,10 @@ const FG_GEMEINSAM = FG_STEPS.filter(st => !st.pfad && !st.ende).map(st => st.id
 /* Jeder Weg mit der Musterlösung: Sieg auf diesem Weg, in dieser Runde – zweimal gespielt
    genau gleich (die Würfel hängen nur am Anlass, nicht an der Reihenfolge). Der Forschungsweg
    siegt seit v97 in Runde 7 (bis v96 in Runde 6): Griechenlands Rabatt und die Wissenschaftliche
-   Methode ziehen weniger ab, in Runde 5 reicht es nicht mehr für die Moderne in allen vier Feldern. */
-for (const [pfad, art, runde] of [['militaer', /^Militärsieg/, 6], ['wirtschaft', /^Wirtschaftssieg/, 6], ['wissenschaft', /^Forschungssieg/, 7]]) {
+   Methode ziehen weniger ab, in Runde 5 reicht es nicht mehr für die Moderne in allen vier Feldern.
+   Der Wirtschaftsweg siegt seit v102 in Runde 7 (bis v101 in Runde 6): im Duell braucht es mit
+   Theologie eine höhere Schwelle (Anweisung des Autors), dafür eine Runde Wachstum mehr. */
+for (const [pfad, art, runde] of [['militaer', /^Militärsieg/, 6], ['wirtschaft', /^Wirtschaftssieg/, 7], ['wissenschaft', /^Forschungssieg/, 7]]) {
   const spur = fgLauf(pfad);
   eq([S.over && S.over.winner, art.test(S.over && S.over.how), S.round], [FG_ICH, true, runde],
     `Erstes Spiel, ${pfad}: Sieg auf diesem Weg in Runde ${runde} (${S.over && S.over.how})`);
@@ -7133,22 +6839,21 @@ for (const n of [2, 3, 4]) {
     seed: 1, duel: true,
     players: [{ civ: 'england', kind: 'bot' }, { civ: 'russland', kind: 'bot' }],
   });
-  eq(techEffect(T, N), '>1/2 der Bevölkerung zum Sieg', 'Theologie zu viert: 1/2 (v101; bis v100 3/5)');
-  eq(techEffect(U, N), '>2/5 der Bevölkerung zum Sieg', 'Vereinte Nationen zu viert: 2/5 (v101; bis v100 1/2)');
-  eq(techEffect(T, D), '>7/10 der Bevölkerung zum Sieg', 'Theologie im Duell: 7/10');
-  eq(techEffect(U, D), '>2/3 der Bevölkerung zum Sieg', 'Vereinte Nationen im Duell: 2/3');
-  eq(techEffect(TECH_BY_KEY.rad, D), TECH_BY_KEY.rad.e, 'andere Technologien bleiben, wie sie sind');
-  eq(techEffect(T, null), '>1/2 der Bevölkerung zum Sieg', 'ohne Spielstand die Werte zu viert (die Vorgabe im Aufbau)');
-  eq([T.e, U.e], [techEffect(T, null), techEffect(U, null)], 'der Text am Bogen (TECHS) nennt dieselben Werte');
-  eq([DATA_EN.tech.theologie[1], DATA_EN.tech.un[1]], ['>1/2 of the population to win', '>2/5 of the population to win'],
-    '… englisch ebenso');
+  const zumSieg = t => `>${bruch(t)} der Bevölkerung zum Sieg`;
   const Z = newGame({ seed: 1, players: ['england', 'russland', 'wikinger'].map(k => ({ civ: k, kind: 'bot' })) });
-  eq([techEffect(T, Z), techEffect(U, Z)], ['>3/5 der Bevölkerung zum Sieg', '>1/2 der Bevölkerung zum Sieg'],
-    'zu dritt weiter 3/5 und 1/2');
+  eq([techEffect(T, N), techEffect(U, N), techEffect(T, D), techEffect(U, D), techEffect(T, Z), techEffect(U, Z)],
+    [VT.vier.theologie, VT.vier.un, VT.duell.theologie, VT.duell.un, VT.drei.theologie, VT.drei.un].map(zumSieg),
+    'Theologie und Vereinte Nationen nennen die Schwelle ihrer Spielart (zu viert, im Duell, zu dritt)');
+  eq(techEffect(TECH_BY_KEY.rad, D), TECH_BY_KEY.rad.e, 'andere Technologien bleiben, wie sie sind');
+  eq(techEffect(T, null), zumSieg(VT.vier.theologie), 'ohne Spielstand die Werte zu viert (die Vorgabe im Aufbau)');
+  eq([T.e, U.e], [techEffect(T, null), techEffect(U, null)], 'der Text am Bogen (TECHS) nennt dieselben Werte');
+  eq([DATA_EN.tech.theologie[1], DATA_EN.tech.un[1]], [VT.vier.theologie, VT.vier.un].map(t => `>${bruch(t)} of the population to win`),
+    '… englisch ebenso');
   // die Anzeige muss zur Rechnung passen
   const pT = { civ: 'england', techs: { theologie: true }, kind: 'human', ability: 'basis' };
-  eq(victoryOption(D, pT).label, '7/10', 'Rechnung und Anzeige nennen dieselbe Schwelle');
-  eq([victoryOption(N, pT).label, victoryOption(Z, pT).label], ['1/2', '3/5'], 'auch zu viert und zu dritt');
+  eq([victoryOption(D, pT).label, victoryOption(N, pT).label, victoryOption(Z, pT).label],
+    ['duell', 'vier', 'drei'].map(m => bruch(niedrigste(m, 'base', 'theologie'))),
+    'Rechnung und Anzeige nennen dieselbe Schwelle – im Duell, zu viert, zu dritt');
   for (const X of [N, D, Z]) {
     const L = victoryLabels(X);
     eq([L.base, L.theologie, L.un], [victoryOption(X, { techs: {} }).label, victoryOption(X, { techs: { theologie: true } }).label,
@@ -7216,12 +6921,12 @@ for (const n of [2, 3, 4]) {
     'auf Englisch ist kein deutscher Tipp übrig: ' + (TIPS.find(t => /[äöüß]/.test(t)) || '').slice(0, 40));
   eq(TILE_SHAPES[2].name, 'Tile map (6 triangles)', 'Kartenformen wechseln');
   // techEffect rechnet weiter mit den Duellschwellen, jetzt auf Englisch
-  eq(techEffect(TECH_BY_KEY.theologie, { duel: true }), '>7/10 of the population to win',
+  eq(techEffect(TECH_BY_KEY.theologie, { duel: true }), `>${bruch(VT.duell.theologie)} of the population to win`,
     'Duellschwellen auch auf Englisch');
   // T(): Übersetzung, Platzhalter, Rückfall auf Deutsch
   eq(T('Neues Spiel'), 'New game', 'Oberflächensatz wird übersetzt');
-  eq(T('Runde %s · Bevölkerung %s/%s (%s %)', 3, 4, 12, 33),
-    'Round 3 · Population 4/12 (33 %)', 'Platzhalter werden der Reihe nach ersetzt');
+  eq(T('Wirtschaftssieg über %s der Weltbevölkerung (Theologie %s, Vereinte Nationen %s).', 'A', 'B', 'C'),
+    'Economic victory above A of the world population (Theology B, United Nations C).', 'Platzhalter werden der Reihe nach ersetzt');
   /* Kein Schlüssel darf zweimal in UI_EN stehen. Ein Objektliteral verschluckt die
      Doppelung stillschweigend – der spätere Eintrag gewinnt, der frühere verschwindet
      ohne jede Meldung. Solange beide dieselbe Übersetzung tragen, fällt das nie auf;
@@ -7247,9 +6952,9 @@ for (const n of [2, 3, 4]) {
      die Flaggen direkt aus LANGS, ohne T(). Die Zahl darf sinken, nicht steigen. */
   {
     const norm = x => x.replace(/\s+/g, ' ');
-    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ki', 'marathon', 'anim', 'ui', 'tutorial', 'firstgame']
+    const quellen = ['data', 'civs', 'hex', 'tiles', 'engine', 'expansion', 'bots', 'ki', 'marathon', 'anim', 'firstgame']
       .map(n => fs.readFileSync(`${__dirname}/js/${n}.js`, 'utf8'))
-      .concat(fs.readFileSync(__dirname + '/index.html', 'utf8')).join('\n');
+      .concat(uiQuelle(), fs.readFileSync(__dirname + '/index.html', 'utf8')).join('\n');
     const heu = norm(quellen);
     const roh = fs.readFileSync(__dirname + '/js/i18n.js', 'utf8');
     const ab = roh.indexOf('const UI_EN = {');
@@ -7280,58 +6985,6 @@ for (const n of [2, 3, 4]) {
   eq(TIPS[0].startsWith('Es ist nicht immer korrekt'), true, 'auch die Spieltipps sind zurück');
 }
 
-/* =================== Tutorialschienen bleiben sprachunabhängig
-   Das Tutorial filtert die Knöpfe im Aktionsblatt über deutsche Ausdrücke. Damit das
-   auch auf Englisch trägt, tragen die Knöpfe ihren **deutschen** Schlüssel als
-   `data-label` – die sichtbare Beschriftung wechselt, der Schlüssel nicht. Zweimal ist
-   genau das schiefgegangen (Schritt 4 „Stadt gründen", Schritt 24 „Straße bauen"),
-   deshalb prüft dieser Block die Quelle statt der Oberfläche.                       */
-{
-  const ui = fs.readFileSync(__dirname + '/js/ui.js', 'utf8');
-  // 1) Kein btn()-Aufruf darf im **ersten** Parameter eine Übersetzung bekommen –
-  //    dort steht der Schlüssel. In den übrigen Parametern ist T(…) richtig.
-  const ersteParameter = [];
-  for (const m of ui.matchAll(/\bbtn\(/g)) {
-    let i = m.index + m[0].length, tiefe = 0, arg = '';
-    for (; i < ui.length; i++) {
-      const ch = ui[i];
-      if (ch === '(' || ch === '[') tiefe++;
-      else if (ch === ')' || ch === ']') { if (!tiefe) break; tiefe--; }
-      else if (ch === ',' && !tiefe) break;
-      arg += ch;
-    }
-    ersteParameter.push(arg.trim());
-  }
-  eq(ersteParameter.filter(a => a.includes('T(')), [],
-    'btn() bekommt im ersten Parameter immer den deutschen Schlüssel, nie T(…)');
-  // 2) Alle deutschen Schlüssel einsammeln, die die Oberfläche vergeben kann
-  const schluessel = [
-    ...[...ui.matchAll(/btn\(\s*'([^']+)'/g)].map(m => m[1]),
-    ...[...ui.matchAll(/btn\([^']*\?\s*'([^']+)'\s*:\s*'([^']+)'/g)].flatMap(m => [m[1], m[2]]),
-    ...[...ui.matchAll(/data-label="([^"]+)"/g)].map(m => m[1]),
-  ];
-  eq(schluessel.length > 10, true, `die Oberfläche vergibt ${schluessel.length} Knopf-Schlüssel`);
-  // 3) Jeder Ausdruck des Tutorials muss auf mindestens einen davon passen
-  const ohne = [];
-  TUT_STEPS.forEach((st, i) => {
-    (st.allow && st.allow.labels || []).forEach(rx => {
-      if (!schluessel.some(k => rx.test(k))) ohne.push(`${i + 1}: ${rx}`);
-    });
-  });
-  eq(ohne, [], 'jeder Knopf-Ausdruck des Tutorials trifft einen vorhandenen Schlüssel');
-  // 4) Titel und Aufgaben aller Schritte haben eine englische Fassung
-  setLang('en', { quiet: true });
-  const fehlt = [];
-  TUT_STEPS.forEach((st, i) => {
-    if (st.t && st.t !== 'Hochzeivilization' && T(st.t) === st.t) fehlt.push(`${i + 1} Titel`);
-    if (st.tKurz && T(st.tKurz) === st.tKurz) fehlt.push(`${i + 1} Kurztitel`);
-    if (st.task && T(st.task) === st.task) fehlt.push(`${i + 1} Aufgabe`);
-  });
-  eq(fehlt, [], 'alle 29 Tutorialschritte haben Titel und Aufgabe auf Englisch');
-  clearMissing();
-  setLang('de', { quiet: true });
-}
-
 /* ============================ Zivilisationen aus data/civs.json (v53)
    Die JSON ist die Quelle, js/civs.js die daraus erzeugte Fassung. Dieser Block prüft,
    dass beide zusammenpassen – wer die JSON ändert und `node tools_civs.js` vergisst,
@@ -7360,8 +7013,8 @@ for (const n of [2, 3, 4]) {
   eq(new Set(CIVS.map(c => c.sym)).size, CIVS.length, 'jede Zivilisation hat ein eigenes Zeichen');
   // Jeder Fähigkeitsschlüssel, der nicht 'basis' ist, muss im Code auch vorkommen –
   // sonst hängt eine Alternative in der Auswahl, ohne etwas zu tun.
-  const code = ['js/engine.js', 'js/expansion.js', 'js/bots.js', 'js/ui.js']
-    .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n');
+  const code = ['js/engine.js', 'js/expansion.js', 'js/bots.js']
+    .map(f => fs.readFileSync(__dirname + '/' + f, 'utf8')).join('\n') + uiQuelle();
   const ohneWirkung = CIVS.flatMap(c => c.abilities.filter(a => a.k !== 'basis').map(a => a.k))
     .filter(k => !code.includes(`'${k}'`));
   eq(ohneWirkung, [], 'jede Alternativfähigkeit wird im Code auch geprüft');
@@ -7416,49 +7069,6 @@ for (const n of [2, 3, 4]) {
     // Gegenprobe: mit doppeltem Zuschlag wäre es das Doppelte
     if (zeile) eq(zeile.y[0] * 2, zeile.count * 2, 'vor v53 waren es +2 – jetzt die Hälfte');
   }
-}
-
-/* ====================== Zwei Tutorialfassungen aus einer Schrittliste (v54)
-   „Ja, ich kenne solche Spiele" führt in eine kurze Fassung: **dieselben Aufgaben**,
-   nur die Eigenheiten dieses Spiels erklärt. Was hier geprüft wird, ist genau das:
-   dass die Kurzfassung nichts weglässt, was den Ablauf trägt.                       */
-{
-  const kurz = TUT_STEPS.filter(st => st.kurz !== false);
-  eq(TUT_STEPS.every(st => st.kurz !== undefined), true,
-    'jeder Schritt sagt, was in der kurzen Fassung mit ihm passiert');
-  eq(TUT_STEPS.filter(st => st.task).every(st => st.kurz !== false), true,
-    'die kurze Fassung enthält jede Aufgabe der langen');
-  eq(TUT_STEPS.filter(st => st.enter || st.dice).every(st => st.kurz !== false), true,
-    'kein Schritt mit Nebenwirkung (enter/dice) fällt weg');
-  eq(TUT_STEPS.filter(st => st.goal).every(st => st.kurz !== false), true,
-    'kein Schritt mit Ziel fällt weg');
-  eq(kurz.length < TUT_STEPS.length, true,
-    `die kurze Fassung ist kürzer (${kurz.length} statt ${TUT_STEPS.length} Schritte)`);
-  eq(kurz[0].t, TUT_STEPS[0].t, 'sie beginnt mit demselben Schritt');
-  eq(kurz[kurz.length - 1].t, TUT_STEPS[TUT_STEPS.length - 1].t, 'und endet mit demselben');
-  // Textmenge: „deutlich abgespeckt" soll auch messbar sein
-  const laenge = x => (typeof x === 'function' ? x() : x || '').length;
-  const lang = TUT_STEPS.reduce((a, st) => a + laenge(st.html), 0);
-  const kurzL = kurz.reduce((a, st) => a + laenge(st.kurz || st.html), 0);
-  eq(kurzL < lang / 2, true, `die kurze Fassung hat weniger als die Hälfte Text ` +
-    `(${kurzL} von ${lang} Zeichen, ${Math.round(100 * kurzL / lang)} %)`);
-  // Die Schlüsselpraktiken müssen in der kurzen Fassung vorkommen
-  const text = kurz.map(st => laenge(st.kurz || st.html) && (typeof (st.kurz || st.html) === 'function'
-    ? (st.kurz || st.html)() : (st.kurz || st.html))).join(' ');
-  [['verfallen', 'Ressourcen verfallen'], ['aufeinanderfolgenden Zügen', 'Kampfsystem'],
-   ['zufällig', 'Zufall im Technologiebaum'], ['Zivilisationsfähigkeit', 'Reichsfähigkeiten'],
-   ['Militärsieg', 'Siegwege'], ['Punkte', 'Punktvergleich am Rundenende']]
-    .forEach(([wort, was]) => eq(text.includes(wort), true, `die kurze Fassung erklärt ${was}`));
-  // und beide Fassungen auf Englisch
-  setLang('en', { quiet: true });
-  const ohne = [];
-  TUT_STEPS.forEach((st, i) => {
-    if (typeof st.kurz === 'function' && /[äöüß]/.test(st.kurz())) ohne.push(`${i + 1} kurz`);
-    if (typeof st.html === 'function' && /[äöüß]/.test(st.html())) ohne.push(`${i + 1} lang`);
-  });
-  eq(ohne, [], 'beide Fassungen sind auf Englisch übersetzt');
-  clearMissing();
-  setLang('de', { quiet: true });
 }
 
 /* ========================= Ausgeloste Fähigkeit muss ablesbar sein (v54) */
@@ -8014,9 +7624,8 @@ function kiAbwehrLage(popKI, gross) {
     `Gegenprobe – die Reihenfolge bis v95: ${kurz(a0)} · ${kurz(c0)}`);
 }
 {
-  /* --- v97: die Wissenschaftliche Methode zieht 2/3/4/5/10 ab – im alten Techtree (Tutorial) weiter
-     2/4/6/8/10, sonst ginge sein fester Ablauf nicht auf: Burgenbau (Mittelalter, 7) kostet dort mit
-     der Methode 3, und die Texte des Tutorials nennen 2/4/6/8 und „Burgenbau (3)". */
+  /* --- v97: die Wissenschaftliche Methode zieht 2/3/4/5/10 ab – im alten Techtree weiter
+     2/4/6/8/10 (Spielstände von vor v82 rechnen weiter so). */
   const mit = oldTree => {
     const S = newGame({ seed: 7, oldTree, players: [{ civ: 'russland', kind: 'human' }, { civ: 'griechenland', kind: 'bot' }] });
     S.players[0].techs.wiss_methode = true;
@@ -8029,12 +7638,6 @@ function kiAbwehrLage(popKI, gross) {
   eq([techEffect(TECH_BY_KEY.wiss_methode, N), techEffect(TECH_BY_KEY.wiss_methode, O)],
     [TECH_BY_KEY.wiss_methode.e, 'Techkosten −2/−4/−6/−8/−10 (je Zeitalter)'], 'der Bogen nennt, was gilt – im alten Techtree die alte Methode');
   eq(UI_EN['Techkosten %s (je Zeitalter)'], 'Tech costs %s (by age)', '… auch englisch');
-  const tut = fs.readFileSync(__dirname + '/js/tutorial.js', 'utf8');
-  const d = OLD_METHOD_DISCOUNT;
-  eq([tut.includes(`<b>${d[0]} in der Antike, ${d[1]} im Mittelalter, ${d[2]} in der Industrialisierung, ${d[3]} in der Moderne</b>`),
-    tut.includes(`um ${d.slice(0, 4).join('/')} (je Zeitalter)`), /<b>Burgenbau<\/b> \(3\)/.test(tut)], [true, true, true],
-    'die Tutorialtexte (lang und kurz) nennen die Methode des alten Techtrees, Burgenbau 3');
-  eq(/function tutorialSetup[\s\S]*?newGame\(\{[\s\S]*?oldTree: true/.test(tut), true, 'das Tutorial spielt im alten Techtree');
   // die KI wertet die Methode im Verhältnis ihres Rabatts ab dem Mittelalter (bis v96 4 + 6 + 8 = 18)
   eq([kiMethodeAnteil(N), kiMethodeAnteil(O)], [12 / 18, 1], 'KI: Zuschlag der Methode auf zwei Drittel, im alten Techtree wie bisher');
 }
@@ -8164,5 +7767,5 @@ function kiAbwehrLage(popKI, gross) {
   eq(B.over && B.over.winners, [kk], 'KI und Bot melden an: wie bei Menschen gewinnt die KI');
 }
 
-console.log(fails ? `\n${fails} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');
+say(fails ? `test   ${fails} failed · ${passed} passed` : `test   ${passed} passed`);
 process.exit(fails ? 1 : 0);

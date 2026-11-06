@@ -1,13 +1,17 @@
 /* Offline-Cache. Bei Änderungen VERSION erhöhen. */
-const VERSION = 'hochciv-v101';
-const BUILD_HASH = '8261fc8ea19c';   // von tools_version.js
-const FILES = [
+const VERSION = 'hochciv-v102';
+const BUILD_HASH = 'a075ec122b21';   // von tools_version.js
+/* Was zwischengespeichert wird: die festen Dateien hier, die Skripte aus index.html – dort
+   steht ihre Liste als <script>-Tags, und nur dort (v102). */
+const STATIC = [
   './', './index.html', './css/style.css',
-  './js/data.js', './js/civs.js', './js/i18n.js', './js/hex.js', './js/tiles.js', './js/engine.js', './js/expansion.js', './js/bots.js', './js/ki.js', './js/marathon.js', './js/anim.js', './js/tutorial.js', './js/firstgame.js', './js/ui.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'
 ];
+const scriptsOf = html => [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => './' + m[1]);
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(fetch('./index.html', { cache: 'no-store' }).then(r => r.text())
+    .then(html => caches.open(VERSION).then(c => c.addAll([...STATIC, ...scriptsOf(html)])))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k))))
