@@ -14,6 +14,8 @@ SVG.createSVGPoint = function () {
 };
 SVG.getScreenCTM = function () { return { a: 1, d: 1, inverse: () => ({}) }; };
 window.Element.prototype.getBoundingClientRect = () => ({ width: 800, height: 600, left: 0, top: 0 });
+// … und keine Layouthöhe: die Leisten (setBarHeight, seit v103 über offsetHeight) bekommen dieselbe
+Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return 600; } });
 window.Element.prototype.setPointerCapture = () => { };
 window.URL.createObjectURL = () => 'blob:x';
 window.URL.revokeObjectURL = () => { };
@@ -224,7 +226,7 @@ step('Armee bauen, in der Stadt anwählen und bewegen', () => {
   const army = S.armies.filter(a => a.owner === pi).pop();
   if (army.r !== cap.r || army.c !== cap.c) throw new Error('Armee steht nicht in der Stadt');
   G('tapHex')(cap.r, cap.c);
-  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Armee hier bewegen/.test(x.textContent));
+  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Armee bewegen/.test(x.textContent));
   if (!b) throw new Error('Armee auf dem Stadtfeld nicht anwählbar');
   b.onclick();
   const ziel = G('neighbors')(cap.r, cap.c).find(([r, c]) => G('canPass')(S, pi, r, c));
@@ -237,13 +239,13 @@ step('Kein Knopf „Armeen" mehr (v79) – Armeen wählt man auf der Karte', () 
   if (G('typeof armySheet') !== 'undefined') throw new Error('armySheet gibt es noch');
   const knoepfe = [...$('screen-game').querySelectorAll('.actionbar button')].map(b => b.textContent.trim());
   if (knoepfe.some(t => /Armee/.test(t))) throw new Error('Leiste: ' + knoepfe.join(', '));
-  // eine eigene Armee auf freiem Feld: antippen → „Diese Armee bewegen"
+  // eine eigene Armee auf freiem Feld: antippen → „Armee bewegen"
   const S = G('S'), pi = S.cur;
   if (AUTO(S.players[pi]) || S.over) return console.log('       kein menschlicher Zug – nur der Knopf geprüft');
   const a = S.armies.find(x => x.owner === pi && !G('cityAt')(S, x.r, x.c) && x.mp > 0);
   if (!a) return console.log('       Leiste ohne „Armeen" (' + knoepfe.length + ' Knöpfe), keine freie Armee zum Antippen');
   G('tapHex')(a.r, a.c);
-  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Diese Armee bewegen/.test(x.textContent));
+  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Armee bewegen/.test(x.textContent));
   if (!b || b.disabled) throw new Error('Armee auf der Karte nicht anwählbar');
   b.onclick();
   if (G('ui').army !== a) throw new Error('Armee nicht ausgewählt');
@@ -1075,7 +1077,7 @@ step('Wachstum: Nahrung und Münzen zählen nicht doppelt (gemeldeter Fehler)', 
     p.res = { sci: 0, food: 0, coins: noetig - 1 };
     G('closeSheet')(); G('tapHex')(cap.r, cap.c);
     const k = [...$('sheet-body').querySelectorAll('.opt')]
-      .find(b => /Bevölkerung wachsen/.test(b.textContent));
+      .find(b => /Bevölkerungswachstum/.test(b.textContent));
     if (!k) throw new Error('kein Wachstumsknopf im Stadtblatt');
     if (!k.disabled)
       throw new Error(`Wachstum freigegeben mit ${noetig - 1} Münzen, nötig sind ${noetig}`);
@@ -1084,7 +1086,7 @@ step('Wachstum: Nahrung und Münzen zählen nicht doppelt (gemeldeter Fehler)', 
   p.res = { sci: 0, food: 0, coins: noetig };
   G('closeSheet')(); G('tapHex')(cap.r, cap.c);
   const k2 = [...$('sheet-body').querySelectorAll('.opt')]
-    .find(b => /Bevölkerung wachsen/.test(b.textContent));
+    .find(b => /Bevölkerungswachstum/.test(b.textContent));
   if (k2.disabled) throw new Error(`mit ${noetig} Münzen bleibt es gesperrt`);
   k2.onclick();
   if (cap.pop !== 2) throw new Error('Stadt ist nicht gewachsen');
@@ -1380,38 +1382,67 @@ step('Blatt endet über der Aktionsleiste (Punkt 3, gemessen)', () => {
   if (!/^\d+px$/.test(v)) throw new Error('--bar-h ist kein Pixelmaß: ' + v);
   console.log('       --bar-h = ' + v);
 });
-/* Gedreht (v87, beim Prüfen gefunden): getBoundingClientRect misst NACH der Drehung um 90°.
-   Bis v86 wurde daraus die Höhe genommen – gedreht ist das die Breite der Leiste, also fast
-   die ganze Bildschirmhöhe (in Chromium 1180px), und jedes Blatt lag außerhalb des
-   Bildschirms, auch das eines KI-Zugs mit seinem „Weiter". jsdom kennt kein Layout, also
-   werden die gemessenen Rechtecke vorgegeben: Leiste 1180 × 53, Kopf 1180 × 61. */
-step('Gedreht: --bar-h und --hud-h messen die Leisten, nicht ihre gedrehte Breite (v87)', () => {
+/* Gedreht (v87, beim Prüfen gefunden) und vergrößert (v103): --bar-h und --hud-h sind die Höhen der
+   Leisten im CSS. Bis v86 stand dort gedreht ihre Breite (in Chromium 1180px), und jedes Blatt lag
+   außerhalb des Bildschirms, auch das eines KI-Zugs mit seinem „Weiter". Seit v103 misst
+   setBarHeight die Layouthöhe (offsetHeight), die weder Drehung noch Zoom kennt. jsdom kennt kein
+   Layout: die Höhen werden vorgegeben (Leiste 53, Kopf 61), das Rechteck dagegen so, wie der Browser
+   es gedreht oder gezoomt zeigte – würde es wieder gemessen, fiele es auf. */
+step('Gedreht und vergrößert: --bar-h und --hud-h messen die Leisten, nicht ihr Bild (v87, v103)', () => {
   const html = window.document.documentElement, st = html.style;
   const bar = window.document.querySelector('#screen-game .actionbar');
   const hud = window.document.querySelector('#screen-game .hud');
   const w = window.innerWidth, h = window.innerHeight;
-  const masse = (iw, ih, gedreht) => {
+  Object.defineProperty(bar, 'offsetHeight', { value: 53, configurable: true });
+  Object.defineProperty(hud, 'offsetHeight', { value: 61, configurable: true });
+  const masse = (iw, ih, rechteck) => {
     Object.defineProperty(window, 'innerWidth', { value: iw, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: ih, configurable: true });
-    bar.getBoundingClientRect = () => gedreht ? { width: 53, height: 1180 } : { width: 1180, height: 53 };
-    hud.getBoundingClientRect = () => gedreht ? { width: 61, height: 1180 } : { width: 1180, height: 61 };
+    bar.getBoundingClientRect = () => rechteck(53); hud.getBoundingClientRect = () => rechteck(61);
     G('syncLayout')();
-    return [st.getPropertyValue('--bar-h'), st.getPropertyValue('--hud-h')].join(' ');
+    return ['--bar-h', '--hud-h', '--ui'].map(v => st.getPropertyValue(v)).join(' ');
   };
   try {
     G('show')('screen-game');
     if (!html.classList.contains('turn')) throw new Error('Spielbildschirm nicht gedreht');
-    const hochkant = masse(820, 1180, true);      // iPad hochkant, App dreht sich
-    const quer = masse(1180, 820, false);         // iPad quer, keine Drehung
-    if (hochkant !== '53px 61px') throw new Error('gedreht: ' + hochkant + ' statt 53px 61px');
-    if (quer !== '53px 61px') throw new Error('quer: ' + quer + ' statt 53px 61px');
-    console.log('       hochkant gedreht ' + hochkant + ' · quer ' + quer);
+    const hochkant = masse(820, 1180, x => ({ width: x, height: 1180 }));          // iPad hochkant, App dreht sich
+    const quer = masse(1180, 820, x => ({ width: 1180, height: x }));              // iPad quer
+    const gross = masse(1920, 1080, x => ({ width: 1920, height: x * 1.41 }));     // 1080p, vergrößert
+    if (hochkant !== '53px 61px 1') throw new Error('gedreht: ' + hochkant + ' statt 53px 61px 1');
+    if (quer !== '53px 61px 1') throw new Error('quer: ' + quer + ' statt 53px 61px 1');
+    if (gross !== '53px 61px 1.41') throw new Error('1920 × 1080: ' + gross + ' statt 53px 61px 1.41');
+    console.log('       hochkant gedreht ' + hochkant + ' · quer ' + quer + ' · 1080p ' + gross);
   } finally {
     delete bar.getBoundingClientRect; delete hud.getBoundingClientRect;
+    delete bar.offsetHeight; delete hud.offsetHeight;
     Object.defineProperty(window, 'innerWidth', { value: w, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
     G('syncLayout')();
   }
+});
+/* Große Bildschirme (v103, Anweisung des Autors: Symbole auf 1080p und größer zu klein): die ganze
+   Oberfläche wächst mit dem Fenster, ein Faktor (--ui). Jedes iPad bleibt bei 1, gedreht auch. */
+step('v103: Maßstab großer Bildschirme – iPads 1, darüber nach der knapperen Seite', () => {
+  const k = G('uiScale');
+  const faelle = [[1180, 820], [1194, 834], [1366, 1024], [1024, 768], [1920, 960], [1920, 1080], [2560, 1300], [3840, 2000]];
+  const ist = faelle.map(([w, h]) => k(w, h)).concat([k(1080, 1920, true)]);
+  const soll = [1, 1, 1, 1, 1.33, 1.41, 1.81, 2.78, 1];
+  if (ist.join() !== soll.join()) throw new Error('Maßstab: ' + ist.join(' · ') + ' statt ' + soll.join(' · '));
+  // die Layoutklassen nach der vergrößerten Seite: 1920 × 960 ÷ 1,33 ist weiter breit und quer
+  const html = window.document.documentElement, w = window.innerWidth, h = window.innerHeight;
+  try {
+    Object.defineProperty(window, 'innerWidth', { value: 1920, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 960, configurable: true });
+    G('show')('screen-menu');
+    const klassen = ['w-wide', 'w-side', 'w-narrow'].filter(c => html.classList.contains(c)).join(' ');
+    if (html.style.getPropertyValue('--ui') !== '1.33' || klassen !== 'w-wide w-side') throw new Error('Menü 1920 × 960: --ui ' +
+      html.style.getPropertyValue('--ui') + ', Klassen ' + klassen);
+  } finally {
+    Object.defineProperty(window, 'innerWidth', { value: w, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: h, configurable: true });
+    G('syncLayout')();
+  }
+  console.log('       ' + faelle.map(([w, hh], i) => `${w}×${hh} ${ist[i]}`).join(' · ') + ' · gedreht 1');
 });
 
 /* ============================================ Plättchenkarte: Startdreiecke legen */
@@ -2210,27 +2241,34 @@ const kachelText = k => {
   const kachel = [...$('ov-body').querySelectorAll('.techgrid .tech')].find(b => b.querySelector('b').textContent === n);
   return kachel ? kachel.querySelector('.eff').textContent : null;
 };
-/* Ein herrenloses Feld über das Aktionsblatt kaufen: der Mensch ist am Zug, hat
-   Kolonialismus und 10 Münzen. Zurück kommen Knopfpreis und abgebuchte Münzen; danach
-   ist die Ausgangslage wiederhergestellt. */
-const feldKaufen = () => {
+/* Herrenlose Felder über das Aktionsblatt beanspruchen (v103: kostenlos, COLONY_CLAIMS je Runde;
+   bis v102 kaufen für 3 Münzen). Der Mensch ist am Zug und hat Kolonialismus; `n` Felder werden
+   der Reihe nach angetippt. Zurück kommt je Feld, was der Knopf zeigte (Punkte offen/alle,
+   gesperrt, Unterzeile), dazu die Münzen danach und wie viele Felder dem Reich gehören; danach ist
+   die Ausgangslage wiederhergestellt. */
+const felderBeanspruchen = n => {
   const S = G('S'), pi = S.players.findIndex(q => q.kind === 'human'), p = S.players[pi];
   S.cur = pi;                                   // der Mensch handelt, nicht ein Bot
   const cap = G('capitalOf')(S, pi);
   p.techs.kolonialismus = true; p.res.coins = 10;
-  const frei = G('within')(cap.r, cap.c, 6).find(([r, c]) => G('terrainAt')(S, r, c) && !G('cityAt')(S, r, c) &&
-    !G('armyAt')(S, r, c) && !S.players.some((_, i) => G('controlledTiles')(S, i).has(G('key')(r, c))));
-  if (!frei) throw new Error('kein herrenloses Feld gefunden');
-  G('tapHex')(frei[0], frei[1]);
-  const knopf = $('sheet-body').querySelector('.opt[data-label="Feld kaufen"]');
-  if (!knopf) throw new Error('kein Kaufknopf im Aktionsblatt');
-  const preis = knopf.querySelector('.cost').textContent;
-  knopf.onclick ? knopf.onclick() : knopf.click();
-  const bezahlt = 10 - p.res.coins;
-  if (!(S.bought[pi] || []).includes(G('key')(frei[0], frei[1]))) throw new Error('das Feld gehört danach nicht dem Reich');
+  const frei = G('within')(cap.r, cap.c, 6).filter(([r, c]) => G('terrainAt')(S, r, c) && !G('isOff')(G('terrainAt')(S, r, c)) &&
+    !G('cityAt')(S, r, c) && !G('armyAt')(S, r, c) && !S.players.some((_, i) => G('controlledTiles')(S, i).has(G('key')(r, c))));
+  if (frei.length < n) throw new Error('zu wenige herrenlose Felder: ' + frei.length);
+  const knoepfe = frei.slice(0, n).map(([r, c]) => {
+    G('closeSheet')(); G('tapHex')(r, c);
+    const knopf = $('sheet-body').querySelector('.opt[data-label="Feld beanspruchen"]');
+    if (!knopf) throw new Error('kein Knopf „Feld beanspruchen" im Aktionsblatt');
+    const pp = knopf.querySelector('.cost .pips'), sub = knopf.querySelector('small');
+    const k = { offen: pp ? pp.querySelectorAll('i.on').length : -1, alle: pp ? pp.querySelectorAll('i').length : -1,
+      aus: knopf.disabled, sub: sub ? sub.textContent : '' };
+    if (!knopf.disabled) knopf.onclick();
+    return k;
+  });
+  const muenzen = p.res.coins;
+  const gehoert = frei.slice(0, n).filter(([r, c]) => (S.bought[pi] || []).includes(G('key')(r, c))).length;
   G('closeSheet')();
-  delete p.techs.kolonialismus; S.bought[pi] = [];
-  return [preis, bezahlt];
+  delete p.techs.kolonialismus; S.bought[pi] = []; delete p.claimRound; delete p.claimCount;
+  return { knoepfe, muenzen, gehoert };
 };
 const NEU_FO = ['mathematik', 'astronomie', 'philosophie', 'schrift'];
 const NEU_PR = ['bewaesserung', 'fischerei', 'rad', 'keramik', 'landwirtschaft'];
@@ -2279,17 +2317,21 @@ step('Techtree: der Bogen zeigt die Leitern nach den Kosten des (einzigen) Techt
     if (k.some((n, i) => i && n < k[i - 1])) throw new Error('Spalte ' + s + ' fällt: ' + k.join(','));
   }
   const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
-  if (ko !== 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen') throw new Error('Kolonialismus-Kachel: ' + ko);
+  if (ko !== '3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen') throw new Error('Kolonialismus-Kachel: ' + ko);
   if (ku !== 'Tech kopieren (2× Kosten in Münzen)') throw new Error('Kundschafterei-Kachel: ' + ku);
   G('closeModal')();
   console.log('       Forschung: ' + fo.map(x => x.join(' ')).join(', '));
   console.log('       Produktion: ' + pr.map(x => x.join(' ')).join(', '));
   console.log('       Forschung/Industrialisierung: ' + fo2.map(x => x.join(' ')).join(', '));
 });
-step('Techtree: Feld kaufen kostet im Aktionsblatt 3 Münzen', () => {
-  const [preis, bezahlt] = feldKaufen();
-  if (preis !== '3🪙' || bezahlt !== 3) throw new Error(`Knopf ${preis}, bezahlt ${bezahlt}`);
-  console.log('       Knopf ' + preis + ', abgebucht ' + bezahlt);
+step('Kolonialismus (v103): drei Felder je Runde beanspruchen, kostenlos – die Punkte am Knopf zählen mit', () => {
+  const n = G('COLONY_CLAIMS');
+  const { knoepfe, muenzen, gehoert } = felderBeanspruchen(n + 1);
+  const punkte = knoepfe.map(k => `${k.offen}/${k.alle}${k.aus ? ' aus' : ''}`).join(' ');
+  if (punkte !== '3/3 2/3 1/3 0/3 aus') throw new Error('Punkte am Knopf: ' + punkte);
+  if (knoepfe.some(k => k.sub)) throw new Error('Unterzeile am Knopf: ' + knoepfe.map(k => k.sub).join(' | '));
+  if (muenzen !== 10 || gehoert !== n) throw new Error(`Münzen ${muenzen} (soll 10), dem Reich gehören ${gehoert} von ${n}`);
+  console.log('       Punkte ' + punkte + ' · Münzen unverändert · ' + gehoert + ' Felder');
 });
 step('Techtree: Regelbogen mit den Kosten, kein Hinweis auf einen anderen Techtree', () => {
   G('rulesModal')();
@@ -2461,7 +2503,7 @@ step('Kosten: Gründungsblatt, Karte, Bogen und Stadtblatt zeigen, was abgeht', 
   p.res = { sci: 0, food: 0, coins: 60 };
   const preis = G('growPrice')(S, pi, cap);
   G('tapHex')(cap.r, cap.c);
-  const wachsen = $('sheet-body').querySelector('[data-label="Bevölkerung wachsen"] .cost').textContent;
+  const wachsen = $('sheet-body').querySelector('[data-label="Bevölkerungswachstum"] .cost').textContent;
   const wsoll = preis.food ? `${preis.food * 2 + preis.coins}🪙` : `${preis.coins}🪙`;
   G('closeSheet')();
   if (!wachsen.endsWith(wsoll) || /🌾/.test(wachsen)) throw new Error('Wachsen: ' + wachsen + ' statt ' + wsoll);
@@ -2713,7 +2755,7 @@ step('Kontrollzone: wer hineinzieht, hält an – Meldung, und das Blatt sagt wa
   S.armies.push(a, { id: S.nextId++, owner: feind, r: lage.W[0], c: lage.W[1], mp: 0, born: 0 });
   G('redraw')();
   G('tapHex')(...lage.A);
-  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Diese Armee bewegen/.test(x.textContent));
+  const b = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Armee bewegen/.test(x.textContent));
   if (!b || b.disabled) throw new Error('Armee nicht anwählbar');
   b.onclick();
   G('tapHex')(...lage.B);
@@ -2721,7 +2763,7 @@ step('Kontrollzone: wer hineinzieht, hält an – Meldung, und das Blatt sagt wa
   if (!a.halted || a.mp !== 0) throw new Error('Armee hält in der Kontrollzone nicht an');
   if (!/Kontrollzone/.test($('toast').textContent)) throw new Error('keine Meldung: ' + $('toast').textContent);
   G('tapHex')(...lage.B);
-  const b2 = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Diese Armee bewegen/.test(x.textContent));
+  const b2 = [...$('sheet-body').querySelectorAll('.opt')].find(x => /Armee bewegen/.test(x.textContent));
   if (!b2 || !b2.disabled || !/Kontrollzone/.test(b2.textContent)) throw new Error('Blatt: ' + (b2 ? b2.textContent : 'kein Knopf'));
   G('closeSheet')();
   console.log('       Wache ' + lage.W + ', Start ' + lage.A + ', angehalten auf ' + lage.B + ' · „' + $('toast').textContent + '"');
@@ -3267,7 +3309,7 @@ step('v88/v102: Hauptmenü ohne Untertitel, Ertragstechnologien in Bogen, Übers
   if (meer && !reihen.some(r => r.includes('Meer') && r.includes('🌾' + meer.y[1]) && r.includes('🪙' + meer.y[2]) &&
     meer.y[1] === 2 * meer.count && meer.y[2] === 2 * meer.count))
     throw new Error('Meereszeile nicht 🌾2 🪙2 je Feld: ' + reihen.join(' | '));
-  for (const t of ['Wald: +3 Wissenschaft', 'Meer: +2 Nahrung, +1 Münze', 'Je Bevölkerung: +2 Münzen', '+3 Angriff gegen Städte'])
+  for (const t of ['Wald bringt 3 Wissenschaft', 'Meer bringt 2 Nahrung, 2 Münzen', 'Bevölkerung bringt je 3 Münzen', '+3 Angriff gegen Städte'])
     if (!body().includes(t)) throw new Error('Bogen: fehlt „' + t + '"');
   // seit v89 ohne „(inkl. …)" auf den Kacheln (Anweisung des Autors)
   const effs = [...$('ov-body').querySelectorAll('.tech .eff')].map(e => e.textContent);
@@ -3281,16 +3323,16 @@ step('v88/v102: Hauptmenü ohne Untertitel, Ertragstechnologien in Bogen, Übers
     return [t, [z.querySelector('.c').textContent.trim(), z.querySelector('b').textContent.trim()]];
   };
   const [de, singDe] = regeln();
-  if (!de.includes('Ertragstechnologien schließen die billigeren ihres Feldes')) throw new Error('Regelbogen: Satz fehlt');
+  if (!de.includes('Für dasselbe Gelände und denselben Ertrag zählt nur die beste')) throw new Error('Regelbogen: Satz fehlt');
   if (JSON.stringify(singDe) !== '["120","Singularität"]') throw new Error('Singularität: ' + singDe.join(' '));
   G('switchLang')('en');
   try {
     G('clearMissing')();
     const [en, singEn] = regeln();
     $('a-tech').onclick(); const bogenEn = body(); G('closeModal')();
-    for (const t of ['Yield technologies include the cheaper ones of their field', 'Forest: +3 science', '+3 attack against cities'])
+    for (const t of ['only the best one counts', 'Forest yields 3 science', '+3 attack against cities'])
       if (!en.includes(t)) throw new Error('Regelbogen englisch: fehlt „' + t + '"');
-    if (!bogenEn.includes('Sea: +2 food, +1 coin') || /incl\./.test(bogenEn)) throw new Error('Bogen englisch: Containerlogistik-Text fehlt oder „incl." steht noch da');
+    if (!bogenEn.includes('Sea yields 2 food, 2 coins') || /incl\./.test(bogenEn)) throw new Error('Bogen englisch: Containerlogistik-Text fehlt oder „incl." steht noch da');
     if (JSON.stringify(singEn) !== '["120","Singularity"]') throw new Error('Singularity englisch: ' + singEn.join(' '));
     const fehlt = G('missingStrings')();
     if (fehlt.length) throw new Error('ohne Übersetzung: ' + fehlt.slice(0, 3).join(' | '));
@@ -3347,7 +3389,7 @@ step('v89: frisch gezeigte Blätter nehmen kurz keine Tipps an – außer auf de
   tippe(knopf('[data-n="1"]'));
   tippe(knopf('[data-n="1"]'));
   if (p.power !== m + 2) throw new Error('zweimal „+1 Macht" gab +' + (p.power - m));
-  // 5 Stadtblatt: nach „Kostenlos wachsen" rückt „Bevölkerung wachsen" an seine Stelle –
+  // 5 Stadtblatt: nach „Kostenlos wachsen" rückt „Bevölkerungswachstum" an seine Stelle –
   //   der Doppeltipp darauf zählt nicht
   G('closeSheet')();
   const ct = G('citiesOf')(S, pi).find(c => G('freeGrowthAvailable')(S, pi, c));
@@ -3356,7 +3398,7 @@ step('v89: frisch gezeigte Blätter nehmen kurz keine Tipps an – außer auf de
   const pop0 = ct.pop;
   const nachLabel = l => [...$('sheet-body').querySelectorAll('.opt')].find(b => b.dataset.label === l);
   tippe(nachLabel('Kostenlos wachsen'));
-  tippe(nachLabel('Bevölkerung wachsen'));
+  tippe(nachLabel('Bevölkerungswachstum'));
   if (ct.pop !== pop0 + 1) throw new Error(`Stadtblatt: ${pop0} → ${ct.pop} statt +1`);
   // 6 Blatt eines Bot- oder KI-Zugs: „Weiter" wirkt sofort
   G('closeSheet')();
@@ -3718,7 +3760,7 @@ step('v92: Erstes Spiel – gründen, wachsen, Zugende, Englands Zug', () => {
   if (!G('cityAt')(S, 5, 5) || fgId() !== 'wachsen1') throw new Error('gründen: ' + fgId());
   const cap = G('capitalOf')(S, 0);
   G('tapHex')(cap.r, cap.c);
-  $('sheet-body').querySelector('.opt[data-label="Bevölkerung wachsen"]').onclick();
+  $('sheet-body').querySelector('.opt[data-label="Bevölkerungswachstum"]').onclick();
   if (fgId() !== 'zug1') throw new Error('wachsen: ' + fgId());
   $('a-end').onclick();
   if (!G('ui').botLock || !/England ist am Zug/.test($('tut-title').textContent)) throw new Error('Englands Zug: ' + $('tut-title').textContent);
@@ -3751,7 +3793,7 @@ step('v92: Erstes Spiel – alle Städte wachsen, Handelsroute, dritte Stadt, be
   const stadt = G('cityAt')(S, 5, 5);
   G('tapHex')(5, 5);
   $('sheet-body').querySelector('.opt[data-label="Armee bauen"]').onclick();
-  $('sheet-body').querySelector('.opt[data-label="Armee hier bewegen"]').onclick();
+  $('sheet-body').querySelector('.opt[data-label="Armee bewegen"]').onclick();
   G('tapHex')(4, 4);
   if (!G('ui').army || !/direkt neben/.test($('toast').textContent)) throw new Error('Zug weg: ' + $('toast').textContent);
   G('tapHex')(4, 6);
@@ -4246,7 +4288,7 @@ step('v96: Kacheln nennen die Bürokratie nicht – der Regelbogen nennt alles; 
     return [kachel('buerokratie'), zeile('buerokratie')];
   };
   const de = pruefen('deutsch');
-  if (de[0] !== 'Hauptstadt produziert doppelt' || !/Handelsrouten, Ökologie, Gentechnik und gekaufte Felder/.test(de[1])) throw new Error('deutsch: ' + de.join(' | '));
+  if (de[0] !== 'Hauptstadt produziert doppelt' || !/Handelsrouten, Ökologie, Gentechnik und beanspruchte Felder/.test(de[1])) throw new Error('deutsch: ' + de.join(' | '));
   // Straßenknöpfe: die Zuschläge der Regel
   p.techs.rad = true; p.techs.eisenbahn = true; p.res.coins = 20;
   const cap = G('capitalOf')(S, pi);
@@ -4264,7 +4306,7 @@ step('v96: Kacheln nennen die Bürokratie nicht – der Regelbogen nennt alles; 
     G('tapHex')(feld[0], feld[1]); ken = knoepfe(); G('closeSheet')();
     if (G('missingStrings')().length) throw new Error('ohne Übersetzung: ' + G('missingStrings')().slice(0, 3).join(' | '));
   } finally { G('switchLang')('de'); }
-  if (en[0] !== 'The capital produces double' || !/trade routes, ecology, genetic engineering and bought tiles/.test(en[1])) throw new Error('englisch: ' + en.join(' | '));
+  if (en[0] !== 'The capital produces double' || !/trade routes, ecology, genetic engineering and claimed tiles/.test(en[1])) throw new Error('englisch: ' + en.join(' | '));
   if (ken.join(' / ') !== 'movement ½ point · trade route +1 / movement free · trade route +4') throw new Error('englisch, Straßenknöpfe: ' + ken.join(' / '));
   // zurück auf Deutsch: wieder die deutschen Texte (der Sprachwechsel trägt auch `voll`)
   if (TB.buerokratie.voll !== de[1]) throw new Error('nach dem Zurückschalten: ' + TB.buerokratie.voll);
@@ -4398,7 +4440,7 @@ const russenSpiel = abil => {
   return S;
 };
 step('v97: Siedlertrecks wachsen zum Preis der kleineren Stadt, Fruchtbarkeit zweimal je Runde – am Stadtknopf', () => {
-  const knopf = () => $('sheet-body').querySelector('.opt[data-label="Bevölkerung wachsen"]');
+  const knopf = () => $('sheet-body').querySelector('.opt[data-label="Bevölkerungswachstum"]');
   const preis = () => knopf().querySelector('.cost').textContent;
   // Siedlertrecks: die Hauptstadt hat 2 Bevölkerung, wachsen kostet 1 und 1
   let S = russenSpiel('siedler'), p = G('P')(S);

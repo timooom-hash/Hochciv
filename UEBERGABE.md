@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 6.11., `sw.js` v102)
+# Hochzeivilization — Projekt-Übergabe (Stand 7.11., `sw.js` v103)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v102)
+## Letzte Sitzungen auf einen Blick (v61 → v103)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -57,6 +57,11 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v100 | Zwei Anweisungen des Autors: Englands **Kolonisten halbieren die Gründungskosten, aufgerundet** – Stadtkosten plus Weg, mit Kartografie nur die Stadtkosten (`foundCostOf`, für Regel und KI; bis v99 keine Stadtkosten und mit Kartografie die günstigere der beiden – diese Sonderregel ist weg; das doppelte Wachstum bleibt); **Marathon ohne Grenze von fünf Gründungen je Zug** (`MARATHON_MAX_FOUNDS`, `foundedThisTurn`, `p.foundRound`/`p.foundCount` weg, `migrateState` räumt den Zähler aus alten Ständen) | Regel |
 | v101 | Zwei Anweisungen des Autors: Griechenlands **Freie Forschung höchstens zweimal je Partie und höchstens einmal je Runde**, weiter alles Erforschbare samt Singularität (`FREE_TECH_USES`, `freeTechsLeft`, `p.freeTechsUsed` neben `p.freeTechUsed`; die KI nutzt sie, sobald sie geht – gemessen besser als Aufheben: Griechenland 20,5 % statt 30,3 % mit v100, gleiche Chance 25 %); **Wirtschaftssieg zu viert über 4/7, mit Theologie 1/2, mit Vereinten Nationen 2/5** (zu dritt weiter 2/3 · 3/5 · 1/2, im Duell 3/4 · 7/10 · 2/3; `VICTORY_THRESHOLDS`, `victoryMode`, auch Marathon und Tutorial). Beim Umbau: ganzzahliger Vergleich (`victoryMet` – im Duell galten 63 von 90 als „mehr als 7/10"), der Bogen der Legephase zeigt die Schwellen der Partie (im Duell vorher 3/5 statt 7/10). Messmodi `tools_ki.js freie` und `wirtschaft` | Regel + KI |
 | v102 | **Vereinfacht** (Anweisung des Autors, nach einem Vorschlag in vierzehn Punkten, davon elf umgesetzt): Leiste mit fünf Knöpfen (**Welt** über den Reichsnamen ▾ und die Bevölkerung, **Protokoll** im Spielmenü ☰); Kopfzeile ohne Beschriftungen, vorn die **Bevölkerung** mit Balken und Strich an der Siegschwelle (`victoryOption`); kein Hinweis „… ist am Zug" (sitzen mehrere Menschen am Gerät, pulsiert das Zeichen, `pulseCiv`); Blätter zeigen die Entscheidung (Macht: Stand und gesperrte Käufe; Fähigkeiten: Punkte statt Sätzen, kein „gratis"; Spielende: Ergebnis als Titel, **der Tipp bleibt**, die nächste Stufe im Knopf); **altes Tutorial entfernt** (`js/tutorial.js`, 105 Übersetzungen, seine Tests); **Aufbau auf einem Bildschirm** (eine Zeile je Platz, Fähigkeitswahl mit Wirkung, Kärtchen, „Spiel beginnen" fest unten, keine Hinweise – die Spielarten stehen in den Regeln); **keine Einstellungen** mehr (Ereignisse und Weltwunder im Aufbau, Animationen im ☰, Kosten immer tatsächlich, Hochkant immer); Menü mit zwei Knöpfen und einer Zeile Verweise; **eine Stelle für die Siegschwellen** (Tests rechnen aus `VICTORY_THRESHOLDS`, ein einziger Schnappschuss, die Dokumente nennen keine Brüche mehr); **ui.js je Bildschirm geteilt** (`js/ui/*.js`), die Skriptliste steht nur noch in `index.html`; **Tests grün in einer Zeile**, `smoke.js` mit festem Zufall. Regeln: Wirtschaftssieg im **Duell** neu (Werte: `VICTORY_THRESHOLDS.duell`), **Philosophie** heißt jetzt „+1/6 Chance auf Techverfügbarkeit" | Oberfläche + Regel + Aufräumen |
+| v103 | Sechs Anweisungen des Autors, unter dem Grundsatz von v102: **„Armee bewegen"** für beide Knöpfe (in der Stadt und auf freiem Feld; ohne den Hinweis „erreichbare Felder werden markiert"); **„Bevölkerungswachstum"** statt „Bevölkerung wachsen"; **Demokratie/Nationalismus** „Armeekosten 4 bzw. 2 statt 5 × Anzahl"; **Ertragstechnologien nennen, was das Feld insgesamt bringt** („Wald bringt 2 Wissenschaft", „Grasland bringt 2 Nahrung" – bis v102 „+n", was nach Stapeln aussah); **große Bildschirme**: die ganze Oberfläche wächst ab 1366 × 720 mit dem Fenster (`--ui`, CSS-zoom; iPads bleiben bei 1); **Kolonialismus: 3× pro Runde ein herrenloses Feld kostenlos beanspruchen** (`claimTile`, `claimsLeft`, `COLONY_CLAIMS`; Kolonie ohne Weg und Hauptstadt-Zählung bleiben – Rückfrage beim Autor) | Oberfläche + Regel + KI |
+
+Neu in v103: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Armee bewegen · Bevölkerungswachstum · Armeekosten · Ertragstexte als Summe · große
+Bildschirme · Kolonialismus kostenlos (v103)"), drei Fragilitäten neu, die offenen Punkte 62 und 63.
 
 Neu in v102: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Vereinfacht: Oberfläche, Tutorial, Einstellungen, eine Stelle für Zahlen (v102)").
@@ -185,7 +190,9 @@ Siedlertrecks bei 1 Bevölkerung, Freie Forschung ohne Singularität, Kriegerkul
 53 (Balance und Draftwerte der fünf Fähigkeiten nicht gemessen) und 54 (ein einmaliger Smoke-Fehler,
 Schritt unbekannt), seit v98 Punkt 55 (Auslegungen zum Startausgleich zu zweit), seit v101 Punkt 60
 (Auslegungen zu v101: Singularität weiter wählbar, Marathon und Tutorial zählen als vier Reiche, zu
-dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und was nicht).
+dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und was nicht), seit v103
+Punkt 62 (Auslegungen zu v103) und 63 (Kolonialismus kostenlos: Balance und KI-Forschungswert nicht
+gemessen).
 
 ## Wo alles liegt
 
@@ -213,24 +220,24 @@ dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und 
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1390 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1387 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
-| `js/data.js` | 540 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
+| `js/data.js` | 545 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 444 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 2286 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
+| `js/engine.js` | 2299 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
 | `js/bots.js` | 486 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1942 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/ki.js` | 1943 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/anim.js` | 165 | **Züge von KI und Bots nachspielen** (v94, ohne Oberfläche): Aufnahme über `LOG_HOOK` (`animAufnahme`, `animSnap`), seit v95 je Aktion eine Szene (`animSzenen`; Art aus `log(…, art)` oder `animUnterschied`, Inhalt `animDetails`), Sätze (`animText`); abgespielt in `ui.js` (`playAnim`, `animFaktor`, `animDraw`, `animMarks`, `animCaption`) |
 | `js/marathon.js` | 328 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
-| `js/ui/base.js` | 163 | Oberfläche, seit v102 je Bildschirm eine Datei (Reihenfolge: die `<script>`-Tags in `index.html`, die einzige Liste). Hier: `show`, `toast`, `modal`, Blätter (`sheet`, Ruhezeit), Leiste, Drehung (im Spiel immer), `store`/`load`/`saveGame` |
+| `js/ui/base.js` | 181 | Oberfläche, seit v102 je Bildschirm eine Datei (Reihenfolge: die `<script>`-Tags in `index.html`, die einzige Liste). Hier: `show`, `toast`, `modal`, Blätter (`sheet`, Ruhezeit), Leiste, Drehung (im Spiel immer), `store`/`load`/`saveGame` |
 | `js/ui/map.js` | 555 | SVG-Karte (`drawMap`), Geländezeichen, Erträge im Gründungsmodus, Machtringe, Flüsse, Kampfbilder, `attachTaps` |
-| `js/ui/game.js` | 421 | Spielbildschirm: `redraw`, Kopfzeile (`hudStand`: Runde, Bevölkerung mit Siegstrich, Vorrat), `pulseCiv`, Gründungsmodus, `tapHex`, Kosten am Knopf (`costText`/`paidText`), Feld- und Stadtblatt, Straßen, Ertragsübersicht |
-| `js/ui/sheets.js` | 312 | Technologiebogen, Macht, Fähigkeiten (Punkte der Freien Forschung), Würfelzeilen, Protokoll |
+| `js/ui/game.js` | 425 | Spielbildschirm: `redraw`, Kopfzeile (`hudStand`: Runde, Bevölkerung mit Siegstrich, Vorrat), `pulseCiv`, Gründungsmodus, `tapHex`, Kosten am Knopf (`costText`/`paidText`), Feld- und Stadtblatt, Straßen, Ertragsübersicht |
+| `js/ui/sheets.js` | 311 | Technologiebogen, Macht, Fähigkeiten (Punkte der Freien Forschung), Würfelzeilen, Protokoll |
 | `js/ui/turns.js` | 378 | Zugende, KI- und Bot-Züge, Kampf- und Zug-Nachspiel (Szenen, Satz, laufender Vorrat), Bot-Blatt |
-| `js/ui/end.js` | 172 | Nochmal spielen (Rezept, Stufen), Spielende (Ergebnis als Titel, Tipp, Stufe im Knopf), Konfetti |
+| `js/ui/end.js` | 175 | Nochmal spielen (Rezept, Stufen), Spielende (Ergebnis als Titel, Tipp, Stufe im Knopf), Konfetti |
 | `js/ui/world.js` | 223 | Ereignis der Runde, Welt, Wunder, Nahrung, freie Wahl, `humanTurnStart` |
 | `js/ui/setup.js` | 335 | die eine Vorliebe (`prefs.anim`, `setAnim`); Aufbau: Spielart, Plätze (eine Zeile, Fähigkeitswahl mit Wirkung), Karte, Startspieler, Rezept, Doppelte |
 | `js/ui/place.js` | 238 | Legephase der Plättchenkarte |
@@ -238,8 +245,8 @@ dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und 
 | `js/ui/editor.js` | 34 | Karteneditor |
 | `js/ui/boot.js` | 285 | Sprache, `boot`, Menü (`menuButtons`), Verdrahtung, Spielmenü ☰, Regeln (`rulesModal`, `spielartenHtml`), Laden/Speichern |
 | `js/firstgame.js` | 1459 | **Erstes Spiel** (v92, v93): Seite vor der Partie mit der Wahl des Wegs (`fgSeite`), Karte, Verfügbarkeit und Würfel (`FG_SPAETER`, `fgVerfuegbar`, `fgWurf`, `fgNextDie`), Englands Drehbuch (`fgGegnerZug`), Schritte `FG_STEPS` (Ziel, Stand, Tipp, Rückmeldung, Schienen, Musterlösung; vom Weg geführt über `fgJe`, `fgRestSchritt`), blasse Kacheln (`fgBlass`), Schienen (`fgVeto`), Panel (`fgRenderPanel`), Spielende |
-| `test.js` | 7772 | **1963 Assertions**, `node test.js` |
-| `smoke.js` | 4537 | **166 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 7822 | **1980 Assertions**, `node test.js` |
+| `smoke.js` | 4579 | **167 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 24 / 85 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 72 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 75 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -267,6 +274,37 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v103 auf einen Blick.** Sechs Anweisungen des Autors, umgesetzt nach dem Grundsatz von v102.
+  · **Knöpfe:** `Armee bewegen` (`data-label`, `FG_AKTION`, `knopf`-Listen im Ersten Spiel) für die
+    Armee in der Stadt und auf freiem Feld; unter dem Knopf nur, was gilt („muss die Stadt noch
+    verlassen", „Kontrollzone – …"). `Bevölkerungswachstum` statt „Bevölkerung wachsen" (englisch
+    weiter „Grow population").
+  · **Texte:** Demokratie „Armeekosten 4 statt 5 × Anzahl", Nationalismus „… 2 statt 5 …" (ein Test
+    liest die Zahlen aus `armyCost`). Ertragstechnologien nennen, was Feld bzw. Bevölkerung damit
+    insgesamt bringt – Grundertrag plus Kette („Wald bringt 1/2/3 Wissenschaft", „Gebirge bringt 2
+    Wissenschaft", „Bevölkerung bringt je 2 Wissenschaft"; englisch „Forest yields 2 science",
+    „Mountains yield …", „Population yields 2 science each"); der Satz im Regelbogen: „es gilt die
+    beste". `test.js` erzeugt jeden Text aus `YIELD_CHAINS` + `TERRAIN`/`CITY_YIELD` und hält fest,
+    dass je Ziel und Ertragsart genau eine Kette zuständig ist.
+  · **Große Bildschirme:** `uiScale(w, h, gedreht)` in `js/ui/base.js` – 1 bis `UI_BASE_W` × `UI_BASE_H`
+    (1366 × 720), darüber `min(w/1366, h/720)`, auf zwei Stellen; gedreht 1. `syncLayout` setzt `--ui`,
+    `css/style.css` wendet es an (`html{zoom:var(--ui,1)}`), die Layoutklassen rechnen mit Fenster ÷
+    `--ui`. `setBarHeight` misst seitdem `offsetHeight` (kennt weder Drehung noch Zoom; bis v102
+    `getBoundingClientRect`, gedreht mit vertauschten Seiten). Das Konfetti fällt um die eigene Höhe in
+    Pixeln (`--fall`), nicht um 105vh – vh wächst mit dem Zoom.
+  · **Kolonialismus:** `claimTile(S, pi, r, c)` statt `buyTile`, `claimsLeft(S, pi)`, `COLONY_CLAIMS` 3
+    statt `COLONY_COST`; gezählt in `p.claimRound`/`p.claimCount` (je Runde, alte Stände: alle offen).
+    Gespeichert weiter in `S.bought` (Name aus der Zeit des Kaufens, Spielstände unverändert). Knopf
+    „Feld beanspruchen" mit Punkten (`pips`, jetzt in `base.js`, auch für die Freie Forschung).
+    Kolonie ohne Siedlerweg und Hauptstadt-Zählung (Bürokratie doppelt) bleiben. KI: Kandidaten,
+    solange Ansprüche offen sind, jedes Feld mit Ertrag (`kiColonySpots` `v > 0`, bis v102 `≥ 2`);
+    ihr Forschungswert für Kolonialismus ist unverändert 4 (offener Punkt 63).
+  · **Tests:** `test.js` neu bzw. umgestellt: Armeekosten-Texte, Ertragstexte als Summe, Kolonialismus
+    (drei je Runde, nichts bezahlt, vierter abgelehnt, nächste Runde wieder drei, alte Stände, X-Felder,
+    beide Techtrees, KI beansprucht drei ohne Münzen). Die Messung „mit Reserve mehr Wissenschaft in die
+    Forschung" läuft mit Startwert 304 statt 303 (mit 303 erforscht England Kolonialismus, der Verlauf
+    kommt danach ohne Reserve aus). `smoke.js`: Punkte am Knopf 3/3 → 0/3, Münzen unverändert;
+    `--bar-h` gedreht, quer und vergrößert; `uiScale` für iPads und Desktopgrößen.
 - **v102 auf einen Blick.** Oberfläche nach dem Grundsatz des Autors: einfacher Zweck, einfacher
   Aufbau, einfache Gestaltung, einfache Umsetzung – keine Untertitel, Hinweistexte und
   Nebenbeschriftungen; braucht ein Bildschirm sie, wird das Layout geändert.
@@ -1125,10 +1163,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1963 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1980 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (166 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (167 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -1189,6 +1227,16 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
 
 - **`sw.js`-Version** nach *jeder* Änderung hochzählen, sonst behält das installierte iPad
   den alten Stand.
+- **Maßstab großer Bildschirme (seit v103)**: `html{zoom:var(--ui)}` lässt auch `vh`/`vw` mitwachsen
+  (Chromium gemessen). Darum bleibt `--ui` gedreht bei 1 (die Drehung rechnet mit 100vh/100vw), und
+  wer neue Längen in `vh`/`vw` braucht, prüft sie bei `--ui` > 1. Höhen fürs CSS mit `offsetHeight`
+  messen, nicht mit `getBoundingClientRect` – das liefert gezoomte (und gedrehte) Bildschirmpixel.
+- **Ertragstexte als Summe (seit v103)**: „es gilt die beste" stimmt nur, solange je Ziel (Gelände
+  bzw. Bevölkerung) und Ertragsart genau eine Kette zuständig ist; zwei Ketten auf derselben
+  Ertragsart addierten sich (`YIELD_CHAINS`). Wer eine Ertragstechnologie neu anlegt, lässt `test.js`
+  laufen: es erzeugt jeden Text aus Grundertrag und Kette und prüft die Zuständigkeit.
+- **`S.bought` heißt nach dem Kaufen (seit v103 beansprucht)**: der Name blieb, damit Spielstände
+  passen. Ansprüche je Runde zählen `p.claimRound`/`p.claimCount` – nicht `S.bought`.
 - **Sechseckform (seit v99)**: `TILE_SHAPES.hex4` muss in einer geraden Zeile beginnen (oberste
   Feldzeile −6), sonst kippt der Versatz der Zeilen (`cubeToRC`, odd-r) und die Karte verzerrt sich.
   Wer Plätze verschiebt, verschiebt um ganze Gitterschritte ((5, −2), (2, 3), (−3, 5) axial) – nur so
@@ -2313,6 +2361,21 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    schwächer (12,8–15,0 %). Wirtschaftssieg (`tools_ki.js wirtschaft`, je 400 Partien, gepaart):
    auf den Dreiecken 35 statt 3 Wirtschaftssiege, auf den Sechsecken 45 statt 7. Nicht gemessen: Duell, drei Reiche,
    Originalkarte, Marathon (Draftwert der Freien Forschung geschätzt 5), und wie Menschen spielen.
+
+62. **Getroffene Auslegungen (v103) – zum Ändern angeboten.** (a) „3× pro Runde" statt „je Zug": im
+   Spiel dasselbe (jedes Reich zieht einmal je Runde), so heißen auch Atomwaffen, Internet und die
+   Freie Forschung. (b) Beansprucht werden darf, was bis v102 gekauft werden durfte: jedes herrenlose
+   Feld der Karte, auch Meer und weit weg. (c) Offene Ansprüche zählen nicht in der Zahl an
+   „Fähigkeiten" – sie brauchen ein Feld auf der Karte. (d) Ertragstexte nennen die Summe mit
+   Grundertrag (Landwirtschaft „Grasland bringt 2 Nahrung"), Wunder (Leuchtturm), Taiga und
+   Ereignisse kommen wie bisher dazu bzw. setzen aus. (e) Der Maßstab beginnt bei 1366 × 720, damit
+   jedes iPad bleibt, wie es ist; gedreht gilt 1. (f) Unter „Armee bewegen" fiel der Hinweis „erreichbare
+   Felder werden markiert", die übrigen Unterzeilen der Blätter blieben.
+63. **Kolonialismus kostenlos – nicht gemessen.** Drei Felder je Runde ohne Preis, dazu Kolonien ohne Weg
+   und Bürokratie doppelt: vermutlich deutlich stärker als bis v102, und eigenes Gebiet sperrt fremde
+   Siedlerwege – drei Ansprüche je Runde reichen, Nachbarn den Weg zu verlegen. Die KI nutzt die
+   Ansprüche (bestes Feld nach Ertrag), bewertet die Technologie beim Forschen aber weiter mit 4 wie
+   die bezahlte. Messbar mit `tools_ki.js` (etwa gepaart mit und ohne Kolonialismus im Pool).
 
 ## Arbeitsweise, die der Autor schätzt
 

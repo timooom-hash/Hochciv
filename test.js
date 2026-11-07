@@ -197,23 +197,38 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
     }
   }
   eq([abw.slice(0, 2), n], [[], 2800], 'Gegenprobe: 400 zufällige Techstände × 7 Ziele wie nach der Regel gerechnet');
-  // Die Techtexte nennen die Summe, die ihr Glied setzt – deutsch und englisch. Seit v89 ohne
-  // „(inkl. …)" (Anweisung des Autors); die Regel steht im Regelbogen.
-  const ZIEL = { de: { G: 'Grasland', W: 'Wald', B: 'Gebirge', F: 'Fluss', M: 'Meer', pop: 'Je Bevölkerung' },
-    en: { G: 'Grassland', W: 'Forest', B: 'Mountains', F: 'River', M: 'Sea', pop: 'Per population' } };
+  /* Die Techtexte nennen, was ein Feld bzw. jede Bevölkerung mit ihrem Glied INSGESAMT bringt –
+     Grundertrag plus Summe (v103, Anweisung des Autors: „Wald: +2 Wissenschaft" las sich, als
+     stapelten Mathematik und Elektrizität). Deutsch und englisch; seit v89 ohne „(inkl. …)". */
+  const ZIEL = {
+    de: { G: 'Grasland bringt', W: 'Wald bringt', B: 'Gebirge bringt', F: 'Fluss bringt', M: 'Meer bringt', pop: 'Bevölkerung bringt je' },
+    en: { G: 'Grassland yields', W: 'Forest yields', B: 'Mountains yield', F: 'River yields', M: 'Sea yields', pop: 'Population yields' } };
   const ART = { de: [['Wissenschaft', 'Wissenschaft'], ['Nahrung', 'Nahrung'], ['Münze', 'Münzen']],
     en: [['science', 'science'], ['food', 'food'], ['coin', 'coins']] };
+  const grund = on => on === 'pop' ? CITY_YIELD : TERRAIN[on].yield;
   const de = k => DATA_DE ? DATA_DE.tech[k] : [TECH_BY_KEY[k].n, TECH_BY_KEY[k].e];
   const tx = (lang, k) => lang === 'de' ? de(k) : DATA_EN.tech[k];
-  const soll = (lang, on, ch, i) => ZIEL[lang][on] + ': ' +
-    ch[i].y.map((v, j) => v ? `+${v} ${ART[lang][j][v > 1 ? 1 : 0]}` : '').filter(Boolean).join(', ');
+  const soll = (lang, on, ch, i) => ZIEL[lang][on] + ' ' +
+    ch[i].y.map((v, j) => v ? `${grund(on)[j] + v} ${ART[lang][j][grund(on)[j] + v > 1 ? 1 : 0]}` : '').filter(Boolean).join(', ') +
+    (lang === 'en' && on === 'pop' ? ' each' : '');
   const falsch = [];
   for (const on of Object.keys(YIELD_CHAINS)) for (const ch of YIELD_CHAINS[on]) ch.forEach((g, i) => {
     for (const lang of ['de', 'en']) if (tx(lang, g.k)[1] !== soll(lang, on, ch, i)) falsch.push(`${lang}:${g.k} „${tx(lang, g.k)[1]}" statt „${soll(lang, on, ch, i)}"`);
   });
-  eq(falsch, [], 'jeder Ertragstext (deutsch und englisch) nennt die Summe, die sein Glied setzt');
-  eq(de('ki')[1], 'Wald: +3 Wissenschaft', 'so liest sich das: Künstliche Intelligenz');
-  eq(DATA_EN.tech.containerlogistik[1], 'Sea: +2 food, +1 coin', '… und Containerlogistik englisch');
+  eq(falsch, [], 'jeder Ertragstext (deutsch und englisch) nennt, was das Feld mit seinem Glied insgesamt bringt');
+  eq([de('mathematik')[1], de('elektrizitaet')[1], de('ki')[1]], ['Wald bringt 1 Wissenschaft', 'Wald bringt 2 Wissenschaft', 'Wald bringt 3 Wissenschaft'],
+    'so liest sich das: Mathematik, Elektrizität, Künstliche Intelligenz');
+  eq([de('landwirtschaft')[1], de('chemie')[1], de('schrift')[1]], ['Grasland bringt 2 Nahrung', 'Gebirge bringt 2 Wissenschaft', 'Bevölkerung bringt je 2 Wissenschaft'],
+    '… mit Grundertrag: Grasland hat schon 1 Nahrung, Gebirge 1 Wissenschaft, jede Bevölkerung 1 Wissenschaft');
+  eq([DATA_EN.tech.containerlogistik[1], DATA_EN.tech.robotik[1]], ['Sea yields 2 food, 2 coins', 'Population yields 3 coins each'], '… und englisch');
+  // Die Texte stimmen mit dem, was tileYield rechnet (Meer hat 1 Münze Grundertrag)
+  eq([y(['containerlogistik'], 'M'), y(['landwirtschaft'], 'G'), py(['robotik'])], [[0, 2, 2], [0, 2, 0], [1, -1, 3]], 'Text und Rechnung: dieselben Zahlen');
+  /* „Es gilt die beste" ist die ganze Regel nur, solange je Ziel und Ertragsart genau eine Kette
+     zuständig ist – zwei Ketten auf derselben Ertragsart würden sich addieren (YIELD_CHAINS). */
+  const zustaendig = {};
+  for (const on of Object.keys(YIELD_CHAINS)) for (const ch of YIELD_CHAINS[on])
+    ch[ch.length - 1].y.forEach((v, j) => { if (v) (zustaendig[on + ':' + j] = zustaendig[on + ':' + j] || []).push(ch[0].k); });
+  eq(Object.entries(zustaendig).filter(([, l]) => l.length > 1), [], 'je Ziel und Ertragsart genau eine Kette');
   eq(TECHS.filter(t => /inkl\.|incl\./.test(de(t.k)[1] + ' ' + DATA_EN.tech[t.k][1])).map(t => t.k), [],
     'kein Techtext sagt mehr „inkl." bzw. „incl." (v89)');
 }
@@ -279,6 +294,19 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(armyCost(W, 0), 5, 'Wikinger: nächste Armee kostet 5 statt 10');
   W.armies.push({ id: 98, owner: 0, r: 0, c: 0, mp: 0, born: 0 });
   eq(armyCost(W, 0), 10, 'Wikinger: dritte Armee kostet 10 statt 15');
+}
+/* --- Demokratie und Nationalismus (v103, Anweisung des Autors: der Text soll zeigen, dass sie
+   Armeen verbilligen): „Armeekosten 4 statt 5 × Anzahl". Die Zahlen kommen aus armyCost – mit
+   beiden gilt Nationalismus, die zwei stapeln nicht. */
+{
+  const faktor = techs => armyCost(mk('griechenland', techs), 0);   // erste Armee: Faktor × 1
+  const [grund, demo, nat, beide] = [[], ['demokratie'], ['nationalismus'], ['demokratie', 'nationalismus']].map(faktor);
+  eq([grund, demo, nat, beide], [5, 4, 2, 2], 'Faktor ohne, mit Demokratie, mit Nationalismus, mit beiden (stapelt nicht)');
+  const de = k => DATA_DE ? DATA_DE.tech[k][1] : TECH_BY_KEY[k].e;
+  eq([de('demokratie'), de('nationalismus'), DATA_EN.tech.demokratie[1], DATA_EN.tech.nationalismus[1]],
+    [`Armeekosten ${demo} statt ${grund} × Anzahl`, `Armeekosten ${nat} statt ${grund} × Anzahl`,
+      `Army cost ${demo} instead of ${grund} × count`, `Army cost ${nat} instead of ${grund} × count`],
+    'die Texte nennen die Zahlen aus armyCost, deutsch und englisch');
 }
 
 /* --- Umrechnung: 2 Münzen = 1 Nahrung; England 1:1 */
@@ -414,16 +442,16 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   }
   /* Texte seit v96 (Anweisung des Autors): die Kachel im Technologiebogen sagt nicht mehr, was die
      Bürokratie mitverdoppelt – nur „Hauptstadt produziert doppelt"; im Regelbogen steht alles
-     (techEffectFull), samt der gekauften Felder (v96). */
+     (techEffectFull), samt der beanspruchten Felder (v96; bis v102 gekauft). */
   eq([TECH_BY_KEY.buerokratie.e, DATA_EN.tech.buerokratie[1]], ['Hauptstadt produziert doppelt', 'The capital produces double'],
     'Kachel der Bürokratie: nur „Hauptstadt produziert doppelt", englisch ebenso (v96)');
-  eq(/Handelsrouten, Ökologie, Gentechnik und gekaufte Felder/.test(techEffectFull(TECH_BY_KEY.buerokratie, null)), true,
+  eq(/Handelsrouten, Ökologie, Gentechnik und beanspruchte Felder/.test(techEffectFull(TECH_BY_KEY.buerokratie, null)), true,
     'Regelbogen: der Text der Bürokratie nennt alle vier');
-  eq(/trade routes, ecology, genetic engineering and bought tiles/.test(DATA_EN.tech.buerokratie[2]), true, 'englisch ebenso');
+  eq(/trade routes, ecology, genetic engineering and claimed tiles/.test(DATA_EN.tech.buerokratie[2]), true, 'englisch ebenso');
 }
 
 /* --- Gekaufte Felder zählen zur Hauptstadt (v96, Anweisung des Autors): mit Bürokratie bringt
-   ein per Kolonialismus gekauftes Feld das Doppelte, wo es auch liegt. Auslegungen (ANNAHMEN
+   ein per Kolonialismus gekauftes – seit v103 beanspruchtes – Feld das Doppelte, wo es auch liegt. Auslegungen (ANNAHMEN
    v96): einmal doppelt, auch wenn ein gekauftes Feld zugleich ans Umland der Hauptstadt grenzt;
    ohne Hauptstadt nicht doppelt (wie das Umland); bei einer Revolution produziert es weiter (wie
    die Handelsrouten seit v86). */
@@ -437,7 +465,7 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const y = tileYield(X, 0, terrainAt(X, frei[0], frei[1]));
   const dop = y.map(n => 2 * n);
   p.res = { sci: 0, food: 0, coins: 10 };
-  eq(buyTile(X, 0, frei[0], frei[1]), null, `Feld ${frei.join('/')} gekauft (Ertrag ${y.join('/')})`);
+  eq(claimTile(X, 0, frei[0], frei[1]), null, `Feld ${frei.join('/')} beansprucht (Ertrag ${y.join('/')})`);
   // Einkommen mit und ohne das gekaufte Feld (über incomeBreakdown, also mit `pre`)
   const anteil = () => {
     const mit = income(X, 0), merk = X.bought[0];
@@ -473,15 +501,16 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const b = incomeBreakdown(X, 0);
   eq(JSON.stringify([0, 1, 2].map(i => b.rows.reduce((n, r) => n + r.y[i], 0) + b.extra.reduce((n, e) => n + e.y[i], 0) + b.pop.y[i])),
     JSON.stringify(b.total), 'Zeilen und Summe gehen auf (gekauftes Feld, Bürokratie)');
-  // Texte: die Kachel des Kolonialismus wie bisher, im Regelbogen der Zusatz
-  eq(TECH_BY_KEY.kolonialismus.e, `Für ${COLONY_COST} Münzen Feld kaufen; dort auch ohne Weg gründen`, 'Kachel des Kolonialismus unverändert');
+  // Texte: die Kachel des Kolonialismus ohne Bürokratie, im Regelbogen der Zusatz
+  eq(TECH_BY_KEY.kolonialismus.e, `${COLONY_CLAIMS}× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen`, 'Kachel des Kolonialismus (v103)');
   eq([/zählen zur Hauptstadt \(mit Bürokratie doppelt\)/.test(techEffectFull(TECH_BY_KEY.kolonialismus, X)),
     /count towards the capital \(doubled with Bureaucracy\)/.test(DATA_EN.tech.kolonialismus[2])], [true, true],
-  'Regelbogen: gekaufte Felder zählen zur Hauptstadt (deutsch und englisch)');
-  // Die KI sieht den doppelten Ertrag auch beim Aussuchen (kiColonySpots): Schwelle mit Bürokratie halb so hoch
-  const spots = () => kiColonySpots(X, 0).length;
+  'Regelbogen: beanspruchte Felder zählen zur Hauptstadt (deutsch und englisch)');
+  // Die KI sieht den doppelten Ertrag auch beim Aussuchen (kiColonySpots): Bürokratie verdoppelt den Wert
+  const spots = () => kiColonySpots(X, 0);
   const mitB = spots(); delete p.techs.buerokratie; const ohneB = spots(); p.techs.buerokratie = true;
-  eq(mitB >= ohneB, true, `KI: mit Bürokratie mindestens so viele Kaufkandidaten (${mitB} gegen ${ohneB})`);
+  eq([mitB.length, mitB[0][2]], [ohneB.length, 2 * ohneB[0][2]], `KI: mit Bürokratie dieselben Felder, doppelt bewertet (${mitB.length} Felder)`);
+  eq(ohneB.every(t => t[2] > 0), true, 'seit v103 kostenlos: jedes Feld mit Ertrag ist ein Kandidat, auch eines mit 1');
 }
 /* --- Kacheln ohne Bürokratie-Zusätze (v96, Anweisung des Autors): keine Kachel des Bogens sagt,
    was die Bürokratie mitverdoppelt – das steht nur im Regelbogen (`voll`, techEffectFull). Wer
@@ -498,8 +527,8 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   const en = [TECH_BY_KEY.buerokratie.e, techEffectFull(TECH_BY_KEY.buerokratie, null), techEffectFull(TECH_BY_KEY.mathematik, null)];
   setLang('de', { quiet: true });
   const de = [TECH_BY_KEY.buerokratie.e, techEffectFull(TECH_BY_KEY.buerokratie, null), techEffectFull(TECH_BY_KEY.mathematik, null)];
-  eq(en, ['The capital produces double', DATA_EN.tech.buerokratie[2], 'Forest: +1 science'], 'englisch: Kachel und Regelbogen; ohne `voll` derselbe Text');
-  eq(de, ['Hauptstadt produziert doppelt', 'Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und gekaufte Felder', 'Wald: +1 Wissenschaft'],
+  eq(en, ['The capital produces double', DATA_EN.tech.buerokratie[2], 'Forest yields 1 science'], 'englisch: Kachel und Regelbogen; ohne `voll` derselbe Text');
+  eq(de, ['Hauptstadt produziert doppelt', 'Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und beanspruchte Felder', 'Wald bringt 1 Wissenschaft'],
     'zurück auf Deutsch: beide Texte wieder deutsch');
 }
 
@@ -1120,18 +1149,31 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(c.pop, 3, 'nur eine Bevölkerung geopfert');
 }
 
-/* Kolonialismus: nur herrenlose Felder */
+/* Kolonialismus: nur herrenlose Felder – seit v103 (Anweisung des Autors) kostenlos, COLONY_CLAIMS
+   je Runde (bis v102 für 3 Münzen je Feld). Was nicht genutzt wird, verfällt. */
 {
   const S = mk('griechenland', ['kolonialismus']);
-  const cap = capitalOf(S, 0);
+  const cap = capitalOf(S, 0), p = S.players[0], n = COLONY_CLAIMS;
   const owned = neighbors(cap.r, cap.c).find(([r, c]) => terrainAt(S, r, c) && !cityAt(S, r, c));
-  S.players[0].res.coins = 20;
-  eq(typeof buyTile(S, 0, owned[0], owned[1]), 'string', 'eigenes Umland ist nicht kaufbar');
-  // ein weit entferntes herrenloses Feld finden
-  let free = null;
-  for (const [r, c] of within(cap.r, cap.c, 6))
-    if (terrainAt(S, r, c) && !S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))) && !cityAt(S, r, c)) { free = [r, c]; break; }
-  eq(buyTile(S, 0, free[0], free[1]), null, 'herrenloses Feld ist kaufbar');
+  p.res = { sci: 0, food: 0, coins: 0 };
+  eq(claimTile(S, 0, owned[0], owned[1]), 'Nur herrenlose Felder können beansprucht werden.', 'eigenes Umland lässt sich nicht beanspruchen');
+  eq(claimsLeft(S, 0), n, 'ein abgelehnter Anspruch zählt nicht');
+  // herrenlose Felder in der Nähe
+  const frei = within(cap.r, cap.c, 6).filter(([r, c]) => terrainAt(S, r, c) && !isOff(terrainAt(S, r, c)) &&
+    !S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))) && !cityAt(S, r, c));
+  eq(frei.length > n + 1, true, `genug herrenlose Felder (${frei.length})`);
+  eq(frei.slice(0, n).map(([r, c]) => claimTile(S, 0, r, c)), Array(n).fill(null), `${n} herrenlose Felder beansprucht – ohne Münzen`);
+  eq([p.res.coins, claimsLeft(S, 0), S.bought[0].length], [0, 0, n], 'nichts bezahlt, nichts mehr offen, die Felder stehen beim Reich');
+  eq(frei.slice(0, n).every(([r, c]) => controlledTiles(S, 0).has(key(r, c))), true, 'beanspruchte Felder sind eigenes Gebiet');
+  eq(claimTile(S, 0, frei[0][0], frei[0][1]), 'Nur herrenlose Felder können beansprucht werden.', 'dasselbe Feld kein zweites Mal');
+  eq(claimTile(S, 0, frei[n][0], frei[n][1]), `Diese Runde schon ${n} Felder beansprucht.`, `ein ${n + 1}. Feld in derselben Runde nicht`);
+  S.round++;
+  eq(claimsLeft(S, 0), n, 'nächste Runde wieder alle');
+  eq([claimTile(S, 0, frei[n][0], frei[n][1]), claimsLeft(S, 0)], [null, n - 1], 'und es geht weiter');
+  eq(claimsLeft(mk('griechenland'), 0), 0, 'ohne Kolonialismus keine Ansprüche');
+  delete p.claimRound; delete p.claimCount;
+  eq(claimsLeft(S, 0), n, 'Spielstand von vor v103 (ohne Zähler): alle offen');
+  eq(S.log.slice(-1)[0].m, `Griechenland: Feld ${frei[n][0]}/${frei[n][1]} beansprucht.`, 'Protokoll');
 }
 
 /* Internet: genau eine Gratiskopie pro Runde */
@@ -3224,36 +3266,34 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     eq(preise3(mkT('england', false, ['kundschafterei'])), [30, 22, 24], 'Standard: Kundschafterei 30/22/24');
   }
 
-  /* v72 (Anweisung des Autors): Kolonialismus kauft ein Feld für 3 Münzen (vorher 5),
-     Kundschafterei kopiert zum Doppelten der Grundkosten (vorher zum Dreifachen) – in
-     BEIDEN Techtrees; sie unterscheiden sich nur in den Forschungskosten. */
+  /* Kolonialismus: seit v103 (Anweisung des Autors) COLONY_CLAIMS kostenlose Felder je Runde – bis
+     v102 kaufte er eines für 3 Münzen (v72, vorher 5). Kundschafterei kopiert seit v72 zum Doppelten
+     der Grundkosten (vorher zum Dreifachen). Beides in BEIDEN Techtrees; sie unterscheiden sich nur
+     in den Forschungskosten. */
   {
-    eq([COLONY_COST, SCOUTING_RATE], [3, 2], 'Kolonialismus 3 Münzen je Feld, Kundschafterei 2×');
-    const kauf = (old, muenzen) => {
+    eq([COLONY_CLAIMS, SCOUTING_RATE], [3, 2], 'Kolonialismus 3 Felder je Runde, Kundschafterei 2×');
+    const anspruch = old => {
       const S = mkT('england', old, ['kolonialismus']), p = S.players[0], cap = capitalOf(S, 0);
-      S.cur = 0; p.res = { sci: 0, food: 0, coins: muenzen };
+      S.cur = 0; p.res = { sci: 0, food: 0, coins: 0 };
       const frei = within(cap.r, cap.c, 6).find(([r, c]) => terrainAt(S, r, c) && !cityAt(S, r, c) &&
         !S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))));
-      const err = buyTile(S, 0, frei[0], frei[1]);
-      return [err, p.res.coins, (S.bought[0] || []).length, S.log[S.log.length - 1].m];
+      const err = claimTile(S, 0, frei[0], frei[1]);
+      return [err, p.res.coins, (S.bought[0] || []).length, claimsLeft(S, 0)];
     };
-    const std = kauf(false, 5);
-    eq(std.slice(0, 3), [null, 2, 1], 'Standard: das Feld kostet 3 Münzen');
-    eq(kauf(true, 5).slice(0, 3), [null, 2, 1], 'alter Techtree: ebenfalls 3 Münzen');
-    eq(/\(3 Münzen\)/.test(std[3]), true, 'das Protokoll nennt den Preis');
-    eq(kauf(false, 2).slice(0, 3), [T('Zu wenig Münzen.'), 2, 0], 'mit 2 Münzen reicht es nicht');
+    eq(anspruch(false), [null, 0, 1, COLONY_CLAIMS - 1], 'Standard: ohne Münzen beansprucht, noch zwei offen');
+    eq(anspruch(true), anspruch(false), 'alter Techtree: ebenso');
     // Die Techtexte nennen dieselben Zahlen wie die Regel – in beiden Sprachen und Techtrees
     const K = TECH_BY_KEY, A = { oldTree: true };
     const texte = X => [techEffect(K.kolonialismus, X), techEffect(K.kundschafterei, X)];
-    eq(texte(STD), [`Für ${COLONY_COST} Münzen Feld kaufen; dort auch ohne Weg gründen`, `Tech kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
-      'Techtexte nennen den Feldpreis und den Kopierfaktor der Regel');
+    eq(texte(STD), [`${COLONY_CLAIMS}× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen`, `Tech kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
+      'Techtexte nennen die Ansprüche je Runde und den Kopierfaktor der Regel');
     eq(texte(A), texte(STD), 'der alte Techtree zeigt dieselben Texte');
     setLang('en', { quiet: true });
     const en = [texte(null), texte(A)];
     setLang('de', { quiet: true });
-    const kauftext = `Buy a tile for ${COLONY_COST} coins; found a city there even without a route`;
-    eq(en, [[kauftext, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`],
-      [kauftext, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
+    const text = `${COLONY_CLAIMS}× per round: claim an unowned tile; found a city there even without a route`;
+    eq(en, [[text, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`],
+      [text, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
   }
 
   // Plättchenmodus: der Vorabwurf läuft im selben Techtree wie die Partie. Geprüft an
@@ -6453,9 +6493,9 @@ ui = { sel: null, army: null, mode: null, botTimer: null };
   eq(TERRAIN.X.land, false, 'außerhalb ist kein Land');
   // v73: X gehört nie zum Gebiet – sonst zog die Reichsgrenze um leere Sechsecke
   eq(controlledTiles(S, 0).has(key(nr, nc)), false, 'es gehört nicht zum Gebiet der Stadt daneben');
-  S.players[0].techs.kolonialismus = true; S.players[0].res.coins = 20;
-  eq(buyTile(S, 0, nr, nc), 'Kein Feld.', 'kaufen lässt es sich auch nicht');
-  eq([S.players[0].res.coins, (S.bought[0] || []).length], [20, 0], 'und es kostet nichts');
+  S.players[0].techs.kolonialismus = true;
+  eq(claimTile(S, 0, nr, nc), 'Kein Feld.', 'beanspruchen lässt es sich auch nicht');
+  eq([claimsLeft(S, 0), (S.bought[0] || []).length], [COLONY_CLAIMS, 0], 'und es verbraucht keinen Anspruch');
 }
 /* Plättchenkarten liegen in einem Rechteck aus X. Eine Stadt am Kartenrand oder am Loch
    zog bis v72 die leeren Sechsecke dahinter in ihr Gebiet – sichtbar als Reichsgrenze
@@ -6908,7 +6948,7 @@ for (const n of [2, 3, 4]) {
 
   // Umschalten und zurück
   setLang('en', { quiet: true });
-  eq([TECH_BY_KEY.schrift.n, TECH_BY_KEY.schrift.e], ['Writing', 'Per population: +1 science'],
+  eq([TECH_BY_KEY.schrift.n, TECH_BY_KEY.schrift.e], ['Writing', 'Population yields 2 science each'],
     'Technologien wechseln Name und Wirkung');
   eq(TERRAIN.G.name, 'Grassland', 'Gelände wechselt');
   eq([CIVS[0].n, CIVS[0].abilities[0].n], ['Greece', 'Cheap research'], 'Zivilisation und Fähigkeit wechseln');
@@ -7204,6 +7244,13 @@ for (const n of [2, 3, 4]) {
   kiTurn(Z, z);
   eq(popOf(Z, z) + citiesOf(Z, z).length > vorher, true, 'im ersten Zug wächst oder siedelt die KI');
   eq(Z.players[z].res.food + Z.players[z].res.coins < inc.food + inc.coins, true, '… und bezahlt dafür');
+  // Kolonialismus (v103): die KI nutzt die kostenlosen Ansprüche, auch ohne einen Vorrat
+  const K = newGame({ seed: 11, players: [kiP('russland', 'basis'), kiP('griechenland', 'basis')] });
+  const k = K.cur, kp = K.players[k];
+  kp.techs.kolonialismus = true; kp.res = { sci: 0, food: 0, coins: 0 };
+  kiTurn(K, k);
+  eq([(K.bought[k] || []).length, claimsLeft(K, k)], [COLONY_CLAIMS, 0], `die KI beansprucht in ihrem Zug ${COLONY_CLAIMS} Felder, ohne Münzen`);
+  eq(K.log.filter(l => /Feld \d+\/\d+ beansprucht/.test(l.m)).length, COLONY_CLAIMS, '… und das Protokoll nennt jedes');
 }
 {
   // --- Volle Partien: 2, 3 und 4 Reiche, Plättchenkarte mit Legephase und feste Karte,
@@ -7560,8 +7607,11 @@ function kiAbwehrLage(popKI, gross) {
   //     vorbei. v82: Startwert 303 statt 300 – im heutigen Techtree (bis v81 der
   //     alternative) kommt die KI mit 300 nur zweimal mit Alchemie an diese Stelle, beide
   //     Male ohne Unterschied; mit 303 sechsmal (225 statt 188). Die Zahl aus v79 (300:
-  //     127 statt 105) galt im alten Techtree und gilt dort weiter.
-  const S = newGame({ seed: 303, players: CIVS.map((c, i) => ({ civ: c.k, kind: 'ki', kiLevel: 'schwer', ability: c.abilities[i % 3].k })) });
+  //     127 statt 105) galt im alten Techtree und gilt dort weiter. v103: Startwert 304 statt
+  //     303 – mit 303 erforscht England in Runde 5 Kolonialismus und beansprucht seither drei
+  //     Felder je Runde; der Verlauf danach kommt ohne die Reserve aus (338 gegen 338). Mit 304
+  //     ist kein Kolonialismus im Spiel: sechsmal, 149 statt 98, in v102 wie in v103.
+  const S = newGame({ seed: 304, players: CIVS.map((c, i) => ({ civ: c.k, kind: 'ki', kiLevel: 'schwer', ability: c.abilities[i % 3].k })) });
   let mit = 0, ohne = 0, zuege = 0, guard = 0;
   const forschung = (X, pi) => {
     let n = 0;

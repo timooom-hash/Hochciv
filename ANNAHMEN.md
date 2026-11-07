@@ -6249,3 +6249,105 @@ Animationen im ☰ samt Übernahme alter Wahlen und Englisch; Menü mit und ohne
 Spiel immer, ohne Schalter. `check_single.js` in der Einzeldatei (24 Skripte). In Chromium (iPad
 quer): Menü, Aufbau (vier Reiche, Duell, Auswahl der Fähigkeit), Spiel, Macht, Fähigkeiten, Spielmenü,
 Welt, Regeln (Spielarten), Spielende – ohne Seitenfehler.
+
+## Armee bewegen · Bevölkerungswachstum · Armeekosten · Ertragstexte als Summe · große Bildschirme · Kolonialismus kostenlos (v103)
+
+Anweisungen des Autors (7.11.), unter dem Grundsatz von v102 („einfacher Zweck, einfacher Aufbau,
+einfache Gestaltung, einfache Umsetzung … Jede Entscheidung soll Bedienung, Entwicklung und Arbeit
+mit Agenten zugleich verbessern, ohne etwas kaputtzumachen"):
+„Zwei verschiedene deutsche Beschriftungen fürs Bewegen von Armeen – beide sollen ‚Armee bewegen'
+heißen"; „für Demokratie/Nationalismus einen Wortlaut finden, der klarer macht, dass sie die
+Armeekosten senken"; „Bevölkerung wachsen soll ‚Bevölkerungswachstum' heißen"; „Symbole sind auf
+größeren Bildschirmen (etwa 1080p-Desktop) sehr klein – eine Lösung finden"; „die Ertragstechnologien
+desselben Feldes (Mathematik, Elektrizität, KI) so beschriften, dass klar ist, dass sie nicht stapeln,
+sondern nur die höchste zählt – vielleicht einfach ‚xyz bringt 2 abc'"; „Kolonialismus: ‚dreimal je
+Zug ein herrenloses Feld beanspruchen' statt einer bezahlten Fähigkeit". Vor dem Bauen gefragt: Behält
+ein beanspruchtes Feld die beiden anderen Seiten des Kolonialismus (Gründen ohne Weg, zählt zur
+Hauptstadt)? Antwort: **beide bleiben**.
+
+### Regeln
+
+* **Kolonialismus:** dreimal je Runde (`COLONY_CLAIMS`) ein herrenloses Feld beanspruchen, kostenlos
+  (bis v102: kaufen für 3 Münzen, bis v71 für 5). Beansprucht werden darf, was bis v102 gekauft werden
+  durfte – jedes Feld der Karte, das niemandem gehört und keine Stadt trägt, auch Meer und weit weg.
+  Was in einer Runde nicht genutzt wird, verfällt. Wie bisher: das Feld ist eigenes Gebiet, dort darf
+  auch ohne Siedlerweg gegründet werden (v84), und es zählt zur Hauptstadt (v96, mit Bürokratie
+  doppelt). Text: „3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen",
+  englisch „3× per round: claim an unowned tile; …". Ausgelegt: „je Zug" als „je Runde" – jedes Reich
+  zieht einmal je Runde, und so heißen auch Atomwaffen, Internet und die Freie Forschung.
+* Sonst ändert sich keine Regel. Demokratie (4) und Nationalismus (2) bleiben, wie sie waren – nur der
+  Text ist neu; ebenso die Ertragstechnologien (v88).
+
+### Oberfläche – wie ausgelegt
+
+* **Armee bewegen:** ein Knopf für die Armee in der Stadt und auf freiem Feld (bis v102 „Armee hier
+  bewegen" bzw. „Diese Armee bewegen", englisch jetzt „Move army"). Die Unterzeile „erreichbare Felder
+  werden markiert" sagte, was der Knopf tut – sie fällt nach dem Grundsatz; was gilt, bleibt („muss die
+  Stadt noch verlassen", „Kontrollzone – hält bis zum nächsten Zug").
+* **Bevölkerungswachstum:** nur die deutsche Beschriftung (englisch weiter „Grow population").
+  „Kostenlos wachsen" daneben und „Alle Städte wachsen" bleiben.
+* **Demokratie / Nationalismus:** „Armeekosten 4 statt 5 × Anzahl" bzw. „2 statt 5" (englisch „Army
+  cost 4 instead of 5 × count"). Das „statt 5" sagt beides: dass es billiger wird und dass die zwei nicht
+  stapeln – mit beiden gilt 2.
+* **Ertragstechnologien:** Der Text nennt, was ein Feld (bzw. jede Bevölkerung) damit insgesamt bringt,
+  samt Grundertrag – Mathematik „Wald bringt 1 Wissenschaft", Elektrizität „… 2", Künstliche
+  Intelligenz „… 3"; Landwirtschaft „Grasland bringt 2 Nahrung" (Grasland hat 1), Chemie „Gebirge bringt
+  2 Wissenschaft", Mühlentechnik „Fluss bringt 2 Münzen", Containerlogistik „Meer bringt 2 Nahrung, 2
+  Münzen", Schrift „Bevölkerung bringt je 2 Wissenschaft". Bis v102 stand die Summe der Kette als „+n"
+  da („Wald: +2 Wissenschaft"), was nach Zuschlag auf Mathematik aussah. Eine absolute Zahl kann nicht
+  stapeln. Das trägt, weil je Ziel und Ertragsart genau eine Kette zuständig ist – Ketten verschiedener
+  Felder betreffen verschiedene Erträge (auf Grasland Papier die Wissenschaft, Landwirtschaft die
+  Nahrung). Der Satz im Regelbogen: „Ertragstechnologien nennen, was ein Feld bzw. jede Bevölkerung damit
+  insgesamt bringt. Für dasselbe Gelände und denselben Ertrag zählt nur die beste: …". Wunder (Großer
+  Leuchtturm +1), Taiga (mindestens 1 Nahrung), Bürokratie und Ereignisse wirken wie bisher darüber.
+* **Große Bildschirme:** die ganze Oberfläche wächst mit dem Fenster – ein Faktor als CSS-`zoom` auf
+  `<html>`, keine zweite Gestaltung. Bis 1366 × 720 bleibt er 1: jedes iPad quer (das größte hat 1366 ×
+  1024) und jedes Telefon, gedreht immer. Darüber `min(Breite/1366, Höhe/720)`: ein maximiertes Fenster
+  auf 1080p (1920 × 960) ×1,33, Vollbild ×1,41, 1440p (2560 × 1300) ×1,81, 4K bei 100 % ×2,78. Die Karte
+  füllt ihre Fläche wie bisher; sie gibt nur ab, was Kopf- und Aktionsleiste an Höhe gewinnen.
+  Verworfen: nur die Symbole größer (Schrift und Blätter blieben so klein wie die Symbole daneben),
+  alles auf `rem` umstellen (hunderte Längen, dazu die in den Vorlagen der Skripte), ein Maßstab ab dem
+  iPad Air (1180 × 820 – dann wüchse das 13-Zoll-iPad um 16 %).
+* **Feld beanspruchen:** rechts statt eines Preises die Ansprüche dieser Runde als Punkte (gefüllt =
+  offen, wie bei der Freien Forschung); verbraucht ist der Knopf gesperrt, alle Punkte leer – ohne Satz.
+  Keine Unterzeile mehr (bis v102 „Kolonialismus"); auf fremdem oder eigenem Gebiet weiter „nur
+  herrenlose Felder". Offene Ansprüche zählen nicht in der Zahl an „Fähigkeiten": sie brauchen ein Feld
+  auf der Karte, das Blatt „Fähigkeiten" könnte sie nicht einlösen.
+
+### Umsetzung
+
+* `claimTile(S, pi, r, c)` und `claimsLeft(S, pi)` in `js/engine.js` statt `buyTile`; gezählt in
+  `p.claimRound`/`p.claimCount` (die Runde der Ansprüche und wie viele). Spielstände von vor v103 haben
+  keinen Zähler – alle offen. Die Felder stehen weiter in `S.bought`: der Name stammt aus der Zeit des
+  Kaufens; ihn zu ändern hätte Spielstände umgeschrieben, ohne dass sich etwas verbessert.
+* KI (`js/ki.js`): Kandidaten, solange `claimsLeft` > 0 – die drei Felder mit dem besten Ertrag;
+  `kiColonySpots` nimmt jedes Feld mit Ertrag (bis v102 erst ab 2 – für 3 Münzen lohnte 1 nicht). Ihr
+  Forschungswert für Kolonialismus bleibt 4 (nicht gemessen, offener Punkt 63).
+* `uiScale(w, h, gedreht)` (`js/ui/base.js`, `UI_BASE_W`/`UI_BASE_H`), `syncLayout` setzt `--ui`, die
+  Layoutklassen (`w-wide`, `w-side`, `w-narrow`) rechnen mit Fenster ÷ `--ui` – auf allen Größen dasselbe
+  Ergebnis wie vorher. `setBarHeight` misst `offsetHeight`: gezoomt liefert `getBoundingClientRect`
+  Bildschirmpixel (in Chromium gemessen: 87 statt 58 bei ×1,5), und `--bar-h` wird im gezoomten CSS noch
+  einmal vergrößert – das Blatt säße zu hoch. Gedreht liefert es die gedrehte Höhe – das war v87. Mit
+  `offsetHeight` entfallen beide Sonderfälle. In Chromium wachsen auch `vh`/`vw` mit dem Zoom (100vh =
+  1620 px bei ×1,5 auf 1080 px): deshalb gilt gedreht 1, und das Konfetti fällt um die eigene Höhe in
+  Pixeln statt um 105vh.
+* `pips(rest, alle)` liegt jetzt in `base.js` (Blatt „Fähigkeiten" und Feldblatt).
+
+### Abgesichert (v103)
+
+`test.js`: Armeekosten-Texte deutsch und englisch aus `armyCost` (5/4/2, mit beiden 2); jeder Ertragstext
+aus Grundertrag und Kette, je Ziel und Ertragsart genau eine Kette, Text und `tileYield` gleich;
+Kolonialismus: eigenes Umland abgelehnt (zählt nicht), drei herrenlose Felder ohne Münzen, gehören dem
+Reich, dasselbe Feld kein zweites Mal, ein viertes in derselben Runde nicht, nächste Runde wieder drei,
+ohne Technologie keine, alter Spielstand alle, Protokoll, X-Feld verbraucht keinen Anspruch, beide
+Techtrees, Kachel und Regelbogen beider Sprachen, Bürokratie-Text „beanspruchte Felder"; die KI
+beansprucht in einem Zug drei Felder ohne Münzen. Die Messung „mit Reserve mehr Wissenschaft in die
+Forschung" (v79) mit Startwert 304 statt 303: mit 303 erforscht England in Runde 5 Kolonialismus und
+beansprucht seither; der Verlauf danach kommt ohne die Reserve aus (338 gegen 338, v102: 331 gegen 317).
+Mit 304 ist kein Kolonialismus im Spiel – sechsmal, 149 gegen 98, in v102 wie v103. `smoke.js`: Punkte am
+Knopf 3/3, 2/3, 1/3, 0/3 gesperrt, keine Unterzeile, Münzen unverändert, drei Felder beim Reich;
+Kolonialismus-Kachel; Ertragstexte im Bogen und Regelbogen (deutsch und englisch); `--bar-h`/`--hud-h`
+gedreht, quer und bei ×1,41 die Layouthöhe; `uiScale` für iPads (1180 × 820, 1194 × 834, 1366 × 1024),
+1024 × 768, 1080p, 1440p, 4K und gedreht; die Layoutklassen bei 1920 × 960. In Chromium: Spiel,
+Stadtblatt, Feldblatt mit Punkten, Technologiebogen bei 1180 × 820 (unverändert), 1920 × 960 (×1,33),
+1920 × 1080 (×1,41), 2560 × 1440 (×1,87) und hochkant gedreht (820 × 1180, ×1) – ohne Seitenfehler.
