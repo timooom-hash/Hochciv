@@ -29,6 +29,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--parchment);color
   /* Gedreht zeigen die Systemeinfassungen in die falsche Richtung – lieber keine. */
   html.turn{--safe-t:0px;--safe-b:0px;--fall:105vw}   /* gedreht ist „unten" die kurze Seite */
 }
+/* Große Bildschirme (v103): die ganze Oberfläche wächst mit dem Fenster. Den Faktor setzt
+   syncLayout (base.js): 1 bis 1366 × 720 – also auf jedem iPad –, darüber nach der knapperen
+   Seite. Ein Faktor statt einer zweiten Gestaltung; Längen in vh/vw wachsen mit (siehe Konfetti). */
+html{zoom:var(--ui,1)}
 button,select,input{font:inherit;color:inherit}
 /* Das hidden-Attribut muss auch bei Zeilen wirken. Der Browser setzt dafür nur
    `[hidden]{display:none}` in seinem eigenen Stilbogen – und der verliegt gegen JEDE
