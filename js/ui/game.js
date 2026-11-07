@@ -121,9 +121,9 @@ function endTutorialPanel() {
 const fgDarf = a => !ui || !ui.fg || typeof fgErlaubt !== 'function' || fgErlaubt(a);
 // Welche Aktion ein Knopf im Aktionsblatt auslöst – nach seinem deutschen Schlüssel
 const FG_AKTION = {
-  'Kostenlos wachsen': 'wachsen', 'Bevölkerung wachsen': 'wachsen', 'Weltwunder bauen': 'wunder',
-  'Armee bauen': 'armee', 'Bevölkerung opfern': 'opfern', 'Armee hier bewegen': 'waehlen',
-  'Diese Armee bewegen': 'waehlen', 'Feld kaufen': 'feld', 'Atomschlag auf dieses Feld': 'atom',
+  'Kostenlos wachsen': 'wachsen', 'Bevölkerungswachstum': 'wachsen', 'Weltwunder bauen': 'wunder',
+  'Armee bauen': 'armee', 'Bevölkerung opfern': 'opfern', 'Armee bewegen': 'waehlen',
+  'Feld beanspruchen': 'feld', 'Atomschlag auf dieses Feld': 'atom',
   'Straße bauen': 'strasse', 'Eisenbahn bauen': 'strasse',
 };
 function tapHex(r, c) {
@@ -263,7 +263,7 @@ function openTile(r, c) {
           act(() => growCity(S, pi, city, 'free')));
       const pc = growPrice(S, pi, city);
       const perr = canGrowPaid(S, pi, city);
-      btn('Bevölkerung wachsen', perr || T('auf %s', city.pop + 1), costText(pc, `${pc.food}🌾 ${pc.coins}🪙`),
+      btn('Bevölkerungswachstum', perr || T('auf %s', city.pop + 1), costText(pc, `${pc.food}🌾 ${pc.coins}🪙`),
         act(() => growCity(S, pi, city, 'paid')), !!perr);
       if (S.wo) {
         const wcost = wonderCost(S, pi);
@@ -285,9 +285,11 @@ function openTile(r, c) {
         btn('Bevölkerung opfern', city.sacrificed === S.round ? T('diese Runde schon geopfert') : TECH_BY_KEY.sklaverei.n, '+' + SLAVERY_COINS + '🪙',
           act(() => sacrifice(S, pi, city)),
           city.pop < 2 || city.sacrificed === S.round);
-      if (army && army.owner === pi)          // Armee steht in der Stadt und muss heraus
-        btn('Armee hier bewegen', army.born === S.round ? T('muss die Stadt noch verlassen')
-          : T('erreichbare Felder werden markiert'), mp(army),
+      /* Armee in der Stadt: derselbe Knopf wie auf freiem Feld (v103, Anweisung des Autors – bis
+         v102 „Armee hier bewegen" und „Diese Armee bewegen"). Darunter steht nur noch, was gilt
+         („muss die Stadt noch verlassen"), nicht mehr, was der Knopf tut. */
+      if (army && army.owner === pi)
+        btn('Armee bewegen', army.born === S.round ? T('muss die Stadt noch verlassen') : '', mp(army),
           () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
     } else {
       const atk = attackersOn(S, pi, city).length;
@@ -299,15 +301,17 @@ function openTile(r, c) {
     const owner = civOf(S.players[army.owner]);
     head = `<h3>${T('Armee')} · ${owner.n}</h3><p class="sub">${T('Angriffswert %s', powerOf(S, army.owner))} · ${mp(army)}</p>`;
     if (army.owner === pi)
-      btn('Diese Armee bewegen', army.halted ? T('Kontrollzone – hält bis zum nächsten Zug')
-        : T('erreichbare Felder werden markiert'), '',
+      btn('Armee bewegen', army.halted ? T('Kontrollzone – hält bis zum nächsten Zug') : '', '',
         () => { ui.army = army; closeSheet(); redraw(); toast(T('Zielfeld antippen')); }, army.mp <= 0);
   } else {
+    /* Kolonialismus (v103): kostenlos, COLONY_CLAIMS-mal je Runde. Rechts stehen statt eines
+       Preises die Ansprüche dieser Runde als Punkte (gefüllt = offen); sind sie verbraucht, ist
+       der Knopf gesperrt und alle Punkte leer – ein Satz dazu wäre doppelt. */
     if (has(p, 'kolonialismus')) {
       const owned = S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
-      btn('Feld kaufen', owned ? T('nur herrenlose Felder') : TECH_BY_KEY.kolonialismus.n,
-        costText({ coins: COLONY_COST }, `${COLONY_COST}🪙`),
-        act(() => buyTile(S, pi, r, c)), owned);
+      const offen = claimsLeft(S, pi);
+      btn('Feld beanspruchen', owned ? T('nur herrenlose Felder') : '', pips(offen, COLONY_CLAIMS),
+        act(() => claimTile(S, pi, r, c)), owned || !offen);
     }
   }
   if (has(p, 'atomwaffen')) {

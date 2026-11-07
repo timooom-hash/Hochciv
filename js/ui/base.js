@@ -38,7 +38,7 @@ function closeModal() {
    0,18 s lang ins Bild; ein früher Tipp trifft, was gerade vorbeizieht.
    Deshalb zählt ein Tipp auf einen Knopf im Blatt erst SHEET_CALM_MS nach dem Öffnen oder
    Neuzeichnen – außer auf DENSELBEN Knopf, der das Neuzeichnen ausgelöst hat (zweimal „+1
-   Macht", noch einmal „Bevölkerung wachsen": das ist gewollt und bleibt flott). Beim Öffnen
+   Macht", noch einmal „Bevölkerungswachstum": das ist gewollt und bleibt flott). Beim Öffnen
    gilt keiner. Ausgenommen ist das Blatt eines Bot- oder KI-Zugs (`locked`): dort gibt es nur
    „Weiter", und das soll sich zügig durchtippen lassen. */
 const SHEET_CALM_MS = 400;
@@ -88,23 +88,19 @@ function lockBar() {
   document.body.classList.toggle('blocked', !!(ui && (ui.botLock || ui.combat || ui.anim)));
 }
 /* Echte Höhe von Kopf- und Aktionsleiste ins CSS spiegeln, damit das Blatt exakt
-   darüber endet – die Leiste wächst mit Schriftgröße und Geräteeinfassung. */
+   darüber endet – die Leiste wächst mit Schriftgröße und Geräteeinfassung.
+   Gemessen wird die Layouthöhe (offsetHeight, seit v103): Sie kennt weder die Drehung um 90°
+   (html.turn) noch den Maßstab großer Bildschirme (--ui) – beide ändern nur, wie groß die Leiste
+   auf dem Schirm erscheint, nicht ihre Höhe im CSS, und dort wird --bar-h gebraucht. Bis v102
+   stand hier getBoundingClientRect: das misst nach Drehung und Zoom. Gedreht war seine Höhe die
+   Breite der Leiste (bis v86 stand --bar-h so auf 1180px, und jedes Blatt lag außerhalb des
+   Bildschirms – v87 nahm dann die Breite), gezoomt wäre sie um den Faktor zu groß. */
 function setBarHeight() {
-  const bar = document.querySelector('#screen-game .actionbar');
-  const hud = document.querySelector('#screen-game .hud');
   const st = document.documentElement.style;
-  // getBoundingClientRect statt offsetHeight: subpixelgenau. Es misst aber das Rechteck NACH
-  // der Drehung – ist die App hochkant um 90° gedreht (turning), ist dessen Höhe die Breite
-  // der Leiste, also fast die ganze Bildschirmhöhe. Dann gilt die Breite (v87, beim Prüfen
-  // gefunden: bis v86 stand --bar-h gedreht auf z. B. 1180px, und jedes Blatt – auch das eines
-  // KI-Zugs samt „Weiter" – lag außerhalb des Bildschirms).
-  const hoch = el => {
-    if (!el) return 0;
-    const r = el.getBoundingClientRect();
-    return Math.round(turning() ? r.width : r.height);
-  };
-  if (hoch(bar)) st.setProperty('--bar-h', hoch(bar) + 'px');
-  if (hoch(hud)) st.setProperty('--hud-h', hoch(hud) + 'px');
+  const hoch = sel => { const el = document.querySelector(sel); return el ? el.offsetHeight : 0; };
+  const bar = hoch('#screen-game .actionbar'), hud = hoch('#screen-game .hud');
+  if (bar) st.setProperty('--bar-h', bar + 'px');
+  if (hud) st.setProperty('--hud-h', hud + 'px');
 }
 /* Querformat. Eine echte Sperre gibt es nur, wo screen.orientation.lock existiert
    (installiertes Android/Chrome); iOS kennt sie nicht – weder über die API noch über
@@ -135,13 +131,29 @@ function turning() {
   return document.documentElement.classList.contains('turn') &&
     window.innerHeight > window.innerWidth;
 }
+/* Große Bildschirme (v103, Anweisung des Autors: Symbole auf 1080p und größer zu klein): die
+   ganze Oberfläche wächst mit dem Fenster – ein Faktor, als CSS-zoom auf <html> (--ui), keine
+   zweite Gestaltung. Bis 1366 × 720 bleibt es bei 1: jedes iPad quer (das größte hat 1366 × 1024),
+   jedes Telefon. Darüber zählt die knappere Seite – ein maximiertes Fenster auf 1080p etwa ×1,33,
+   Vollbild ×1,41, 1440p etwa ×1,8. Die Karte füllt ihre Fläche ohnehin; sie gibt nur ab, was Kopf-
+   und Aktionsleiste an Höhe gewinnen. Gedreht (html.turn) bleibt es bei 1: die Drehung rechnet mit
+   100vh/100vw, und die wüchsen mit. Auf zwei Stellen gerundet, damit kleine Größenänderungen nicht
+   jedes Mal neu umbrechen. */
+const UI_BASE_W = 1366, UI_BASE_H = 720;
+function uiScale(w, h, gedreht) {
+  if (gedreht) return 1;
+  return Math.max(1, Math.round(100 * Math.min(w / UI_BASE_W, h / UI_BASE_H)) / 100);
+}
 /* Effektive Layoutgröße: im gedrehten Zustand sind Breite und Höhe vertauscht.
    Media Queries können das nicht wissen – sie messen den ungedrehten Viewport und
-   lägen um 90° daneben. Deshalb setzt diese Funktion die Layoutklassen selbst. */
+   lägen um 90° daneben. Deshalb setzt diese Funktion die Layoutklassen selbst – seit v103 nach
+   der Größe in CSS-Pixeln der vergrößerten Seite (Fenster ÷ --ui). */
 function syncLayout() {
   const t = turning();
-  const w = t ? window.innerHeight : window.innerWidth;
-  const h = t ? window.innerWidth : window.innerHeight;
+  const vw = t ? window.innerHeight : window.innerWidth;
+  const vh = t ? window.innerWidth : window.innerHeight;
+  const k = uiScale(vw, vh, t), w = vw / k, h = vh / k;
+  document.documentElement.style.setProperty('--ui', String(k));
   const cl = document.documentElement.classList;
   cl.toggle('w-wide', w >= 820);
   // Neben der Karte statt darunter, sobald quer und breit genug: gestapelt bliebe auf
@@ -154,6 +166,12 @@ function initOrientation() {
   applyTurn();
   window.addEventListener('resize', syncLayout);
   window.addEventListener('orientationchange', syncLayout);
+}
+
+/* Stand als Punkte, gefüllt = noch offen (v102 Freie Forschung, v103 Kolonialismus). */
+function pips(rest, alle) {
+  return `<span class="pips" aria-label="${T('Noch %s von %s', rest, alle)}">` +
+    Array.from({ length: alle }, (_, i) => `<i class="${i < rest ? 'on' : ''}"></i>`).join('') + '</span>';
 }
 
 // localStorage kann fehlen oder sperren (privater Modus) – dann wird eben nichts gemerkt.

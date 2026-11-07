@@ -230,7 +230,7 @@ function rulesModal() {
       <tr style="border-top:1px solid var(--rule)"><td>${T('Stadt (je Bevölkerung)')}</td>
         <td align="center">1</td><td align="center">−1</td><td align="center">1</td></tr>
     </table>
-    <p style="font-size:13px;margin:6px 0 4px">${T('Ertragstechnologien schließen die billigeren ihres Feldes auf demselben Gelände (bzw. je Bevölkerung) ein – sie setzen den Bonus, statt ihn zu erhöhen: Mathematik gibt Wald +1 Wissenschaft, Elektrizität +2, Künstliche Intelligenz +3, und mit allen dreien bleibt es bei +3. Technologien verschiedener Felder addieren sich, etwa Papier und Landwirtschaft auf Grasland.')}</p>
+    <p style="font-size:13px;margin:6px 0 4px">${T('Ertragstechnologien nennen, was ein Feld bzw. jede Bevölkerung damit insgesamt bringt. Für dasselbe Gelände und denselben Ertrag zählt nur die beste: Mit Mathematik bringt Wald 1 Wissenschaft, mit Elektrizität 2, mit Künstlicher Intelligenz 3 – auch mit allen dreien.')}</p>
     <p class="sub">${T('Zivilisationen — je drei wählbare Fähigkeiten (Bots haben keine)')}</p>
     ${CIVS.map(c => `<p style="font-size:13px;margin:6px 0"><b>${SYM[c.sym]} ${c.n}</b><br>` +
       c.abilities.map((a, j) => `<span style="color:var(--ink-soft)">${j === 0 ? T('Grund') : T('Alt. %s', j + 1)}:</span> ${abilEffect(Object.assign({ civ: c.k }, a), S)}`).join('<br>') +

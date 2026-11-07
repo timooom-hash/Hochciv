@@ -167,5 +167,8 @@ function confetti(farbe) {
   }
   box.innerHTML = h;
   document.body.appendChild(box);
+  // Fallweg in Pixeln der eigenen Höhe (v103): 105vh wüchse mit dem Maßstab großer Bildschirme
+  // (--ui) und ließe die Schnipsel schneller fallen; gedreht ist die Höhe ohnehin die kurze Seite
+  if (box.offsetHeight) box.style.setProperty('--fall', Math.round(box.offsetHeight * 1.05) + 'px');
   setTimeout(() => box.remove(), 3400);
 }

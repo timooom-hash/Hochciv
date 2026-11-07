@@ -172,11 +172,10 @@ function abilSheet(oben) {
   const abils = abilInfos(p).filter(a => !gesehen.has(a.id) && gesehen.add(a.id));
   /* Die Karte der Fähigkeit trägt ihren Stand (v102): bei der Freien Forschung je kostenloser
      Forschung ein Punkt, gefüllt solange offen – statt Überschrift und Satz. Kostenlose
-     Knöpfe tragen kein „gratis": sie sind als kostenlos hervorgehoben (.opt.free). */
-  const punkte = (rest, alle) => `<span class="pips" aria-label="${T('Noch %s von %s', rest, alle)}">` +
-    Array.from({ length: alle }, (_, i) => `<i class="${i < rest ? 'on' : ''}"></i>`).join('') + '</span>';
+     Knöpfe tragen kein „gratis": sie sind als kostenlos hervorgehoben (.opt.free). Die Punkte
+     zeichnet pips (base.js) – dieselben stehen seit v103 am Knopf „Feld beanspruchen". */
   abils.forEach(a => {
-    const stand = a.k === 'gratistech' ? punkte(freeTechsLeft(p), FREE_TECH_USES) : '';
+    const stand = a.k === 'gratistech' ? pips(freeTechsLeft(p), FREE_TECH_USES) : '';
     rows.push(`<div class="abil-card"><b>${esc(a.n)}${stand}</b><small>${esc(abilEffect(a, S))}</small></div>`);
     if (a.k === 'gratistech') {
       // seit v101 zweimal je Partie, höchstens einmal je Runde – alles Erforschbare samt Singularität
