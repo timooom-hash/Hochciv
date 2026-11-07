@@ -72,39 +72,39 @@ const DATA_EN = {
     },
   },
   tech: {
-    schrift: ['Writing', 'Per population: +1 science'],
-    mathematik: ['Mathematics', 'Forest: +1 science'],
-    astronomie: ['Astronomy', 'Sea: +1 science'],
+    schrift: ['Writing', 'Population yields 2 science each'],
+    mathematik: ['Mathematics', 'Forest yields 1 science'],
+    astronomie: ['Astronomy', 'Sea yields 1 science'],
     philosophie: ['Philosophy', '+1/6 chance for tech availability'],
-    papier: ['Paper', 'Grassland: +1 science'],
+    papier: ['Paper', 'Grassland yields 1 science'],
     alchemie: ['Alchemy', '1:1 science → coins'],
-    buchdruck: ['Printing', 'River: +1 science'],
-    universitaet: ['Universities', 'Per population: +2 science'],
+    buchdruck: ['Printing', 'River yields 1 science'],
+    universitaet: ['Universities', 'Population yields 3 science each'],
     wiss_methode: ['Scientific method', 'Tech costs −2/−3/−4/−5/−10 (by age)'],
-    chemie: ['Chemistry', 'Mountains: +1 science'],
-    elektrizitaet: ['Electricity', 'Forest: +2 science'],
-    biologie: ['Biology', 'Grassland: +2 science'],
+    chemie: ['Chemistry', 'Mountains yield 2 science'],
+    elektrizitaet: ['Electricity', 'Forest yields 2 science'],
+    biologie: ['Biology', 'Grassland yields 2 science'],
     computertechnik: ['Computing', '1:1 coins → science'],
     gentechnik: ['Genetic engineering', 'One food per four science; also feeds 1:1'],
     raumfahrt: ['Spaceflight', 'One free technology with every wonder built'],
-    ki: ['Artificial intelligence', 'Forest: +3 science'],
-    landwirtschaft: ['Agriculture', 'Grassland: +1 food'],
-    fischerei: ['Fishing', 'Sea: +1 food'],
+    ki: ['Artificial intelligence', 'Forest yields 3 science'],
+    landwirtschaft: ['Agriculture', 'Grassland yields 2 food'],
+    fischerei: ['Fishing', 'Sea yields 1 food'],
     rad: ['The wheel', 'Roads'],
     keramik: ['Pottery', 'One extra growth per city'],
-    bewaesserung: ['Irrigation', 'Mountains: +1 food'],
-    segeln: ['Sailing', 'Sea: +2 food'],
-    muehlentechnik: ['Mills', 'River: +1 coin'],
+    bewaesserung: ['Irrigation', 'Mountains yield 1 food'],
+    segeln: ['Sailing', 'Sea yields 2 food'],
+    muehlentechnik: ['Mills', 'River yields 2 coins'],
     baukraene: ['Cranes', 'Wonders cost 2/4/6/8/… less'],
     gilden: ['Guilds', '1:1 coins → food'],
     dampfmaschine: ['Steam engine', 'No coin cost for population growth; one extra growth per city'],
     eisenbahn: ['Railway', 'Railways'],
-    kunstduenger: ['Fertiliser', 'Forest: +1 food'],
-    fliessband: ['Assembly line', 'Per population: +1 coin'],
+    kunstduenger: ['Fertiliser', 'Forest yields 1 food'],
+    fliessband: ['Assembly line', 'Population yields 2 coins each'],
     verbundwerkstoffe: ['Composites', 'One extra free growth per city'],
-    gruene_revolution: ['Green revolution', 'Grassland: +1 food, +1 coin'],
-    containerlogistik: ['Container shipping', 'Sea: +2 food, +1 coin'],
-    robotik: ['Robotics', 'Per population: +2 coins'],
+    gruene_revolution: ['Green revolution', 'Grassland yields 2 food, 1 coin'],
+    containerlogistik: ['Container shipping', 'Sea yields 2 food, 2 coins'],
+    robotik: ['Robotics', 'Population yields 3 coins each'],
     taktik: ['Tactics', 'Flanking from any two positions'],
     eisenverarbeitung: ['Ironworking', '4 coins = 1 power'],
     belagerung: ['Siege engines', '+3 attack against cities'],
@@ -122,21 +122,21 @@ const DATA_EN = {
     raketentechnik: ['Rocketry', 'Armies have one more ring of range'],
     atomwaffen: ['Nuclear weapons', 'Once per round pick a tile and its surroundings, destroying all armies there'],
     navigation: ['Navigation', 'Movement across sea'],
-    demokratie: ['Democracy', 'Army cost = 4 × count'],
+    demokratie: ['Democracy', 'Army cost 4 instead of 5 × count'],
     wallfahrt: ['Pilgrimage', '+3 to all yields per wonder you own'],
     sklaverei: ['Slavery', 'Sacrifice city population → 7 coins · becomes obsolete in the Modern Age'],
     rittertum: ['Chivalry', 'Only 1 population lost when conquering'],
     kundschafterei: ['Scouting', 'Copy a tech (2× its cost in coins)'],
     // dritte Stelle (v96): der ganze Text für den Regelbogen, wo die Kachel kürzer ist (`voll`)
     buerokratie: ['Bureaucracy', 'The capital produces double',
-      'The capital produces double, as do trade routes, ecology, genetic engineering and bought tiles'],
+      'The capital produces double, as do trade routes, ecology, genetic engineering and claimed tiles'],
     kartografie: ['Cartography', 'No distance cost when founding'],
     theologie: ['Theology', '>1/2 of the population to win'],
-    nationalismus: ['Nationalism', 'Army cost = 2 × count'],
+    nationalismus: ['Nationalism', 'Army cost 2 instead of 5 × count'],
     spionage: ['Espionage', 'Copy a tech (1× its cost in coins)'],
     militaergericht: ['Military tribunal', 'No population lost when conquering'],
-    kolonialismus: ['Colonialism', 'Buy a tile for 3 coins; found a city there even without a route',
-      'Buy a tile for 3 coins; found a city there even without a route. Bought tiles count towards the capital (doubled with Bureaucracy)'],
+    kolonialismus: ['Colonialism', '3× per round: claim an unowned tile; found a city there even without a route',
+      '3× per round: claim an unowned tile; found a city there even without a route. Claimed tiles count towards the capital (doubled with Bureaucracy)'],
     massenmedien: ['Mass media', 'One coin feeds three population'],
     un: ['United Nations', '>2/5 of the population to win'],
     oekologie: ['Ecology', '+1 to all yields per 2 population across the empire (rounded down)'],
@@ -448,7 +448,7 @@ const UI_EN = {
   '%s: Der Apostolische Palast schützt vor dem Ereignis.': '%s: the Apostolic Palace shields you from the event.',
   '%s: Die Pest kostet %s Bevölkerung.': '%s: the plague costs %s population.',
   '%s: Die Stadt verliert %s Bevölkerung.': '%s: the city loses %s population.',
-  '%s: Feld %s/%s gekauft (%s Münzen).': '%s: bought tile %s/%s (%s coins).',
+  '%s: Feld %s/%s beansprucht.': '%s: claimed tile %s/%s.',
   '%s: Feld %s/%s ist jetzt ein Vulkan (unpassierbar, kein Ertrag).': '%s: tile %s/%s is now a volcano (impassable, no yield).',
   '%s: Machtwert auf 0 zurückgesetzt.': '%s: power value reset to 0.',
   '%s: Raumfahrt – eine Technologie gratis erforschbar.': '%s: spaceflight – one technology can be researched for free.',
@@ -542,7 +542,8 @@ const UI_EN = {
   'Nicht möglich.': 'Not possible.',
   'Nichts abzugeben.': 'Nothing to give.',
   'Nichts zurückzunehmen.': 'Nothing to take back.',
-  'Nur herrenlose Felder können gekauft werden.': 'Only unowned tiles can be bought.',
+  'Nur herrenlose Felder können beansprucht werden.': 'Only unowned tiles can be claimed.',
+  'Diese Runde schon %s Felder beansprucht.': 'Already claimed %s tiles this round.',
   'Nur in eigener Stadt.': 'Only in your own city.',
   'Ohne Weltwunder-Erweiterung.': 'Without the wonders expansion.',
   'Rad noch nicht erforscht.': 'The wheel is not researched yet.',
@@ -631,8 +632,8 @@ const UI_EN = {
     'Attack value %s',
   'Armee':
     'Army',
-  'Armee hier bewegen':
-    'Move army from here',
+  'Armee bewegen':
+    'Move army',
   'Atomschlag auf dieses Feld':
     'Nuclear strike on this tile',
   'Atomschlag ausgeführt':
@@ -660,7 +661,7 @@ const UI_EN = {
     'Population %s · defence %s',
   'Bevölkerung opfern':
     'Sacrifice population',
-  'Bevölkerung wachsen':
+  'Bevölkerungswachstum':
     'Grow population',
   'Bewegung kostenlos · Handelsroute +%s':
     'movement free · trade route +%s',
@@ -688,8 +689,6 @@ const UI_EN = {
     'The column die came up empty.',
   'Die Bevölkerung isst (%s)':
     'The population eats (%s)',
-  'Diese Armee bewegen':
-    'Move this army',
   'Dieses Spiel läuft ohne Ereignisse und ohne Weltwunder.':
     'This game runs without events and without wonders.',
   'Eine beliebige Technologie desselben Feldes aus einem früheren Zeitalter, kostenlos.':
@@ -708,8 +707,8 @@ const UI_EN = {
     'Yield next turn',
   'Feld %s/%s · Ertrag':
     'Tile %s/%s · yield',
-  'Feld kaufen':
-    'Buy tile',
+  'Feld beanspruchen':
+    'Claim tile',
   'Für diese Spielerzahl gibt es keine Plättchenkarte.':
     'There is no tile map for this number of players.',
   'Melden Mensch und Bot in derselben Runde einen Sieg an, gewinnt der Mensch – auch mit weniger Punkten.':
@@ -834,8 +833,6 @@ const UI_EN = {
     'this city already has two wonders',
   'durch Atomwaffenproteste dauerhaft gesperrt':
     'permanently blocked by anti-nuclear protests',
-  'erreichbare Felder werden markiert':
-    'reachable tiles are highlighted',
   'freistehend':
     'free-standing',
   'gratis':
@@ -878,8 +875,8 @@ const UI_EN = {
     'Events (expansion)',
   'Feld':
     'Tile',
-  'Ertragstechnologien schließen die billigeren ihres Feldes auf demselben Gelände (bzw. je Bevölkerung) ein – sie setzen den Bonus, statt ihn zu erhöhen: Mathematik gibt Wald +1 Wissenschaft, Elektrizität +2, Künstliche Intelligenz +3, und mit allen dreien bleibt es bei +3. Technologien verschiedener Felder addieren sich, etwa Papier und Landwirtschaft auf Grasland.':
-    'Yield technologies include the cheaper ones of their field on the same terrain (or per population) – they set the bonus instead of raising it: Mathematics gives forest +1 science, Electricity +2, Artificial intelligence +3, and with all three it stays at +3. Technologies of different fields add up, such as Paper and Agriculture on grassland.',
+  'Ertragstechnologien nennen, was ein Feld bzw. jede Bevölkerung damit insgesamt bringt. Für dasselbe Gelände und denselben Ertrag zählt nur die beste: Mit Mathematik bringt Wald 1 Wissenschaft, mit Elektrizität 2, mit Künstlicher Intelligenz 3 – auch mit allen dreien.':
+    'Yield technologies state what a tile, or each population, then yields in total. For the same terrain and the same yield only the best one counts: with Mathematics a forest yields 1 science, with Electricity 2, with Artificial intelligence 3 – even with all three.',
   'Geländeerträge je Feld':
     'Terrain yields per tile',
   'Grund':
@@ -974,7 +971,7 @@ const UI_EN = {
   'Stadt wächst kostenlos': 'city grows for free',
   'gründet eine Stadt auf %s/%s': 'founds a city at %s/%s',
   'opfert Bevölkerung': 'sacrifices population',
-  'kauft Feld %s/%s': 'buys tile %s/%s',
+  'beansprucht Feld %s/%s': 'claims tile %s/%s',
   'baut %s': 'builds %s',
   'kauft %s Macht': 'buys %s power',
   'greift die Stadt auf %s/%s an': 'attacks the city at %s/%s',
@@ -1027,7 +1024,7 @@ const UI_EN = {
   '%s baut Eisenbahn': '%s builds railways',
   '%s baut Straßen': '%s builds roads',
   '%s baut eine Straße': '%s builds a road',
-  '%s kauft Land': '%s buys land',
+  '%s beansprucht Land': '%s claims land',
   '%s baut %s': '%s builds %s',
   '%s erforscht %s': '%s researches %s',
   '%s kopiert %s': '%s copies %s',
@@ -1181,7 +1178,7 @@ const UI_EN = {
   'Was am Zugende übrig ist, verfällt – nur ⚔︎ Macht bleibt.':
     'Whatever is left at the end of the turn is lost – only ⚔︎ power stays.',
   'Lass deine Hauptstadt wachsen.': 'Let your capital grow.',
-  'Hauptstadt antippen → <b>Bevölkerung wachsen</b>.': 'Tap the capital → <b>Grow population</b>.',
+  'Hauptstadt antippen → <b>Bevölkerungswachstum</b>.': 'Tap the capital → <b>Grow population</b>.',
   'Diesmal die Hauptstadt – neue Städte wachsen erst ab der nächsten Runde.':
     'This time the capital – new cities only grow from next round on.',
   'Wachsen kostet je vorhandener Bevölkerung 1 🌾 und 1 🪙. Fehlt Nahrung oder Wissenschaft, springen Münzen ein: <b>2 🪙 für 1</b>.':

@@ -153,7 +153,7 @@ function animText(s, wer) {
     case 'wachsen': return n > 1 ? T('%s lässt %s Städte wachsen', wer, n) : T('%s lässt eine Stadt wachsen', wer);
     case 'opfer': return T('%s opfert Bevölkerung', wer);
     case 'strasse': return s.bahn ? T('%s baut Eisenbahn', wer) : n > 1 ? T('%s baut Straßen', wer) : T('%s baut eine Straße', wer);
-    case 'feld': return T('%s kauft Land', wer);
+    case 'feld': return T('%s beansprucht Land', wer);
     case 'wunder': return T('%s baut %s', wer, s.wunder.map(w => (WONDER_BY_KEY[w.k] || { n: w.k }).n).join(', '));
     case 'forschen': return T('%s erforscht %s', wer, animTechNamen(s));
     case 'kopieren': return T('%s kopiert %s', wer, animTechNamen(s));

@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v102';
+const APP_VERSION = 'v103';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -57,40 +57,40 @@ const CITY_YIELD = [1, -1, 1];
    wie es war (auch im Tutorial). */
 const TECHS = [
   // Forschung
-  { k: 'schrift', n: 'Schrift', f: 0, c: 4, e: 'Je Bevölkerung: +1 Wissenschaft' },
-  { k: 'mathematik', n: 'Mathematik', f: 0, c: 1, e: 'Wald: +1 Wissenschaft' },
-  { k: 'astronomie', n: 'Astronomie', f: 0, c: 2, e: 'Meer: +1 Wissenschaft' },
+  { k: 'schrift', n: 'Schrift', f: 0, c: 4, e: 'Bevölkerung bringt je 2 Wissenschaft' },
+  { k: 'mathematik', n: 'Mathematik', f: 0, c: 1, e: 'Wald bringt 1 Wissenschaft' },
+  { k: 'astronomie', n: 'Astronomie', f: 0, c: 2, e: 'Meer bringt 1 Wissenschaft' },
   { k: 'philosophie', n: 'Philosophie', f: 0, c: 3, e: '+1/6 Chance auf Techverfügbarkeit' },
-  { k: 'papier', n: 'Papier', f: 0, c: 6, e: 'Grasland: +1 Wissenschaft' },
+  { k: 'papier', n: 'Papier', f: 0, c: 6, e: 'Grasland bringt 1 Wissenschaft' },
   { k: 'alchemie', n: 'Alchemie', f: 0, c: 8, e: '1:1 Wissenschaft → Münzen' },
-  { k: 'buchdruck', n: 'Buchdruck', f: 0, c: 9, e: 'Fluss: +1 Wissenschaft' },
-  { k: 'universitaet', n: 'Universitätswesen', f: 0, c: 10, e: 'Je Bevölkerung: +2 Wissenschaft' },
+  { k: 'buchdruck', n: 'Buchdruck', f: 0, c: 9, e: 'Fluss bringt 1 Wissenschaft' },
+  { k: 'universitaet', n: 'Universitätswesen', f: 0, c: 10, e: 'Bevölkerung bringt je 3 Wissenschaft' },
   { k: 'wiss_methode', n: 'Wissenschaftliche Methode', f: 0, c: 15, e: 'Techkosten −2/−3/−4/−5/−10 (je Zeitalter)' },
-  { k: 'chemie', n: 'Chemie', f: 0, c: 11, e: 'Gebirge: +1 Wissenschaft' },
-  { k: 'elektrizitaet', n: 'Elektrizität', f: 0, c: 13, e: 'Wald: +2 Wissenschaft' },
-  { k: 'biologie', n: 'Biologie', f: 0, c: 12, e: 'Grasland: +2 Wissenschaft' },
+  { k: 'chemie', n: 'Chemie', f: 0, c: 11, e: 'Gebirge bringt 2 Wissenschaft' },
+  { k: 'elektrizitaet', n: 'Elektrizität', f: 0, c: 13, e: 'Wald bringt 2 Wissenschaft' },
+  { k: 'biologie', n: 'Biologie', f: 0, c: 12, e: 'Grasland bringt 2 Wissenschaft' },
   { k: 'computertechnik', n: 'Computertechnik', f: 0, c: 17, e: '1:1 Münzen → Wissenschaft' },
   { k: 'gentechnik', n: 'Gentechnik', f: 0, c: 18, e: 'Je vier Wissenschaft eine Nahrung; füttert auch 1:1' },
   { k: 'raumfahrt', n: 'Raumfahrt', f: 0, c: 19, wo: true, e: 'Bei jedem Wunderbau eine Technologie gratis' },
-  { k: 'ki', n: 'Künstliche Intelligenz', f: 0, c: 20, e: 'Wald: +3 Wissenschaft' },
+  { k: 'ki', n: 'Künstliche Intelligenz', f: 0, c: 20, e: 'Wald bringt 3 Wissenschaft' },
   // Produktion
-  { k: 'landwirtschaft', n: 'Landwirtschaft', f: 1, c: 5, e: 'Grasland: +1 Nahrung' },
-  { k: 'fischerei', n: 'Fischerei', f: 1, c: 2, e: 'Meer: +1 Nahrung' },
+  { k: 'landwirtschaft', n: 'Landwirtschaft', f: 1, c: 5, e: 'Grasland bringt 2 Nahrung' },
+  { k: 'fischerei', n: 'Fischerei', f: 1, c: 2, e: 'Meer bringt 1 Nahrung' },
   { k: 'rad', n: 'Rad', f: 1, c: 3, e: 'Straßen' },
   { k: 'keramik', n: 'Keramik', f: 1, c: 4, e: '1× zusätzliches Wachstum pro Stadt' },
-  { k: 'bewaesserung', n: 'Bewässerung', f: 1, c: 1, e: 'Gebirge: +1 Nahrung' },
-  { k: 'segeln', n: 'Segeln', f: 1, c: 7, e: 'Meer: +2 Nahrung' },
-  { k: 'muehlentechnik', n: 'Mühlentechnik', f: 1, c: 8, e: 'Fluss: +1 Münze' },
+  { k: 'bewaesserung', n: 'Bewässerung', f: 1, c: 1, e: 'Gebirge bringt 1 Nahrung' },
+  { k: 'segeln', n: 'Segeln', f: 1, c: 7, e: 'Meer bringt 2 Nahrung' },
+  { k: 'muehlentechnik', n: 'Mühlentechnik', f: 1, c: 8, e: 'Fluss bringt 2 Münzen' },
   { k: 'baukraene', n: 'Baukräne', f: 1, c: 9, wo: true, e: 'Weltwunder kosten 2/4/6/8/… weniger' },
   { k: 'gilden', n: 'Gilden', f: 1, c: 10, e: '1:1 Münzen → Nahrung' },
   { k: 'dampfmaschine', n: 'Dampfmaschine', f: 1, c: 11, e: 'Keine Münzkosten für Bevölkerungswachstum; 1× zusätzliches Wachstum pro Stadt' },
   { k: 'eisenbahn', n: 'Eisenbahn', f: 1, c: 13, e: 'Eisenbahn' },
-  { k: 'kunstduenger', n: 'Kunstdünger', f: 1, c: 14, e: 'Wald: +1 Nahrung' },
-  { k: 'fliessband', n: 'Fließband', f: 1, c: 15, e: 'Je Bevölkerung: +1 Münze' },
+  { k: 'kunstduenger', n: 'Kunstdünger', f: 1, c: 14, e: 'Wald bringt 1 Nahrung' },
+  { k: 'fliessband', n: 'Fließband', f: 1, c: 15, e: 'Bevölkerung bringt je 2 Münzen' },
   { k: 'verbundwerkstoffe', n: 'Verbundwerkstoffe', f: 1, c: 16, e: '1× zusätzliches, kostenloses Wachstum pro Stadt' },
-  { k: 'gruene_revolution', n: 'Grüne Revolution', f: 1, c: 17, e: 'Grasland: +1 Nahrung, +1 Münze' },
-  { k: 'containerlogistik', n: 'Containerlogistik', f: 1, c: 18, e: 'Meer: +2 Nahrung, +1 Münze' },
-  { k: 'robotik', n: 'Robotik', f: 1, c: 19, e: 'Je Bevölkerung: +2 Münzen' },
+  { k: 'gruene_revolution', n: 'Grüne Revolution', f: 1, c: 17, e: 'Grasland bringt 2 Nahrung, 1 Münze' },
+  { k: 'containerlogistik', n: 'Containerlogistik', f: 1, c: 18, e: 'Meer bringt 2 Nahrung, 2 Münzen' },
+  { k: 'robotik', n: 'Robotik', f: 1, c: 19, e: 'Bevölkerung bringt je 3 Münzen' },
   // Militär
   { k: 'taktik', n: 'Taktik', f: 2, c: 1, e: 'Flankieren von zwei beliebigen Positionen' },
   { k: 'eisenverarbeitung', n: 'Eisenverarbeitung', f: 2, c: 4, e: '4 Münzen = 1 Macht' },
@@ -110,20 +110,20 @@ const TECHS = [
   { k: 'atomwaffen', n: 'Atomwaffen', f: 2, c: 20, e: '1x pro Runde ein Feld mit Umland wählen, alle Armeen zerstören' },
   // Spezial
   { k: 'navigation', n: 'Navigation', f: 3, c: 1, e: 'Bewegung über Meer' },
-  { k: 'demokratie', n: 'Demokratie', f: 3, c: 3, e: 'Armeekosten = 4 × Anzahl' },
+  { k: 'demokratie', n: 'Demokratie', f: 3, c: 3, e: 'Armeekosten 4 statt 5 × Anzahl' },
   { k: 'wallfahrt', n: 'Wallfahrt', f: 3, c: 4, wo: true, e: 'Je eigenem Weltwunder +3 auf alle Erträge' },
   { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 7 Münzen · wird in der Moderne obsolet' },
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
   { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (2× Kosten in Münzen)' },
   { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 8, e: 'Hauptstadt produziert doppelt',
-    voll: 'Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und gekaufte Felder' },
+    voll: 'Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und beanspruchte Felder' },
   { k: 'kartografie', n: 'Kartografie', f: 3, c: 9, e: 'Keine Distanzkosten beim Gründen' },
   { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>1/2 der Bevölkerung zum Sieg' },
-  { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten = 2 × Anzahl' },
+  { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten 2 statt 5 × Anzahl' },
   { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
   { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 13, e: 'Kein Bevölkerungsverlust beim Erobern' },
-  { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen',
-    voll: 'Für 3 Münzen Feld kaufen; dort auch ohne Weg gründen. Gekaufte Felder zählen zur Hauptstadt (mit Bürokratie doppelt)' },
+  { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: '3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen',
+    voll: '3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen. Beanspruchte Felder zählen zur Hauptstadt (mit Bürokratie doppelt)' },
   { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Eine Münze ernährt drei Bevölkerung' },
   { k: 'un', n: 'Vereinte Nationen', f: 3, c: 17, e: '>2/5 der Bevölkerung zum Sieg' },
   { k: 'oekologie', n: 'Ökologie', f: 3, c: 18, e: '+1 auf alle Erträge je 2 Bevölkerung im ganzen Reich (abrunden)' },
@@ -195,10 +195,14 @@ TECHS.forEach(t => { TECH_BY_KEY[t.k] = t; });
    YIELD_CHAINS[Ziel] = je Feld eine Kette, nach den Grundkosten sortiert, jedes Glied mit
    der Summe bis zu sich; yieldBonus (engine.js) nimmt das höchste erforschte Glied.
    Sortiert wird nach t.c: im alten Techtree (Tutorial) und im Marathon ist die Reihenfolge
-   innerhalb jeder Kette dieselbe – ein Test hält das fest. Die Techtexte (TECHS und DATA_EN)
-   nennen die Summe, die das Glied setzt; ein Test rechnet sie nach. Seit v89 ohne den Zusatz
-   „(inkl. …)" (Anweisung des Autors) – die Regel erklärt der Regelbogen unter der
-   Geländetabelle. */
+   innerhalb jeder Kette dieselbe – ein Test hält das fest.
+   Die Techtexte (TECHS und DATA_EN) nennen seit v103 (Anweisung des Autors), was das Feld bzw.
+   jede Bevölkerung mit dem Glied INSGESAMT bringt – Grundertrag plus Summe: „Wald bringt 2
+   Wissenschaft", „Grasland bringt 2 Nahrung" (bis v102 „Wald: +2 Wissenschaft", „Grasland: +1
+   Nahrung" – das las sich, als stapelten Mathematik und Elektrizität). Das trägt, weil je Ziel
+   und Ertragsart genau eine Kette zuständig ist; „es gilt die beste" ist damit die ganze Regel.
+   Beides rechnet ein Test nach. Seit v89 ohne den Zusatz „(inkl. …)" – die Regel steht im
+   Regelbogen unter der Geländetabelle. */
 const YIELD_TECHS = {
   schrift: { on: 'pop', y: [1, 0, 0] },
   universitaet: { on: 'pop', y: [1, 0, 0] },
@@ -267,10 +271,11 @@ const OLD_TECH_COSTS = {
    mit ihr – Burgenbau (Mittelalter) kostet dort 3 statt 4, und am Ende des Zuges bleibt genau die
    1 Wissenschaft fürs Rad. Gilt im alten Techtree, also auch in Partien von vor v82. */
 const OLD_METHOD_DISCOUNT = [2, 4, 6, 8, 10];
-/* Kolonialismus und Kundschafterei (v72, Anweisung des Autors; gilt in beiden Techtrees –
-   sie unterscheiden sich nur in den Forschungskosten). Die Techtexte in TECHS und DATA_EN
-   nennen dieselben Zahlen; ein Test hält beides zusammen. */
-const COLONY_COST = 3;       // Kolonialismus: Münzen je Feld (bis v71: 5)
+/* Kolonialismus (v103, Anweisung des Autors): kostenlos, COLONY_CLAIMS herrenlose Felder je Runde
+   beanspruchen – bis v102 kaufen für 3 Münzen je Feld (v72), bis v71 für 5. Kundschafterei (v72):
+   2× der Grundkosten in Münzen, bis v71 3×. Beides gilt in beiden Techtrees. Die Techtexte in
+   TECHS und DATA_EN nennen dieselben Zahlen; ein Test hält beides zusammen. */
+const COLONY_CLAIMS = 3;     // Kolonialismus: Felder je Runde
 const SCOUTING_RATE = 2;     // Kundschafterei: × Grundkosten, in Münzen (bis v71: 3)
 /* Marathon (v83, Anweisung des Autors; Karte und Draft in js/marathon.js): Karte viermal so
    groß wie die Europakarte (Originalkarte 12 × 18), Technologien je Zeitalter ×2/×3/×4/×5.

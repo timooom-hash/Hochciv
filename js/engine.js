@@ -1734,19 +1734,32 @@ function sacrificeAll(S, pi) {
   }
   return out;
 }
-function buyTile(S, pi, r, c) {             // Kolonialismus
+/* Kolonialismus (v103, Anweisung des Autors): COLONY_CLAIMS-mal je Runde ein herrenloses Feld
+   beanspruchen, kostenlos – bis v102 kaufen für 3 Münzen. Sonst wie bisher (Rückfrage beim
+   Autor: beides bleibt): das Feld gehört zum Reich (controlledTiles), dort darf auch ohne
+   Siedlerweg gegründet werden (Kolonien, v84), und es zählt zur Hauptstadt (v96).
+   Gespeichert wird weiter in S.bought – der Name stammt aus der Zeit des Kaufens; so passen alte
+   Spielstände ohne Umbau. Gezählt wird je Runde (p.claimRound, p.claimCount): jedes Reich zieht
+   einmal je Runde, „je Zug" und „je Runde" sind dasselbe. Was nicht genutzt wird, verfällt. */
+function claimsLeft(S, pi) {
+  const p = S.players[pi];
+  if (!has(p, 'kolonialismus')) return 0;
+  return COLONY_CLAIMS - (p.claimRound === S.round ? p.claimCount || 0 : 0);
+}
+function claimTile(S, pi, r, c) {
   const p = S.players[pi];
   if (!has(p, 'kolonialismus')) return T('Kolonialismus nicht erforscht.');
-  // X ist kein Feld – gekauft würde es über S.bought doch wieder zum Gebiet (v73)
+  // X ist kein Feld – beansprucht würde es über S.bought doch wieder zum Gebiet (v73)
   const t = terrainAt(S, r, c);
   if (!t || isOff(t)) return T('Kein Feld.');
   if (cityAt(S, r, c)) return T('Dort steht eine Stadt.');
   if (S.players.some((_, i) => controlledTiles(S, i).has(key(r, c))))
-    return T('Nur herrenlose Felder können gekauft werden.');
-  const preis = COLONY_COST;
-  if (!pay(S, pi, 'coins', preis)) return T('Zu wenig Münzen.');
+    return T('Nur herrenlose Felder können beansprucht werden.');
+  if (claimsLeft(S, pi) <= 0) return T('Diese Runde schon %s Felder beansprucht.', COLONY_CLAIMS);
+  if (p.claimRound !== S.round) { p.claimRound = S.round; p.claimCount = 0; }
+  p.claimCount++;
   (S.bought[pi] = S.bought[pi] || []).push(key(r, c));
-  log(S, 'act', T('%s: Feld %s/%s gekauft (%s Münzen).', civOf(p).n, r, c, preis));
+  log(S, 'act', T('%s: Feld %s/%s beansprucht.', civOf(p).n, r, c));
   return null;
 }
 /* Kopierbare Technologien anderer Reiche. Drei getrennte Wege:

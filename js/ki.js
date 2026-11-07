@@ -935,10 +935,10 @@ function kiCandidates(S, pi, K, memo, billig) {
       const id = city.id;
       add(() => T('opfert Bevölkerung'), X => sacrifice(X, pi, kiCity(X, id)), 'slave:' + id);
     }
-  // --- Kolonialismus: herrenlose Felder mit gutem Ertrag
-  if (has(p, 'kolonialismus') && available(S, pi, 'coins') >= COLONY_COST)
-    for (const t of kiColonySpots(S, pi).slice(0, 3))
-      add(() => T('kauft Feld %s/%s', t[0], t[1]), X => buyTile(X, pi, t[0], t[1]), 'col:' + t[0] + ',' + t[1]);
+  // --- Kolonialismus (v103): kostenlos, COLONY_CLAIMS je Runde – die Felder mit dem besten Ertrag
+  if (claimsLeft(S, pi) > 0)
+    for (const t of kiColonySpots(S, pi).slice(0, COLONY_CLAIMS))
+      add(() => T('beansprucht Feld %s/%s', t[0], t[1]), X => claimTile(X, pi, t[0], t[1]), 'col:' + t[0] + ',' + t[1]);
   // --- Weltwunder
   if (S.wo && !billig) for (const w of availableWonders(S)) {
     const city = kiWonderCity(S, pi, w.k);
@@ -1218,7 +1218,8 @@ function kiColonySpots(S, pi) {
     if (!t || isOff(t) || TERRAIN[t].block || cityAt(S, r, c) || owned.has(key(r, c))) continue;
     const y = tileYield(S, pi, t);
     const v = f * (y[0] + y[1] + y[2]);
-    if (v >= 2) out.push([r, c, v]);
+    // Seit v103 kostenlos: jedes Feld mit Ertrag lohnt (bis v102 für 3 Münzen erst ab 2)
+    if (v > 0) out.push([r, c, v]);
   }
   return out.sort((a, b) => b[2] - a[2]);
 }
