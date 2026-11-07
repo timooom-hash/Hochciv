@@ -2333,6 +2333,39 @@ step('Kolonialismus (v103): drei Felder je Runde beanspruchen, kostenlos – die
   if (muenzen !== 10 || gehoert !== n) throw new Error(`Münzen ${muenzen} (soll 10), dem Reich gehören ${gehoert} von ${n}`);
   console.log('       Punkte ' + punkte + ' · Münzen unverändert · ' + gehoert + ' Felder');
 });
+/* v104 (gemeldet vom Autor): neben einem fremden beanspruchten Feld wird nicht gegründet – die Karte
+   im Gründungsmodus blendet den Platz ab, das Gründungsblatt sagt warum. */
+step('v104: Gründungsmodus – kein Platz neben einem fremden Anspruch', () => {
+  const S = G('S'), pi = S.players.findIndex(q => q.kind === 'human'), p = S.players[pi];
+  S.cur = pi;
+  const andere = S.players.findIndex((q, i) => i !== pi && !q.dead);
+  const merkRes = Object.assign({}, p.res); p.res = { sci: 0, food: 99, coins: 0 };
+  const cap = G('capitalOf')(S, pi), key = G('key');
+  // ein freier Platz und daneben ein herrenloses Feld, das der andere beansprucht
+  const plaetze = G('within')(cap.r, cap.c, 7).filter(([r, c]) => !G('foundSiteError')(S, pi, r, c));
+  let platz = null, feld = null;
+  for (const [r, c] of plaetze) {
+    feld = G('neighbors')(r, c).find(([a, b]) => { const t = G('terrainAt')(S, a, b);
+      return t && !G('isOff')(t) && !G('cityAt')(S, a, b) && !S.players.some((_, i) => G('controlledTiles')(S, i).has(key(a, b))); });
+    if (feld) { platz = [r, c]; break; }
+  }
+  if (!platz) throw new Error('kein Platz mit herrenlosem Nachbarfeld');
+  const merkB = S.bought[andere];
+  S.bought[andere] = (merkB || []).concat([key(feld[0], feld[1])]);
+  try {
+    $('a-found').onclick();
+    const mark = $('map').querySelector(`[data-rc="${platz[0]}/${platz[1]}"][data-found]`);
+    if (!mark || mark.getAttribute('data-found') !== 'nein') throw new Error('Karte: ' + (mark && mark.getAttribute('data-found')) + ' statt nein');
+    G('tapHex')(platz[0], platz[1]);
+    const knopf = $('sheet-body').querySelector('[data-label="Hier gründen"]');
+    if (!knopf || !knopf.disabled || !/Nicht auf oder direkt neben gegnerischem Gebiet/.test(knopf.textContent))
+      throw new Error('Gründungsblatt: ' + (knopf ? knopf.textContent : 'kein Knopf'));
+    console.log(`       Platz ${platz.join('/')} neben dem Anspruch ${feld.join('/')}: abgeblendet, „${knopf.querySelector('small').textContent}"`);
+  } finally {
+    G('closeSheet')(); if (G('ui').mode === 'found') $('a-found').onclick();
+    S.bought[andere] = merkB || []; p.res = merkRes;
+  }
+});
 step('Techtree: Regelbogen mit den Kosten, kein Hinweis auf einen anderen Techtree', () => {
   G('rulesModal')();
   const zeilen = [...$('ov-body').querySelectorAll('.rule-tech')]

@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 7.11., `sw.js` v103)
+# Hochzeivilization — Projekt-Übergabe (Stand 7.11., `sw.js` v104)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v103)
+## Letzte Sitzungen auf einen Blick (v61 → v104)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -58,6 +58,11 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v101 | Zwei Anweisungen des Autors: Griechenlands **Freie Forschung höchstens zweimal je Partie und höchstens einmal je Runde**, weiter alles Erforschbare samt Singularität (`FREE_TECH_USES`, `freeTechsLeft`, `p.freeTechsUsed` neben `p.freeTechUsed`; die KI nutzt sie, sobald sie geht – gemessen besser als Aufheben: Griechenland 20,5 % statt 30,3 % mit v100, gleiche Chance 25 %); **Wirtschaftssieg zu viert über 4/7, mit Theologie 1/2, mit Vereinten Nationen 2/5** (zu dritt weiter 2/3 · 3/5 · 1/2, im Duell 3/4 · 7/10 · 2/3; `VICTORY_THRESHOLDS`, `victoryMode`, auch Marathon und Tutorial). Beim Umbau: ganzzahliger Vergleich (`victoryMet` – im Duell galten 63 von 90 als „mehr als 7/10"), der Bogen der Legephase zeigt die Schwellen der Partie (im Duell vorher 3/5 statt 7/10). Messmodi `tools_ki.js freie` und `wirtschaft` | Regel + KI |
 | v102 | **Vereinfacht** (Anweisung des Autors, nach einem Vorschlag in vierzehn Punkten, davon elf umgesetzt): Leiste mit fünf Knöpfen (**Welt** über den Reichsnamen ▾ und die Bevölkerung, **Protokoll** im Spielmenü ☰); Kopfzeile ohne Beschriftungen, vorn die **Bevölkerung** mit Balken und Strich an der Siegschwelle (`victoryOption`); kein Hinweis „… ist am Zug" (sitzen mehrere Menschen am Gerät, pulsiert das Zeichen, `pulseCiv`); Blätter zeigen die Entscheidung (Macht: Stand und gesperrte Käufe; Fähigkeiten: Punkte statt Sätzen, kein „gratis"; Spielende: Ergebnis als Titel, **der Tipp bleibt**, die nächste Stufe im Knopf); **altes Tutorial entfernt** (`js/tutorial.js`, 105 Übersetzungen, seine Tests); **Aufbau auf einem Bildschirm** (eine Zeile je Platz, Fähigkeitswahl mit Wirkung, Kärtchen, „Spiel beginnen" fest unten, keine Hinweise – die Spielarten stehen in den Regeln); **keine Einstellungen** mehr (Ereignisse und Weltwunder im Aufbau, Animationen im ☰, Kosten immer tatsächlich, Hochkant immer); Menü mit zwei Knöpfen und einer Zeile Verweise; **eine Stelle für die Siegschwellen** (Tests rechnen aus `VICTORY_THRESHOLDS`, ein einziger Schnappschuss, die Dokumente nennen keine Brüche mehr); **ui.js je Bildschirm geteilt** (`js/ui/*.js`), die Skriptliste steht nur noch in `index.html`; **Tests grün in einer Zeile**, `smoke.js` mit festem Zufall. Regeln: Wirtschaftssieg im **Duell** neu (Werte: `VICTORY_THRESHOLDS.duell`), **Philosophie** heißt jetzt „+1/6 Chance auf Techverfügbarkeit" | Oberfläche + Regel + Aufräumen |
 | v103 | Sechs Anweisungen des Autors, unter dem Grundsatz von v102: **„Armee bewegen"** für beide Knöpfe (in der Stadt und auf freiem Feld; ohne den Hinweis „erreichbare Felder werden markiert"); **„Bevölkerungswachstum"** statt „Bevölkerung wachsen"; **Demokratie/Nationalismus** „Armeekosten 4 bzw. 2 statt 5 × Anzahl"; **Ertragstechnologien nennen, was das Feld insgesamt bringt** („Wald bringt 2 Wissenschaft", „Grasland bringt 2 Nahrung" – bis v102 „+n", was nach Stapeln aussah); **große Bildschirme**: die ganze Oberfläche wächst ab 1366 × 720 mit dem Fenster (`--ui`, CSS-zoom; iPads bleiben bei 1); **Kolonialismus: 3× pro Runde ein herrenloses Feld kostenlos beanspruchen** (`claimTile`, `claimsLeft`, `COLONY_CLAIMS`; Kolonie ohne Weg und Hauptstadt-Zählung bleiben – Rückfrage beim Autor) | Oberfläche + Regel + KI |
+| v104 | Gemeldet vom Autor: man konnte **neben (und auf) einem fremden beanspruchten Feld gründen** – das Feld gehörte danach beiden Reichen. Jetzt gesperrt wie neben einer gegnerischen Armee (`foreignClaimNear`, auch Bots und KI); **ein eigenes Feld daneben wird ein gewöhnliches Feld der neuen Stadt** (verlässt `S.bought`, `claimsApart`; `settleGain` rechnet es mit; alte Spielstände beim Laden ebenso). Damit ist der offene Punkt 3 (Nachbarschaftsverbot der Territoriumsklausel) erledigt | Fehler + Regel |
+
+Neu in v104: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
+(Abschnitt „Nicht an fremden Ansprüchen gründen (v104)"), die Fragilität zu `S.bought` ergänzt, der
+offene Punkt 3 erledigt, Punkt 64.
 
 Neu in v103: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Armee bewegen · Bevölkerungswachstum · Armeekosten · Ertragstexte als Summe · große
@@ -171,8 +176,7 @@ passt, Rechenzeit auf dem iPad nicht gemessen), 17 (Abwehr gegen Menschen nur ge
 Skript gemessen) und 18 (Straßen im Bündel des Planers). Seit v80 Punkt 19 (Auslöser des
 gesperrten Bildschirms unbekannt).
 
-Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 3 (Nachbarschaftsverbot
-der Territoriumsklausel) und Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
+Offen und beim Autor: siehe „Offene Punkte" unten – vor allem Punkt 7 (verteidigt die Burg auch Feldarmeen?), seit v69 außerdem Punkt 9
 (Siedelvorschau bei Siedlertrecks), seit v72 Punkt 10 (Spieltipp zur Kundschafterei), seit v73
 Punkt 11 („eine Reihe näher": Ecken bei 4 Reichen, schnelle Duelle bei Abstand 2) und
 Punkt 12 (dominiert über alle Lagen oder nur je Lage?), seit v75 Punkt 13 (Bot-Partner
@@ -192,7 +196,8 @@ Schritt unbekannt), seit v98 Punkt 55 (Auslegungen zum Startausgleich zu zweit),
 (Auslegungen zu v101: Singularität weiter wählbar, Marathon und Tutorial zählen als vier Reiche, zu
 dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und was nicht), seit v103
 Punkt 62 (Auslegungen zu v103) und 63 (Kolonialismus kostenlos: Balance und KI-Forschungswert nicht
-gemessen).
+gemessen), seit v104 Punkt 64 (Auslegungen zu v104). Punkt 3 (Nachbarschaftsverbot der
+Territoriumsklausel) hat der Autor in v104 entschieden.
 
 ## Wo alles liegt
 
@@ -220,16 +225,16 @@ gemessen).
 
 | Datei | Zeilen | Inhalt |
 |---|---|---|
-| `js/i18n.js` | 1387 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
+| `js/i18n.js` | 1388 | Sprachen: `LANG`, `setLang`, `DATA_EN` (Spielobjekte), `UI_EN` + `T()` (Oberflächensätze), `missingStrings()` |
 | `data/civs.json` | 69 | **Quelle** für die Zivilisationen · `node tools_civs.js` → `js/civs.js` |
 | `js/civs.js` | 54 | ERZEUGT: `CIVS`, `CIV_BY_KEY`, `ORDER` (Zugfolge), `BARB_CIV` – nicht von Hand ändern |
 | `js/data.js` | 545 | `APP_VERSION`, TERRAIN (inkl. Vulkan und `X` „Kein Feld"), TECHS (66, davon 62 Grundspiel) samt `OLD_TECH_COSTS`/`techBase` (alter Techtree, nur Tutorial), CIVS mit je 3 Fähigkeiten, feste Karten, `mapRng`, EVENT_ROWS (18), WONDERS (18), Regelkonstanten |
 | `js/hex.js` | 157 | Hexraster (pointy-top, odd-r), `hexDistance`, `hexOpposite`, `reachable` (Heap, seit v77), `pathSteps` |
 | `js/tiles.js` | 444 | Dreiecksplättchen: Würfelgeometrie, `TILE_POOL` (20), `TILE_SHAPES` (2/3/4), Plan, Legeregeln (`seatFreeCells`), Ertragsvorschau und dominierte Startfelder (`placeYieldTable`, `dominatedCells`), Kartenbau |
-| `js/engine.js` | 2299 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
+| `js/engine.js` | 2328 | Kernregeln: Einkommen, Kurse, Kampf, Bewegung, Wachstum inkl. Nahrungsgrenze, Handelsrouten, Zivilisationsfähigkeiten, Sieg, Zugablauf, Protokoll · `powerView` (Machtansicht), `canFlank`, `foundSiteError`/`withFoundTable` · `isAuto`/`kindTag` (Bot oder KI) · Sammelaktionen `growAll`/`growAllPlan`/`sacrificeAll` und `freeActions` (v87) |
 | `js/expansion.js` | 524 | Ereignisse, Barbaren (neutrale Fraktion), Weltwunder, Kultursieg, Bot-Wunderbau |
-| `js/bots.js` | 486 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
-| `js/ki.js` | 1943 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
+| `js/bots.js` | 487 | Bot-Züge, Siedlerbewegung, **neunstufige Armeeprioritäten** (`botPlanArmies` für 1–6, `botMoveArmy` für 7–9), Bot-Forschung |
+| `js/ki.js` | 1945 | **KI nach den Regeln für Menschen** (v77): Lage (`kiContext`), Bewertung (`kiValue`, `kiRisk` mit Ernstfall und Plätzen an der Stadt `kiAttackSlots`, `kiOffense`), Kandidaten und Planer auf Kopien (`kiCandidates`, `kiPlan`), Militärpakete (Angriff, Verteidigung, Flanke), Aufstellen, Startplättchen (`kiPlaceSeat`), Stufen (`KI_PARAMS`) |
 | `js/anim.js` | 165 | **Züge von KI und Bots nachspielen** (v94, ohne Oberfläche): Aufnahme über `LOG_HOOK` (`animAufnahme`, `animSnap`), seit v95 je Aktion eine Szene (`animSzenen`; Art aus `log(…, art)` oder `animUnterschied`, Inhalt `animDetails`), Sätze (`animText`); abgespielt in `ui.js` (`playAnim`, `animFaktor`, `animDraw`, `animMarks`, `animCaption`) |
 | `js/marathon.js` | 328 | **Marathon** (v83): Kartengenerator (`marathonTerrain`, Rauschen, Kämme, Flüsse), Hauptstädte (`marathonCapitals`, `marathonStartYield`), Draft (`draftView`, `draftNew`, `draftOptions`, `draftPick`, `ALL_ABILITIES`), Wahl der KI (`KI_DRAFT_BASE`, `kiDraftValue`, `kiDraftPick`) |
 | `js/ui/base.js` | 181 | Oberfläche, seit v102 je Bildschirm eine Datei (Reihenfolge: die `<script>`-Tags in `index.html`, die einzige Liste). Hier: `show`, `toast`, `modal`, Blätter (`sheet`, Ruhezeit), Leiste, Drehung (im Spiel immer), `store`/`load`/`saveGame` |
@@ -245,8 +250,8 @@ gemessen).
 | `js/ui/editor.js` | 34 | Karteneditor |
 | `js/ui/boot.js` | 285 | Sprache, `boot`, Menü (`menuButtons`), Verdrahtung, Spielmenü ☰, Regeln (`rulesModal`, `spielartenHtml`), Laden/Speichern |
 | `js/firstgame.js` | 1459 | **Erstes Spiel** (v92, v93): Seite vor der Partie mit der Wahl des Wegs (`fgSeite`), Karte, Verfügbarkeit und Würfel (`FG_SPAETER`, `fgVerfuegbar`, `fgWurf`, `fgNextDie`), Englands Drehbuch (`fgGegnerZug`), Schritte `FG_STEPS` (Ziel, Stand, Tipp, Rückmeldung, Schienen, Musterlösung; vom Weg geführt über `fgJe`, `fgRestSchritt`), blasse Kacheln (`fgBlass`), Schienen (`fgVeto`), Panel (`fgRenderPanel`), Spielende |
-| `test.js` | 7822 | **1980 Assertions**, `node test.js` |
-| `smoke.js` | 4579 | **167 Schritte** durch die echte UI via jsdom, `node smoke.js` |
+| `test.js` | 7886 | **1994 Assertions**, `node test.js` |
+| `smoke.js` | 4612 | **168 Schritte** durch die echte UI via jsdom, `node smoke.js` |
 | `build_single.py` / `check_single.js` | 24 / 85 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 72 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 75 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
@@ -274,6 +279,20 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v104 auf einen Blick.** Fehler gemeldet vom Autor: neben einem fremden beanspruchten Feld ließ
+  sich gründen (und darauf auch, weil nur der Weg gesperrt war, nie das Zielfeld) – das Feld gehörte
+  danach beiden Reichen, beide bekamen seinen Ertrag. Jetzt in `foundSiteError` nach dem Mindestabstand:
+  „Nicht auf oder direkt neben gegnerischem Gebiet." (`foreignClaimNear(S, pi, r, c)`: ein beanspruchtes
+  Feld eines anderen lebenden Reichs auf dem Platz oder einem der sechs Nachbarn; Stadtumland braucht
+  die Prüfung nicht, der Mindestabstand hält es zwei Felder fern). Dieselbe Regel in `settleable`
+  (Bots) und `kiSiteOk` (KI). Eigene Ansprüche auf oder neben einer neuen Stadt werden ihre Felder:
+  `foundCity` nimmt sie aus `S.bought` (`claimsApart`), `settleGain` rechnet das mit (mit Bürokratie
+  zählen sie danach einfach), `migrateState` macht dasselbe beim Laden für alle Ansprüche auf oder neben
+  einer Stadt – auch für den fremden aus dem Fehler. Tests: `test.js` fremder Anspruch (auf, daneben,
+  zwei weiter, Bots, KI), eigener (Bürokratie doppelt → einfach, `settleGain` gleich der Änderung),
+  alter Spielstand (das doppelt beherrschte Feld, ein zweites Laden ändert nichts), der bis v103 offene
+  Fall „auf einem fremden Einzelfeld"; `smoke.js` Gründungsmodus: Platz neben einem fremden Anspruch
+  abgeblendet, das Blatt nennt den Grund.
 - **v103 auf einen Blick.** Sechs Anweisungen des Autors, umgesetzt nach dem Grundsatz von v102.
   · **Knöpfe:** `Armee bewegen` (`data-label`, `FG_AKTION`, `knopf`-Listen im Ersten Spiel) für die
     Armee in der Stadt und auf freiem Feld; unter dem Knopf nur, was gilt („muss die Stadt noch
@@ -1163,10 +1182,10 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 1980 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 1994 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
-2. **`node smoke.js`** fährt die echte UI durch jsdom (167 Schritte), inklusive
+2. **`node smoke.js`** fährt die echte UI durch jsdom (168 Schritte), inklusive
    Tutorial-Audit: in jedem der 29 Schritte wird geprüft, dass **nur** das Vorgesehene
    anklickbar ist — und dass überhaupt etwas anklickbar ist (beide Richtungen!).
 3. **`python3 build_single.py && node check_single.js`** — Einzeldatei bauen und prüfen.
@@ -1236,7 +1255,10 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
   Ertragsart addierten sich (`YIELD_CHAINS`). Wer eine Ertragstechnologie neu anlegt, lässt `test.js`
   laufen: es erzeugt jeden Text aus Grundertrag und Kette und prüft die Zuständigkeit.
 - **`S.bought` heißt nach dem Kaufen (seit v103 beansprucht)**: der Name blieb, damit Spielstände
-  passen. Ansprüche je Runde zählen `p.claimRound`/`p.claimCount` – nicht `S.bought`.
+  passen. Ansprüche je Runde zählen `p.claimRound`/`p.claimCount` – nicht `S.bought`. Seit v104 liegt
+  kein Eintrag auf oder neben einer Stadt (`foundCity`, `settleGain`, `migrateState`); wer einen neuen
+  Weg baut, eine Stadt entstehen zu lassen, nimmt eigene Ansprüche dort heraus (`claimsApart`) und prüft
+  fremde (`foreignClaimNear`) – Bots gründen ohne `foundCity`, ihr `settleable` prüft eigens.
 - **Sechseckform (seit v99)**: `TILE_SHAPES.hex4` muss in einer geraden Zeile beginnen (oberste
   Feldzeile −6), sonst kippt der Versatz der Zeilen (`cubeToRC`, odd-r) und die Karte verzerrt sich.
   Wer Plätze verschiebt, verschiebt um ganze Gitterschritte ((5, −2), (2, 3), (−3, 5) axial) – nur so
@@ -1680,6 +1702,13 @@ gegen die Fassung davor — identisch).
 
 ## Vollständige Bug-Historie (alle behoben — nicht versehentlich rückgängig machen)
 
+Aus der Sitzung v104:
+- **Gründen neben einem fremden beanspruchten Feld** (gemeldet vom Autor; bis v103 bewusst offen –
+  offener Punkt 3 –, mit dem kostenlosen Kolonialismus von v103 häufig): `foundSiteError` prüfte nur den Weg, nie den Platz und
+  seine Nachbarn. Das Feld gehörte danach beiden Reichen, beide bekamen seinen Ertrag; auf dem Feld
+  selbst ließ sich ebenso gründen, dann verlor es der andere. Jetzt gesperrt (`foreignClaimNear`),
+  auch für Bots (`settleable`) und KI (`kiSiteOk`); alte Spielstände bereinigt `migrateState`.
+
 Aus der Sitzung v96:
 - **Die KI erforschte die Wissenschaftliche Methode zu spät** (gemeldet vom Autor: „schlechte
   Reihenfolge"): andere Technologien zuerst, zum vollen Preis, oder die Methode blieb bezahlbar
@@ -1960,11 +1989,12 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
 2. **Wikinger „Beutezüge"** funktioniert, zahlt aber selten: der Ertrag ist Angriffswert minus
    Verteidigungswert, und ein Mensch überbietet Bots (Machtwert = Gesamtbevölkerung) selten.
    Gemessen: mit Macht 30 über 20 Partien 1809 Beute, mit normal gekaufter Macht 0.
-3. **Regelheft-Klausel, zweite Hälfte:** „gegnerische Territorien zählen als unpassierbar"
-   ist in v63 umgesetzt (siehe unten). Offen bleibt „**neben** ihnen darf nicht gegründet
-   werden" — das war nicht verlangt und würde die Ausbreitung noch deutlich stärker
-   einengen. Ebenso offen: gesperrt ist der Weg, nicht das Zielfeld — auf einem von außen
-   erreichbaren gekauften Fremdfeld darf weiter gegründet werden.
+3. **Regelheft-Klausel, zweite Hälfte – erledigt (v104):** „gegnerische Territorien zählen als
+   unpassierbar" ist seit v63 umgesetzt. „**Neben** ihnen darf nicht gegründet werden" seit v104
+   (Anweisung des Autors) so: nicht auf und nicht direkt neben einem fremden Feld – praktisch einem
+   beanspruchten, denn fremdes Stadtumland liegt wegen des Mindestabstands nie daneben. Nicht gemeint
+   war, dass das Umland der neuen Stadt fremdes Gebiet nicht berühren darf (das hätte die Ausbreitung
+   stark eingeengt: Mindestabstand 4).
 4. **Bot-Siedler** scheitert in späten Runden weiter gelegentlich, obwohl Platz da ist
    (Zufallslauf auf gefüllter Karte).
 5. **Plättchenkarten sind enger als die festen Karten:** 45 Felder je Reich (2 Spieler),
@@ -2376,6 +2406,15 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    Siedlerwege – drei Ansprüche je Runde reichen, Nachbarn den Weg zu verlegen. Die KI nutzt die
    Ansprüche (bestes Feld nach Ertrag), bewertet die Technologie beim Forschen aber weiter mit 4 wie
    die bezahlte. Messbar mit `tools_ki.js` (etwa gepaart mit und ohne Kolonialismus im Pool).
+
+64. **Getroffene Auslegungen (v104) – zum Ändern angeboten.** (a) Gemeldet war „neben"; gesperrt ist
+   auch **auf** einem fremden Anspruch – wie auf und neben einer Armee, und sonst verlöre der andere
+   sein Feld ganz. (b) Ein eigenes Feld, das so ein Feld der neuen Stadt wird, zählt nicht mehr zur
+   Hauptstadt (mit Bürokratie einfach statt doppelt) und geht mit der Stadt, wird sie erobert.
+   (c) Alte Spielstände: beim Laden wird jeder Anspruch auf oder neben einer Stadt ein Feld der Stadt –
+   ein eigener (bis v103 blieb er beansprucht) wie ein fremder aus dem Fehler (dann verliert ihn der,
+   der ihn beansprucht hatte; die Stadt steht schon). (d) Ansprüche ausgeschiedener Reiche sperren
+   nicht – wie bei `foreignTerritory`.
 
 ## Arbeitsweise, die der Autor schätzt
 

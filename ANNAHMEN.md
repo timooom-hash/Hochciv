@@ -376,11 +376,13 @@ mindestens 3 Felder Abstand zu jeder Stadt):
   **Zwei Dinge sind dabei bewusst NICHT mitgeändert worden:**
   · Die zweite Hälfte der Klausel — „**neben** gegnerischen Territorien darf nicht gegründet
     werden" — ist weiter nicht umgesetzt. Verlangt war die Unpassierbarkeit, und das
-    Nachbarschaftsverbot würde die Ausbreitung noch deutlich stärker einengen.
+    Nachbarschaftsverbot würde die Ausbreitung noch deutlich stärker einengen. *(Seit v104 umgesetzt
+    – nicht auf und nicht neben einem fremden Feld; siehe dort.)*
   · Gesperrt ist der **Weg**, nicht das Zielfeld. Auf einem einzelnen fremden Feld, das man
     von außen erreicht, darf weiter gegründet werden (`pathSteps` prüft das Zielfeld nie,
     und `canFound` hat dafür keine eigene Regel). Praktisch nur bei gekauften Feldern
     möglich: das Umland fremder Städte liegt ohnehin näher als drei Felder an einer Stadt.
+    *(Seit v104 gesperrt, siehe dort.)*
 - **Nicht direkt neben einer gegnerischen Armee.** Gilt für Menschen (`canFound`) und Bots
   (`settleable`) gleichermaßen; eigene Armeen stören nicht, zwei Felder Abstand genügt.
 - **Ausweichen des Bot-Siedlers** (Fehlerbehebung 17.8.): Zeigt die gewürfelte Richtung ins
@@ -6351,3 +6353,45 @@ gedreht, quer und bei ×1,41 die Layouthöhe; `uiScale` für iPads (1180 × 820,
 1024 × 768, 1080p, 1440p, 4K und gedreht; die Layoutklassen bei 1920 × 960. In Chromium: Spiel,
 Stadtblatt, Feldblatt mit Punkten, Technologiebogen bei 1180 × 820 (unverändert), 1920 × 960 (×1,33),
 1920 × 1080 (×1,41), 2560 × 1440 (×1,87) und hochkant gedreht (820 × 1180, ×1) – ohne Seitenfehler.
+
+## Nicht an fremden Ansprüchen gründen (v104)
+
+Gemeldet vom Autor (7.11.): „Man kann neben einem Feld gründen, das ein Gegner beansprucht hat. Das
+soll nicht gehen (wie neben einer gegnerischen Armee). Neben einem eigenen ist es natürlich in
+Ordnung – dann wird es eben ein gewöhnliches Feld der neuen Stadt."
+
+Nachgestellt (Startwert 5, zwei Reiche): Griechenland beansprucht 0/4, England gründet auf 0/5 – erlaubt;
+danach steht 0/4 in `controlledTiles` beider Reiche, beide bekommen seinen Ertrag. Auf 0/4 selbst ließ
+sich ebenso gründen: gesperrt war seit v63 nur der Weg, nie das Zielfeld (der offene Punkt 3 der
+Übergabe, „Wer das auch sperren will, sagt es").
+
+### Regeln
+
+* **Nicht auf und nicht direkt neben einem fremden beanspruchten Feld** wird gegründet – für Menschen
+  und KI (`foundSiteError`, `kiSiteOk`) wie für Bots (`settleable`). Meldung: „Nicht auf oder direkt
+  neben gegnerischem Gebiet." Ausgelegt: „auf" gehört dazu – wie bei Armeen (auf und neben), und sonst
+  verlöre der andere sein Feld ganz an die Stadt. Ansprüche ausgeschiedener Reiche sperren nicht (wie
+  `foreignTerritory`). Fremdes **Stadtumland** braucht keine eigene Prüfung: ein Platz liegt mindestens
+  drei Felder von jeder Stadt, ihr Umland also mindestens zwei. Damit ist die zweite Hälfte der
+  Territoriumsklausel des Regelhefts („neben gegnerischen Territorien darf nicht gegründet werden") so
+  umgesetzt, wie der Autor sie meint: der Platz, nicht das Umland der neuen Stadt – das hätte einen
+  Mindestabstand von 4 bedeutet.
+* **Eigene Ansprüche auf oder neben der neuen Stadt werden ihre Felder:** sie verlassen `S.bought`. Sie
+  zählen damit nicht mehr zur Hauptstadt (mit Bürokratie einfach statt doppelt) und gehen mit der
+  Stadt, wird sie erobert. Der Ertrag beim Siedeln (`settleGain`, Gründungsblatt und KI) rechnet das
+  mit.
+* **Alte Spielstände:** `migrateState` macht beim Laden jeden Anspruch auf oder neben einer Stadt zu
+  einem Feld der Stadt – einen eigenen (bis v103 blieb er beansprucht) wie einen fremden aus dem Fehler:
+  dann verliert ihn, wer ihn beansprucht hatte; die Stadt steht schon, und so gehört kein Feld mehr
+  zwei Reichen.
+
+### Abgesichert (v104)
+
+`test.js`: fremder Anspruch – England gründet weder darauf noch daneben (dieselbe Meldung, auch über
+`foundCity`), zwei Felder weiter schon; Bots und KI sehen dieselbe Regel; Griechenland selbst darf
+daneben. Eigener Anspruch – mit Bürokratie vorher doppelt, nach dem Gründen daneben ein gewöhnliches Feld
+der Stadt (nicht mehr in `S.bought`, einfacher Ertrag), `settleGain` gleich der Änderung des Einkommens.
+Alter Spielstand – das Feld, das beiden gehörte, ist danach Feld der Stadt, ein ferner Anspruch bleibt,
+ein zweites Laden ändert nichts. Der bis v103 offene Fall „auf einem fremden Einzelfeld" erwartet jetzt die
+Meldung. `smoke.js`: im Gründungsmodus ist ein Platz neben einem fremden Anspruch abgeblendet, das
+Gründungsblatt sperrt „Hier gründen" und nennt den Grund.

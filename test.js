@@ -1175,6 +1175,70 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   eq(claimsLeft(S, 0), n, 'Spielstand von vor v103 (ohne Zähler): alle offen');
   eq(S.log.slice(-1)[0].m, `Griechenland: Feld ${frei[n][0]}/${frei[n][1]} beansprucht.`, 'Protokoll');
 }
+/* Gründen und beanspruchte Felder (v104, gemeldet vom Autor: man konnte neben einem fremden
+   beanspruchten Feld gründen – das Feld gehörte danach beiden Reichen; auch darauf ging es). Nicht auf
+   und nicht neben einem fremden Anspruch, wie neben einer gegnerischen Armee; ein eigener wird beim
+   Gründen ein gewöhnliches Feld der neuen Stadt. */
+{
+  const neu = () => {
+    const S = newGame({ seed: 5, players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }] });
+    S.players.forEach(p => { p.res = { sci: 0, food: 99, coins: 0 }; p.techs.kolonialismus = true; });
+    return S;
+  };
+  const herrenlos = (S, r, c) => !S.players.some((_, i) => controlledTiles(S, i).has(key(r, c)));
+  // ein herrenloses Landfeld mit Ertrag; daneben und zwei Felder weiter dürfte `wer` gründen
+  const lage = (S, wer) => {
+    for (let r = 0; r < S.map.rows.length; r++) for (let c = 0; c < S.map.rows[r].length; c++) {
+      const t = terrainAt(S, r, c);
+      if (!t || isOff(t) || !TERRAIN[t].land || TERRAIN[t].block || cityAt(S, r, c) || !herrenlos(S, r, c)) continue;
+      if (!tileYield(S, wer, t).some(n => n > 0)) continue;
+      const nb = neighbors(r, c).find(([a, b]) => !foundSiteError(S, wer, a, b));
+      const weit = within(r, c, 2).find(([a, b]) => hexDistance(a, b, r, c) === 2 && !foundSiteError(S, wer, a, b));
+      if (nb && weit) return { x: [r, c], nb, weit };
+    }
+    return null;
+  };
+  const msg = 'Nicht auf oder direkt neben gegnerischem Gebiet.';
+  // Fremder Anspruch: England kann weder darauf noch daneben gründen, zwei Felder weiter schon
+  {
+    const S = neu(), L = lage(S, 1);
+    eq(claimTile(S, 0, ...L.x), null, `Griechenland beansprucht ${L.x.join('/')}`);
+    eq([foundSiteError(S, 1, ...L.x), foundSiteError(S, 1, ...L.nb), foundSiteError(S, 1, ...L.weit)], [msg, msg, null],
+      'England: auf und neben dem fremden Anspruch nicht, zwei Felder weiter schon');
+    eq([foundCity(S, 1, ...L.nb), controlledTiles(S, 1).has(key(...L.x))], [msg, false], 'foundCity lehnt ebenso ab, das Feld bleibt Griechenlands');
+    eq([settleable(S, 1, ...L.nb), kiSiteOk(S, 1, ...L.nb), settleable(S, 1, ...L.weit), kiSiteOk(S, 1, ...L.weit)],
+      [false, false, true, true], 'Bots und KI sehen dieselbe Regel');
+    eq(foundSiteError(S, 0, ...L.nb), null, 'Griechenland selbst darf neben seinem Anspruch gründen');
+  }
+  // Eigener Anspruch: gründen daneben geht, das Feld wird ein gewöhnliches Feld der Stadt
+  {
+    const S = neu(), L = lage(S, 0), k = key(...L.x);
+    S.players[0].techs.buerokratie = true;
+    eq(claimTile(S, 0, ...L.x), null, 'Griechenland beansprucht ein Feld');
+    const y = tileYield(S, 0, terrainAt(S, ...L.x));
+    eq(tileYieldAt(S, 0, ...L.x), y.map(n => 2 * n), 'beansprucht: mit Bürokratie doppelt (zählt zur Hauptstadt)');
+    const vorher = income(S, 0), gain = settleGain(S, 0, ...L.nb);
+    eq(foundCity(S, 0, ...L.nb), null, 'Stadt daneben gegründet');
+    eq([S.bought[0].includes(k), controlledTiles(S, 0).has(k), tileYieldAt(S, 0, ...L.x)], [false, true, y],
+      'danach ein gewöhnliches Feld der neuen Stadt: nicht mehr beansprucht, einfacher Ertrag');
+    const nachher = income(S, 0);
+    eq([nachher.sci - vorher.sci, nachher.food - vorher.food, nachher.coins - vorher.coins], [gain.sci, gain.food, gain.coins],
+      `Ertrag beim Siedeln (settleGain) sah es voraus: ${[gain.sci, gain.food, gain.coins].join('/')}`);
+  }
+  // Spielstände von davor: Ansprüche auf oder neben einer Stadt werden beim Laden Felder der Stadt
+  {
+    const S = neu(), L = lage(S, 1);
+    eq(foundCity(S, 1, ...L.nb), null, 'England gründet');
+    const fern = within(L.x[0], L.x[1], 5).find(([r, c]) => terrainAt(S, r, c) && !isOff(terrainAt(S, r, c)) && herrenlos(S, r, c) &&
+      !S.cities.some(ct => hexDistance(ct.r, ct.c, r, c) <= 1));
+    S.bought[0] = [key(...L.x), key(...fern)];          // wie bis v103: Englands Stadt neben Griechenlands Anspruch
+    eq([controlledTiles(S, 0).has(key(...L.x)), controlledTiles(S, 1).has(key(...L.x))], [true, true], 'vorher gehört das Feld beiden');
+    migrateState(S);
+    eq([S.bought[0], controlledTiles(S, 0).has(key(...L.x))], [[key(...fern)], false], 'nach dem Laden: Feld der Stadt, der ferne Anspruch bleibt');
+    const wieder = migrateState(JSON.parse(JSON.stringify(S)));
+    eq(JSON.stringify(wieder.bought), JSON.stringify(S.bought), 'ein zweites Laden ändert nichts');
+  }
+}
 
 /* Internet: genau eine Gratiskopie pro Runde */
 {
@@ -2630,15 +2694,15 @@ const setEvent = (S, k) => {
       foundBlockReason(mitMauer('feindgebiet'), 0, ZR, ZC)],
     ['wasser', 'gelaende', 'gebiet'], 'die drei Gründe sind einzeln ablesbar');
 
-  /* OFFEN (bewusst nicht mitgeändert): gesperrt ist der WEG. Auf einem einzelnen
-     fremden Feld, das man von außen erreicht, darf weiter gegründet werden – pathSteps
-     prüft das Zielfeld nie, und canFound hat dafür keine eigene Regel. Praktisch nur
-     bei per Kolonialismus gekauften Feldern möglich: das Umland fremder Städte liegt
-     ohnehin näher als drei Felder an einer Stadt. Wer das auch sperren will, sagt es. */
+  /* Bis v103 offen (bewusst nicht mitgeändert): gesperrt war nur der WEG – auf einem einzelnen
+     fremden Feld, das man von außen erreicht, durfte gegründet werden, und daneben auch. Seit v104
+     (Anweisung des Autors, gemeldet als Fehler) nicht mehr: auf und neben einem fremden
+     beanspruchten Feld wird nicht gegründet, wie neben einer gegnerischen Armee. Das Umland fremder
+     Städte erreicht ein Platz ohnehin nie – der Mindestabstand von 3 hält es zwei Felder fern. */
   {
     const S = flacheKarte();
     S.bought[1] = [key(ZR, ZC)];
-    eq(canFound(S, 0, ZR, ZC), null, 'auf einem fremden Einzelfeld darf noch gegründet werden');
+    eq(canFound(S, 0, ZR, ZC), 'Nicht auf oder direkt neben gegnerischem Gebiet.', 'auf einem fremden Einzelfeld wird nicht gegründet (v104)');
   }
 
   /* Kolonien (v84, Anweisung des Autors): ein per Kolonialismus gekauftes Feld darf auch

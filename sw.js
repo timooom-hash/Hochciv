@@ -1,6 +1,6 @@
 /* Offline-Cache. Bei Änderungen VERSION erhöhen. */
-const VERSION = 'hochciv-v103';
-const BUILD_HASH = 'd90d002690ca';   // von tools_version.js
+const VERSION = 'hochciv-v104';
+const BUILD_HASH = 'fd3e56e78bb3';   // von tools_version.js
 /* Was zwischengespeichert wird: die festen Dateien hier, die Skripte aus index.html – dort
    steht ihre Liste als <script>-Tags, und nur dort (v102). */
 const STATIC = [
