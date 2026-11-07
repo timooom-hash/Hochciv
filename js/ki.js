@@ -1040,14 +1040,16 @@ function kiSitesAll(S, pi, K) {
   return out;
 }
 // Kommt das Feld als Siedelplatz in Frage? Land ohne Vulkan, keine gegnerische Armee darauf
-// oder daneben, mindestens 3 Felder von jeder Stadt – ohne Weg und Kosten.
+// oder daneben, mindestens 3 Felder von jeder Stadt, kein fremder Anspruch darauf oder daneben
+// (v104) – ohne Weg und Kosten.
 function kiSiteOk(S, pi, r, c) {
   const t = terrainAt(S, r, c);
   if (!t || isOff(t) || !TERRAIN[t].land || TERRAIN[t].block) return false;
   if (enemyArmyAdjacent(S, pi, r, c)) return false;
   const a = armyAt(S, r, c);
   if (a && a.owner !== pi) return false;
-  return !S.cities.some(ct => hexDistance(ct.r, ct.c, r, c) < 3);
+  if (S.cities.some(ct => hexDistance(ct.r, ct.c, r, c) < 3)) return false;
+  return !foreignClaimNear(S, pi, r, c);
 }
 // Siedelplätze ändern sich mit Städten, Armeen, Techs und Straßen – nicht mit den Ressourcen
 const kiSiteKey = (S, pi) => S.cities.length + '|' +

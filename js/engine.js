@@ -342,6 +342,14 @@ function migrateState(S) {
     if (p.freeTechsUsed === undefined && typeof p.freeTechUsed === 'number') p.freeTechsUsed = 1;
   // Gründungen je Zug (v84–v99, für die Grenze im Marathon) – seit v100 ohne Grenze, ungenutzt
   for (const p of S.players || []) { delete p.foundRound; delete p.foundCount; }
+  /* Beanspruchte Felder auf oder neben einer Stadt (v104): bis v103 durfte man neben fremde
+     gründen – das Feld gehörte dann zwei Reichen –, und ein eigenes daneben blieb beansprucht.
+     Beides wird hier, was es seit v104 beim Gründen wird: ein Feld der Stadt. */
+  if (S.bought && S.cities) {
+    const anStadt = new Set();
+    for (const ct of S.cities) siteKeys(ct.r, ct.c).forEach(k => anStadt.add(k));
+    for (const i of Object.keys(S.bought)) S.bought[i] = (S.bought[i] || []).filter(k => !anStadt.has(k));
+  }
   return S;
 }
 function rollSetup(cfg) {
@@ -704,9 +712,12 @@ function income(S, pi) {
 function settleGain(S, pi, r, c, before) {
   before = before || income(S, pi);
   const fake = { id: -999, owner: pi, r, c, pop: 1, cap: false, grown: 0, born: -1 };
+  // wie foundCity (v104): eigene beanspruchte Felder daneben werden Felder der Stadt
+  const merk = S.bought[pi];
+  if (merk) S.bought[pi] = claimsApart(S, pi, r, c);
   S.cities.push(fake);
   let after;
-  try { after = income(S, pi); } finally { S.cities.pop(); }
+  try { after = income(S, pi); } finally { S.cities.pop(); if (merk) S.bought[pi] = merk; }
   return { sci: after.sci - before.sci, food: after.food - before.food, coins: after.coins - before.coins };
 }
 
@@ -1456,6 +1467,22 @@ function foundDistance(S, pi, r, c) {
   return d;
 }
 const isColony = (S, pi, r, c) => (S.bought[pi] || []).includes(key(r, c));
+/* Beanspruchte Felder und Städte (v104, Anweisung des Autors): kein beanspruchtes Feld liegt auf
+   oder neben einer Stadt. Ein fremdes sperrt das Gründen dort – wie eine gegnerische Armee
+   daneben (bis v103 ging es, und das Feld gehörte danach zwei Reichen). Ein eigenes wird beim
+   Gründen ein gewöhnliches Feld der neuen Stadt: es verlässt S.bought, zählt also nicht mehr zur
+   Hauptstadt (Bürokratie) und geht mit der Stadt, wird sie erobert.
+   Stadtumland braucht diese Prüfung nicht: der Mindestabstand von 3 hält es zwei Felder fern. */
+const siteKeys = (r, c) => new Set([key(r, c)].concat(neighbors(r, c).map(([nr, nc]) => key(nr, nc))));
+function foreignClaimNear(S, pi, r, c) {
+  const nah = siteKeys(r, c);
+  return S.players.some((p, i) => i !== pi && !p.dead && (S.bought[i] || []).some(k => nah.has(k)));
+}
+// Die eigenen beanspruchten Felder, die eine Stadt auf r/c NICHT berührt
+function claimsApart(S, pi, r, c) {
+  const nah = siteKeys(r, c);
+  return (S.bought[pi] || []).filter(k => !nah.has(k));
+}
 /* Wegtabelle für den Gründungsmodus (v75). Die Oberfläche fragt dort JEDES Feld der
    Karte ab – je Feld zwei bis vier Wegsuchen von der Hauptstadt, auf der großen Karte gut
    50 ms je Zeichnen. Innerhalb von withFoundTable rechnet eine einzige Breitensuche je
@@ -1573,6 +1600,7 @@ function foundSiteError(S, pi, r, c) {
     return T('Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.');
   }
   for (const city of S.cities) if (hexDistance(city.r, city.c, r, c) < 3) return T('Mindestens 3 Felder Abstand zu allen Städten.');
+  if (foreignClaimNear(S, pi, r, c)) return T('Nicht auf oder direkt neben gegnerischem Gebiet.');   // v104
   return null;
 }
 function foundCity(S, pi, r, c) {
@@ -1582,6 +1610,7 @@ function foundCity(S, pi, r, c) {
   const pop = isAbil(S.players[pi], 'siedler') ? 2 : 1;   // Russland: Städte mit 2 Bevölkerung
   const city = { id: S.nextId++, owner: pi, r, c, pop, cap: false, grown: 0, born: S.round };
   S.cities.push(city);
+  if (S.bought[pi]) S.bought[pi] = claimsApart(S, pi, r, c);   // eigene Ansprüche werden Felder der Stadt (v104)
   log(S, 'act', T('%s: Stadt gegründet auf %s/%s (%s Nahrung, Bevölkerung %s).', civOf(S.players[pi]).n, r, c, cost, pop));
   claimOrphanWonders(S, pi, city);      // Wunder, die ohne Stadt auf dem Feld stehen
   return null;

@@ -15,7 +15,8 @@ function settleable(S, pi, r, c) {
   if (!t || !TERRAIN[t].land || TERRAIN[t].block) return false;   // kein Meer, kein Vulkan
   if (armyAt(S, r, c)) return false;
   if (enemyArmyAdjacent(S, pi, r, c)) return false;               // nicht neben fremden Armeen
-  return !S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3);
+  if (S.cities.some(x => hexDistance(x.r, x.c, r, c) < 3)) return false;
+  return !foreignClaimNear(S, pi, r, c);                          // nicht an fremden Ansprüchen (v104)
 }
 // Bots bewegen sich nach genau denselben Regeln wie Menschen: überall canPass (engine.js).
 

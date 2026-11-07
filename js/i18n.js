@@ -537,6 +537,7 @@ const UI_EN = {
   'Nicht auf Meer.': 'Not on sea.',
   'Nicht auf einem Vulkan.': 'Not on a volcano.',
   'Nicht direkt neben einer gegnerischen Armee.': 'Not right next to an enemy army.',
+  'Nicht auf oder direkt neben gegnerischem Gebiet.': 'Not on or right next to enemy territory.',
   'Nicht erreichbar – dafür fehlt Navigation oder Panzerschiff.': 'Not reachable – navigation or an ironclad is missing.',
   'Nicht genug Wissenschaft.': 'Not enough science.',
   'Nicht möglich.': 'Not possible.',
