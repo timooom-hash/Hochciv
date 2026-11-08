@@ -6395,3 +6395,70 @@ Alter Spielstand – das Feld, das beiden gehörte, ist danach Feld der Stadt, e
 ein zweites Laden ändert nichts. Der bis v103 offene Fall „auf einem fremden Einzelfeld" erwartet jetzt die
 Meldung. `smoke.js`: im Gründungsmodus ist ein Platz neben einem fremden Anspruch abgeblendet, das
 Gründungsblatt sperrt „Hier gründen" und nennt den Grund.
+
+## Kosten getauscht · Kopieren je Weg einmal je Runde (v105)
+
+Anweisungen des Autors (7.11.): „Reihenfolge und Kosten dieser Technologien ändern: Theologie auf 8
+und Bürokratie auf 10 tauschen; Militärgericht auf 11, Nationalismus auf 13; Stahl auf 7, Burgenbau auf
+8; Kunstdünger auf 11, Dampfmaschine auf 13, Eisenbahn auf 14." – „Spionage und Kundschafterei sollen
+eine Fähigkeit einmal je Zug werden (wie das Internet), aber zu ihrem jeweiligen Münzfaktor." Vor dem
+Bauen gefragt: Wer beide bezahlten Wege hat – zwei Kopien je Runde oder eine zum besten Preis? Antwort:
+**zwei, je eine**.
+
+### Regeln
+
+* **Kosten:** Theologie 8, Bürokratie 10 (vorher 10, 8) · Militärgericht 11, Nationalismus 13 (13, 11) ·
+  Stahl 7, Burgenbau 8 (8, 7) · Kunstdünger 11, Dampfmaschine 13, Eisenbahn 14 (14, 11, 13). Jede bleibt
+  in ihrem Zeitalter (Mittelalter 6–10, Industrialisierung 11–15); Zeitalterrabatte, Obsoleszenz und
+  die Chance jeder Technologie im Verfügbarkeitswurf bleiben also gleich – es ändern sich Preis und
+  Platz in der Leiter (und damit, welcher Würfel auf welche fällt). Im Marathon mal den Faktor des
+  Zeitalters, wie alles.
+* **Der alte Techtree behält die alten Kosten** (`OLD_TECH_COSTS`, seit v102 nur noch Spielstände von
+  vor v82), wie seit v84 die drei militärischen der Antike. **Laufende Partien** im Standard bekommen
+  die neuen Kosten – sie stehen nicht im Spielstand.
+* **Kopieren:** drei Wege, jeder **einmal je Runde** und unabhängig: Internet gratis, Spionage zum
+  Einfachen, Kundschafterei zum Doppelten der Grundkosten in Münzen (der Partie, ohne Vergünstigung).
+  Wer alle drei hat, kopiert bis zu drei Technologien je Runde. Bis v104 kopierten Spionage und
+  Kundschafterei beliebig oft, und wer beide hatte, zahlte nur den Preis der Spionage. „Je Zug" als „je
+  Runde", wie beim Kolonialismus (v103) – jedes Reich zieht einmal je Runde. Was ungenutzt bleibt,
+  verfällt. Texte: „1 Tech/Runde kopieren (1× Kosten in Münzen)" bzw. „(2× …)", wie das Internet „1
+  Tech/Runde kopieren".
+
+### Oberfläche – wie ausgelegt
+
+* **Fähigkeiten → Technologien kopieren:** eine Zeile je Technologie (Name, Wirkung, wer sie hat), rechts
+  je offenem Weg sein Preis als Knopf – „gratis" (hervorgehoben), z. B. „4🪙", „8🪙". Ein genutzter Weg
+  verschwindet aus allen Zeilen; sind alle genutzt, steht dort nur „Diese Runde schon kopiert." Welcher
+  Knopf welcher Weg ist, sagt der Preis (der Name steht als `title`, Name und Preis als `aria-label`); kein Satz mit den
+  Wirkungstexten mehr (bis v104 „Spionage: … · Internet: …" und „· 1× gratis per Internet" im Kopf).
+  Verworfen: je Technologie und Weg ein ganzzeiliger Knopf (bis zu drei Zeilen je Technologie); ein
+  Knopf, der den billigsten offenen Weg nimmt – dann bestimmte die Reihenfolge der Tipps, wo die
+  Gratiskopie landet, und wer erst die billige Technologie tippte, zahlte für die teure.
+* **„gratis" am Knopf:** seit v102 tragen kostenlose ganzzeilige Knöpfe das Wort nicht mehr (die
+  Hervorhebung sagt es). Hier ist der Knopf selbst der Preis; ohne Text bliebe er leer.
+
+### Umsetzung
+
+* `COPY_WAYS` (Weg, Faktor) und `copyWaysOpen(S, pi)` in `js/engine.js`; `copyableTechs` liefert je
+  Technologie `ways: [{ k, coins }]`, `copyTech(S, pi, k, way)` (ohne `way`: der billigste offene) setzt
+  `p.copied[way] = S.round`. `copyRate`, `internetAvailable`, `p.internetUsed` und die Modi
+  `'free'`/`'paid'` sind weg; `migrateState` übernimmt `p.internetUsed` als `p.copied.internet`.
+  Neue Meldungen „Diese Runde schon per Spionage kopiert." (je Weg) und „Diese Runde schon kopiert.";
+  „Nicht kopierbar." ist jetzt übersetzt. Protokoll: „Astronomie kopiert (Kundschafterei, 4 Münzen)."
+* KI: je offenem Weg ein Kandidat mit eigenem Schlüssel (`copyinternet:`, `copyspionage:`,
+  `copykundschafterei:` – die Muster für Forschung, Bündel und Methode nehmen `copy[a-z]+`). Wert beim
+  Forschen von Spionage und Kundschafterei: `2 + 0,2 · H · min(3, kopierbar)`, nach dem Muster des
+  Internets (`3 + 0,3 · H · …`; bis v104 `2 + 0,5 · min(8, kopierbar)` – für beliebig viele Kopien).
+  Geschätzt, nicht gemessen.
+
+### Abgesichert (v105)
+
+`test.js`: die neun neuen Kosten, keine wechselt das Zeitalter, die vier betroffenen Leitern, die alten
+Werte in `OLD_TECH_COSTS`, Burgenbau mit der Methode 5 (alter Techtree 3); Kopieren – nur Internet,
+nur Spionage (zweite Kopie abgelehnt, nächste Runde wieder), nur Kundschafterei, alle drei in einer
+Runde (Kundschafterei zuerst, danach steht sie nirgends mehr; 5 Münzen; das Protokoll nennt den Weg),
+zu wenig Münzen (der Weg bleibt offen), alter Spielstand, `freeActions` nur mit Gratiskopie, beide
+bezahlten Preise nebeneinander, die Preise im alten Techtree und im Marathon; die KI kopiert ohne Wissenschaft
+über mehrere Wege, über jeden einmal. `smoke.js`: die Zeile mit „gratis" (englisch „free") und
+`title`, drei Wege mit 3 Münzen („gratis · 2🪙 · 4🪙" gesperrt), nach der Kundschafterei und dem
+Internet die übrigen Preise, nach drei Kopien nur noch „Diese Runde schon kopiert."

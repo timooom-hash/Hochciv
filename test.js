@@ -1240,46 +1240,79 @@ const spotBy = (S, city) => neighbors(city.r, city.c).find(([r, c]) =>
   }
 }
 
-/* Internet: genau eine Gratiskopie pro Runde */
+/* Kopieren (v105, Anweisung des Autors): Internet, Spionage und Kundschafterei sind je EINE Kopie
+   je Runde, unabhängig voneinander – gratis, 1× und 2× der Grundkosten in Münzen. Bis v104
+   kopierten die beiden bezahlten Wege beliebig oft, und Spionage ersetzte Kundschafterei. */
 {
-  const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 14 });
-  S.players[1].techs.stadtmauern = true; S.players[1].techs.taktik = true;
-  S.players[0].techs.internet = true;
-  eq(internetAvailable(S, 0), true, 'Internet-Kopie steht zu Rundenbeginn bereit');
-  const opt = copyableTechs(S, 0);
-  eq(opt.length >= 2 && opt.every(o => o.freeOk && o.paidCoins == null), true, 'reines Internet: nur Gratiskopie, kein bezahlter Weg');
-  eq(copyTech(S, 0, 'stadtmauern'), null, 'erste Gratiskopie klappt');
-  eq(typeof copyTech(S, 0, 'taktik'), 'string', 'zweite Kopie in derselben Runde wird abgelehnt');
-}
+  const spiel = (...wege) => {
+    const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 15 });
+    ['stadtmauern', 'taktik', 'mathematik', 'astronomie'].forEach(k => { S.players[1].techs[k] = true; delete S.players[0].techs[k]; });
+    wege.forEach(k => { S.players[0].techs[k] = true; });
+    S.players[0].res.coins = 50;
+    return S;
+  };
+  const preise = (S, k) => copyableTechs(S, 0).find(o => o.tech.k === k).ways.map(w => w.k + ' ' + w.coins).join(', ');
+  const offen = S => copyWaysOpen(S, 0).map(w => w.k).join(' ');
 
-/* Kundschafterei/Spionage + Internet: jede Tech bietet bezahlt UND gratis an */
-{
-  const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 15 });
-  S.players[1].techs.stadtmauern = true;   // Kosten 2 (bis v83: 5)
-  S.players[1].techs.taktik = true;        // Kosten 1
-  S.players[0].techs.kundschafterei = true; S.players[0].techs.internet = true;
-  S.players[0].res.coins = 50;
-  const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
-  eq(sm.paidCoins, 4, 'Kundschafterei: 2× Basiskosten (2×2) in Münzen');
-  eq(sm.freeOk, true, 'Internet-Gratiskopie steht trotz Kundschafterei zur Verfügung (Bugfix)');
-  // Gratiskopie kostet keine Münzen und verbraucht das Rundenkontingent
-  eq(copyTech(S, 0, 'stadtmauern', 'free'), null, 'gratis kopieren klappt');
-  eq(S.players[0].res.coins, 50, 'Gratiskopie kostet keine Münzen');
-  eq(internetAvailable(S, 0), false, 'Internet-Kontingent danach verbraucht');
-  // eine zweite Kopie in derselben Runde geht nur noch bezahlt
-  const tk = copyableTechs(S, 0).find(o => o.tech.k === 'taktik');
-  eq(tk.freeOk, false, 'keine zweite Gratiskopie in derselben Runde');
-  eq(tk.paidCoins, 2, 'bezahlter Weg (2×1) bleibt');
-}
-
-/* Nur Spionage (ohne Internet): bezahlt, keine Gratiskopie */
-{
-  const S = newGame({ players: [{ civ: 'griechenland', kind: 'human' }, { civ: 'england', kind: 'human' }], seed: 15 });
-  S.players[1].techs.stadtmauern = true;
-  S.players[0].techs.spionage = true;
-  const sm = copyableTechs(S, 0).find(o => o.tech.k === 'stadtmauern');
-  eq(sm.paidCoins, 2, 'Spionage: 1× Basiskosten in Münzen (Stadtmauern 2)');
-  eq(sm.freeOk, false, 'ohne Internet keine Gratiskopie');
+  // Nur Internet: eine Gratiskopie, die zweite in derselben Runde nicht
+  {
+    const S = spiel('internet');
+    eq([offen(S), preise(S, 'stadtmauern')], ['internet', 'internet 0'], 'Internet: ein Weg, gratis');
+    eq(copyTech(S, 0, 'stadtmauern'), null, 'erste Kopie (ohne Angabe: der billigste Weg) klappt');
+    eq([copyTech(S, 0, 'taktik'), copyTech(S, 0, 'taktik', 'internet')], ['Diese Runde schon kopiert.', 'Diese Runde schon per Internet kopiert.'],
+      'zweite Kopie in derselben Runde wird abgelehnt');
+    eq([S.players[0].res.coins, S.players[0].copied], [50, { internet: S.round }], 'kostet nichts, vermerkt die Runde');
+  }
+  // Nur Spionage: einmal je Runde zum Einfachen
+  {
+    const S = spiel('spionage');
+    eq(preise(S, 'stadtmauern'), 'spionage 2', 'Spionage: 1× Grundkosten (Stadtmauern 2)');
+    eq([copyTech(S, 0, 'stadtmauern', 'spionage'), S.players[0].res.coins], [null, 48], 'Spionage kopiert für 2 Münzen');
+    eq([copyTech(S, 0, 'taktik', 'spionage'), copyableTechs(S, 0)], ['Diese Runde schon per Spionage kopiert.', []],
+      'ein zweites Mal in derselben Runde nicht – bis v104 beliebig oft');
+    S.round++;
+    eq([offen(S), copyTech(S, 0, 'taktik', 'spionage'), S.players[0].res.coins], ['spionage', null, 47], 'nächste Runde wieder: Taktik für 1');
+  }
+  // Nur Kundschafterei: einmal je Runde zum Doppelten
+  {
+    const S = spiel('kundschafterei');
+    eq(preise(S, 'stadtmauern'), 'kundschafterei 4', 'Kundschafterei: 2× Grundkosten (2×2)');
+    eq([copyTech(S, 0, 'stadtmauern'), copyTech(S, 0, 'taktik'), S.players[0].res.coins], [null, 'Diese Runde schon kopiert.', 46],
+      'einmal für 4 Münzen, kein zweites Mal');
+  }
+  // Alle drei: drei Kopien in einer Runde, je Weg eine, jede zu ihrem Preis
+  {
+    const S = spiel('internet', 'spionage', 'kundschafterei');
+    eq(preise(S, 'astronomie'), 'internet 0, spionage 2, kundschafterei 4', 'alle drei Wege, billigster zuerst (Astronomie 2)');
+    eq(copyTech(S, 0, 'astronomie', 'kundschafterei'), null, 'Kundschafterei zuerst – Spionage ersetzt sie nicht mehr');
+    eq(preise(S, 'mathematik'), 'internet 0, spionage 1', 'danach steht Kundschafterei nirgends mehr');
+    eq(copyTech(S, 0, 'mathematik', 'spionage'), null, 'Spionage auf Mathematik');
+    eq(copyTech(S, 0, 'stadtmauern', 'internet'), null, 'Internet auf Stadtmauern');
+    eq([offen(S), copyableTechs(S, 0).length, S.players[0].res.coins], ['', 0, 50 - 4 - 1], 'drei Kopien, alle Wege genutzt, 5 Münzen bezahlt');
+    eq(S.log.filter(l => / kopiert \(/.test(l.m)).map(l => l.m.replace(/^[^:]+: /, '')),
+      ['Astronomie kopiert (Kundschafterei, 4 Münzen).', 'Mathematik kopiert (Spionage, 1 Münzen).', 'Stadtmauern kopiert (Internet, gratis).'],
+      'das Protokoll nennt den Weg');
+  }
+  // Zu wenig Münzen: der Weg bleibt offen
+  {
+    const S = spiel('kundschafterei');
+    S.players[0].res = { sci: 0, food: 0, coins: 3 };
+    eq([copyTech(S, 0, 'stadtmauern', 'kundschafterei'), offen(S)], ['Zu wenig Münzen (4 nötig).', 'kundschafterei'], 'zu wenig Münzen: abgelehnt, nichts verbraucht');
+  }
+  // Ein Spielstand von vor v105 (p.internetUsed) zählt weiter
+  {
+    const S = spiel('internet');
+    S.players[0].internetUsed = S.round;
+    migrateState(S);
+    eq([S.players[0].internetUsed, S.players[0].copied, offen(S)], [undefined, { internet: S.round }, ''], 'alter Spielstand: diese Runde schon kopiert');
+  }
+  // freeActions zählt nur die Gratiskopie
+  {
+    const S = spiel('spionage', 'kundschafterei');
+    eq(freeActions(S, 0).includes('internet'), false, 'bezahltes Kopieren ist keine kostenlose Aktion');
+    S.players[0].techs.internet = true;
+    eq(freeActions(S, 0).includes('internet'), true, 'die Gratiskopie schon');
+  }
 }
 
 /* === Regeln der Hauptvariante (vormals v2) === */
@@ -3235,7 +3268,19 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     wiss_methode: 11, chemie: 12, biologie: 15,
     landwirtschaft: 1, bewaesserung: 5,
     eisenverarbeitung: 2, belagerung: 4, stadtmauern: 5,
-  }, 'alter Techtree: die neun Kosten bis v81 und die drei militärischen bis v83');
+    theologie: 10, buerokratie: 8, militaergericht: 13, nationalismus: 11, stahl: 8, burgenbau: 7,
+    kunstduenger: 14, dampfmaschine: 11, eisenbahn: 13,
+  }, 'alter Techtree: die neun Kosten bis v81, die drei militärischen bis v83, die neun bis v104');
+  /* v105 (Anweisung des Autors): neun Kosten getauscht bzw. gedreht, jede im selben Zeitalter wie
+     vorher – im Tutorial (alter Techtree) bleiben die alten, sein Ablauf rechnet mit Burgenbau 7. */
+  const v105 = { theologie: 8, buerokratie: 10, militaergericht: 11, nationalismus: 13, stahl: 7, burgenbau: 8,
+    kunstduenger: 11, dampfmaschine: 13, eisenbahn: 14 };
+  eq(Object.fromEntries(Object.keys(v105).map(k => [k, TECH_BY_KEY[k].c])), v105, 'v105: die neun neuen Grundkosten');
+  eq(Object.keys(v105).filter(k => ageOfCost(v105[k]) !== ageOfCost(OLD_TECH_COSTS[k])), [], 'v105: keine wechselt das Zeitalter');
+  eq([leiter(STD, 3, 1), leiter(STD, 3, 2), leiter(STD, 2, 1), leiter(STD, 1, 2)].map(l => l.join(' ')),
+    ['rittertum kundschafterei theologie kartografie buerokratie', 'militaergericht spionage nationalismus kolonialismus',
+      'stahl burgenbau schiesspulver', 'kunstduenger dampfmaschine eisenbahn fliessband'],
+    'v105: die vier Leitern – Spezial Mittelalter und Industrialisierung, Militär Mittelalter, Produktion Industrialisierung');
   // v84 (Anweisung des Autors): Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5
   eq(['stadtmauern', 'eisenverarbeitung', 'belagerung'].map(k => TECH_BY_KEY[k].c), [2, 4, 5],
     'Militär/Antike: Stadtmauern 2, Eisenverarbeitung 4, Belagerungsmaschinen 5 (v84)');
@@ -3263,7 +3308,10 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     const [W0, W1] = [false, true].map(old => mkT('england', old, [], { wonders: true }));
     const anders = [], ungeordnet = [];
     for (let f = 0; f < 4; f++) for (let a = 0; a < 4; a++) {
-      const geaendert = (a === 0 && f < 3) || (a === 2 && f === 0);     // Antike 0/1/2, Industrialisierung 0
+      // Antike 0/1/2, Industrialisierung 0; seit v105 Spezial Mittelalter/Industrialisierung,
+      // Militär Mittelalter, Produktion Industrialisierung
+      const geaendert = (a === 0 && f < 3) || (a === 2 && f === 0) ||
+        (f === 3 && (a === 1 || a === 2)) || (f === 2 && a === 1) || (f === 1 && a === 2);
       if (!geaendert && leiter(W0, f, a).join() !== leiter(W1, f, a).join()) anders.push(`${f}/${a}`);
       for (const X of [W0, W1]) {
         const k = techsIn(f, a, X).map(t => techBase(X, t));
@@ -3308,26 +3356,27 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     eq([doResearch(S, 0, 'mathematik'), p.res.sci], [null, 0], 'Mathematik kostet 1');
   }
 
-  // Kopieren zahlt die Basiskosten der Partie
+  // Kopieren zahlt die Basiskosten der Partie (je bezahltem Weg sein Preis – seit v105 beide nebeneinander)
   {
+    const bezahlt = o => o.ways.filter(w => w.coins).map(w => w.coins);
     const preise = S => {
       S.players[1].techs.schrift = true; S.players[1].techs.landwirtschaft = true; S.players[1].techs.mathematik = true;
-      return ['schrift', 'landwirtschaft', 'mathematik'].map(k => copyableTechs(S, 0).find(o => o.tech.k === k).paidCoins);
+      return ['schrift', 'landwirtschaft', 'mathematik'].map(k => bezahlt(copyableTechs(S, 0).find(o => o.tech.k === k)).join('/'));
     };
-    eq(preise(mkT('england', false, ['spionage'])), [4, 5, 1], 'Standard: Spionage kopiert zu 4/5/1 Münzen');
-    eq(preise(mkT('england', true, ['spionage'])), [1, 1, 2], 'alter Techtree: Spionage kopiert zu 1/1/2 Münzen');
+    eq(preise(mkT('england', false, ['spionage'])), ['4', '5', '1'], 'Standard: Spionage kopiert zu 4/5/1 Münzen');
+    eq(preise(mkT('england', true, ['spionage'])), ['1', '1', '2'], 'alter Techtree: Spionage kopiert zu 1/1/2 Münzen');
     // v72: Kundschafterei kopiert in beiden Techtrees zum Doppelten der Grundkosten der Partie
-    eq(preise(mkT('england', false, ['kundschafterei'])), [8, 10, 2], 'Standard: Kundschafterei zum Doppelten');
-    eq(preise(mkT('england', true, ['kundschafterei'])), [2, 2, 4], 'alter Techtree: Kundschafterei zum Doppelten');
-    eq(preise(mkT('england', false, ['kundschafterei', 'spionage'])), [4, 5, 1],
-      'mit beiden Wegen gilt der günstigere – Spionage');
+    eq(preise(mkT('england', false, ['kundschafterei'])), ['8', '10', '2'], 'Standard: Kundschafterei zum Doppelten');
+    eq(preise(mkT('england', true, ['kundschafterei'])), ['2', '2', '4'], 'alter Techtree: Kundschafterei zum Doppelten');
+    eq(preise(mkT('england', false, ['kundschafterei', 'spionage'])), ['4/8', '5/10', '1/2'],
+      'mit beiden Wegen beide Preise – seit v105 je eine Kopie (bis v104 galt nur Spionage)');
     const preise3 = S => {
       ['wiss_methode', 'chemie', 'biologie'].forEach(k => { S.players[1].techs[k] = true; });
-      return ['wiss_methode', 'chemie', 'biologie'].map(k => copyableTechs(S, 0).find(o => o.tech.k === k).paidCoins);
+      return ['wiss_methode', 'chemie', 'biologie'].map(k => bezahlt(copyableTechs(S, 0).find(o => o.tech.k === k)).join('/'));
     };
-    eq(preise3(mkT('england', false, ['spionage'])), [15, 11, 12], 'Standard: Spionage kopiert zu 15/11/12 Münzen');
-    eq(preise3(mkT('england', true, ['spionage'])), [11, 12, 15], 'alter Techtree: Spionage kopiert zu 11/12/15 Münzen');
-    eq(preise3(mkT('england', false, ['kundschafterei'])), [30, 22, 24], 'Standard: Kundschafterei 30/22/24');
+    eq(preise3(mkT('england', false, ['spionage'])), ['15', '11', '12'], 'Standard: Spionage kopiert zu 15/11/12 Münzen');
+    eq(preise3(mkT('england', true, ['spionage'])), ['11', '12', '15'], 'alter Techtree: Spionage kopiert zu 11/12/15 Münzen');
+    eq(preise3(mkT('england', false, ['kundschafterei'])), ['30', '22', '24'], 'Standard: Kundschafterei 30/22/24');
   }
 
   /* Kolonialismus: seit v103 (Anweisung des Autors) COLONY_CLAIMS kostenlose Felder je Runde – bis
@@ -3349,15 +3398,15 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
     // Die Techtexte nennen dieselben Zahlen wie die Regel – in beiden Sprachen und Techtrees
     const K = TECH_BY_KEY, A = { oldTree: true };
     const texte = X => [techEffect(K.kolonialismus, X), techEffect(K.kundschafterei, X)];
-    eq(texte(STD), [`${COLONY_CLAIMS}× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen`, `Tech kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
+    eq(texte(STD), [`${COLONY_CLAIMS}× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen`, `1 Tech/Runde kopieren (${SCOUTING_RATE}× Kosten in Münzen)`],
       'Techtexte nennen die Ansprüche je Runde und den Kopierfaktor der Regel');
     eq(texte(A), texte(STD), 'der alte Techtree zeigt dieselben Texte');
     setLang('en', { quiet: true });
     const en = [texte(null), texte(A)];
     setLang('de', { quiet: true });
     const text = `${COLONY_CLAIMS}× per round: claim an unowned tile; found a city there even without a route`;
-    eq(en, [[text, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`],
-      [text, `Copy a tech (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
+    eq(en, [[text, `Copy 1 tech per round (${SCOUTING_RATE}× its cost in coins)`],
+      [text, `Copy 1 tech per round (${SCOUTING_RATE}× its cost in coins)`]], 'englisch ebenso');
   }
 
   // Plättchenmodus: der Vorabwurf läuft im selben Techtree wie die Partie. Geprüft an
@@ -3497,7 +3546,7 @@ const cityPlace = (S, pi, cap) => within(cap.r, cap.c, 9).find(([r, c]) =>
   eq(techCost(M, gr, TECH_BY_KEY.papier), 6 * 3 - 2, 'Rabatte ziehen danach ab, im Marathon doppelt (v85; seit v97 Papier 18 − 2 × 1)');
   M.players[gr].techs.spionage = true;
   ['schrift', 'papier'].forEach(k => { M.players[(gr + 1) % 4].techs[k] = true; });
-  eq(['schrift', 'papier'].map(k => copyableTechs(M, gr).find(o => o.tech.k === k).paidCoins), [8, 18],
+  eq(['schrift', 'papier'].map(k => copyableTechs(M, gr).find(o => o.tech.k === k).ways[0].coins), [8, 18],
     'Kopieren zahlt die Grundkosten des Marathons (Schrift 4 × 2, Papier 6 × 3)');
 
   // --- Gründungen je Zug: im Marathon v84–v99 höchstens fünf, seit v100 ohne Grenze
@@ -5231,7 +5280,7 @@ const spielArt = mode => mode === 'duell'
   eq(art(N), [], 'Internet ohne etwas zu kopieren: zählt nicht');
   N.players[1].techs.schrift = true; delete N.players[0].techs.schrift;
   eq(art(N), ['internet'], 'Internet mit einer fremden Technologie: zählt');
-  eq(copyTech(N, 0, 'schrift', 'free'), null, 'per Internet kopiert');
+  eq(copyTech(N, 0, 'schrift', 'internet'), null, 'per Internet kopiert');
   N.players[1].techs.rad = true; delete N.players[0].techs.rad;
   eq(art(N), [], 'danach zählt das bezahlte Kopieren (Spionage) nicht');
   // Kostenlose Technologie aus einem Wunder – und alles zusammen
@@ -5879,7 +5928,7 @@ ui = { sel: null, army: null, mode: null, botTimer: null };
     const rec = animAufnahme(S, () => {
       applyWonderEffect(S, 0, cap, WONDER_BY_KEY.koloss);
       applyWonderEffect(S, 0, cap, WONDER_BY_KEY.pentagon);
-      copyTech(S, 0, 'schrift', 'paid');
+      copyTech(S, 0, 'schrift', 'spionage');
     });
     const sz = animSzenen(rec, 0);
     eq([sz.map(s => s.art).join(), sz[1].ringe, sz[3].techs, animText(sz[2], 'Griechenland') === sz[2].texte[0], /Pentagon/.test(sz[2].texte[0])],
@@ -7315,6 +7364,17 @@ for (const n of [2, 3, 4]) {
   kiTurn(K, k);
   eq([(K.bought[k] || []).length, claimsLeft(K, k)], [COLONY_CLAIMS, 0], `die KI beansprucht in ihrem Zug ${COLONY_CLAIMS} Felder, ohne Münzen`);
   eq(K.log.filter(l => /Feld \d+\/\d+ beansprucht/.test(l.m)).length, COLONY_CLAIMS, '… und das Protokoll nennt jedes');
+  /* Kopieren (v105): die Wege sind unabhängig – die KI kopiert im selben Zug über mehrere, über
+     jeden höchstens einmal. Ohne Wissenschaft geht es nur so (hier über alle drei); ob sie die
+     doppelt teure Kundschafterei nimmt, wägt sie gegen anderes ab – geprüft wird nur „mehrere". */
+  const C = newGame({ seed: 11, players: [kiP('russland', 'basis'), kiP('griechenland', 'basis')] });
+  const ci = C.cur, cp = C.players[ci], co = 1 - ci;
+  ['internet', 'spionage', 'kundschafterei'].forEach(k => { cp.techs[k] = true; });
+  ['wiss_methode', 'universitaet', 'buerokratie', 'chemie'].forEach(k => { C.players[co].techs[k] = true; delete cp.techs[k]; });
+  cp.res = { sci: 0, food: 0, coins: 200 };
+  kiTurn(C, ci);
+  const kopien = C.log.filter(l => / kopiert \((Internet|Spionage|Kundschafterei)/.test(l.m)).map(l => l.m.replace(/^.* kopiert \(([^,]+).*$/, '$1'));
+  eq([kopien.length >= 2, new Set(kopien).size === kopien.length], [true, true], `die KI kopiert über mehrere Wege, über jeden einmal: ${kopien.join(', ')}`);
 }
 {
   // --- Volle Partien: 2, 3 und 4 Reiche, Plättchenkarte mit Legephase und feste Karte,
@@ -7746,7 +7806,7 @@ function kiAbwehrLage(popKI, gross) {
     return S;
   };
   const N = mit(false), O = mit(true), burg = TECH_BY_KEY.burgenbau;
-  eq([techCost(N, 0, burg), techCost(O, 0, burg)], [7 - 3, 7 - 4], 'Burgenbau mit der Methode: 4, im alten Techtree 3');
+  eq([techCost(N, 0, burg), techCost(O, 0, burg)], [8 - 3, 7 - 4], 'Burgenbau mit der Methode: 5 (seit v105 Grundkosten 8), im alten Techtree 3');
   eq([techCost(N, 0, TECH_BY_KEY.robotik), techCost(O, 0, TECH_BY_KEY.robotik)], [19 - 5, 19 - 8], 'Robotik (Moderne): 19 − 5, im alten Techtree 19 − 8');
   eq([techCost(N, 0, SINGULARITY), techCost(O, 0, SINGULARITY)], [110, 110], 'die Singularität in beiden −10');
   eq([techEffect(TECH_BY_KEY.wiss_methode, N), techEffect(TECH_BY_KEY.wiss_methode, O)],

@@ -363,6 +363,46 @@ step('Sklaverei wird im Techbogen als obsolet markiert', () => {
   console.log('       ' + tile.textContent.replace(/\s+/g, ' ').trim().slice(0, 60));
   G('closeModal')();
 });
+/* v105 (Anweisung des Autors): Internet, Spionage und Kundschafterei sind je eine Kopie je Runde,
+   unabhängig voneinander. Eine Zeile je Technologie, rechts je offenem Weg sein Preis als Knopf;
+   ein genutzter Weg verschwindet aus allen Zeilen. */
+step('v105: Kopieren – je Weg eine Kopie je Runde, die Preise als Knöpfe in der Zeile', () => {
+  const S = G('S'), pi = S.players.findIndex(q => q.kind === 'human'), p = S.players[pi];
+  const o = (pi + 1) % S.players.length, cur = S.cur;
+  const merk = { techs: Object.assign({}, p.techs), res: Object.assign({}, p.res), fremd: Object.assign({}, S.players[o].techs), copied: p.copied };
+  const geld = n => G('costText')({ coins: n }, n + '🪙');
+  try {
+    S.cur = pi;
+    ['internet', 'spionage', 'kundschafterei'].forEach(k => { p.techs[k] = true; });
+    ['stadtmauern', 'taktik', 'astronomie'].forEach(k => { S.players[o].techs[k] = true; delete p.techs[k]; });
+    p.res = { sci: 0, food: 0, coins: 3 }; delete p.copied;   // nichts, was in Münzen einspringt
+    G('redraw')(); $('a-abil').onclick();
+    const preise = k => {
+      const b = $('sheet-body').querySelector(`.copy-row [data-act$=":${k}"]`);
+      return b ? [...b.closest('.copy-row').querySelectorAll('button')].map(x => x.textContent + (x.disabled ? ' (aus)' : '')).join(' · ') : '–';
+    };
+    const tippe = act => { const b = $('sheet-body').querySelector(`[data-act="${act}"]`); if (!b) throw new Error('kein Knopf ' + act); b.onclick(); };
+    const stand = () => ['stadtmauern', 'taktik', 'astronomie'].map(k => k + ': ' + preise(k)).join(' | ');
+    const a = stand();
+    if (a !== `stadtmauern: gratis · ${geld(2)} · 4🪙 (aus) | taktik: gratis · ${geld(1)} · ${geld(2)} | astronomie: gratis · ${geld(2)} · 4🪙 (aus)`)
+      throw new Error('drei Wege, 3 Münzen: ' + a);
+    tippe('kopie:kundschafterei:taktik');                 // 2 Münzen, Kundschafterei ist verbraucht
+    const b = stand();
+    if (b !== 'stadtmauern: gratis · 2🪙 (aus) | taktik: – | astronomie: gratis · 2🪙 (aus)') throw new Error('nach Kundschafterei: ' + b);
+    tippe('kopie:internet:astronomie');                   // gratis, Internet ist verbraucht
+    p.res = { sci: 0, food: 0, coins: 5 }; G('redraw')(); G('abilSheet')();
+    const c = stand();
+    if (c !== `stadtmauern: ${geld(2)} | taktik: – | astronomie: –`) throw new Error('nach dem Internet: ' + c);
+    tippe('kopie:spionage:stadtmauern');
+    if (!['taktik', 'astronomie', 'stadtmauern'].every(k => p.techs[k]) || p.res.coins !== 3) throw new Error('Kopien oder Münzen falsch: ' + p.res.coins);
+    if ($('sheet-body').querySelector('.copy-row') || !/Diese Runde schon kopiert/.test($('sheet-body').textContent)) throw new Error('nach drei Kopien noch Zeilen');
+    console.log('       ' + a.replace(/\s+/g, ' ') + '  →  drei Kopien in einer Runde, danach „Diese Runde schon kopiert."');
+  } finally {
+    G('closeSheet')();
+    p.techs = merk.techs; p.res = merk.res; S.players[o].techs = merk.fremd; p.copied = merk.copied; S.cur = cur;
+    G('redraw')();
+  }
+});
 step('Internet: Gratiskopie unter „Fähigkeiten" (v87; bis v86 im Technologiebogen)', () => {
   const S = G('S'), pi = S.cur;
   S.players[pi].techs.internet = true;
@@ -377,28 +417,30 @@ step('Internet: Gratiskopie unter „Fähigkeiten" (v87; bis v86 im Technologieb
   G('redraw')();
   if ($('a-abil-n').hidden || +$('a-abil-n').textContent < 1) throw new Error('keine Zahl an „Fähigkeiten" trotz Gratiskopie');
   $('a-abil').onclick();
-  // Die Gratiskopie zeigt die Wirkung der Technologie – bis v72 stand dort nur
-  // „Internet · Gratiskopie", die Wirkung fehlte.
-  const frei = $('sheet-body').querySelector('[data-act="kopie:gratis:stadtmauern"]');
+  /* Seit v105 eine Zeile je Technologie mit ihrer Wirkung (bis v72 stand dort nur „Internet ·
+     Gratiskopie"), rechts je offenem Weg der Preis als Knopf – beim Internet „gratis",
+     hervorgehoben, Name des Wegs als title. */
+  const frei = $('sheet-body').querySelector('[data-act="kopie:internet:stadtmauern"]');
   if (!frei) throw new Error('keine Gratiskopie für Stadtmauern');
   if (!frei.classList.contains('free')) throw new Error('Gratiskopie nicht als kostenlos hervorgehoben');
-  const eff = frei.querySelector('small').childNodes[0].textContent.trim();
+  const zeile = frei.closest('.copy-row');
+  const eff = zeile.querySelector('small').childNodes[0].textContent.trim();
   const soll = G('techEffect')(G('TECH_BY_KEY').stadtmauern, S);
   if (eff !== soll) throw new Error('Gratiskopie zeigt „' + eff + '" statt der Wirkung „' + soll + '"');
-  if (/Gratiskopie/.test(frei.textContent)) throw new Error('„Gratiskopie" steht noch auf dem Knopf');
-  if (frei.querySelector('.cost').textContent.trim() !== '') throw new Error('v102: kein „gratis" mehr – die Hervorhebung sagt es');
-  if (!frei.querySelector('.owner-mark.has')) throw new Error('nicht zu sehen, wer sie hat');
+  if (frei.textContent !== 'gratis' || frei.title !== 'Internet') throw new Error('Preisknopf: „' + frei.textContent + '", title ' + frei.title);
+  if (zeile.querySelectorAll('button').length !== 1) throw new Error('nur Internet: ein Preisknopf je Zeile');
+  if (!zeile.querySelector('.owner-mark.has')) throw new Error('nicht zu sehen, wer sie hat');
   // auf Englisch: „free" und die englische Wirkung
   G('closeSheet')(); G('switchLang')('en'); $('a-abil').onclick();
-  const freiEn = $('sheet-body').querySelector('[data-act="kopie:gratis:stadtmauern"]');
-  const effEn = freiEn.querySelector('small').childNodes[0].textContent.trim();
-  if (effEn !== 'Cities have +5 defence') throw new Error('englische Gratiskopie: „' + effEn + '"');
+  const freiEn = $('sheet-body').querySelector('[data-act="kopie:internet:stadtmauern"]');
+  const effEn = freiEn.closest('.copy-row').querySelector('small').childNodes[0].textContent.trim();
+  if (effEn !== 'Cities have +5 defence' || freiEn.textContent !== 'free') throw new Error('englisch: „' + effEn + '", „' + freiEn.textContent + '"');
   G('closeSheet')(); G('switchLang')('de'); $('a-abil').onclick();
-  console.log('       Gratiskopie: „' + eff + '" · englisch „' + effEn + '"');
-  $('sheet-body').querySelector('[data-act="kopie:gratis:stadtmauern"]').onclick();
+  console.log('       Zeile: „' + eff + '" · Preis „gratis" · englisch „' + effEn + '", „free"');
+  $('sheet-body').querySelector('[data-act="kopie:internet:stadtmauern"]').onclick();
   if (!G('has')(S.players[pi], 'stadtmauern')) throw new Error('Kopie nicht übernommen');
-  if ($('sheet-body').querySelector('[data-act^="kopie:gratis:"]')) throw new Error('zweite Gratiskopie in derselben Runde');
-  if (!/schon eingesetzt/.test($('sheet-body').textContent)) throw new Error('kein Hinweis, dass das Internet genutzt ist');
+  if ($('sheet-body').querySelector('[data-act^="kopie:internet:"]')) throw new Error('zweite Gratiskopie in derselben Runde');
+  if (!/Diese Runde schon kopiert/.test($('sheet-body').textContent)) throw new Error('kein Hinweis, dass diese Runde kopiert ist');
   G('closeSheet')();
 });
 step('Sklaverei- und Kolonialismus-Buttons erscheinen', () => {
@@ -2318,7 +2360,7 @@ step('Techtree: der Bogen zeigt die Leitern nach den Kosten des (einzigen) Techt
   }
   const ko = kachelText('kolonialismus'), ku = kachelText('kundschafterei');
   if (ko !== '3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen') throw new Error('Kolonialismus-Kachel: ' + ko);
-  if (ku !== 'Tech kopieren (2× Kosten in Münzen)') throw new Error('Kundschafterei-Kachel: ' + ku);
+  if (ku !== '1 Tech/Runde kopieren (2× Kosten in Münzen)') throw new Error('Kundschafterei-Kachel: ' + ku);
   G('closeModal')();
   console.log('       Forschung: ' + fo.map(x => x.join(' ')).join(', '));
   console.log('       Produktion: ' + pr.map(x => x.join(' ')).join(', '));
@@ -3135,9 +3177,9 @@ step('Fähigkeiten: in der Leiste an der Stelle von „Erträge", Zahl der Arten
   if (zahlAbil() !== 3) throw new Error('bezahltes Kopieren zählt mit: ' + zahlAbil());
   // im Blatt sind genau diese drei Arten hervorgehoben
   $('a-abil').onclick();
-  const arten = new Set([...$('sheet-body').querySelectorAll('.opt.free')].map(b => b.dataset.act.split(':')[0]));
+  const arten = new Set([...$('sheet-body').querySelectorAll('button.free')].map(b => b.dataset.act.split(':')[0]));
   if ([...arten].sort().join() !== 'forschung,kopie,wachsen') throw new Error('hervorgehoben: ' + [...arten].join(','));
-  if ($('sheet-body').querySelector('.opt.free[disabled]')) throw new Error('ein gesperrter Knopf ist als kostenlos hervorgehoben');
+  if ($('sheet-body').querySelector('button.free[disabled]')) throw new Error('ein gesperrter Knopf ist als kostenlos hervorgehoben');
   // Nutzen senkt die Zahl
   $('sheet-body').querySelector('[data-act="wachsen:gratis"]').onclick();
   if (zahlAbil() !== 2) throw new Error('nach dem kostenlosen Wachsen Zahl ' + zahlAbil());
@@ -3294,7 +3336,7 @@ step('Fähigkeiten: auf Englisch vollständig, kostenlose Technologie aus Wunder
   $('a-abil').onclick();
   const txt = $('sheet-body').textContent.replace(/\s+/g, ' ');
   for (const t of ['Abilities', 'Free research', 'Free technology', 'Grow all cities for free',
-    'Grow all cities', 'Copy technologies', 'once free via the Internet'])
+    'Grow all cities', 'Copy technologies'])
     if (!txt.includes(t)) throw new Error('fehlt: ' + t);
   if (/[äöüß]/.test(txt.replace(/Test/g, ''))) throw new Error('deutscher Rest: ' + txt.match(/\S*[äöüß]\S*/)[0]);
   const fehlt = G('missingStrings')();
@@ -3407,7 +3449,7 @@ step('v89: frisch gezeigte Blätter nehmen kurz keine Tipps an – außer auf de
   if (Object.keys(p.techs).length !== vorTech + 1) throw new Error('Freie Forschung ging nicht');
   const coins = p.res.coins;
   tippe(knopf('[data-act="wachsen:bezahlt"]'));
-  tippe(knopf('[data-act^="kopie:bezahlt:"]'));
+  tippe(knopf('[data-act^="kopie:spionage:"]'));
   if (pops() !== vorher || p.res.coins !== coins || Object.keys(p.techs).length !== vorTech + 1)
     throw new Error('Doppeltipp nach dem Neuzeichnen hat gewirkt');
   // 3 bewusst, nach der Pause: wirkt
