@@ -181,7 +181,19 @@ function boot() {
   $('pl-rot').onclick = placeRotate;
   $('pl-ok').onclick = placeConfirm;
   initOrientation();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+  if ('serviceWorker' in navigator) swStart();
+}
+/* Offline-Cache (sw.js). Übernimmt eine neue Fassung, während das Menü offen ist, lädt die
+   Seite neu (v106) – so kommt sie mit dem ersten Start nach dem Upload an, nicht erst mit dem
+   zweiten. Mitten im Spiel nicht: dann beim nächsten Start. `vorher`: beim allerersten Einbau
+   gab es keine alte Fassung, die zu ersetzen wäre. Die Einzeldatei hat keinen Service Worker
+   (build_single.py nimmt den Aufruf heraus). */
+function swStart() {
+  const vorher = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (vorher && $('screen-menu').classList.contains('show')) location.reload();
+  });
+  navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 function startGameScreen() {
   show('screen-game');

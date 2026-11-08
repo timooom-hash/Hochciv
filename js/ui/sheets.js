@@ -137,6 +137,16 @@ function abilSheet(oben) {
         : teil[0] === 'kopie' ? { art: 'kopieren', k: teil[2] } : { art: 'gratis', k: teil[1] };
     handlers.push([id, () => { if (fgDarf(aktion)) fn(); }]);
   };
+  // Ein Kopierweg als Preisknopf in der Zeile einer Technologie (v105): gratis ist hervorgehoben
+  const weg = (act, w, fn) => {
+    const id = 'f' + (handlers.length + 1) + Math.random().toString(36).slice(2, 6);
+    const name = esc(TECH_BY_KEY[w.k].n), frei = !w.coins;
+    const preis = frei ? T('gratis') : costText({ coins: w.coins }, `${w.coins}🪙`);
+    handlers.push([id, () => { if (fgDarf({ art: 'kopieren', k: act.split(':')[2] })) fn(); }]);
+    return `<button class="way${frei ? ' free' : ''}" id="${id}" data-label="${frei ? 'Gratis kopieren' : 'Kopieren'}" ` +
+      `data-act="${act}" title="${name}" aria-label="${name}: ${esc(preis)}" ${available(S, pi, 'coins') < w.coins ? 'disabled' : ''}>` +
+      `${esc(preis)}</button>`;
+  };
   const kopf = t => rows.push(`<h4 class="abil-h">${t}</h4>`);
   const notiz = t => rows.push(`<p class="sub abil-note">${t}</p>`);
   // Einzelne Wahl (Technologie, Kopie): Fehler melden, sonst neu zeichnen – auch das Ende
@@ -237,25 +247,21 @@ function abilSheet(oben) {
       !r.done);
   }
 
-  // 5 Kopieren – Spionage (1×), Kundschafterei (2×) und die Gratiskopie per Internet
-  const bezahlt = copyRate(p) != null, netz = has(p, 'internet');
-  if (bezahlt || netz) {
-    const frei = internetAvailable(S, pi);
-    kopf(T('Technologien kopieren') + (frei ? ' · ' + T('1× gratis per Internet') : ''));
-    const weg = has(p, 'spionage') ? TECH_BY_KEY.spionage : has(p, 'kundschafterei') ? TECH_BY_KEY.kundschafterei : null;
-    notiz([weg ? `${esc(weg.n)}: ${esc(weg.e)}` : '',
-      netz ? `${esc(TECH_BY_KEY.internet.n)}: ${frei ? esc(TECH_BY_KEY.internet.e) : T('diese Runde schon eingesetzt')}` : '']
-      .filter(Boolean).join(' · '));
+  /* 5 Kopieren (v105): Internet, Spionage und Kundschafterei sind je eine Kopie je Runde. Eine
+     Zeile je Technologie, rechts je offenem Weg sein Preis als Knopf – gratis, Einfaches,
+     Doppeltes der Grundkosten. Ein genutzter Weg verschwindet aus allen Zeilen; welcher Weg
+     welcher ist, sagt der Preis (und title/aria-label), kein Satz. Bis v104 je Weg ein eigener
+     Knopf und eine Zeile mit den Wirkungstexten. */
+  if (COPY_WAYS.some(w => has(p, w.k))) {
+    kopf(T('Technologien kopieren'));
     const cop = copyableTechs(S, pi);
-    if (!cop.length) notiz(T('Nichts zu kopieren – kein anderes Reich hat eine Technologie, die dir fehlt.'));
+    if (!copyWaysOpen(S, pi).length) notiz(T('Diese Runde schon kopiert.'));
+    else if (!cop.length) notiz(T('Nichts zu kopieren – kein anderes Reich hat eine Technologie, die dir fehlt.'));
     cop.slice(0, 40).forEach(o => {
-      const t = o.tech, marken = ownerMarks(S, t.k, pi);
-      // je Technologie bis zu zwei Knöpfe: gratis per Internet und bezahlt
-      if (o.freeOk) knopf('Gratis kopieren', 'kopie:gratis:' + t.k, esc(t.n), techSub(t) + marken, '',
-        tu(() => copyTech(S, pi, t.k, 'free')), false, true);
-      if (o.paidCoins != null) knopf('Kopieren', 'kopie:bezahlt:' + t.k, esc(t.n), techSub(t) + marken,
-        costText({ coins: o.paidCoins }, `${o.paidCoins}🪙`), tu(() => copyTech(S, pi, t.k, 'paid')),
-        available(S, pi, 'coins') < o.paidCoins);
+      const t = o.tech;
+      const preise = o.ways.map(w => weg('kopie:' + w.k + ':' + t.k, w, tu(() => copyTech(S, pi, t.k, w.k)))).join('');
+      rows.push(`<div class="copy-row"><span>${esc(t.n)}<small>${techSub(t)}${ownerMarks(S, t.k, pi)}</small></span>` +
+        `<span class="copy-ways">${preise}</span></div>`);
     });
   }
 
