@@ -216,7 +216,7 @@ function newGame(cfg) {
     // Erweiterungen: Ereignisse und Weltwunder werden im Aufbau zugeschaltet
     ev: cfg.events ? { mode: cfg.eventMode === 'easy' ? 'easy' : 'hard' } : null,
     wo: !!cfg.wonders,
-    // Alter Techtree (bis v81 der Standard, seit v82 nur im Tutorial): OLD_TECH_COSTS / techBase.
+    // Alter Techtree (bis v81 der Standard, heute nur in Spielständen von vor v82): OLD_TECH_COSTS / techBase.
     // Steht immer im Spielstand – auch false –, daran erkennt migrateState neue Spielstände.
     oldTree: !!cfg.oldTree,
     // Marathon (v83): große Zufallskarte, teurere Technologien, gedraftete Fähigkeiten
@@ -282,7 +282,7 @@ function newGame(cfg) {
 /* ------------------------------------------------------------ Technologien */
 function techCost(S, pi, tech) {
   const p = S.players[pi];
-  let c = techBase(S, tech);          // Grundkosten dieser Partie (im Tutorial der alte Techtree)
+  let c = techBase(S, tech);          // Grundkosten dieser Partie (alter Techtree, Marathon)
   const age = tech.k === 'singularitaet' ? 4 : tech.age;
   if (tech.k === 'singularitaet' && kremlBuilt(S)) c += KREML_SURCHARGE;
   const f = discountFactor(S);                                         // Marathon: doppelt (v85)
@@ -291,7 +291,7 @@ function techCost(S, pi, tech) {
   return Math.max(0, c);
 }
 const discountFactor = S => S && S.marathon ? MARATHON_DISCOUNT_FACTOR : 1;
-// Rabatt der Wissenschaftlichen Methode je Zeitalter – im alten Techtree (Tutorial) der bis v96
+// Rabatt der Wissenschaftlichen Methode je Zeitalter – im alten Techtree der bis v96
 const methodDiscount = S => S && S.oldTree ? OLD_METHOD_DISCOUNT : METHOD_DISCOUNT;
 // Griechenland hat keinen Würfelbonus mehr – nur Philosophie gibt +1.
 function availBonus(p) { return has(p, 'philosophie') ? 1 : 0; }
@@ -342,6 +342,11 @@ function migrateState(S) {
     if (p.freeTechsUsed === undefined && typeof p.freeTechUsed === 'number') p.freeTechsUsed = 1;
   // Gründungen je Zug (v84–v99, für die Grenze im Marathon) – seit v100 ohne Grenze, ungenutzt
   for (const p of S.players || []) { delete p.foundRound; delete p.foundCount; }
+  // Kopieren (v105): je Weg die Runde der letzten Kopie – bis v104 nur das Internet
+  for (const p of S.players || []) if (p.internetUsed !== undefined) {
+    (p.copied = p.copied || {}).internet = p.internetUsed;
+    delete p.internetUsed;
+  }
   /* Beanspruchte Felder auf oder neben einer Stadt (v104): bis v103 durfte man neben fremde
      gründen – das Feld gehörte dann zwei Reichen –, und ein eigenes daneben blieb beansprucht.
      Beides wird hier, was es seit v104 beim Gründen wird: ein Feld der Stadt. */
@@ -1791,28 +1796,27 @@ function claimTile(S, pi, r, c) {
   log(S, 'act', T('%s: Feld %s/%s beansprucht.', civOf(p).n, r, c));
   return null;
 }
-/* Kopierbare Technologien anderer Reiche. Drei getrennte Wege:
-   - Spionage: bezahlt, 1× Wissenschaftskosten in Münzen, kein Rundenlimit
-   - Kundschafterei: bezahlt, 2× Kosten in Münzen (SCOUTING_RATE, bis v71 3×), kein
-     Rundenlimit
-   - Internet: 1× pro Runde kostenlos
-   Vergünstigungen (Wiss. Methode etc.) gelten beim Kopieren nicht. Hat ein Reich beide
-   bezahlten Wege, gilt der günstigere – Spionage. */
-function copyRate(p) {
-  if (has(p, 'spionage')) return 1;
-  if (has(p, 'kundschafterei')) return SCOUTING_RATE;
-  return null;
-}
-function internetAvailable(S, pi) {
-  const p = S.players[pi];
-  return has(p, 'internet') && (p.internetUsed !== S.round);
+/* Technologien anderer Reiche kopieren (v105, Anweisung des Autors): drei Wege, jeder EINMAL JE
+   RUNDE und unabhängig von den anderen – Internet kostenlos, Spionage zum Einfachen, Kundschafterei
+   zum Doppelten der Grundkosten in Münzen (SCOUTING_RATE). Wer alle drei hat, kopiert bis zu drei
+   Technologien je Runde. Bis v104 kopierten Spionage und Kundschafterei beliebig oft, und wer beide
+   hatte, kopierte nur zum Preis der Spionage (Rückfrage beim Autor: jetzt je eine Kopie).
+   Vergünstigungen (Wiss. Methode, Griechenland) gelten beim Kopieren nicht. Gezählt in
+   p.copied[Weg] = Runde der letzten Kopie (bis v104 nur p.internetUsed, migrateState). */
+const COPY_WAYS = [
+  { k: 'internet', rate: 0 },
+  { k: 'spionage', rate: 1 },
+  { k: 'kundschafterei', rate: SCOUTING_RATE },
+];
+// Die Wege, die diesem Reich diese Runde noch offenstehen – der billigste zuerst
+function copyWaysOpen(S, pi) {
+  const p = S.players[pi], done = p.copied || {};
+  return COPY_WAYS.filter(w => has(p, w.k) && done[w.k] !== S.round);
 }
 function copyableTechs(S, pi) {
   const p = S.players[pi], out = [];
-  const rate = copyRate(p);                 // ohne Vergünstigung: Basiskosten der Tech
-  const paidPossible = rate != null;
-  const freePossible = internetAvailable(S, pi);
-  if (!paidPossible && !freePossible) return out;
+  const wege = copyWaysOpen(S, pi);
+  if (!wege.length) return out;
   const seen = new Set();
   S.players.forEach((o, i) => {
     if (i === pi) return;
@@ -1821,35 +1825,25 @@ function copyableTechs(S, pi) {
       seen.add(k);
       const t = TECH_BY_KEY[k];
       if (!t) return;
-      // Beide Wege sind unabhängig: bezahlt (Spionage/Kundschafterei) UND/ODER
-      // die eine Gratiskopie pro Runde (Internet).
-      out.push({
-        tech: t,
-        paidCoins: paidPossible ? rate * techBase(S, t) : null,   // null = kein bezahlter Weg
-        freeOk: freePossible,                          // true = Gratiskopie möglich
-      });
+      // je offenem Weg der Preis in Münzen (Grundkosten dieser Partie, ohne Vergünstigung)
+      out.push({ tech: t, ways: wege.map(w => ({ k: w.k, coins: w.rate * techBase(S, t) })) });
     });
   });
   return out;
 }
-function copyTech(S, pi, tk, mode) {
+// `way`: 'internet' | 'spionage' | 'kundschafterei'; ohne Angabe der billigste offene
+function copyTech(S, pi, tk, way) {
   const p = S.players[pi];
+  if (way && has(p, way) && (p.copied || {})[way] === S.round) return T('Diese Runde schon per %s kopiert.', TECH_BY_KEY[way].n);
+  if (!way && COPY_WAYS.some(w => has(p, w.k)) && !copyWaysOpen(S, pi).length) return T('Diese Runde schon kopiert.');
   const opt = copyableTechs(S, pi).find(o => o.tech.k === tk);
-  if (!opt) return 'Nicht kopierbar.';
-  // Modus wählen: 'free' oder 'paid'. Ohne Angabe: bezahlt bevorzugen, damit die
-  // Gratiskopie für später frei bleibt.
-  const useMode = mode || (opt.paidCoins != null ? 'paid' : 'free');
-  if (useMode === 'free') {
-    if (!opt.freeOk || !internetAvailable(S, pi)) return T('Diese Runde schon per Internet kopiert.');
-    p.internetUsed = S.round;
-    p.techs[tk] = true;
-    log(S, 'act', T('%s: %s kopiert (Internet, gratis).', civOf(p).n, opt.tech.n), 'kopieren');
-  } else {
-    if (opt.paidCoins == null) return T('Kein bezahlter Kopierweg erforscht.');
-    if (opt.paidCoins && !pay(S, pi, 'coins', opt.paidCoins)) return T('Zu wenig Münzen (%s nötig).', opt.paidCoins);
-    p.techs[tk] = true;
-    log(S, 'act', T('%s: %s kopiert (%s Münzen).', civOf(p).n, opt.tech.n, opt.paidCoins), 'kopieren');
-  }
+  const w = opt && (way ? opt.ways.find(x => x.k === way) : opt.ways[0]);
+  if (!w) return T('Nicht kopierbar.');
+  if (w.coins && !pay(S, pi, 'coins', w.coins)) return T('Zu wenig Münzen (%s nötig).', w.coins);
+  (p.copied = p.copied || {})[w.k] = S.round;
+  p.techs[tk] = true;
+  log(S, 'act', w.coins ? T('%s: %s kopiert (%s, %s Münzen).', civOf(p).n, opt.tech.n, TECH_BY_KEY[w.k].n, w.coins)
+    : T('%s: %s kopiert (Internet, gratis).', civOf(p).n, opt.tech.n), 'kopieren');
   const same = techPool(S).filter(t => t.f === opt.tech.f && t.age === opt.tech.age && p.techs[t.k]);
   if (same.length === 1) rollAvailability(S, pi, opt.tech.f, opt.tech.age + 1);
   return null;
@@ -1869,7 +1863,7 @@ function freeActions(S, pi) {
   if (freePickOptions(S, pi).length) out.push('wunder');
   if (citiesOf(S, pi).some(c => freeGrowthAvailable(S, pi, c) && !growBlockReason(S, pi, c)))
     out.push('wachstum');
-  if (internetAvailable(S, pi) && copyableTechs(S, pi).some(o => o.freeOk)) out.push('internet');
+  if (copyableTechs(S, pi).some(o => o.ways.some(w => !w.coins))) out.push('internet');
   return out;
 }
 function nuke(S, pi, r, c) {                // Atomwaffen

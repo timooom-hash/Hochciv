@@ -1,6 +1,6 @@
 /* Version der App. Sie steht im Hauptmenü und muss zur VERSION in sw.js passen –
    ein Test bindet beide aneinander, damit sie nicht auseinanderlaufen. */
-const APP_VERSION = 'v104';
+const APP_VERSION = 'v105';
 
 /* Hochzeivilization – Spieldaten
    Alle Werte aus den Originalregeln (Regelheft + Technologiebogen).
@@ -50,11 +50,14 @@ const CITY_YIELD = [1, -1, 1];
    Anweisung des Autors): Mathematik 1, Astronomie 2, Philosophie 3, Schrift 4 ·
    Bewässerung 1, Landwirtschaft 5 · Chemie 11, Biologie 12, Wissenschaftliche Methode 15.
    Seit v84 (Anweisung des Autors) außerdem Stadtmauern 2, Eisenverarbeitung 4,
-   Belagerungsmaschinen 5 (vorher 5, 2, 4).
-   Die alten Werte gibt es nur noch im Tutorial (OLD_TECH_COSTS). Die Reihenfolge dieser
+   Belagerungsmaschinen 5 (vorher 5, 2, 4). Seit v105 (Anweisung des Autors) getauscht bzw.
+   gedreht, jeweils im selben Zeitalter: Theologie 8 und Bürokratie 10 (vorher 10, 8),
+   Militärgericht 11 und Nationalismus 13 (13, 11), Stahl 7 und Burgenbau 8 (8, 7), Kunstdünger
+   11, Dampfmaschine 13, Eisenbahn 14 (14, 11, 13).
+   Die alten Werte behält der alte Techtree (OLD_TECH_COSTS). Die Reihenfolge dieser
    Liste ist bewusst die alte geblieben – die Leiter im Bogen kommt aus techsIn (nach
    Kosten sortiert), und wo Code die Liste der Reihe nach durchgeht, bleibt so alles,
-   wie es war (auch im Tutorial). */
+   wie es war. */
 const TECHS = [
   // Forschung
   { k: 'schrift', n: 'Schrift', f: 0, c: 4, e: 'Bevölkerung bringt je 2 Wissenschaft' },
@@ -83,9 +86,9 @@ const TECHS = [
   { k: 'muehlentechnik', n: 'Mühlentechnik', f: 1, c: 8, e: 'Fluss bringt 2 Münzen' },
   { k: 'baukraene', n: 'Baukräne', f: 1, c: 9, wo: true, e: 'Weltwunder kosten 2/4/6/8/… weniger' },
   { k: 'gilden', n: 'Gilden', f: 1, c: 10, e: '1:1 Münzen → Nahrung' },
-  { k: 'dampfmaschine', n: 'Dampfmaschine', f: 1, c: 11, e: 'Keine Münzkosten für Bevölkerungswachstum; 1× zusätzliches Wachstum pro Stadt' },
-  { k: 'eisenbahn', n: 'Eisenbahn', f: 1, c: 13, e: 'Eisenbahn' },
-  { k: 'kunstduenger', n: 'Kunstdünger', f: 1, c: 14, e: 'Wald bringt 1 Nahrung' },
+  { k: 'dampfmaschine', n: 'Dampfmaschine', f: 1, c: 13, e: 'Keine Münzkosten für Bevölkerungswachstum; 1× zusätzliches Wachstum pro Stadt' },
+  { k: 'eisenbahn', n: 'Eisenbahn', f: 1, c: 14, e: 'Eisenbahn' },
+  { k: 'kunstduenger', n: 'Kunstdünger', f: 1, c: 11, e: 'Wald bringt 1 Nahrung' },
   { k: 'fliessband', n: 'Fließband', f: 1, c: 15, e: 'Bevölkerung bringt je 2 Münzen' },
   { k: 'verbundwerkstoffe', n: 'Verbundwerkstoffe', f: 1, c: 16, e: '1× zusätzliches, kostenloses Wachstum pro Stadt' },
   { k: 'gruene_revolution', n: 'Grüne Revolution', f: 1, c: 17, e: 'Grasland bringt 2 Nahrung, 1 Münze' },
@@ -96,8 +99,8 @@ const TECHS = [
   { k: 'eisenverarbeitung', n: 'Eisenverarbeitung', f: 2, c: 4, e: '4 Münzen = 1 Macht' },
   { k: 'belagerung', n: 'Belagerungsmaschinen', f: 2, c: 5, e: '+3 Angriff gegen Städte' },
   { k: 'stadtmauern', n: 'Stadtmauern', f: 2, c: 2, e: 'Städte haben +5 Verteidigung' },
-  { k: 'burgenbau', n: 'Burgenbau', f: 2, c: 7, e: 'Städte enthalten unbewegliche Armee' },
-  { k: 'stahl', n: 'Stahl', f: 2, c: 8, e: 'Machtverlust = 1/3' },
+  { k: 'burgenbau', n: 'Burgenbau', f: 2, c: 8, e: 'Städte enthalten unbewegliche Armee' },
+  { k: 'stahl', n: 'Stahl', f: 2, c: 7, e: 'Machtverlust = 1/3' },
   { k: 'militaerlogistik', n: 'Militärlogistik', f: 2, c: 6, wo: true, e: '+1 Bewegungsweite je eigenem Weltwunder' },
   { k: 'schiesspulver', n: 'Schießpulver', f: 2, c: 10, e: 'Kontrollzone' },
   { k: 'gewehre', n: 'Gewehre', f: 2, c: 11, e: '3 Münzen = 1 Macht' },
@@ -114,14 +117,14 @@ const TECHS = [
   { k: 'wallfahrt', n: 'Wallfahrt', f: 3, c: 4, wo: true, e: 'Je eigenem Weltwunder +3 auf alle Erträge' },
   { k: 'sklaverei', n: 'Sklaverei', f: 3, c: 5, e: 'Stadtbevölkerung opfern → 7 Münzen · wird in der Moderne obsolet' },
   { k: 'rittertum', n: 'Rittertum', f: 3, c: 6, e: '1 Bevölkerungsverlust beim Erobern' },
-  { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: 'Tech kopieren (2× Kosten in Münzen)' },
-  { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 8, e: 'Hauptstadt produziert doppelt',
+  { k: 'kundschafterei', n: 'Kundschafterei', f: 3, c: 7, e: '1 Tech/Runde kopieren (2× Kosten in Münzen)' },
+  { k: 'buerokratie', n: 'Bürokratie', f: 3, c: 10, e: 'Hauptstadt produziert doppelt',
     voll: 'Hauptstadt produziert doppelt, dazu Handelsrouten, Ökologie, Gentechnik und beanspruchte Felder' },
   { k: 'kartografie', n: 'Kartografie', f: 3, c: 9, e: 'Keine Distanzkosten beim Gründen' },
-  { k: 'theologie', n: 'Theologie', f: 3, c: 10, e: '>1/2 der Bevölkerung zum Sieg' },
-  { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 11, e: 'Armeekosten 2 statt 5 × Anzahl' },
-  { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: 'Tech kopieren (1× Kosten in Münzen)' },
-  { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 13, e: 'Kein Bevölkerungsverlust beim Erobern' },
+  { k: 'theologie', n: 'Theologie', f: 3, c: 8, e: '>1/2 der Bevölkerung zum Sieg' },
+  { k: 'nationalismus', n: 'Nationalismus', f: 3, c: 13, e: 'Armeekosten 2 statt 5 × Anzahl' },
+  { k: 'spionage', n: 'Spionage', f: 3, c: 12, e: '1 Tech/Runde kopieren (1× Kosten in Münzen)' },
+  { k: 'militaergericht', n: 'Militärgericht', f: 3, c: 11, e: 'Kein Bevölkerungsverlust beim Erobern' },
   { k: 'kolonialismus', n: 'Kolonialismus', f: 3, c: 14, e: '3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen',
     voll: '3× pro Runde: ein herrenloses Feld beanspruchen; dort auch ohne Weg gründen. Beanspruchte Felder zählen zur Hauptstadt (mit Bürokratie doppelt)' },
   { k: 'massenmedien', n: 'Massenmedien', f: 3, c: 16, e: 'Eine Münze ernährt drei Bevölkerung' },
@@ -252,12 +255,13 @@ const SINGULARITY = {
   k: 'singularitaet', n: 'Singularität', c: SINGULARITY_BASE,
   e: 'Erfordert mind. 1 Technologie der Moderne in jedem Feld. Du gewinnst das Spiel.',
 };
-/* Der alte Techtree (bis v81 der Standard) – seit v82 nur noch im Tutorial (Anweisung des
-   Autors: „bis ich ein besseres Tutorialspiel liefere"). Er unterscheidet sich vom
-   heutigen nur in den Grundkosten dieser zwölf Technologien (die drei militärischen seit
-   v84: das Tutorial behält seine Kosten und damit seinen festen Ablauf) und seit v97 im
-   Rabatt der Wissenschaftlichen Methode (OLD_METHOD_DISCOUNT, aus demselben Grund); die
-   übrigen Wirkungen, Feld und Zeitalter sind gleich. Eine Partie trägt ihn als S.oldTree. Bis v81 hieß der Schalter andersherum
+/* Der alte Techtree (bis v81 der Standard): v82–v101 im Tutorial (Anweisung des Autors: „bis
+   ich ein besseres Tutorialspiel liefere"), seit v102 (Tutorial entfernt) nur noch in
+   Spielständen von vor v82. Er unterscheidet sich vom heutigen nur in den Grundkosten dieser
+   einundzwanzig Technologien – ändert sich der Standard, behält er die alten Werte (die drei
+   militärischen seit v84, neun weitere seit v105) – und seit v97 im Rabatt der
+   Wissenschaftlichen Methode (OLD_METHOD_DISCOUNT); die übrigen Wirkungen, Feld und Zeitalter
+   sind gleich. Eine Partie trägt ihn als S.oldTree. Bis v81 hieß der Schalter andersherum
    S.altTree (der heutige Standard war zuschaltbar) – migrateState übersetzt alte
    Spielstände, eine laufende Partie behält ihren Techtree. Ein Test hält fest, dass keiner
    dieser Werte die Zeitaltergrenze überschreitet (t.age kommt aus c). */
@@ -266,14 +270,17 @@ const OLD_TECH_COSTS = {
   wiss_methode: 11, chemie: 12, biologie: 15,                   // Forschung, Industrialisierung
   landwirtschaft: 1, bewaesserung: 5,                           // Produktion, Antike
   eisenverarbeitung: 2, belagerung: 4, stadtmauern: 5,          // Militär, Antike (bis v83 Standard)
+  // bis v104 Standard (seit v105 getauscht bzw. gedreht)
+  theologie: 10, buerokratie: 8, militaergericht: 13, nationalismus: 11, stahl: 8, burgenbau: 7,
+  kunstduenger: 14, dampfmaschine: 11, eisenbahn: 13,
 };
-/* Seit v97 dazu die Wissenschaftliche Methode von damals (bis v96 überall): Das Tutorial rechnet
-   mit ihr – Burgenbau (Mittelalter) kostet dort 3 statt 4, und am Ende des Zuges bleibt genau die
-   1 Wissenschaft fürs Rad. Gilt im alten Techtree, also auch in Partien von vor v82. */
+/* Seit v97 dazu die Wissenschaftliche Methode von damals (bis v96 überall) – eingeführt fürs
+   Tutorial (bis v101), das mit ihr rechnete; heute für Spielstände von vor v82. */
 const OLD_METHOD_DISCOUNT = [2, 4, 6, 8, 10];
 /* Kolonialismus (v103, Anweisung des Autors): kostenlos, COLONY_CLAIMS herrenlose Felder je Runde
    beanspruchen – bis v102 kaufen für 3 Münzen je Feld (v72), bis v71 für 5. Kundschafterei (v72):
-   2× der Grundkosten in Münzen, bis v71 3×. Beides gilt in beiden Techtrees. Die Techtexte in
+   2× der Grundkosten in Münzen, bis v71 3× – seit v105 einmal je Runde (COPY_WAYS, engine.js).
+   Beides gilt in beiden Techtrees. Die Techtexte in
    TECHS und DATA_EN nennen dieselben Zahlen; ein Test hält beides zusammen. */
 const COLONY_CLAIMS = 3;     // Kolonialismus: Felder je Runde
 const SCOUTING_RATE = 2;     // Kundschafterei: × Grundkosten, in Münzen (bis v71: 3)

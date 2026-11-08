@@ -126,14 +126,14 @@ const DATA_EN = {
     wallfahrt: ['Pilgrimage', '+3 to all yields per wonder you own'],
     sklaverei: ['Slavery', 'Sacrifice city population → 7 coins · becomes obsolete in the Modern Age'],
     rittertum: ['Chivalry', 'Only 1 population lost when conquering'],
-    kundschafterei: ['Scouting', 'Copy a tech (2× its cost in coins)'],
+    kundschafterei: ['Scouting', 'Copy 1 tech per round (2× its cost in coins)'],
     // dritte Stelle (v96): der ganze Text für den Regelbogen, wo die Kachel kürzer ist (`voll`)
     buerokratie: ['Bureaucracy', 'The capital produces double',
       'The capital produces double, as do trade routes, ecology, genetic engineering and claimed tiles'],
     kartografie: ['Cartography', 'No distance cost when founding'],
     theologie: ['Theology', '>1/2 of the population to win'],
     nationalismus: ['Nationalism', 'Army cost 2 instead of 5 × count'],
-    spionage: ['Espionage', 'Copy a tech (1× its cost in coins)'],
+    spionage: ['Espionage', 'Copy 1 tech per round (1× its cost in coins)'],
     militaergericht: ['Military tribunal', 'No population lost when conquering'],
     kolonialismus: ['Colonialism', '3× per round: claim an unowned tile; found a city there even without a route',
       '3× per round: claim an unowned tile; found a city there even without a route. Claimed tiles count towards the capital (doubled with Bureaucracy)'],
@@ -418,7 +418,7 @@ const UI_EN = {
   '%s übernimmt %s Weltwunder:': '%s takes over %s wonders:',
   '%s übernimmt %s freistehende(s) Weltwunder.': '%s takes over %s free-standing wonder(s).',
   '%s: %s auf %s/%s (%s Münzen).': '%s: %s on %s/%s (%s coins).',
-  '%s: %s kopiert (%s Münzen).': '%s: copied %s (%s coins).',
+  '%s: %s kopiert (%s, %s Münzen).': '%s: copied %s (%s, %s coins).',
   '%s: %s kopiert (Internet, gratis).': '%s: copied %s (Internet, free).',
   '%s: %s zerstört – kann nicht wieder gebaut werden.': '%s: %s destroyed – cannot be rebuilt.',
   '%s: +%s Macht für %s Münzen → %s.': '%s: +%s power for %s coins → %s.',
@@ -493,7 +493,9 @@ const UI_EN = {
   'Diese Runde nur noch kostenloses Wachstum.': 'Only free growth left this round.',
   'Diese Runde schon eingesetzt.': 'Already used this round.',
   'Diese Runde schon gewachsen.': 'Already grown this round.',
-  'Diese Runde schon per Internet kopiert.': 'Already copied via the Internet this round.',
+  'Diese Runde schon per %s kopiert.': 'Already copied via %s this round.',
+  'Diese Runde schon kopiert.': 'Already copied this round.',
+  'Nicht kopierbar.': 'Not copyable.',
   'Diese Stadt hat diese Runde schon geopfert.': 'This city has already sacrificed this round.',
   'Diese Stadt hat schon zwei Wunder.': 'This city already has two wonders.',
   'Diese Technologie gehört zur Weltwunder-Erweiterung.': 'This technology belongs to the wonders expansion.',
@@ -519,7 +521,6 @@ const UI_EN = {
   'Kampf um %ss Stadt: Angriff %s > Verteidigung %s (Zug %s/2).': "Battle for %s's city: attack %s > defence %s (turn %s/2).",
   'Kein Feld.': 'No tile.',
   'Kein Reich mit Sieganspruch ist noch im Spiel – es geht weiter.': 'No empire with a victory claim is left in the game – play continues.',
-  'Kein bezahlter Kopierweg erforscht.': 'No paid way of copying researched.',
   'Kein Weg dorthin – Gelände oder gegnerische Armeen sperren ihn.':
     'No route there – terrain or enemy armies block it.',
   'Kein Weg dorthin – gegnerisches Gebiet sperrt ihn.':
@@ -618,8 +619,6 @@ const UI_EN = {
     '%s: %s left',
   '+%s Macht':
     '+%s power',
-  '1× gratis per Internet':
-    'once free via the Internet',
   '<p class="hint">Mit <b>Gentechnik</b> oder <b>Massenmedien</b> ließe sich ein Teil davon aus Wissenschaft oder Münzen bestreiten.</p>':
     '<p class="hint">With <b>genetic engineering</b> or <b>mass media</b> part of it could be covered from science or coins.</p>',
   '<p class="sub" style="margin-top:10px">Aus anderen Quellen bestreiten – höchstens %s, also nur die tatsächlichen Kosten.</p>':

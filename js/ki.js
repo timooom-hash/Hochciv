@@ -619,7 +619,9 @@ function kiTechBonus(S, pi, k, K, y) {
     case 'atomwaffen': return 3;
     case 'militaerlogistik': return 1;
     case 'rittertum': case 'militaergericht': return 1;
-    case 'kundschafterei': case 'spionage': return 2 + 0.5 * Math.min(8, kiCopyCount(S, pi));
+    // seit v105 je eine Kopie je Runde (bis v104 beliebig viele: 2 + 0,5 je kopierbarer, bis 8) –
+    // geschätzt wie das Internet, nur bezahlt; nicht gemessen
+    case 'kundschafterei': case 'spionage': return 2 + 0.2 * H * Math.min(3, kiCopyCount(S, pi));
     case 'internet': return 3 + 0.3 * H * Math.min(3, kiCopyCount(S, pi));
     case 'massenmedien': case 'gentechnik': return 0.3 * H * Math.min(popOf(S, pi), 20) / 2 + 3;
     case 'wallfahrt': case 'baukraene': case 'raumfahrt': return S.wo ? 3 : 0;
@@ -903,12 +905,11 @@ function kiCandidates(S, pi, K, memo, billig) {
     add(() => T('Rückschau: %s', t.n), X => useBackPick(X, pi, t.k), 'back:' + t.k);
   for (const t of freePickOptions(S, pi))
     add(() => T('gratis: %s', t.n), X => useFreePick(X, pi, t.k), 'pick:' + t.k);
-  // --- Kopieren
-  for (const o of copyableTechs(S, pi)) {
-    if (o.freeOk) add(() => T('kopiert %s', o.tech.n), X => copyTech(X, pi, o.tech.k, 'free'), 'copyf:' + o.tech.k);
-    if (o.paidCoins != null && available(S, pi, 'coins') >= o.paidCoins)
-      add(() => T('kopiert %s', o.tech.n), X => copyTech(X, pi, o.tech.k, 'paid'), 'copyp:' + o.tech.k);
-  }
+  // --- Kopieren (v105): je offenem Weg ein Kandidat – jeder Weg einmal je Runde
+  for (const o of copyableTechs(S, pi))
+    for (const w of o.ways)
+      if (available(S, pi, 'coins') >= w.coins)
+        add(() => T('kopiert %s', o.tech.n), X => copyTech(X, pi, o.tech.k, w.k), 'copy' + w.k + ':' + o.tech.k);
   // --- Wachstum
   for (const city of citiesOf(S, pi)) {
     const id = city.id;
@@ -1680,7 +1681,7 @@ function kiSpent(before, after, sciFactor) {
    alles außer Forschung und Kopieren dreifach (KI_W.sciReserve) – erst wird geforscht, was
    sich lohnt, der Rest darf danach in Münzen. Im Ernstfall (eine eigene Stadt belagert) gilt
    das nicht. */
-const KI_RESEARCH_TAG = /^(tech|free|back|pick|copyf|copyp):/;
+const KI_RESEARCH_TAG = /^(tech|free|back|pick|copy[a-z]+):/;
 /* Wählt Schritt für Schritt die beste Aktion (Nutzen je eingesetzter Ressource, mit einem
    Sockel, damit fast kostenlose Aktionen nicht unendlich gut aussehen) und führt sie auf
    dem echten Spielstand aus. Nach jeder Aktion wird neu bewertet: die Würfel nach einer
@@ -1693,7 +1694,7 @@ const KI_RESEARCH_TAG = /^(tech|free|back|pick|copyf|copyp):/;
      bleiben nur noch die billigen Kandidaten; das hält auch Züge mit Luftwaffe und
      zwanzig Armeen im Rahmen. Gezählt wird, nicht gestoppt – das Ergebnis hängt also nicht
      davon ab, wie schnell das Gerät ist. */
-const KI_BATCH = /^(grow|gfree|tech|free|back|pick|copyf|copyp|road|col):/;
+const KI_BATCH = /^(grow|gfree|tech|free|back|pick|copy[a-z]+|road|col):/;
 // Wird `x` im selben Schritt wie `pick` gebündelt ausgeführt? (eine Regel für kiPlan und kiMethodeZuerst)
 const kiImBuendel = (x, pick) => x !== pick && KI_BATCH.test(pick.c.tag) && KI_BATCH.test(x.c.tag) && x.ratio >= pick.ratio * 0.6;
 /* Wissenschaftliche Methode zuerst (v96, Anweisung des Autors: „sie hatte da eine schlechte
@@ -1709,7 +1710,7 @@ const kiImBuendel = (x, pick) => x !== pick && KI_BATCH.test(pick.c.tag) && KI_B
    mit dem besten Verhältnis, den der Planer gefunden hat (bezahlt, Freie Forschung, Rückschau,
    gratis, Kopie). Danach plant er neu, mit den neuen Preisen (kiPlan). Zurück kommt dieser
    Kandidat oder null. Wer weniger sieht (Stufe Leicht, `see`), übersieht auch sie öfter. */
-const KI_METHODE = /^(tech|free|back|pick|copyf|copyp):wiss_methode$/;
+const KI_METHODE = /^(tech|free|back|pick|copy[a-z]+):wiss_methode$/;
 // Ließe sich die Methode erforschen? (verfügbar und noch nicht erforscht)
 function kiMethodeOffen(S, pi) { return !!S.players[pi].avail.wiss_methode && !S.players[pi].techs.wiss_methode; }
 function kiMethodeZuerst(S, pi, scored, pick) {
