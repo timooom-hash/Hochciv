@@ -6462,3 +6462,46 @@ bezahlten Preise nebeneinander, die Preise im alten Techtree und im Marathon; di
 über mehrere Wege, über jeden einmal. `smoke.js`: die Zeile mit „gratis" (englisch „free") und
 `title`, drei Wege mit 3 Münzen („gratis · 2🪙 · 4🪙" gesperrt), nach der Kundschafterei und dem
 Internet die übrigen Preise, nach drei Kopien nur noch „Diese Runde schon kopiert."
+
+## Aktualisierung ganz oder gar nicht (v106)
+
+Gemeldet vom Autor (8.11.): „There's a bug in v105 that I can't open the abilities tab." Nachgefragt:
+in der App auf dem Home-Bildschirm, in jeder Partie ab Zug 1 – im Browser geht es.
+
+### Ursache (nachgestellt)
+
+Im Code von v105 ließ sich das Blatt in keinem Spielstand zum Scheitern bringen (Chromium: neue
+Partien, Spielstände von v102, alle Kopierwege, beide Sprachen, Erstes Spiel). Nachgestellt mit einem
+Server wie GitHub Pages und dem echten Service Worker: Ist `sw.js` schon neu, während der Upload noch
+läuft, füllt der Einbau den neuen Cache mit dem, was gerade auf dem Server liegt – hier neue
+`js/engine.js`, alte `js/ui/sheets.js`. Das alte Blatt ruft `copyRate`, das es seit v105 nicht mehr
+gibt: „Fähigkeiten" geht nicht auf. So bleibt es auch nach dem Upload, denn gefüllt wird nur einmal je
+`VERSION`. Ein zweiter Weg zum selben Ergebnis: Der HTTP-Cache des Browsers (GitHub Pages erlaubt zehn
+Minuten) reicht beim Einbau alte Dateien weiter. Welcher Weg es auf dem iPad war, lässt sich von hier
+nicht sagen; beide sind jetzt zu.
+
+### Verhalten – wie ausgelegt
+
+* **Ganz oder gar nicht:** Jede Datei kommt frisch vom Server, und ihr Inhalt muss `BUILD_HASH`
+  ergeben (dieselbe Rechnung wie `tools_version.js`). Sonst bricht der Einbau ab: Die alte Fassung
+  bleibt, beim nächsten Start versucht der Browser es wieder.
+* **Übernehmen:** wie bisher sofort; ist das Menü offen, lädt die Seite neu, mitten im Spiel nicht –
+  dann beim nächsten Start. Verworfen: immer neu laden (risse eine Partie aus dem Zug); nie (die neue
+  Fassung käme wie bis v105 erst mit dem zweiten Start).
+* Ohne WebCrypto (nur über unverschlüsseltes http außerhalb von localhost) wird nicht geprüft.
+
+### Umsetzung
+
+`sw.js`: `frisch` (`cache: 'reload'`), `buildHash` (SHA-1 über Name und Inhalt, nach Namen sortiert,
+ohne `./`, Icons und Manifest – wie `tools_version.js` und `test.js`), der Einbau als eine
+async-Funktion. `js/ui/boot.js`: `swStart()`. `build_single.py` ersetzt dessen Aufruf und bricht ab,
+wenn er fehlt. README: Hochladen mit `node tools_version.js`, ein halber Upload schadet nicht mehr.
+
+### Abgesichert (v106)
+
+`test.js` (erstmals mit asynchronem Schluss, `SPAETER`): sw.js in eigener Umgebung mit nachgebautem
+`fetch` und `caches` – mit den Dateien dieser Fassung kommen alle 30 frisch (`cache: 'reload'`) in den
+Cache, weicht eine ab, keine. Von Hand mit Chromium und einem Server wie GitHub Pages: v105 halb
+hochgeladen → „copyRate is not defined", auch nachdem der Rest da ist; v106 hochgeladen → geht; eine
+Fassung halb hochgeladen → abgelehnt, die alte läuft weiter; vollständig → übernommen und im Menü
+von selbst neu geladen; während einer Partie übernommen → kein Neuladen, beim nächsten Start da.

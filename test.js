@@ -14,6 +14,7 @@ const VERBOSE = process.argv.includes('--verbose') || process.argv.includes('-v'
 const say = console.log;
 if (!VERBOSE) console.log = (...a) => { const z = a.join(' '); if (z.startsWith('FAIL')) say(z); };
 let fails = 0, passed = 0;
+const SPAETER = [];   // asynchrone Prüfungen (seit v106 der Einbau des Service Workers) – laufen zum Schluss
 const eq = (got, want, label) => {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) { fails++; console.log(`FAIL ${label}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); }
@@ -5340,6 +5341,40 @@ const spielArt = mode => mode === 'duell'
     const soll = (sw.match(/const BUILD_HASH = '([^']*)'/) || [])[1];
     eq(ist, soll, `sw.js kennt den Stand der Dateien (sonst: node tools_version.js)`);
   }
+  /* Der Einbau (v106): jede Datei frisch vom Server, und in den Cache nur, wenn der Inhalt
+     BUILD_HASH ergibt – sonst bleibt die alte Fassung. Gemeldet nach v105: Die App auf dem
+     Home-Bildschirm hielt neue Dateien neben alten, „Fähigkeiten" ging nicht mehr auf. sw.js
+     läuft hier in eigener Umgebung; fetch liest die Dateien dieses Ordners (auf Wunsch eine
+     verändert, wie bei einem halb fertigen Upload), caches merkt sich, was abgelegt wird. */
+  SPAETER.push(async () => {
+    const einbau = async veraltet => {
+      const h = {}, abgelegt = new Map(), modi = new Set();
+      let uebernommen = false, fehler = null, warten = null;
+      const g = {
+        crypto: require('crypto').webcrypto, TextEncoder,
+        caches: { open: async () => ({ put: async (u, r) => { abgelegt.set(u, r); } }) },
+        fetch: async (u, opt) => {
+          modi.add(opt && opt.cache);
+          const f = u.replace(/^\.\//, '') || 'index.html';
+          const inhalt = fs.readFileSync(__dirname + '/' + f);
+          return new Response(f === veraltet ? Buffer.concat([inhalt, Buffer.from('\n// alt')]) : inhalt);
+        },
+        addEventListener: (art, fn) => { h[art] = fn; },
+        skipWaiting: async () => { uebernommen = true; },
+      };
+      g.self = g;
+      vm.runInNewContext(sw, g);
+      h.install({ waitUntil: p => { warten = p; } });
+      try { await warten; } catch (e) { fehler = e.message; }
+      return { abgelegt: abgelegt.size, modi: [...modi], uebernommen, fehler };
+    };
+    const n = 6 + SKRIPTE.length;    // STATIC samt './' und Icons, dazu die Skripte
+    eq(await einbau(null), { abgelegt: n, modi: ['reload'], uebernommen: true, fehler: null },
+      `Service Worker: mit den Dateien dieser Fassung kommen alle ${n} frisch vom Server in den Cache`);
+    const halb = await einbau('js/ui/sheets.js');
+    eq([halb.abgelegt, halb.uebernommen, /passen \(noch\) nicht/.test(halb.fehler || '')], [0, false, true],
+      'Service Worker: weicht eine Datei ab (halber Upload, alter HTTP-Cache), kommt nichts in den Cache – die alte Fassung bleibt');
+  });
 }
 
 /* --- Vollständige Partien: 4 Bots, keine Ausnahmen, Spiel endet */
@@ -7941,5 +7976,10 @@ function kiAbwehrLage(popKI, gross) {
   eq(B.over && B.over.winners, [kk], 'KI und Bot melden an: wie bei Menschen gewinnt die KI');
 }
 
-say(fails ? `test   ${fails} failed · ${passed} passed` : `test   ${passed} passed`);
-process.exit(fails ? 1 : 0);
+(async () => {
+  for (const f of SPAETER) {
+    try { await f(); } catch (e) { fails++; console.log(`FAIL ${e.message}`); }
+  }
+  say(fails ? `test   ${fails} failed · ${passed} passed` : `test   ${passed} passed`);
+  process.exit(fails ? 1 : 0);
+})();

@@ -16,7 +16,9 @@ for js in skripte:
 
 # Service Worker und Manifest gibt es in der Einzeldatei nicht
 html = html.replace('<link rel="manifest" href="manifest.webmanifest">','')
-html = html.replace("if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });","/* Einzeldatei: kein Service Worker */")
+sw_aufruf = "if ('serviceWorker' in navigator) swStart();"
+assert html.count(sw_aufruf) == 1, 'Aufruf des Service Workers nicht gefunden (boot.js)'
+html = html.replace(sw_aufruf, "/* Einzeldatei: kein Service Worker */")
 assert 'src="js/' not in html and 'href="css/' not in html, 'nicht alles inline'
 out = root/'hochzeivilization-einzeldatei.html'
 out.write_text(html)

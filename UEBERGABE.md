@@ -1,4 +1,4 @@
-# Hochzeivilization — Projekt-Übergabe (Stand 7.11., `sw.js` v105)
+# Hochzeivilization — Projekt-Übergabe (Stand 8.11., `sw.js` v106)
 
 Dieses Dokument ist so geschrieben, dass es in einen neuen Chat kopiert werden kann.
 
@@ -10,7 +10,7 @@ Home-Bildschirm hinzugefügt** (PWA, funktioniert offline). Vollständige Regel-
 automatischen Bots, Solo-gegen-Bots und Hotseat für 2–4 Menschen. Oberfläche **deutsch
 und englisch** (zwei Flaggen im Hauptmenü, Deutsch ist Vorgabe und Quelle).
 
-## Letzte Sitzungen auf einen Blick (v61 → v105)
+## Letzte Sitzungen auf einen Blick (v61 → v106)
 
 Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser Reihenfolge:
 
@@ -60,6 +60,10 @@ Für den Einstieg in einen neuen Chat – was sich zuletzt getan hat, in dieser 
 | v103 | Sechs Anweisungen des Autors, unter dem Grundsatz von v102: **„Armee bewegen"** für beide Knöpfe (in der Stadt und auf freiem Feld; ohne den Hinweis „erreichbare Felder werden markiert"); **„Bevölkerungswachstum"** statt „Bevölkerung wachsen"; **Demokratie/Nationalismus** „Armeekosten 4 bzw. 2 statt 5 × Anzahl"; **Ertragstechnologien nennen, was das Feld insgesamt bringt** („Wald bringt 2 Wissenschaft", „Grasland bringt 2 Nahrung" – bis v102 „+n", was nach Stapeln aussah); **große Bildschirme**: die ganze Oberfläche wächst ab 1366 × 720 mit dem Fenster (`--ui`, CSS-zoom; iPads bleiben bei 1); **Kolonialismus: 3× pro Runde ein herrenloses Feld kostenlos beanspruchen** (`claimTile`, `claimsLeft`, `COLONY_CLAIMS`; Kolonie ohne Weg und Hauptstadt-Zählung bleiben – Rückfrage beim Autor) | Oberfläche + Regel + KI |
 | v104 | Gemeldet vom Autor: man konnte **neben (und auf) einem fremden beanspruchten Feld gründen** – das Feld gehörte danach beiden Reichen. Jetzt gesperrt wie neben einer gegnerischen Armee (`foreignClaimNear`, auch Bots und KI); **ein eigenes Feld daneben wird ein gewöhnliches Feld der neuen Stadt** (verlässt `S.bought`, `claimsApart`; `settleGain` rechnet es mit; alte Spielstände beim Laden ebenso). Damit ist der offene Punkt 3 (Nachbarschaftsverbot der Territoriumsklausel) erledigt | Fehler + Regel |
 | v105 | **Neun Kosten** getauscht bzw. gedreht (Theologie 8/Bürokratie 10, Militärgericht 11/Nationalismus 13, Stahl 7/Burgenbau 8, Kunstdünger 11/Dampfmaschine 13/Eisenbahn 14; jede im selben Zeitalter; der alte Techtree behält die alten über `OLD_TECH_COSTS`). **Kopieren:** Internet, Spionage und Kundschafterei je eine Kopie je Runde, unabhängig (`COPY_WAYS`, `copyWaysOpen`, `copyTech(…, way)`, `p.copied`) – Rückfrage beim Autor: wer beide bezahlten hat, kopiert zweimal. Im Blatt eine Zeile je Technologie mit den Preisen als Knöpfen | Regel + Oberfläche + KI |
+| v106 | Gemeldet vom Autor: In der App auf dem Home-Bildschirm ging **„Fähigkeiten" in keiner Partie auf**, im Browser schon. Ursache, nachgestellt: Ihr Offline-Cache hielt neue Dateien neben alten (`copyRate is not defined`) – `sw.js` war schon neu, während der Upload lief, und gefüllt wird ein Cache nur einmal je `VERSION`. **Der Service Worker übernimmt eine Fassung jetzt ganz oder gar nicht:** jede Datei frisch (`cache: 'reload'`), Inhalt gegen `BUILD_HASH` geprüft, sonst bleibt die alte. Ist das Menü offen, lädt die App eine übernommene Fassung gleich neu (`swStart`) | Fehler + Auslieferung |
+
+Neu in v106: der erste Punkt unter „Was das Spiel heute kann", die Bug-Historie und `ANNAHMEN.md`
+(Abschnitt „Aktualisierung ganz oder gar nicht (v106)"), Punkt 66.
 
 Neu in v105: der erste Punkt unter „Was das Spiel heute kann", ausführlich in `ANNAHMEN.md`
 (Abschnitt „Kosten getauscht · Kopieren je Weg einmal je Runde (v105)"), Punkt 65.
@@ -201,7 +205,7 @@ Schritt unbekannt), seit v98 Punkt 55 (Auslegungen zum Startausgleich zu zweit),
 dritt unverändert, alte Spielstände) und 61 (was die Messung zu v101 sagt und was nicht), seit v103
 Punkt 62 (Auslegungen zu v103) und 63 (Kolonialismus kostenlos: Balance und KI-Forschungswert nicht
 gemessen), seit v104 Punkt 64 (Auslegungen zu v104), seit v105 Punkt 65 (Kopieren und Kosten: Auslegungen,
-nicht gemessen). Punkt 3 (Nachbarschaftsverbot der
+nicht gemessen), seit v106 Punkt 66 (Auslieferung: Auslegungen). Punkt 3 (Nachbarschaftsverbot der
 Territoriumsklausel) hat der Autor in v104 entschieden.
 
 ## Wo alles liegt
@@ -253,11 +257,11 @@ Territoriumsklausel) hat der Autor in v104 entschieden.
 | `js/ui/place.js` | 238 | Legephase der Plättchenkarte |
 | `js/ui/draft.js` | 89 | Marathon: Fähigkeiten draften |
 | `js/ui/editor.js` | 34 | Karteneditor |
-| `js/ui/boot.js` | 285 | Sprache, `boot`, Menü (`menuButtons`), Verdrahtung, Spielmenü ☰, Regeln (`rulesModal`, `spielartenHtml`), Laden/Speichern |
+| `js/ui/boot.js` | 297 | Sprache, `boot`, Menü (`menuButtons`), Verdrahtung, Spielmenü ☰, Regeln (`rulesModal`, `spielartenHtml`), Laden/Speichern |
 | `js/firstgame.js` | 1459 | **Erstes Spiel** (v92, v93): Seite vor der Partie mit der Wahl des Wegs (`fgSeite`), Karte, Verfügbarkeit und Würfel (`FG_SPAETER`, `fgVerfuegbar`, `fgWurf`, `fgNextDie`), Englands Drehbuch (`fgGegnerZug`), Schritte `FG_STEPS` (Ziel, Stand, Tipp, Rückmeldung, Schienen, Musterlösung; vom Weg geführt über `fgJe`, `fgRestSchritt`), blasse Kacheln (`fgBlass`), Schienen (`fgVeto`), Panel (`fgRenderPanel`), Spielende |
-| `test.js` | 7946 | **2006 Assertions**, `node test.js` |
+| `test.js` | 7986 | **2008 Assertions**, `node test.js` |
 | `smoke.js` | 4654 | **169 Schritte** durch die echte UI via jsdom, `node smoke.js` |
-| `build_single.py` / `check_single.js` | 24 / 85 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
+| `build_single.py` / `check_single.js` | 26 / 85 | Einzeldatei bauen und in jsdom prüfen (inkl. Plättchenkarte) |
 | `tools_version.js` | 72 | Version erhöhen + `BUILD_HASH` schreiben – **vor jedem Ausrollen** |
 | `tools_docs.js` | 75 | Zahlen in dieser Übergabe nachziehen (Zeilen, Assertions, Schritte) |
 | `tools_civs.js` | 82 | `data/civs.json` → `js/civs.js` |
@@ -284,6 +288,27 @@ Gedächtnis rekonstruieren.
 
 ## Was das Spiel heute kann
 
+- **v106 auf einen Blick.** Fehler gemeldet vom Autor: „Fähigkeiten" ging in der App auf dem
+  Home-Bildschirm nicht auf, in jeder Partie; im Browser schon. Im Code von v105 nicht zu finden
+  (Chromium: neue Partien, alte Spielstände, alle Kopierwege, beide Sprachen, Erstes Spiel). Nachgestellt
+  mit einem Server wie GitHub Pages und dem echten Service Worker: Lief der Upload noch, als die App
+  das neue `sw.js` sah, kam ein Gemisch in den Cache – neue `js/engine.js`, alte `js/ui/sheets.js`,
+  deren Blatt `copyRate` ruft. Neu gefüllt wird erst bei der nächsten `VERSION`, also blieb es kaputt.
+  · **`sw.js`:** Der Einbau holt jede Datei mit `cache: 'reload'` (nie aus dem HTTP-Cache des
+    Browsers, GitHub Pages: zehn Minuten) und legt sie nur ab, wenn `buildHash` – SHA-1 über Name und
+    Inhalt, wie `tools_version.js` – `BUILD_HASH` ergibt. Sonst wirft er: Die alte Fassung bleibt, beim
+    nächsten Start versucht der Browser es wieder. Ohne WebCrypto (http außerhalb von localhost)
+    ungeprüft.
+  · **`js/ui/boot.js`:** `swStart()` – übernimmt ein neuer Service Worker (`controllerchange`),
+    während das Menü offen ist, lädt die Seite neu; beim allerersten Einbau und mitten im Spiel nicht.
+    `build_single.py` ersetzt den Aufruf `if ('serviceWorker' in navigator) swStart();` und bricht ab,
+    wenn er fehlt (bis v105 ersetzte es stumm oder gar nicht).
+  · **Tests:** `test.js` läuft seit v106 mit asynchronem Schluss (`SPAETER`): sw.js in eigener Umgebung
+    mit nachgebautem `fetch`/`caches` – alle 30 Dateien frisch im Cache, mit einer abweichenden
+    nichts. Von Hand (Chromium, lokaler Server mit `Cache-Control` wie GitHub Pages,
+    `registration.update()`): v105 halb hochgeladen → kaputt, auch nach dem Rest; v106 → geht; eine
+    Fassung halb hochgeladen → abgelehnt, die alte läuft; komplett → übernommen und im Menü neu
+    geladen; während einer Partie → kein Neuladen.
 - **v105 auf einen Blick.** Zwei Anweisungen des Autors.
   · **Kosten:** `TECHS` Theologie 8, Bürokratie 10, Militärgericht 11, Nationalismus 13, Stahl 7,
     Burgenbau 8, Kunstdünger 11, Dampfmaschine 13, Eisenbahn 14 (getauscht bzw. gedreht, keine wechselt
@@ -1208,7 +1233,7 @@ Grundermittlung für die Meldung läuft nur, wenn schon feststeht, dass es keine
 
 ## Verifikationsmethoden (etabliert, unbedingt beibehalten)
 
-1. **`node test.js`** muss grün sein — 2006 Assertions, darunter die Rechnungen aus dem
+1. **`node test.js`** muss grün sein — 2008 Assertions, darunter die Rechnungen aus dem
    Regelheft-Beispiel, ein Test je geänderter Regel, 40 Bot-Partien, 40 mit Erweiterungen,
    20 Mensch-Partien, 20 Duelle, der komplette Tutorial-Durchlauf (zweimal, auf Gleichheit).
 2. **`node smoke.js`** fährt die echte UI durch jsdom (169 Schritte), inklusive
@@ -1270,8 +1295,11 @@ Begründung und Messung festgehalten, chronologisch nach Versionen.
 
 ## Bekannte Fragilitäten
 
-- **`sw.js`-Version** nach *jeder* Änderung hochzählen, sonst behält das installierte iPad
-  den alten Stand.
+- **`sw.js`: `VERSION` und `BUILD_HASH` nur über `node tools_version.js`.** Ohne neue `VERSION`
+  kommt eine Änderung nicht an; seit v106 auch nicht ohne passenden `BUILD_HASH` – der Einbau prüft
+  den Inhalt und übernimmt nur eine vollständige Fassung. Ein Host, der Dateien beim Ausliefern
+  umschreibt (Minify, eingefügte Skripte), verhindert damit jede Aktualisierung; dann die Prüfung in
+  `sw.js` herausnehmen. `build_single.py` sucht den Aufruf `swStart();` aus `boot.js` wörtlich.
 - **Maßstab großer Bildschirme (seit v103)**: `html{zoom:var(--ui)}` lässt auch `vh`/`vw` mitwachsen
   (Chromium gemessen). Darum bleibt `--ui` gedreht bei 1 (die Drehung rechnet mit 100vh/100vw), und
   wer neue Längen in `vh`/`vw` braucht, prüft sie bei `--ui` > 1. Höhen fürs CSS mit `offsetHeight`
@@ -1727,6 +1755,13 @@ gegen die Fassung davor — identisch).
   Fehlerbehebung, nicht Aufräumen. Ebenso schreibt `mp()` das Dezimalkomma fest.
 
 ## Vollständige Bug-Historie (alle behoben — nicht versehentlich rückgängig machen)
+
+Aus der Sitzung v106:
+- **„Fähigkeiten" ging in der App auf dem Home-Bildschirm nicht auf** (gemeldet vom Autor, in jeder
+  Partie ab Zug 1; im Browser ging es): Der Offline-Cache hielt v105-Dateien neben älteren
+  (`copyRate is not defined`). Der Service Worker füllte ihn beim Einbau mit dem, was gerade auf dem
+  Server lag – auch mitten in einem Upload –, und über den HTTP-Cache des Browsers; danach erst wieder
+  bei neuer `VERSION`. Jetzt nur ganz oder gar nicht (frisch geladen, gegen `BUILD_HASH` geprüft).
 
 Aus der Sitzung v104:
 - **Gründen neben einem fremden beanspruchten Feld** (gemeldet vom Autor; bis v103 bewusst offen –
@@ -2452,6 +2487,13 @@ Aus der Sitzung vom 21.–22.8. (Versionen v30–v49), grob nach Themen:
    ohne das Wort auskommen. (e) KI: der Wert von Spionage und Kundschafterei ist geschätzt, nicht
    gemessen. Belegt ist nur, dass sie über mehrere Wege kopiert (im Test mit 200 Münzen und ohne
    Wissenschaft über alle drei).
+
+66. **Getroffene Auslegungen (v106) – zum Ändern angeboten.** (a) Eine übernommene Fassung lädt die
+   App nur im Menü gleich neu; mitten im Spiel kommt sie beim nächsten Start (immer neu zu laden
+   risse eine Partie aus dem Zug). (b) Passt der Inhalt nicht zu `BUILD_HASH`, bleibt die alte Fassung
+   ohne Hinweis – bei einem Upload in Etappen gewollt, bei einem Host, der Dateien umschreibt, ein
+   Dauerzustand (Fragilitäten). (c) Der Übergang von v105: Die gemischte Seite kennt `swStart` nicht,
+   dort braucht es einmal einen Neustart der App von Hand.
 
 ## Arbeitsweise, die der Autor schätzt
 

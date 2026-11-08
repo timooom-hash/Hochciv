@@ -14,8 +14,15 @@ Läuft als Web-App offline auf dem iPad.
    das Spiel ohne Netz.
 
 Alle Pfade sind relativ, ein Unterverzeichnis ist also kein Problem.
-Nach Änderungen an den Dateien in `sw.js` die Zeile `const VERSION` hochzählen,
-sonst behalten installierte Geräte die alte Fassung.
+Nach Änderungen an den Dateien `node tools_version.js` ausführen: Es zählt `VERSION` in `sw.js`
+hoch und setzt `BUILD_HASH` – sonst behalten installierte Geräte die alte Fassung.
+
+Seit v106 übernimmt die App eine neue Fassung erst, wenn **alle** Dateien auf dem Server zu
+`BUILD_HASH` passen. Ein halb fertiger Upload schadet also nicht mehr: Bis er komplett ist, bleibt
+die App bei der alten Fassung (bis v105 konnte sie alte und neue Dateien mischen). Ist beim
+Übernehmen das Menü offen, lädt sie sich selbst neu; mitten im Spiel kommt die neue Fassung beim
+nächsten Start. GitHub Pages liefert die Dateien unverändert aus – ein Dienst, der sie beim
+Ausliefern umschreibt (etwa verkleinert), verhindert jede Aktualisierung.
 
 ## Bedienung
 
@@ -333,7 +340,7 @@ node tools_ki.js duell 40 diff=david   # Messreihen mit der KI (siehe Kopf der D
 node tools_ki.js methode 200           # v96: Methode zuerst gegen die Reihenfolge bis v95, gepaart
 ```
 
-Grün schreibt jeder Lauf **eine Zeile** (`test   2006 passed`, `smoke  169 passed`, `single  ok`),
+Grün schreibt jeder Lauf **eine Zeile** (`test   2008 passed`, `smoke  169 passed`, `single  ok`),
 rot jede FAIL-Zeile; alles andere – „ok"-Zeilen und Messwerte – mit `--verbose` (v102).
 `smoke.js` würfelt mit festem Startwert (`SMOKE_SEED=…` probiert einen anderen).
 
