@@ -44,11 +44,14 @@ const recipeKiLevel = rec => ((rec.players || []).find(p => p.kind === 'ki' && p
    Das gibt es nicht mehr – „Nochmal spielen“ legt dann die Plättchenkarte. */
 function recipeNow(rec) {
   if (rec.mode === 'drei' && rec.mapPick !== 'plaettchen') rec.mapPick = 'plaettchen';
+  // v99–v106 das Häkchen „Sechseck-Plättchen" – seit v107 die Plättchenkarte aus 14 Dreiecken
+  if (rec.hexTiles && rec.mode === 'vier' && rec.mapPick === 'plaettchen') rec.mapPick = 'plaettchen14';
+  delete rec.hexTiles;
   return rec;
 }
 function rematch(harder) {
   const rec = recipeNow(JSON.parse(JSON.stringify(S.recipe)));
-  const frei = rec.mapPick === 'plaettchen';    // dort darf ein Reich doppelt sitzen
+  const frei = isTilePick(rec.mapPick);    // dort darf ein Reich doppelt sitzen
   rec.players.forEach((p, i) => {
     if (harder) p.diff = nextDiff(p.diff);
     if (harder && p.kind === 'ki') p.kiLevel = nextKiLevel(p.kiLevel);
@@ -71,7 +74,7 @@ function rematch(harder) {
 }
 function startFromRecipe(rec) {
   recipeNow(rec);
-  const frei = rec.mapPick === 'plaettchen';       // dort darf ein Reich doppelt sitzen
+  const frei = isTilePick(rec.mapPick);       // dort darf ein Reich doppelt sitzen
   const players = nameDoubles(resolveRandom(JSON.parse(JSON.stringify(rec.players)), frei));
   const cfg = {
     players, duel: rec.mode === 'duell', recipe: rec,
@@ -79,7 +82,7 @@ function startFromRecipe(rec) {
       : Math.min(players.length - 1, Math.max(0, +rec.start || 0)),
     events: rec.events, eventMode: rec.eventMode, wonders: rec.wonders,
     seatOrder: platzNummern(rec.mode, rec.mapPick, players.length),   // wie beim ersten Mal (v90)
-    hexTiles: !!rec.hexTiles && rec.mode === 'vier',                   // Sechseck-Plättchen (v99)
+    tileShape: tileShapeOf(rec.mapPick),                               // 14 Dreiecke (v107)
     // Ein Rezept aus v70–v81 kann noch altTree tragen – egal: jede neue Partie läuft seit
     // v82 im (einzigen) Techtree, auch „Nochmal spielen" nach einer alten Partie.
   };

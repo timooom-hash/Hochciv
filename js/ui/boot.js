@@ -115,13 +115,13 @@ function boot() {
       events: recipe.events, eventMode: recipe.eventMode,
       wonders: recipe.wonders,
       seatOrder: platzNummern(setupMode, pick, players.length),     // Zugfolge nach Plätzen (v90)
-      hexTiles: recipe.hexTiles,                                    // Sechseck-Plättchen (v99)
+      tileShape: tileShapeOf(pick),                                 // 14 Dreiecke (v107)
     };
     endTutorialPanel();
     // Marathon: Zufallskarte, dann sehen alle Karte und Starttechnologien und draften
     if (setupMode === 'marathon') return startMarathon(cfg);
     // Plättchenkarte: erst legen alle ihr Startdreieck, dann beginnt das Spiel.
-    if (pick === 'plaettchen') return startPlacement(cfg);
+    if (isTilePick(pick)) return startPlacement(cfg);
     cfg.map = pick === 'eigene' ? customMap : MAPS[+pick];
     S = newGame(cfg);
     startGameScreen();
@@ -280,7 +280,7 @@ function spielartenHtml() {
       MARATHON_TECH_FACTOR.join('/'), MARATHON_SINGULARITY, MARATHON_DISCOUNT_FACTOR, MARATHON_CAPITALS)) +
     zeile(T('Plättchenkarte'), T('Plättchenkarte: die offenen Dreiecke liegen gleich, das eigene legt jede*r selbst – Lage wählen, Hauptstadt setzen, verdeckt.').replace(/^[^:]*:\s*/, '') + ' ' +
       T('Jeder Platz wählt frei, auch zweimal dieselbe Zivilisation; Doppelte bekommen Ziffern und eine eigene Farbe. Gezogen wird in der Reihenfolge der Plätze.')) +
-    zeile(T('Sechseck-Plättchen'), T('Experimentell: zehn sechseckige Plättchen zu je 19 Feldern, schräg in Reihen zu 3, 4 und 3 gelegt. Die Startplättchen liegen an den Enden der beiden Dreierreihen; das eigene legt jede*r selbst – Lage wählen (sechs Drehungen), Hauptstadt setzen, verdeckt.')) +
+    zeile(TILE_SHAPES.tri14.name, T('Experimentell, vier Reiche: alle zehn Dreiecke liegen offen, die vier Startdreiecke außen an jeder zweiten Kante.')) +
     zeile(T('KI'), T('Die KI spielt nach denselben Regeln wie ein Mensch: sie bezahlt alles, hat ihre Zivilisationsfähigkeit, und Ereignisse treffen sie.'));
 }
 function download(name, text) {

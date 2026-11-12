@@ -49,9 +49,14 @@ function mapOptions() {
   const out = [];
   if (n === 4) MAPS.forEach((m, i) => out.push([String(i), m.name]));
   out.push(['plaettchen', TILE_SHAPES[n].name]);
+  // experimenteller Plättchenmodus (v107; v99–v106 das Häkchen „Sechseck-Plättchen")
+  if (n === 4) out.push(['plaettchen14', TILE_SHAPES.tri14.name]);
   if (customMap && n === 4) out.push(['eigene', T('Eigene Karte')]);
   return out;
 }
+// Plättchenkarten in der Kartenliste – und welche Form außer der üblichen sie meinen
+const isTilePick = v => v === 'plaettchen' || v === 'plaettchen14';
+const tileShapeOf = v => v === 'plaettchen14' ? 'tri14' : null;
 /* Die Karte, die der Aufbau gerade wirklich anbietet: die gemerkte Wahl, wenn es sie bei
    dieser Spielerzahl gibt, sonst die erste der Liste (bei zwei und drei Reichen die
    Plättchenkarte). Bis v98 fragten die Zivilisationswahl und die Platznummern die gemerkte
@@ -61,11 +66,6 @@ function setupPick() {
   const opts = mapOptions();
   return opts.some(o => o[0] === setupMapWanted) ? setupMapWanted : opts[0][0];
 }
-/* Experimenteller Plättchenmodus (v99): nur vier Reiche auf der Plättchenkarte. Die Wahl
-   bleibt gemerkt wie die Karte; gilt nur, wo das Häkchen überhaupt zu sehen ist. */
-let setupHexWanted = false;
-const setupHexOffered = () => setupMode !== 'marathon' && setupCount() === 4 && setupPick() === 'plaettchen';
-const setupHex = () => setupHexOffered() && setupHexWanted;
 /* Die zuletzt bewusst gewählte Karte. Sie wird gemerkt, damit ein Ausflug in den
    Duellmodus (dort gibt es die festen Karten nicht) die Wahl nicht still umstellt. */
 let setupMapWanted = '0';
@@ -76,7 +76,6 @@ function fillMapSelect() {
   const marathon = setupMode === 'marathon';
   if (marathon) {
     $('setup-map-row').hidden = true;
-    $('setup-hex-row').hidden = true;
     return;
   }
   const opts = mapOptions();
@@ -90,21 +89,17 @@ function fillMapSelect() {
     setupMapWanted = sel.value;
     renderSlots();          // die Plättchenkarte lässt jede Zivilisation mehrfach zu
   };
-  const hex = $('setup-hex');
-  hex.checked = setupHexWanted;
-  hex.onchange = () => { setupHexWanted = hex.checked; fillMapSelect(); };
-  $('setup-hex-row').hidden = !setupHexOffered();
 }
 // Auf der Plättchenkarte darf jeder Platz frei wählen, auch dieselbe Zivilisation
 // mehrfach – auf den festen Karten sitzt jede Zivilisation genau einmal (feste
 // Startsterne, ein Stern je Reich).
-const freieCivWahl = () => setupMode !== 'marathon' && setupPick() === 'plaettchen';
+const freieCivWahl = () => setupMode !== 'marathon' && isTilePick(setupPick());
 /* Nummerierte Plätze („Platz 1 …") hat der Aufbau auf der Plättchenkarte und bei weniger als
    vier Reichen. Dort ziehen die Reiche seit v90 in der Reihenfolge der Plätze, ab dem
    Startspieler (newGame mit cfg.seatOrder, Anweisung des Autors). Die klassische Aufstellung
    mit allen vier Zivilisationen und der Marathon zeigen Zivilisationen statt Plätzen – dort
    ist jede ihr eigener Platz, und es bleibt bei Russland → Griechenland → England → Wikinger. */
-const platzNummern = (mode, mapPick, n) => (mode !== 'marathon' && mapPick === 'plaettchen') || n < 4;
+const platzNummern = (mode, mapPick, n) => (mode !== 'marathon' && isTilePick(mapPick)) || n < 4;
 function setupScreen() {
   $('setup-evmode').innerHTML = EVENT_MODES.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
   $('setup-diff').innerHTML = DIFFICULTIES.map(x =>
@@ -256,7 +251,6 @@ function kindRows() {
 function setupRecipe(mapPick, startWahl) {
   return {
     mode: setupMode, mapPick, start: startWahl,
-    hexTiles: setupHex(),                // experimenteller Plättchenmodus (v99)
     events: $('setup-events').checked, eventMode: $('setup-evmode').value,
     wonders: $('setup-wonders').checked,
     players: setupConfig(),
@@ -268,7 +262,11 @@ function setupRecipe(mapPick, startWahl) {
    das andere zum Beispiel Englands Rot). Ohne Farbunterschied wären sie auf der Karte
    nicht auseinanderzuhalten: Städte, Armeen und Grenzen werden nur über sie unterschieden. */
 const ROMAN = ['I', 'II', 'III', 'IV'];
-function nameDoubles(players) {
+function nameDoubles(alle) {
+  /* Wer noch seine Fähigkeit wählt (v107), hat noch keine Zivilisation – nach der Wahl läuft es
+     noch einmal, deshalb erst zurücksetzen. */
+  const players = alle.filter(p => CIV_BY_KEY[p.civ]);
+  players.forEach(p => { delete p.color; delete p.roman; delete p.name; });
   const zaehler = {};
   players.forEach(p => { zaehler[p.civ] = (zaehler[p.civ] || 0) + 1; });
   const belegt = new Set();
@@ -293,22 +291,24 @@ function nameDoubles(players) {
     p.roman = ROMAN[k - 1] || String(k);      // civOf baut den Namen daraus
     p.name = `${civ.n} ${p.roman}`;           // für Anzeigen, die nur den Text kennen
   });
-  return players;
+  return alle;
 }
 /* „Zufall" in der Auswahl wird erst beim Spielstart aufgelöst – bis dahin steht im
    Aufbau wirklich Zufall, damit niemand aus der Anzeige schon die Wahl abliest.
    `frei` = Doppelungen erlaubt (Plättchenkarte); sonst bleibt jede Zivilisation einmalig. */
 function resolveRandom(players, frei) {
   const pick = list => list[Math.floor(Math.random() * list.length)];
+  // Fähigkeitswahl (v107, pickWanted): wer wählt, behält den Zufall bis zur Wahl vor dem Legen
+  if (frei && pickWanted(players)) players.forEach(p => { if (p.kind !== 'bot') p.pick = true; });
   players.forEach((p, i) => {
-    if (p.civ !== 'zufall') return;
+    if (p.civ !== 'zufall' || p.pick) return;
     const pool = CIV_KEYS.filter(k => frei ||
       !players.some((q, j) => j !== i && q.civ === k));
     p.civ = pick(pool.length ? pool : CIV_KEYS);
     p.randomCiv = true;
   });
   players.forEach(p => {
-    if (p.ability !== 'zufall') return;
+    if (p.ability !== 'zufall' || p.pick) return;
     p.ability = pick(CIV_BY_KEY[p.civ].abilities).k;
     p.randomAbility = true;
   });
