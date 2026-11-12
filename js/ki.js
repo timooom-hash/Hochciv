@@ -521,7 +521,7 @@ function kiDefensePotential(S, oi, city, budgetIn, room) {
     const mult = arm + castle;
     // d0 enthält die jetzige Macht bereits; ersetzen durch die neue
     const base = d0 - pNow * (helpers + castle);
-    best = Math.max(best, base + pw * mult + (growLimits(S, oi).paid) * (has(o, 'maschinengewehr') ? 3 : 1));
+    best = Math.max(best, base + pw * mult + (growLimits(S, oi).paid) * (1 + (has(o, 'maschinengewehr') ? MG_DEFENSE : 0)));
   }
   return best;
 }
@@ -608,7 +608,7 @@ function kiTechBonus(S, pi, k, K, y) {
     // der Zuschlag 1,5 je Stadt galt diesen 2, seit v97 also 0,75 je Punkt)
     case 'burgenbau': return 4 + cities + (isAbil(p, 'armeemacht') ? 0.75 * WARRIOR_POWER * cities : 0) +
       kiDefPerm(K, () => Math.max(2, p.power + (isAbil(p, 'armeemacht') ? WARRIOR_POWER * cities : 0)));
-    case 'maschinengewehr': return 3 + cities + kiDefPerm(K, c => 2 * c.pop);
+    case 'maschinengewehr': return 3 + cities + kiDefPerm(K, c => MG_DEFENSE * c.pop);
     case 'schiesspulver': return 3;
     case 'taktik': return 3;
     case 'belagerung': return 4;
@@ -1909,7 +1909,7 @@ function kiUsePicks(S, pi, K) {
    dem Platz zum Siedeln: die besten Gründungsplätze in Reichweite auf der sichtbaren Karte. */
 function kiPlaceSeat(plan, seat, player, setup) {
   const best = [];
-  for (let o = 0; o < planRotations(plan); o++) {
+  for (let o = 0; o < TRI_ROT.length; o++) {
     const ok = placeOptions(plan, seat, o);
     ok.forEach((v, cell) => {
       if (!v) return;
