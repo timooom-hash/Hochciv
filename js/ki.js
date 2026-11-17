@@ -142,13 +142,11 @@ function kiMoveToFirst(X, a, tiles) {
 const kiArmy = (S, id) => S.armies.find(a => a.id === id);
 
 /* ------------------------------------------------------------------ Kleine Rechnungen */
-// Zahl der Wege, eine Einheit Macht zu verlieren: 1/2, mit Stahl 1/3, mit Panzer 1/4
-const kiDecayDiv = p => has(p, 'panzer') ? 4 : has(p, 'stahl') ? 3 : 2;
-// gekaufte Macht nach dem Machtverlust zu Beginn des nächsten eigenen Zuges
+// gekaufte Macht nach dem Machtverlust zu Beginn des nächsten eigenen Zuges (1/powerDecay)
 function kiPowerAfterDecay(S, pi) {
   const p = S.players[pi];
   if (p.kind === 'bot') return 0;
-  const loss = Math.min(p.power, Math.ceil(powerOf(S, pi) / kiDecayDiv(p)));
+  const loss = Math.min(p.power, Math.ceil(powerOf(S, pi) / powerDecay(p)));
   return p.power - loss;
 }
 // Machtzuschlag (Kriegerkultur, Zeusstatue) bei n Armeen – mit Burgenbau zählen bei
@@ -459,7 +457,7 @@ function kiAttackWaves(S, info, city, hard, slIn) {
     const a1 = n ? kiAttackPer(S, e, info.power) * n : 0;
     return { a1, a2: a1 ? a1 + 2 : 0, n1: n };
   }
-  const ep = S.players[e], div = kiDecayDiv(ep), nOwn = armiesOf(S, e).length;
+  const ep = S.players[e], div = powerDecay(ep), nOwn = armiesOf(S, e).length;
   const budget = hard ? info.budgetHard : info.budget;
   let a1 = 0, a2 = 0, n1 = 0, armyCost = 0;
   for (let m = 0; m <= nC; m++) {
@@ -521,7 +519,7 @@ function kiDefensePotential(S, oi, city, budgetIn, room) {
     const mult = arm + castle;
     // d0 enthält die jetzige Macht bereits; ersetzen durch die neue
     const base = d0 - pNow * (helpers + castle);
-    best = Math.max(best, base + pw * mult + (growLimits(S, oi).paid) * (1 + (has(o, 'maschinengewehr') ? MG_DEFENSE : 0)));
+    best = Math.max(best, base + pw * mult + growLimits(S, oi).paid * defensePerPop(S, city));
   }
   return best;
 }
@@ -575,7 +573,10 @@ function kiMethodeAnteil(S) {
 function kiTechBonus(S, pi, k, K, y) {
   const p = S.players[pi];
   const cities = citiesOf(S, pi).length;
-  const H = K.H;
+  const H = K.H, t = TECH_BY_KEY[k];
+  // Macht billiger: 2 und je Münze Ersparnis 1 (4 🪙: 3, 3 🪙: 4); haltbarer: mehr wert, je mehr man hat
+  if (t && t.machtPreis) return 2 + POWER_PRICE - t.machtPreis;
+  if (t && t.machtVerlust) return 1 + 0.25 * p.power;
   switch (k) {
     case 'keramik': return 0.5 * H * Math.min(cities, 6);
     case 'verbundwerkstoffe': return cities * H * Math.max(1, H) / 3;
@@ -599,9 +600,6 @@ function kiTechBonus(S, pi, k, K, y) {
     case 'kolonialismus': return 4;
     case 'demokratie': return 2 + armiesOf(S, pi).length;
     case 'nationalismus': return 3 + 1.5 * armiesOf(S, pi).length;
-    case 'eisenverarbeitung': return 3;
-    case 'gewehre': return 4;
-    case 'stahl': case 'panzer': return 1 + 0.25 * p.power;
     // Im Ernstfall zählt dazu, dass sie bleiben (kiDefPerm) – gekaufte Macht verfällt
     case 'stadtmauern': return 4 + 1.5 * cities + kiDefPerm(K, () => 5);
     // Kriegerkultur (v83): mit Burgenbau gibt jede Stadt dauerhaft WARRIOR_POWER Macht (bis v96 2 –
@@ -1589,8 +1587,8 @@ function kiFlankPlans(S, pi, K, memo) {
       }
       if (list.length) fills.set(k, list);
     }
-    // Paare bilden. „Gegenüber" fragt die Regel des Kampfes selbst (hexOpposite, am Gegner
-    // gespiegelt in Würfelkoordinaten) – höchstens 18 Felder, also billig genug für alle Paare.
+    // Paare bilden. „Gegenüber" fragt die Regel des Kampfes selbst (hexOpposite: auf einer Linie
+    // durch den Gegner) – höchstens 18 Felder, also billig genug für alle Paare.
     const pairs = [];
     const ks = [...fills.keys()];
     for (let i = 0; i < ks.length; i++) {
