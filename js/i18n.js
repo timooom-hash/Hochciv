@@ -756,8 +756,11 @@ const UI_EN = {
     'Nothing to use.',
   'Noch %s kostenlose Technologie(n).':
     '%s free technology/technologies left.',
-  'Nochmal tippen zum Bestätigen.':
-    'Tap again to confirm.',
+  'Zug beenden?': 'End turn?',
+  '%s verfallen am Zugende – genug für: %s.': '%s expire at the end of the turn – enough for: %s.',
+  'Noch offen: %s.': 'Still open: %s.',
+  'Freie Forschung': 'Free research',
+  'Zurück': 'Back',
   'Nur auf Land – und nicht so nah an einem fremden Startplättchen.':
     'On land only – and not that close to another starting tile.',
   'Nur auf dem eigenen Plättchen.':
