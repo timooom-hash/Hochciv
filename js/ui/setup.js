@@ -48,15 +48,14 @@ function mapOptions() {
   const n = setupCount();
   const out = [];
   if (n === 4) MAPS.forEach((m, i) => out.push([String(i), m.name]));
+  // Zu viert seit v111 die 14 Dreiecke (v107–v110 als eigener Eintrag „experimentell" neben
+  // den zehn, v99–v106 das Häkchen „Sechseck-Plättchen") – Anweisung des Autors
   out.push(['plaettchen', TILE_SHAPES[n].name]);
-  // experimenteller Plättchenmodus (v107; v99–v106 das Häkchen „Sechseck-Plättchen")
-  if (n === 4) out.push(['plaettchen14', TILE_SHAPES.tri14.name]);
   if (customMap && n === 4) out.push(['eigene', T('Eigene Karte')]);
   return out;
 }
-// Plättchenkarten in der Kartenliste – und welche Form außer der üblichen sie meinen
-const isTilePick = v => v === 'plaettchen' || v === 'plaettchen14';
-const tileShapeOf = v => v === 'plaettchen14' ? 'tri14' : null;
+// Die Plättchenkarte in der Kartenliste (bis v110 auch „plaettchen14", siehe recipeNow)
+const isTilePick = v => v === 'plaettchen';
 /* Die Karte, die der Aufbau gerade wirklich anbietet: die gemerkte Wahl, wenn es sie bei
    dieser Spielerzahl gibt, sonst die erste der Liste (bei zwei und drei Reichen die
    Plättchenkarte). Bis v98 fragten die Zivilisationswahl und die Platznummern die gemerkte
@@ -109,6 +108,10 @@ function setupScreen() {
   // Ereignisse und Weltwunder (v102): immer im Aufbau, je Partie, ab Werk aus
   $('setup-events').onchange = evmodeRow;
   evmodeRow();
+  /* Experimentelle Zivilisationen (v111): ab Werk aus. Beide Häkchen ändern, welche Reiche zur
+     Wahl stehen – Aztekenreich und Ägypten wirken über Weltwunder, es gibt sie nur mit ihnen. */
+  $('setup-expciv').onchange = renderSlots;
+  $('setup-wonders').onchange = renderSlots;
   // Der gewählte Modus bleibt erhalten, wenn man den Aufbau erneut öffnet
   $('setup-mode').querySelectorAll('[data-mode]').forEach(b =>
     b.classList.toggle('on', b.dataset.mode === setupMode));
@@ -128,6 +131,13 @@ function renderSlots() {
   fillMapSelect();
   const list = $('setup-list');
   const frei = freieCivWahl(), plaetze = platzNummern(setupMode, setupPick(), n);
+  // Das Häkchen steht nur, wo die Zivilisation wählbar ist (v111) – nicht auf den festen Karten
+  // zu viert (dort sitzen die vier Grundreiche) und nicht im Marathon
+  $('setup-expciv-row').hidden = setupMode === 'marathon' || !plaetze;
+  const zurWahl = civKeysFor(setupCivOpts());
+  // Was nicht mehr zur Wahl steht (Häkchen weg, Weltwunder aus), fällt auf die Vorauswahl zurück
+  if (plaetze) for (let i = 0; i < n; i++)
+    if (pickCivs[i] !== 'zufall' && !zurWahl.includes(pickCivs[i])) pickCivs[i] = PICK_DEFAULT[i];
   // Mensch/Bot und Fähigkeit überleben ein Neuzeichnen (Kartenwechsel, Zivilisationswahl)
   const alt = [...list.children].map(x => ({
     kind: x.querySelector('[data-kind].on').dataset.kind,
@@ -146,7 +156,7 @@ function renderSlots() {
        auch bei der Fähigkeit nur der Zufall. Eine Zeile „Grundfähigkeit" gab es hier
        früher; sie ist ersatzlos weg. Sie benannte nichts: die Grundfähigkeit heißt bei
        jedem Reich anders und wirkt anders (Günstige Forschung, Handelsreich, Taiga,
-       Seefahrer), und welche man bekommt, entscheidet erst die Auslosung. */
+       Berserker), und welche man bekommt, entscheidet erst die Auslosung. */
     const abils = zufall
       ? [{ k: 'zufall', n: T('Zufall') }]
       : civ.abilities.map(a => ({ k: a.k, n: a.n, e: a.e }))
@@ -158,8 +168,7 @@ function renderSlots() {
     d.className = 'slot'; d.dataset.civ = civKey;
     d.innerHTML = `<div class="slot-civ">` + (plaetze
       ? `<h3>${zufall ? '🎲' : SYM[civ.sym]}</h3>
-         <select data-civpick aria-label="${T('Zivilisation')}">${CIVS.map(c =>
-           `<option value="${c.k}"${c.k === civKey ? ' selected' : ''}>${c.n}</option>`).join('')}
+         <select data-civpick aria-label="${T('Zivilisation')}">${civOptionsHTML(zurWahl, civKey)}
            <option value="zufall"${zufall ? ' selected' : ''}>${T('Zufall')}</option>
          </select>`
       : `<h3>${SYM[civ.sym]} ${civ.n}</h3>`) + `</div>` +
@@ -221,8 +230,20 @@ function renderSlots() {
   refreshStart();
 }
 // Vorauswahl der frei wählbaren Plätze (Duell, drei Reiche, Plättchenkarte)
-let pickCivs = ['griechenland', 'wikinger', 'russland', 'england'];
+const PICK_DEFAULT = ['griechenland', 'wikinger', 'russland', 'england'];
+let pickCivs = PICK_DEFAULT.slice();
 function pickChoice(n) { return pickCivs.slice(0, n); }
+/* Was der Aufbau an Zivilisationen anbietet (v111): {exp, wo} für civKeysFor. Ohne sichtbares
+   Häkchen (feste Karte, Marathon) keine experimentellen. */
+const expCivsOn = () => !$('setup-expciv-row').hidden && $('setup-expciv').checked;
+const setupCivOpts = () => ({ exp: expCivsOn(), wo: $('setup-wonders').checked });
+// Die Auswahl: erst die Grundreiche, die experimentellen in einer eigenen Gruppe
+function civOptionsHTML(keys, sel) {
+  const opt = k => `<option value="${k}"${k === sel ? ' selected' : ''}>${CIV_BY_KEY[k].n}</option>`;
+  const exp = keys.filter(k => CIV_BY_KEY[k].exp);
+  return keys.filter(k => !CIV_BY_KEY[k].exp).map(opt).join('') +
+    (exp.length ? `<optgroup label="${T('Experimentell')}">${exp.map(opt).join('')}</optgroup>` : '');
+}
 function setupConfig() {
   const diff = $('setup-diff').value;    // ein Schwierigkeitsgrad für alle Bots
   const kiLevel = $('setup-kilevel').value || KI_DEFAULT_LEVEL;   // eine Stufe für alle KI
@@ -253,6 +274,7 @@ function setupRecipe(mapPick, startWahl) {
     mode: setupMode, mapPick, start: startWahl,
     events: $('setup-events').checked, eventMode: $('setup-evmode').value,
     wonders: $('setup-wonders').checked,
+    expCivs: expCivsOn(),                    // experimentelle Zivilisationen (v111)
     players: setupConfig(),
   };
 }
@@ -295,14 +317,15 @@ function nameDoubles(alle) {
 }
 /* „Zufall" in der Auswahl wird erst beim Spielstart aufgelöst – bis dahin steht im
    Aufbau wirklich Zufall, damit niemand aus der Anzeige schon die Wahl abliest.
-   `frei` = Doppelungen erlaubt (Plättchenkarte); sonst bleibt jede Zivilisation einmalig. */
-function resolveRandom(players, frei) {
+   `frei` = Doppelungen erlaubt (Plättchenkarte); sonst bleibt jede Zivilisation einmalig.
+   `opts` (v111): {exp, wo} – gelost wird aus civKeysFor(opts), ohne `opts` aus den Grundreichen. */
+function resolveRandom(players, frei, opts) {
   const pick = list => list[Math.floor(Math.random() * list.length)];
   // Fähigkeitswahl (v107, pickWanted): wer wählt, behält den Zufall bis zur Wahl vor dem Legen
   if (frei && pickWanted(players)) players.forEach(p => { if (p.kind !== 'bot') p.pick = true; });
   players.forEach((p, i) => {
     if (p.civ !== 'zufall' || p.pick) return;
-    const pool = CIV_KEYS.filter(k => frei ||
+    const pool = civKeysFor(opts).filter(k => frei ||
       !players.some((q, j) => j !== i && q.civ === k));
     p.civ = pick(pool.length ? pool : CIV_KEYS);
     p.randomCiv = true;
@@ -316,7 +339,7 @@ function resolveRandom(players, frei) {
 }
 /* Fertige Spielerliste für den Start: Zufall auflösen, dann Ziffern und Farben. */
 function startPlayers() {
-  return nameDoubles(resolveRandom(setupConfig(), freieCivWahl()));
+  return nameDoubles(resolveRandom(setupConfig(), freieCivWahl(), setupCivOpts()));
 }
 // Nur eine bewusste Wahl bleibt stehen; ohne sie steht „Zufällig“ (seit v99, Anweisung des
 // Autors – bis v98 richtete sich die Vorauswahl nach der Besetzung: bei mehreren Menschen
